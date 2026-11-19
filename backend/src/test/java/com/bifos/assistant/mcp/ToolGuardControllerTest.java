@@ -36,7 +36,7 @@ class ToolGuardControllerTest {
     @Test
     @DisplayName("판정이 NOT_FOUND 를 던져도 404 가 아니라 block 으로 답한다")
     void exceptionDuringDecisionBlocks() {
-        when(guard.decide(anyString(), anyString(), anyString()))
+        when(guard.decide(anyString(), anyString(), anyString(), anyString()))
             .thenThrow(new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "no such execution"));
 
         ToolGuardResponse response = controller.decide(principal, body());
@@ -49,7 +49,7 @@ class ToolGuardControllerTest {
     @Test
     @DisplayName("판정이 다른 런타임 예외를 던져도 block 으로 답한다")
     void runtimeExceptionBlocks() {
-        when(guard.decide(anyString(), anyString(), anyString())).thenThrow(new IllegalStateException("boom"));
+        when(guard.decide(anyString(), anyString(), anyString(), anyString())).thenThrow(new IllegalStateException("boom"));
 
         assertThat(controller.decide(principal, body()).decision()).isEqualTo("block");
     }

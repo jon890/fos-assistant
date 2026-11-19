@@ -130,6 +130,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261117 / native-delegation-wake](ADR-20261117-native-delegation-wake.md) | Hermes 내장 위임의 끝은 profile 플러그인 hook 이 Control Plane 에 알리고, Control Plane 이 맡긴 에이전트의 결과와 같은 자동 turn 으로 전한다 | backend, frontend, hermes | Accepted. ADR-040 의 깨우기를 내장 위임으로 넓힌다 |
 | [ADR-20261119 / file-space-put](ADR-20261119-file-space-put.md) | 에이전트가 「내 파일」 에 넣는 파일은 Control Plane 이 실행 공간과 대화 폴더에서 읽어 보관함에 넣는다 | backend, frontend | Accepted. [ADR-20261101 / artifact-vault](ADR-20261101-artifact-vault.md) 의 대상과 파일 하나 상한을 넓힌다 |
 | [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) | 비서가 만든 그림은 fos-ctx 가 Control Plane 에 올리고 대화의 결과물로 묶는다 | backend, frontend, hermes | Accepted. ADR-027 의 답에 묶는 결과물에 그림을 더한다 |
+| [ADR-20261119 / image-gen-defaults](ADR-20261119-image-gen-defaults.md) | 기본 비서의 「그림 만들기」 는 Control Plane 이 켜고 이미지 서비스를 함께 넣으며 사람이 없는 실행에서는 막는다 | backend, hermes | Accepted. ADR-20261008 default-toolsets 의 기본 도구에 `image_gen` 을 더한다 |
 | [ADR-20261119 / tier-model-names](ADR-20261119-tier-model-names.md) | 모델 단계를 고르는 곳에는 모든 사용자에게 그 단계의 모델과 강도를 보이고, 고르는 모양은 세로 목록으로 한다 | backend, frontend | Accepted. ADR-063 의 단계 목록 값과 [ADR-20261101 / model-setting](ADR-20261101-model-setting.md) 의 슬라이더 모양을 대체한다 |
 
 ## 보관

@@ -133,6 +133,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 **session 없는 호출의 예외는 Hermes 업그레이드 PR3 에서 제거했다.** v0.21.6 은 코드 실행 안 호출에 `task_id` 만 넘겨 통과시켰지만, 현재 기준은 RPC 와 상주 kernel 모두 `session_id` 를 넘긴다. `tool_call_id` 는 비므로 fos-ctx 가 `code-exec:` 번호를 만들어 Control Plane 에 묻는다. 보통 대화는 통과하고 사건 실행 트리는 막힌다. 안전 목록 밖 호출에 session 이 없으면 막는다. 현재 계약은 [fos-ctx README](../../../hermes/plugins/fos-ctx/README.md) 가 갖는다.
 
 **Control Plane 의 판정(`EventToolGuard.decide`).** 서명을 확인한 profile, 루트 session, session 으로 이 순서로 본다.
+1 과 2 에서 실행을 찾아 통과시키기 전에 한 가지를 더 본다. 도구가 `image_generate` 이고 그 실행의 트리 루트가 사람이 없는 실행이면 막는다. 규칙은 [비서가 만든 이미지](../generated-image.md) 의 「사람이 없는 실행」 이 갖는다.
 
 1. session 의 자식 등록(`hermes_session_binding`)이 있으면 그 origin 실행의 트리 루트가 사건 살펴보기면 막고, 아니면 통과다. 등록의 루트가 서명한 루트와 다르면 막는다
 2. 등록이 없으면 루트 session 에서 그 profile 로 도는 실행을 찾는다. 하나면 그 트리 루트가 사건 살펴보기일 때 막고, 아니면 통과다. 실행 줄은 대화의 루트 session 을 적으므로 압축 교체된 session 도 여기서 풀린다. 둘 이상이면 막는다

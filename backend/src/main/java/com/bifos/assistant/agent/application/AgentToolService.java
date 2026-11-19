@@ -34,6 +34,7 @@ public class AgentToolService {
     private final AgentRepository agentRepository;
     private final AgentConnectorBindings connectorBindings;
     private final ToolsetVisibilityService visibility;
+    private final AgentPendingToolsets pendingToolsets;
 
 
     /** 사진이 있는 일반 turn 제출 전에 기존 profile에도 원본 조회 도구를 자동 제공한다. */
@@ -142,6 +143,8 @@ public class AgentToolService {
             throw new ApiException(
                 ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the requested toolsets", missing);
         }
+        // 기다리던 기본 도구를 사람이 켰거나 관리자가 껐으면 더 기다리지 않는다(ADR-20261119 / image-gen-defaults).
+        pendingToolsets.settle(agent, current, applied);
         return response(user, agent, catalog, applied, connectorServers, adminView);
     }
 

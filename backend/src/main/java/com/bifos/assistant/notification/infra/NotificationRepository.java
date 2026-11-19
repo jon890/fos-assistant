@@ -39,6 +39,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countByUserIdAndReadAtIsNull(Long userId);
 
 
+    /** 그 사용자에게 그 원인의 그 종류 알림이 읽었는지와 상관없이 이미 있는가. */
+    boolean existsByUserIdAndKindAndSourcePublicId(Long userId, NotificationKind kind, UUID sourcePublicId);
+
+
     /**
      * 그 사용자의 읽지 않은 줄을 모두 읽음으로 바꾼다. 이미 읽은 줄의 시각은 그대로 둔다.
      *

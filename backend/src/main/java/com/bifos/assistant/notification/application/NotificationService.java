@@ -92,6 +92,29 @@ public class NotificationService {
 
 
     /**
+     * 같은 원인의 같은 종류 알림이 그 사용자에게 아직 없을 때만 저장한다. 되풀이해 도는 작업이 같은 일을 한 번만 알릴 때 쓴다.
+     *
+     * <p>읽은 알림도 있는 것으로 본다. 오래된 알림 정리가 그 줄을 지운 뒤에는 다시 만든다. 부르는 쪽의 트랜잭션에 참여한다.
+     *
+     * @return 새로 만들었으면 참
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean notifyOnce(
+        Long userId,
+        NotificationKind kind,
+        String title,
+        String body,
+        NotificationTarget target,
+        UUID sourcePublicId) {
+        if (notifications.existsByUserIdAndKindAndSourcePublicId(userId, kind, sourcePublicId)) {
+            return false;
+        }
+        notify(userId, kind, title, body, target, sourcePublicId);
+        return true;
+    }
+
+
+    /**
      * 내 알림을 최근 것부터 한 쪽 읽는다.
      *
      * @param cursor 앞 쪽이 돌려준 다음 자리. 첫 쪽이면 null

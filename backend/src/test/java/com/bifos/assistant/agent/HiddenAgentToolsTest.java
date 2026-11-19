@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.agent.application.dto.AgentToolView;
+import com.bifos.assistant.agent.application.AgentPendingToolsets;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.application.ToolsetVisibilityService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -39,7 +40,8 @@ class HiddenAgentToolsTest {
     private final AgentRepository agents = mock(AgentRepository.class);
     private final ProfileSkillFiles skills = mock(ProfileSkillFiles.class);
     private final AgentToolService service = new AgentToolService(
-        toolsets, skills, mock(AgentService.class), agents, mock(AgentConnectorBindings.class), visibility);
+        toolsets, skills, mock(AgentService.class), agents, mock(AgentConnectorBindings.class), visibility,
+        mock(AgentPendingToolsets.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final CurrentUser admin = new CurrentUser(2L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
     private final Agent agent = Agent.of(

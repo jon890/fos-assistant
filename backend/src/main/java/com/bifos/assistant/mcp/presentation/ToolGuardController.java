@@ -18,7 +18,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * profile 의 hook 이 안전 목록 밖의 도구 호출 전에 사건 실행 트리인지 묻는 경로다(ADR-20261105 / event-watch).
+ * profile 의 hook 이 안전 목록 밖의 도구 호출 전에 사건 실행 트리인지 묻는 경로다(ADR-20261105 / event-watch). 사람이 없는 실행의
+ * 그림 만들기도 이 경로가 막는다(ADR-20261119 / image-gen-defaults).
  *
  * <p>계약은 {@code hermes/plugins/fos-ctx/README.md} 의 「도구 판정」 이 갖는다. 인증은 {@code /mcp} 와 같은 profile 토큰이다. 막는
  * 판정은 오류가 아니라 200 의 {@code block} 이다. <b>이 경로는 404 를 내지 않는다.</b> hook 이 404 를 이 경로가 없는 옛 Control Plane
@@ -42,7 +43,8 @@ public class ToolGuardController {
         }
         ToolGuardRequest request = ToolGuardRequest.verify(read(body), mcp.tokenHash());
         try {
-            ToolGuardAnswer answer = guard.decide(mcp.profileName(), request.rootSessionId(), request.sessionId());
+            ToolGuardAnswer answer = guard.decide(
+                mcp.profileName(), request.rootSessionId(), request.sessionId(), request.hermesTool());
             return answer.allowed() ? ToolGuardResponse.allow() : ToolGuardResponse.block(answer.message());
         } catch (RuntimeException ex) {
             // 판정이 던지는 *_NOT_FOUND 가 404 로 나가면 hook 이 통과시킨다. 막는 답으로 바꾼다.

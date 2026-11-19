@@ -17,6 +17,8 @@ import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
@@ -100,8 +102,38 @@ class FirstAgentCreatorTest {
         verify(toolsets)
             .writeApiServerInSandbox(
                 PROFILE,
-                List.of("delegation", "web", "terminal", "file", "code_execution", "fos-assistant"),
+                List.of("delegation", "web", "terminal", "file", "code_execution", "image_gen", "fos-assistant"),
                 "u" + userId);
+    }
+
+
+    @Test
+    @DisplayName("새 사용자의 기본 비서는 「그림 만들기」 가 켜지면 더 기다리지 않는다")
+    void newPrimaryAgentStopsWaitingOnceImageToolsetIsOn() throws InterruptedException {
+        when(toolsets.readEnabled(anyString(), eq(PROFILE)))
+            .thenReturn(List.of("delegation"))
+            .thenReturn(List.of("delegation", "web", "terminal", "file", "code_execution", "image_gen"));
+
+        provisioning.resolve(EMAIL, NAME);
+        backgroundTasks.awaitIdle(Duration.ofSeconds(5));
+
+        assertThat(agents.findByCode(PROFILE).orElseThrow().pendingToolsets()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("실행 공간이 없어 「그림 만들기」 가 빠진 새 기본 비서는 켜질 때까지 기다리는 목록에 남는다")
+    void newPrimaryAgentKeepsWaitingWithoutSandbox() throws InterruptedException {
+        when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenReturn(List.of("delegation"));
+        doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "no sandbox"))
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
+
+        provisioning.resolve(EMAIL, NAME);
+        backgroundTasks.awaitIdle(Duration.ofSeconds(5));
+
+        verify(toolsets).writeApiServer(eq(PROFILE), eq(List.of("delegation", "web", "fos-assistant")), anyString());
+        assertThat(agents.findByCode(PROFILE).orElseThrow().pendingToolsets()).containsExactly("image_gen");
     }
 
 
