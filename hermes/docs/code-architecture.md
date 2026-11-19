@@ -22,7 +22,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | --- | --- | --- |
 | `dashboard-profile-api` | `common.py` | 응답, 본문 읽기, profile 이름, 원자적 쓰기, 공용 표식 |
 | `dashboard-profile-api` | `profiles.py`, `session.py` | profile 생성과 삭제, 스킬 검사, 모델 기본값과 판단 준비 검사, 자식 session provider |
-| `dashboard-profile-api` | `sandbox.py`, `sandbox_paths.py`, `sandbox_approvals.py`, `toolconfig.py`, `env.py` | 실행 공간과 첨부 디렉터리, 실행 공간 정책의 경로 검사, 실행 공간과 함께 쓰는 승인 설정, 도구와 스킬 경로 설정, env 검사 |
+| `dashboard-profile-api` | `sandbox.py`, `sandbox_paths.py`, `sandbox_approvals.py`, `image_service.py`, `toolconfig.py`, `env.py` | 실행 공간과 첨부 디렉터리, 실행 공간 정책의 경로 검사, 실행 공간과 함께 쓰는 승인 설정, 「그림 만들기」 와 함께 넣는 이미지 서비스 설정, 도구와 스킬 경로 설정, env 검사 |
 | `dashboard-profile-api` | `connector_schema.py`, `connector_policy.py`, `connector_skills.py`, `connector_appearance.py`, `connector_description.py` | manifest 형식 규칙, 입력 칸과 도구 정책·오류 계약, 스킬 읽기, 아이콘과 링크·도구 설명 검사 |
 | `dashboard-profile-api` | `connector_manifest.py`, `connector_vault.py` | manifest 읽기와 카탈로그, 연결 보관 파일 |
 | `dashboard-profile-api` | `connector_vault_key.py`, `connector_vault_format.py`, `connector_vault_migration.py` | 보관 파일의 암호화, 모양과 풀기, 기동 때의 이관 |

@@ -27,7 +27,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 플러그인의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?, ensure_image_service?}`. `ensure_image_service` 는 참 거짓 값이고, 참이면 같은 쓰기에서 profile 설정에 이미지 서비스를 넣는다(아래 「이미지 서비스」). `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}, sandbox_owner?, require_sandbox?}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다. `scripts/` 가 든 스킬을 게시할 때 Control Plane 은 지금 도구 목록과 `require_sandbox: true` 를 함께 보낸다. 그때 plugin 은 목록에 실행 공간 도구가 있고, profile 이 정책에 등록돼 있고, 정책에 `skill_root` 가 있어야 받는다. 이 판정이 없는 옛 plugin 은 `require_sandbox` 를 셸 도구에만 적용해 그대로 받으므로, 이 판정을 가진 plugin 을 Control Plane 보다 먼저 배포한다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 409 `sandbox_unavailable` 은 `require_sandbox` 인데 위 셋 가운데 하나가 없다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -270,6 +270,18 @@ plugin 이 올라올 때 보관 파일 이관 뒤에 옛 정의의 로컬 바인
 - Hermes 가 계산한 실제 API 도구에 요청 목록 밖의 이름이 있으면 저장하지 않는다
 - 다른 platform 의 계산 결과가 바뀌어도 저장하지 않는다
 - 목록에 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 를 검사한다. 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다. 정책에 등록된 profile 만 `terminal:` 전체를 docker 설정으로 다시 쓴다. 미등록 profile 은 `terminal`, `file`, `code_execution` 만 local 로 둘 수 있고 `vision`, `image_gen`, `video_gen` 은 409 로 거절한다. 이때 `approvals.unattended_mode` 도 함께 맞춘다(docker 는 `approve`, local 은 삭제)
+
+#### 이미지 서비스
+
+`image_gen` toolset 만 켜면 Hermes 가 `image_generate` 를 모델에 보이지 않는다. profile 설정에 이미지 서비스(`image_gen.provider`)가 있어야 한다([`hermes-contract.md`](../../docs/hermes-contract.md) 의 「`image_generate` 의 결과와 그림 파일」).
+Control Plane 은 `image_gen` 이 든 도구 저장에 `ensure_image_service: true` 를 넣어 보낸다(fos-assistant [ADR-20261119 / image-gen-defaults](../../../docs/adr/ADR-20261119-image-gen-defaults.md)).
+
+- 참이면 `api_server` 목록에 `image_gen` 이 있어야 한다. 없거나 도구 목록 없이 오면 400 이다. 참 거짓 값이 아니어도 400 이다
+- 저장된 `image_gen.provider` 가 비었을 때만 `IMAGE_SERVICE_PROVIDER`(`image_service.py`)를 넣는다. 이미 있는 서비스와 `image_gen` 의 다른 키는 덮어쓰지 않는다
+- `image_gen` 이 객체가 아니면 덮어쓰지 않고 500 으로 답한다. 도구도 켜지지 않는다
+- 실행 공간 판정이 먼저다. 정책에 없는 profile 은 409 이고 서비스도 쓰지 않는다
+- 서비스는 plugin 이 Hermes 처리기보다 먼저 쓰고, 처리기가 실패하면 원래 바이트로 되돌린다
+- 칸이 없는 요청은 지금처럼 toolset 만 쓴다. 이 칸을 모르는 옛 plugin 은 본문을 400 으로 거절하므로 이 plugin 을 Control Plane 보다 먼저 배포한다
 
 올린 스킬 경로는 이렇게 본다. 루트는 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 다.
 

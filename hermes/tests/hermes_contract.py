@@ -582,3 +582,10 @@ PRE_TOOL_CALL_MODIFY = ("hermes_cli/plugins.py", 'if action == "modify":', "**pa
 # `transform_tool_result` 에 도구 인자를 넘기는 호출이다.
 TRANSFORM_RESULT_ARGS = ("model_tools.py", 'invoke_hook("transform_tool_result", tool_name=function_name, args=function_args,')
 GENERATED_IMAGE_HOST_PATH = ("tools/image_generation_tool.py", 'payload.setdefault("host_image", image)')
+
+# 대시보드 plugin 이 「그림 만들기」 를 켤 때 profile 설정에 넣는 이미지 서비스다(fos-assistant ADR-20261119 / image-gen-defaults).
+# 설정의 자리와 키, 서비스 이름, 그 서비스 plugin 의 파일, 설정을 읽는 호출이다. `test_generated_image_contract.py` 가 Hermes 소스에서 본다.
+IMAGE_SERVICE = ("image_gen", "provider", "openai-codex")
+IMAGE_SERVICE_PLUGIN = "plugins/image_gen/openai-codex/__init__.py"
+IMAGE_SERVICE_CONFIG_READ = ("agent/image_gen_registry.py", 'configured_provider_name("image_gen", logger)')
+IMAGE_SERVICE_CONFIG_KEY = ("agent/provider_registry.py", 'block.get("provider")')
