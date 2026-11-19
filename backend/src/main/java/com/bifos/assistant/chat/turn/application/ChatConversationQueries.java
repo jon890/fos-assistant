@@ -5,8 +5,6 @@ import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.turn.application.dto.TurnMark;
 import com.bifos.assistant.chat.turn.application.port.CheckReportReads;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
-import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
-import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationCursor;
@@ -57,7 +55,6 @@ class ChatConversationQueries {
     private final AgentExecutionRepository executionRepository;
     private final AttachmentService attachments;
     private final ArtifactService artifacts;
-    private final GeneratedImageService generatedImages;
     private final TurnCancellation turns;
     private final Clock clock;
     private final List<CheckReportReads> checkReportReads;
@@ -219,30 +216,6 @@ class ChatConversationQueries {
             .filter(message -> message.role() == MessageRole.ASSISTANT)
             .map(ChatMessage::id)
             .toList());
-    }
-
-
-    /**
-     * 답에 묶인 그림마다 지시문과 살아 있는 보관본 번호를 읽는다(스펙 generated-image REQ5, REQ7, REQ9). 그림이 없으면 묻지 않는다.
-     *
-     * @param ownerUserId 대화 요청자. 지시문의 key 주인이고 보관 주인이다
-     * @return 결과물 행 번호마다의 값. 그림이 아닌 행은 없다
-     */
-    Map<Long, GeneratedImageDetail> generatedImageDetails(
-        Long ownerUserId, Long conversationId, Map<Long, List<ChatArtifact>> produced) {
-        List<ChatArtifact> images = produced.values().stream()
-            .flatMap(List::stream)
-            .filter(ChatArtifact::isGeneratedImage)
-            .toList();
-        if (images.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Long> vaultIds = artifacts.vaultItemIds(ownerUserId, conversationId, images.stream().map(ChatArtifact::path).toList());
-        return images.stream()
-            .collect(Collectors.toMap(
-                ChatArtifact::id,
-                image -> new GeneratedImageDetail(
-                    generatedImages.promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()))));
     }
 
 

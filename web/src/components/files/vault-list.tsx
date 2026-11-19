@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
@@ -17,12 +18,12 @@ import {
   type VaultItem,
   type VaultList,
 } from "@/lib/artifact-vault-api";
-import { artifactName } from "@/lib/artifact-name";
+import { artifactName, imageTitle } from "@/lib/artifact-name";
 import { formatFullTime } from "@/lib/format";
 import { formatSize } from "@/lib/workspace-file";
 
 /**
- * 「보관한 결과물」 목록이다. 대화에서 골라 보관한 HTML·CSS 와 사진을 읽고 지운다.
+ * 「보관한 결과물」 목록이다. 대화에서 골라 보관한 HTML·CSS 와 사진, 비서가 만든 그림을 읽고 지운다. 그림 줄은 제목 앞에 작은 그림을 보인다.
  *
  * <p>HTML 은 스크립트가 돌지 않는 iframe 으로 미리 본다. 사진과 스타일을 부르는 HTML 은 묶음으로 보관돼 있고, iframe 이
  * 보관본 안의 파일 주소로 열려 상대 주소의 사진도 보관본에서 읽는다. 묶음은 zip 으로 내려받는다.
@@ -31,7 +32,11 @@ import { formatSize } from "@/lib/workspace-file";
 export function VaultListView() {
   const [items, setItems] = useState<VaultItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [previewId, setPreviewId] = useState<number | null>(null);
+  // 대화의 「보관함에서 보기」 가 `item` 으로 보관본 하나를 가리킨다. 그 줄의 미리보기를 펼친 채 연다.
+  const linked = Number(useSearchParams().get("item"));
+  const [previewId, setPreviewId] = useState<number | null>(
+    Number.isInteger(linked) && linked > 0 ? linked : null,
+  );
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -90,9 +95,10 @@ export function VaultListView() {
         />
       ) : null}
       {items?.map((item) => {
-        const name = artifactName(item.path);
         const isHtml = item.path.toLowerCase().endsWith(".html");
         const isImage = isVaultImage(item.path);
+        // 그림은 제목이 곧 파일 이름이라 확장자를 떼고 보인다.
+        const name = isImage ? imageTitle(item.path) : artifactName(item.path);
         const isBundle = item.fileCount > 1;
         return (
           <div
@@ -101,6 +107,16 @@ export function VaultListView() {
             className="rounded-md border border-border p-3"
           >
             <div className="flex flex-wrap items-center gap-2">
+              {isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element -- 보관본 주소는 next/image 최적화를 거치지 않는다
+                <img
+                  src={vaultContentUrl(item.id)}
+                  alt=""
+                  loading="lazy"
+                  data-testid="vault-thumbnail"
+                  className="size-10 shrink-0 rounded border border-border object-cover"
+                />
+              ) : null}
               <p
                 className="min-w-0 flex-1 truncate font-medium"
                 title={item.path}

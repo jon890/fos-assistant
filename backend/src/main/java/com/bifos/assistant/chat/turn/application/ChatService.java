@@ -14,7 +14,6 @@ import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.ConversationSessions;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
-import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
@@ -399,13 +398,6 @@ public class ChatService {
      */
     public Map<Long, List<ChatArtifact>> artifactsByMessage(List<ChatMessage> history) {
         return chatConversationQueries.artifactsByMessage(history);
-    }
-
-
-    /** 답에 묶인 그림마다 지시문과 보관본 번호를 읽는다. 뜻은 {@link ChatConversationQueries#generatedImageDetails} 가 적는다. */
-    public Map<Long, GeneratedImageDetail> generatedImageDetails(
-        CurrentUser user, Long conversationId, Map<Long, List<ChatArtifact>> produced) {
-        return chatConversationQueries.generatedImageDetails(user.id(), conversationId, produced);
     }
 
 

@@ -6,7 +6,8 @@
  */
 import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
-import { ARTIFACT_PROBE, ARTIFACT_WRITE_PROBE } from "../fake-hermes.ts";
+import { ARTIFACT_PROBE, ARTIFACT_WRITE_PROBE, IMAGE_GENERATE_PROBE, IMAGE_GENERATE_PROMPT, IMAGE_GENERATE_TITLE } from "../fake-hermes.ts";
+import { ONE_PIXEL_PNG } from "../fake-hermes/scenario-fixtures.ts";
 import { DAD_BINDING } from "./binding.ts";
 
 type ChatEvent = { type: string; conversationId?: string; messageId?: number };
@@ -14,6 +15,12 @@ type Message = {
   id: number;
   role: "USER" | "ASSISTANT";
   artifacts: { path: string; byteSize: number; deleted: boolean }[];
+};
+
+type ImageMessage = {
+  id: number;
+  content: string;
+  artifacts: { path: string; kind: "IMAGE" | "HTML"; prompt: string | null }[];
 };
 
 const CSP =
@@ -147,6 +154,51 @@ export const artifactScenario: Scenario = {
       expect(mcpHtml.status === 200 && (await mcpHtml.text()).includes("MCP 결과물"), "MCP HTML 본문이 다르다");
       const mcpCss = await fetchFile(context, mcpConversationId, "test/style.css");
       expect(mcpCss.status === 200 && (await mcpCss.text()).includes("color: navy"), "MCP CSS 본문이 다르다");
+
+      step("profile 플러그인처럼 올린 그림이 답에 묶이고 지시문이 응답에 들며 답 글의 Hermes 쪽 경로는 빠진다");
+      const imageResponse = expectStatus(
+        await call(context, "/chat/messages/stream", {
+          method: "POST",
+          token: context.tokens.dad,
+          body: { text: IMAGE_GENERATE_PROBE, agentCode: "dad" },
+        }),
+        200,
+        "그림 만들기 스트림",
+      );
+      const imageEvents: ChatEvent[] = [];
+      await readEventStream<ChatEvent>(
+        new globalThis.Response(imageResponse.body, { headers: { "Content-Type": "text/event-stream" } }),
+        (event) => imageEvents.push(event),
+      );
+      const imageDone = imageEvents.find((event) => event.type === "done");
+      expect(imageDone?.conversationId !== undefined, `그림 만들기 done 사건이 없다: ${JSON.stringify(imageEvents)}`);
+      const imageInput = context.hermes.lastSubmittedInput() ?? "";
+      expect(imageInput.includes("지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고"),
+        `Hermes 입력에 그림 지시문 규칙이 없다: ${imageInput}`);
+      const imageMessages = expectStatus(
+        await call(context, `/chat/conversations/${imageDone!.conversationId!}/messages`, { token: context.tokens.dad }),
+        200,
+        "그림 대화 이력",
+      ).json<ImageMessage[]>();
+      const imageAnswer = imageMessages.find((message) => message.id === imageDone!.messageId);
+      const made = imageAnswer?.artifacts[0];
+      expect(
+        imageAnswer?.artifacts.length === 1 &&
+          made?.kind === "IMAGE" &&
+          made.path === `generated/${IMAGE_GENERATE_TITLE}.png` &&
+          made.prompt === IMAGE_GENERATE_PROMPT,
+        `올린 그림이 답에 묶이지 않았다: ${JSON.stringify(imageAnswer?.artifacts)}`,
+      );
+      expect(IMAGE_GENERATE_PROMPT !== IMAGE_GENERATE_PROBE && IMAGE_GENERATE_PROMPT.length > IMAGE_GENERATE_PROBE.length,
+        "지시문이 사용자의 부탁 글보다 자세하지 않다");
+      expect(
+        imageAnswer?.content === "수채화 고양이를 만들었다." && !JSON.stringify(imageMessages).includes("/cache/generated/images/"),
+        `답 글에 Hermes 쪽 경로가 남았다: ${imageAnswer?.content}`,
+      );
+      const madeFile = await fetchFile(context, imageDone!.conversationId!, made!.path);
+      expect(madeFile.status === 200 && madeFile.headers.get("content-type") === "image/png",
+        `올린 그림을 받지 못했다: ${madeFile.status}`);
+      expect(Buffer.from(await madeFile.arrayBuffer()).equals(ONE_PIXEL_PNG), "받은 그림이 올린 원본과 다르다");
     } finally {
       expectStatus(await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }),
         200,

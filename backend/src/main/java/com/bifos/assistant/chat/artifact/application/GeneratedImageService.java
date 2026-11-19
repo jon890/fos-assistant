@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.artifact.application;
 
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
@@ -13,7 +14,11 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Clock;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
@@ -89,6 +94,33 @@ public class GeneratedImageService {
         } finally {
             lock.unlock();
         }
+    }
+
+
+    /**
+     * 답에 묶인 그림마다 지시문과 살아 있는 보관본 번호를 읽는다(스펙 generated-image REQ5, REQ7, REQ9). 그림이 없으면 묻지 않는다.
+     *
+     * @param ownerUserId 대화 요청자. 지시문의 key 주인이고 보관 주인이다. 부르는 쪽이 그 대화의 주인임을 먼저 확인한다
+     * @return 결과물 행 번호마다의 값. 그림이 아닌 행은 없다
+     */
+    public Map<Long, GeneratedImageDetail> details(Long ownerUserId, Long conversationId, Collection<List<ChatArtifact>> produced) {
+        List<ChatArtifact> images = produced.stream()
+            .flatMap(List::stream)
+            .filter(ChatArtifact::isGeneratedImage)
+            .toList();
+        if (images.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Long> vaultIds = new HashMap<>();
+        for (ChatArtifact copy : artifacts.findLiveVaultCopies(
+            ownerUserId, conversationId, images.stream().map(ChatArtifact::path).toList())) {
+            vaultIds.put(copy.path(), copy.id());
+        }
+        Map<Long, GeneratedImageDetail> details = new HashMap<>();
+        for (ChatArtifact image : images) {
+            details.put(image.id(), new GeneratedImageDetail(promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path())));
+        }
+        return details;
     }
 
 

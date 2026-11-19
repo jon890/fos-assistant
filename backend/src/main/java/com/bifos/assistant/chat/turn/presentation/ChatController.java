@@ -19,6 +19,7 @@ import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.conversation.application.dto.TaskLabel;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.MediaPathMask;
@@ -85,6 +86,7 @@ public class ChatController {
     private final List<ConversationTaskLabels> taskLabels;
     private final SourceReadSummaries sourceReads;
     private final AutoTurnNoticeStatuses noticeStatuses;
+    private final GeneratedImageService generatedImages;
 
 
     @Autowired
@@ -98,7 +100,8 @@ public class ChatController {
         ModelTierService modelTiers,
         List<ConversationTaskLabels> taskLabels,
         SourceReadSummaries sourceReads,
-        AutoTurnNoticeStatuses noticeStatuses) {
+        AutoTurnNoticeStatuses noticeStatuses,
+        GeneratedImageService generatedImages) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -109,6 +112,7 @@ public class ChatController {
         this.taskLabels = taskLabels;
         this.sourceReads = sourceReads;
         this.noticeStatuses = noticeStatuses;
+        this.generatedImages = generatedImages;
     }
 
 
@@ -328,7 +332,7 @@ public class ChatController {
         Map<Long, ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
-        Map<Long, GeneratedImageDetail> images = chat.generatedImageDetails(user, number, produced);
+        Map<Long, GeneratedImageDetail> images = generatedImages.details(user.id(), number, produced.values());
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);

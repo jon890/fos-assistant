@@ -22,9 +22,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.crypto.application.DataKeyService;
-import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
@@ -89,9 +87,6 @@ class GeneratedImageTurnTest {
 
     @Autowired
     AgentRepository agents;
-
-    @Autowired
-    ChatService chat;
 
     @Autowired
     DataKeyService dataKeys;
@@ -260,8 +255,7 @@ class GeneratedImageTurnTest {
 
 
     private Map<Long, GeneratedImageDetail> details(ChatMessage answer) {
-        CurrentUser user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
-        return chat.generatedImageDetails(user, conversation.id(), Map.of(answer.id(), bound(answer)));
+        return images.details(owner.id(), conversation.id(), List.of(bound(answer)));
     }
 
 

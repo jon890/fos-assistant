@@ -17,7 +17,6 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -142,23 +141,6 @@ public class ArtifactService {
             log.warn(
                 "could not bind generated images of a turn conversationId={} messageId={}", conversationId, messageId, ex);
         }
-    }
-
-
-    /**
-     * 지워졌거나 아직 있는 결과물의 살아 있는 보관본 번호를 경로마다 준다. 같은 경로에 여럿이면 가장 새것이다.
-     *
-     * @param ownerUserId 보관 주인. 대화 요청자다
-     */
-    public Map<String, Long> vaultItemIds(Long ownerUserId, Long conversationId, Collection<String> paths) {
-        if (paths == null || paths.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Long> ids = new HashMap<>();
-        for (ChatArtifact copy : artifacts.findLiveVaultCopies(ownerUserId, conversationId, paths)) {
-            ids.put(copy.path(), copy.id());
-        }
-        return ids;
     }
 
 
