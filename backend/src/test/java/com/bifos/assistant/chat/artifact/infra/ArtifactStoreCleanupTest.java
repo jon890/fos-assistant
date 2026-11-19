@@ -133,7 +133,7 @@ class ArtifactStoreCleanupTest {
 
 
     private ArtifactStore store(ArtifactCleanupProbe probe) {
-        ArtifactProperties properties = new ArtifactProperties(root.toString(), "/agent/artifacts", 30);
+        ArtifactProperties properties = new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null);
         ArtifactAtomicMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         return new ArtifactStore(properties, false, mover, probe);
     }

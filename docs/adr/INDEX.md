@@ -128,6 +128,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261116 / browser-lock](ADR-20261116-browser-lock.md) | 「내 브라우저」 는 에이전트와 사람 가운데 하나가 쥐고, 사람이 쥔 동안 중계가 에이전트를 거절해 넘기기로 끝낸다 | backend, frontend, hermes | Accepted. [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) 의 중계 위에 잠금을 더하고, [ADR-20261111 / connector-handoff](ADR-20261111-connector-handoff.md) 의 넘기기 어휘에 `human_browser` 와 탭 없는 넘기기를 더한다 |
 | [ADR-20261116 / run-steer](ADR-20261116-run-steer.md) | 답이 도는 중 입력창 글은 대기 줄에 먼저 두고 루트 실행에 steer 하며, 넣지 못한 글은 말풍선을 붙인 채 대기 줄로 되돌린다 | backend, frontend | Accepted. ADR-048 의 「적용 범위」 가 미룬 steer 를 그 대기열 위에 얹는다 |
 | [ADR-20261117 / native-delegation-wake](ADR-20261117-native-delegation-wake.md) | Hermes 내장 위임의 끝은 profile 플러그인 hook 이 Control Plane 에 알리고, Control Plane 이 맡긴 에이전트의 결과와 같은 자동 turn 으로 전한다 | backend, frontend, hermes | Accepted. ADR-040 의 깨우기를 내장 위임으로 넓힌다 |
+| [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) | 비서가 만든 그림은 fos-ctx 가 Control Plane 에 올리고 대화의 결과물로 묶는다 | backend, frontend, hermes | Accepted. ADR-027 의 답에 묶는 결과물에 그림을 더한다 |
 
 ## 보관
 

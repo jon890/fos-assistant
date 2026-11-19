@@ -93,7 +93,7 @@ class ArtifactStoreWriteTest {
         ArtifactStore initial = store(root, true);
         initial.write(10L, "index.html", "이전 본문".getBytes(StandardCharsets.UTF_8));
         ArtifactStore failing = new ArtifactStore(
-            new ArtifactProperties(root.toString(), "/agent/artifacts", 30), true, (source, target) -> {
+            new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null), true, (source, target) -> {
                 throw new IOException("forced replacement failure");
             });
 
@@ -163,7 +163,7 @@ class ArtifactStoreWriteTest {
 
     private static ArtifactStore store(Path root, boolean forceAtomicMoveFallback) {
         return new ArtifactStore(
-            new ArtifactProperties(root.toString(), "/agent/artifacts", 30), forceAtomicMoveFallback);
+            new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null), forceAtomicMoveFallback);
     }
 
 

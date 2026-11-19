@@ -1,6 +1,6 @@
 import { type FakeHermesState, type ConnectorCall } from "./state.ts";
 import { FAKE_CONNECTORS } from "./connectors.ts";
-import { signedPolicyRequest, signedCallContext, signedSubagentRegistration } from "../mcp-context.ts";
+import { signedPolicyRequest, signedCallContext, signedSubagentRegistration, signedGeneratedImage } from "../mcp-context.ts";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 /** profile hook 처럼 Control Plane 정책과 MCP 도구를 부른다. */
@@ -154,5 +154,37 @@ export function createMcp(state: FakeHermesState) {
       if (written.path !== path || typeof written.byteSize !== "number") throw new Error("artifact_write MCP response is invalid");
     }
   };
-  return { judgeConnectorCalls, callControlPlaneToolViaMcp, readMemoryViaMcp, registerSubagent, writeArtifactViaMcp };
+  /**
+   * profile 플러그인의 `transform_tool_result` hook 처럼 만든 그림 한 장을 올린다.
+   *
+   * <p>본문은 `hermes/plugins/fos-ctx/generated_image.py` 와 같은 모양의 multipart 다. 조각은 `meta`(JSON)와 `image`(바이트) 둘이고,
+   * 서명은 호출 세 칸과 그림, 제목, 지시문의 SHA-256 을 묶는다. 올리기 경로는 `/mcp` 와 같은 서버에 있어 MCP 주소에서 `/mcp` 를 떼어 만든다.
+   * 주소와 토큰은 `setArtifactWriteMcp` 로 받은 것을 쓴다.
+   */
+  const uploadGeneratedImage = async (
+    sessionId: string | undefined, title: string, prompt: string, image: Buffer,
+  ): Promise<void> => {
+    if (state.artifactWriteMcp === undefined) throw new Error("generated image upload needs the MCP token");
+    if (sessionId === undefined) throw new Error("generated image upload needs the submitted session_id");
+    const { endpoint, token } = state.artifactWriteMcp;
+    const meta = signedGeneratedImage(token, sessionId, sessionId, `call_${randomUUID()}`, title, prompt, image);
+    const boundary = `fos${randomUUID().replaceAll("-", "")}`;
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="meta"\r\n`
+        + "Content-Type: application/json; charset=utf-8\r\n\r\n", "utf8"),
+      Buffer.from(JSON.stringify(meta), "utf8"),
+      Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="image"\r\n`
+        + "Content-Type: application/octet-stream\r\n\r\n", "utf8"),
+      image,
+      Buffer.from(`\r\n--${boundary}--\r\n`, "utf8"),
+    ]);
+    const response = await fetch(`${endpoint.replace(/\/mcp$/, "")}/internal/hermes/generated-image`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    if (!response.ok) throw new Error(`generated image upload HTTP ${response.status}: ${await response.text()}`);
+  };
+
+  return { judgeConnectorCalls, callControlPlaneToolViaMcp, readMemoryViaMcp, registerSubagent, writeArtifactViaMcp, uploadGeneratedImage };
 }

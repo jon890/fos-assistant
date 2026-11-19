@@ -19,7 +19,10 @@ import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.conversation.application.dto.TaskLabel;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.artifact.domain.MediaPathMask;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -83,6 +86,7 @@ public class ChatController {
     private final List<ConversationTaskLabels> taskLabels;
     private final SourceReadSummaries sourceReads;
     private final AutoTurnNoticeStatuses noticeStatuses;
+    private final GeneratedImageService generatedImages;
 
 
     @Autowired
@@ -96,7 +100,8 @@ public class ChatController {
         ModelTierService modelTiers,
         List<ConversationTaskLabels> taskLabels,
         SourceReadSummaries sourceReads,
-        AutoTurnNoticeStatuses noticeStatuses) {
+        AutoTurnNoticeStatuses noticeStatuses,
+        GeneratedImageService generatedImages) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -107,6 +112,7 @@ public class ChatController {
         this.taskLabels = taskLabels;
         this.sourceReads = sourceReads;
         this.noticeStatuses = noticeStatuses;
+        this.generatedImages = generatedImages;
     }
 
 
@@ -120,7 +126,8 @@ public class ChatController {
             request.agentCode(),
             request.attachmentIds(),
             request.delegateTo());
-        return new SendMessageResponse(turn.conversationPublicId(), turn.executionId(), turn.assistantText());
+        return new SendMessageResponse(
+            turn.conversationPublicId(), turn.executionId(), MediaPathMask.strip(turn.assistantText()));
     }
 
 
@@ -325,6 +332,7 @@ public class ChatController {
         Map<Long, ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
+        Map<Long, GeneratedImageDetail> images = generatedImages.details(user.id(), number, produced.values());
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);
@@ -335,7 +343,8 @@ public class ChatController {
             .map(it -> new MessageView(
                 it.id(),
                 it.role().name(),
-                it.content(),
+                // 답에 남은 Hermes 쪽 그림 경로는 내보낼 때 가린다. 사용자가 쓴 글은 그대로 둔다.
+                it.role() == MessageRole.ASSISTANT ? MediaPathMask.strip(it.content()) : it.content(),
                 it.senderUserId() == null ? null : senderName,
                 it.executionId(),
                 // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
@@ -347,7 +356,7 @@ public class ChatController {
                     .map(AttachmentView::from)
                     .toList(),
                 produced.getOrDefault(it.id(), List.of()).stream()
-                    .map(ArtifactView::from)
+                    .map(artifact -> ArtifactView.from(artifact, images.get(artifact.id())))
                     .toList(),
                 it.executionId() == null ? null : activity.get(it.executionId()),
                 it.executionId() == null || statuses.get(it.executionId()) == null

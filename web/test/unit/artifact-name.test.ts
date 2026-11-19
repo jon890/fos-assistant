@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { artifactName, artifactNames } from "../../src/lib/artifact-name.ts";
+import { artifactName, artifactNames, imageTitle } from "../../src/lib/artifact-name.ts";
 
 test("index.html 이면 폴더 이름이 이름이다", () => {
   assert.equal(artifactName("제주-여행/index.html"), "제주-여행");
@@ -24,4 +24,10 @@ test("이름이 서로 다르면 폴더 이름만 쓴다", () => {
   const names = artifactNames(["a/index.html", "b/index.html"]);
   assert.equal(names.get("a/index.html"), "a");
   assert.equal(names.get("b/index.html"), "b");
+});
+
+test("만든 그림의 제목은 파일 이름에서 확장자를 뗀 것이다", () => {
+  assert.equal(imageTitle("generated/수채화 고양이 2.png"), "수채화 고양이 2");
+  assert.equal(imageTitle("generated/v1.5 그림.webp"), "v1.5 그림");
+  assert.equal(imageTitle("확장자없음"), "확장자없음");
 });

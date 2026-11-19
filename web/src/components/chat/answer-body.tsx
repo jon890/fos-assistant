@@ -1,5 +1,6 @@
 "use client";
 
+import { stripMediaPaths } from "@/lib/media-path";
 import { useMemo, useSyncExternalStore } from "react";
 import { recoverAnswers, splitAnswer, type AnswerSegment } from "@/lib/ask";
 import { AskCard } from "./ask-card";
@@ -53,7 +54,7 @@ export function AnswerBody({
             key={index}
             fades={index === segments.length - 1 ? fades : undefined}
           >
-            {segment.text}
+            {stripMediaPaths(segment.text)}
           </Markdown>
         ) : (
           <AskCard

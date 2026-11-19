@@ -35,6 +35,13 @@ public class ChatArtifactWriter {
     }
 
 
+    /** 그 대화에서 아직 답에 묶이지 않은 그림 행을 이 답에 묶는다. 뜻은 {@link ChatArtifactRepository#bindGeneratedImages} 가 적는다. */
+    @Transactional
+    public int bindGeneratedImages(Long conversationId, Long messageId) {
+        return repository.bindGeneratedImages(conversationId, messageId);
+    }
+
+
     /** 그 답의 결과물 행을 자동 보관 차례에 둔다. 뜻은 {@link ChatArtifactRepository#markAutoVaultPending} 이 적는다. */
     @Transactional
     public int markAutoVaultPending(Long messageId) {
