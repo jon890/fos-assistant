@@ -97,8 +97,11 @@ export function VaultListView() {
       {items?.map((item) => {
         const isHtml = item.path.toLowerCase().endsWith(".html");
         const isImage = isVaultImage(item.path);
-        // 그림은 제목이 곧 파일 이름이라 확장자를 떼고 보인다.
-        const name = isImage ? imageTitle(item.path) : artifactName(item.path);
+        // 비서가 만든 그림은 제목이 곧 파일 이름이라 확장자를 떼고 보인다. HTML 이 부르던 사진은 파일 이름 그대로다.
+        const name =
+          isImage && item.path.startsWith("generated/")
+            ? imageTitle(item.path)
+            : artifactName(item.path);
         const isBundle = item.fileCount > 1;
         return (
           <div

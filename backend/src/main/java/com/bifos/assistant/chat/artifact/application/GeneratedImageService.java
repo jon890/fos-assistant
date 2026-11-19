@@ -80,7 +80,7 @@ public class GeneratedImageService {
             if (existing.isPresent()) {
                 return new GeneratedImageSaved(GeneratedImageTitle.ofPath(existing.get().path()));
             }
-            String name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()));
+            String name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()), extension);
             String path = FOLDER + name + "." + extension;
             long byteSize = store.write(conversationId, path, image);
             try {
@@ -148,20 +148,23 @@ public class GeneratedImageService {
     }
 
 
-    /** 그 대화의 그림 행(지워진 것 포함)과 겹치지 않는 이름을 고른다. 확장자가 달라도 같은 제목으로 본다. */
-    private String uniqueName(Long conversationId, String base) {
+    /**
+     * 그 대화의 그림 행(지워진 것 포함)과 겹치지 않는 이름을 고른다. 확장자가 달라도 같은 제목으로 본다.
+     *
+     * <p>행이 없어도 그 경로에 파일이 이미 있으면 넘긴다. 에이전트가 파일 도구로 같은 이름의 파일을 써 두었을 수 있고, 덮어쓰면 안 된다.
+     */
+    private String uniqueName(Long conversationId, String base, String extension) {
         Set<String> taken = new HashSet<>();
         for (String path : artifacts.findGeneratedImagePaths(conversationId)) {
             taken.add(GeneratedImageTitle.ofPath(path));
         }
-        if (!taken.contains(base)) {
-            return base;
-        }
+        String name = base;
         int number = 2;
-        while (taken.contains(base + " " + number)) {
+        while (taken.contains(name) || store.resolveInside(conversationId, FOLDER + name + "." + extension).isPresent()) {
+            name = base + " " + number;
             number++;
         }
-        return base + " " + number;
+        return name;
     }
 
 

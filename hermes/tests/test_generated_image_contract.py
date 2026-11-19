@@ -59,6 +59,11 @@ class HermesImageSourceTest(unittest.TestCase):
                    for key in node.keys if isinstance(key, ast.Constant)}
         self.assertTrue(keys <= literal, "성공 응답에 %s 가 없다" % sorted(keys - literal))
 
+    def test_host_image_is_the_host_path(self):
+        """실행 공간이 있으면 `host_image` 에 호스트 경로를 둔다. plugin 이 `image` 보다 먼저 읽는다."""
+        path, line = contract.GENERATED_IMAGE_HOST_PATH
+        self.assertIn(line, self.source(path))
+
     def test_images_are_written_under_generated_cache(self):
         """그림은 `cache/generated/images` 에 쓴다. plugin 은 이 폴더 밖의 경로를 읽지 않는다."""
         cache, subdir, kind = contract.GENERATED_IMAGE_CACHE_SOURCE

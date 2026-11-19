@@ -102,6 +102,10 @@ test("그림을 누르면 크게 보이고 내려받는 파일 이름이 제목�
 
   await viewer.getByRole("button", { name: "크게 보기 닫기" }).click();
   await expect(viewer).toBeHidden();
+  // 다시 열어도 보관한 그림에는 「보관」 단추가 보이지 않는다.
+  await page.getByRole("button", { name: "수채화 고양이 크게 보기" }).click();
+  await expect(viewer.getByTestId("generated-image-kept")).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "보관" })).toHaveCount(0);
 });
 
 test("보관한 그림은 보관 상태가 보이고 크게 보기에 보관 단추 대신 보관함 링크가 있다", async ({ page }) => {

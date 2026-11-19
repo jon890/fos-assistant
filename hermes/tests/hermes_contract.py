@@ -573,6 +573,7 @@ GENERATED_IMAGE_TOOL = "image_generate"
 # `$HERMES_HOME` 아래에서 그림을 쓰는 폴더다. plugin 은 이 폴더 아래의 파일만 읽고 지운다.
 GENERATED_IMAGE_CACHE_PARTS = ("cache", "generated", "images")
 # provider 의 성공 응답을 만드는 함수와 plugin 이 읽는 키다.
+# `host_image` 는 실행 공간이 있을 때 `tools/image_generation_tool.py` 의 `_postprocess_image_generate_result` 가 더한다. plugin 은 있으면 그것을 먼저 읽는다.
 GENERATED_IMAGE_RESULT = ("agent/image_gen_provider.py", "success_response", frozenset({"success", "image"}))
 # 캐시 폴더를 정하는 파일, 그 안의 상수 이름, provider 쪽에서 `images` 를 붙이는 글이다.
 GENERATED_IMAGE_CACHE_SOURCE = ("agent/provider_media.py", "GENERATED_SUBDIR", '{provider_media.GENERATED_SUBDIR}/images')
@@ -580,3 +581,4 @@ GENERATED_IMAGE_CACHE_SOURCE = ("agent/provider_media.py", "GENERATED_SUBDIR", '
 PRE_TOOL_CALL_MODIFY = ("hermes_cli/plugins.py", 'if action == "modify":', "**partial}")
 # `transform_tool_result` 에 도구 인자를 넘기는 호출이다.
 TRANSFORM_RESULT_ARGS = ("model_tools.py", 'invoke_hook("transform_tool_result", tool_name=function_name, args=function_args,')
+GENERATED_IMAGE_HOST_PATH = ("tools/image_generation_tool.py", 'payload.setdefault("host_image", image)')

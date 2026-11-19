@@ -35,6 +35,9 @@ MAX_BYTES = 20 * 1024 * 1024
 CACHE_PARTS = ("cache", "generated", "images")
 # 뗀 제목을 결과 hook 이 꺼낼 때까지 두는 항목 수의 상한이다. 넘으면 오래된 것부터 버린다.
 MAX_TITLES = 256
+# Control Plane 이 받는 제목과 지시문의 길이 상한(500자, 32,000자)보다 짧게 자른다. 넘겨 보내면 그림까지 거절된다.
+MAX_TITLE_CHARS = 200
+MAX_PROMPT_CHARS = 30_000
 
 SAVED_MESSAGE = "그림을 대화에 저장했다. 사용자의 화면에 자동으로 보인다. 답에 파일 경로나 MEDIA: 를 쓰지 않는다."
 FAILED_MESSAGE = ("그림을 만들었지만 대화에 저장하지 못했다. 사용자에게 그림을 보여 주지 못했다고 알리고 "
@@ -164,7 +167,8 @@ def publish(args, result, session_id, tool_call_id):
     image = path.read_bytes()
     # hook 이 받은 인자에 제목 줄이 남아 있으면 그것을 쓴다. Hermes 가 고친 인자를 주면 기억해 둔 제목을 쓴다.
     title, prompt = split_title(args.get("prompt") if isinstance(args, dict) else None)
-    title = title or remembered
+    title = (title or remembered)[:MAX_TITLE_CHARS]
+    prompt = prompt[:MAX_PROMPT_CHARS]
     try:
         root = root_session(session_id)
     except sqlite3.Error as exc:

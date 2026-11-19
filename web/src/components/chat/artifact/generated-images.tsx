@@ -44,11 +44,16 @@ function PromptDetails({ prompt }: { prompt?: string | null }) {
 function KeepButton({
   conversationId,
   path,
+  kept,
+  onKept,
 }: {
   conversationId: string;
   path: string;
+  /** 이 화면에서 이미 보관했다. 크게 보기를 닫았다 열어도 단추를 다시 보이지 않는다 */
+  kept: boolean;
+  onKept(): void;
 }) {
-  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  const [state, setState] = useState<"idle" | "busy">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   async function keep() {
@@ -61,14 +66,15 @@ function KeepButton({
         setState("idle");
         return;
       }
-      setState("done");
+      setState("idle");
+      onKept();
     } catch {
       setMessage("보관하지 못했어요. 다시 시도해 주세요.");
       setState("idle");
     }
   }
 
-  if (state === "done")
+  if (kept)
     return (
       <span
         data-testid="generated-image-kept"
@@ -114,6 +120,8 @@ export function GeneratedImages({
   messageId: number | string;
 }) {
   const [openPath, setOpenPath] = useState<string | null>(null);
+  // 메시지를 다시 읽기 전에는 보관본 번호가 오지 않는다. 그동안 보관한 그림을 기억한다.
+  const [keptPaths, setKeptPaths] = useState<string[]>([]);
   if (images.length === 0 || conversationId === null) return null;
   const opened = images.find((image) => image.path === openPath) ?? null;
   return (
@@ -226,6 +234,10 @@ export function GeneratedImages({
                   key={opened.path}
                   conversationId={conversationId}
                   path={opened.path}
+                  kept={keptPaths.includes(opened.path)}
+                  onKept={() =>
+                    setKeptPaths((paths) => [...paths, opened.path])
+                  }
                 />
               )}
             </div>

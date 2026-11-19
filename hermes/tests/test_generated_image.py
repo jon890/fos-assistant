@@ -160,6 +160,12 @@ class PublishTest(GeneratedImageFixture):
         meta = json.loads(self.uploads[0]["parts"]["meta"])
         self.assertEqual((meta["title"], meta["prompt"]), ("강아지", PROMPT))
 
+    def test_long_title_and_prompt_are_cut(self):
+        """Control Plane 의 길이 상한을 넘는 제목과 지시문은 잘라 보낸다. 넘겨 보내면 그림까지 거절된다."""
+        self.transform(self.result(self.image()), prompt="제목: " + "가" * 600 + "\n" + "나" * 40000)
+        meta = json.loads(self.uploads[0]["parts"]["meta"])
+        self.assertEqual((len(meta["title"]), len(meta["prompt"])), (200, 30000))
+
     def test_failed_or_remote_result_is_untouched(self):
         """실패한 결과와 원격 주소, 캐시 폴더 밖 경로는 건드리지 않고 올리지 않는다."""
         outside = pathlib.Path(self.tmp.name) / "state.db"

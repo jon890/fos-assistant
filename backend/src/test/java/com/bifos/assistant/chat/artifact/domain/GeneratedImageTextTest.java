@@ -33,6 +33,14 @@ class GeneratedImageTextTest {
             .isEqualTo("그림은 에 있어요.\n\n다음 줄");
         assertThat(MediaPathMask.strip("MEDIA:")).isEmpty();
         assertThat(MediaPathMask.strip("경로가 없는 글 https://example.com/a.png")).isEqualTo("경로가 없는 글 https://example.com/a.png");
+        assertThat(MediaPathMask.strip("SOCIAL_MEDIA:on 설정")).as("낱말의 일부는 태그가 아니다").isEqualTo("SOCIAL_MEDIA:on 설정");
+        assertThat(MediaPathMask.strip("MEDIA:on 처럼 경로가 아닌 값")).isEqualTo("MEDIA:on 처럼 경로가 아닌 값");
+        assertThat(MediaPathMask.strip("https://example.com/cache/generated/images/a.png 를 봐"))
+            .as("웹 주소의 일부는 Hermes 경로가 아니다")
+            .isEqualTo("https://example.com/cache/generated/images/a.png 를 봐");
+        assertThat(MediaPathMask.strip("경로는 `MEDIA:/srv/x/a.png` 다")).isEqualTo("경로는 `` 다");
+        assertThat(MediaPathMask.strip("파일 ~/.hermes/cache/generated/images/a.png 끝")).isEqualTo("파일 끝");
+        assertThat(MediaPathMask.strip("파일 /cache/generated/images/a.png 끝")).isEqualTo("파일 끝");
         assertThat(MediaPathMask.strip(null)).isNull();
     }
 }

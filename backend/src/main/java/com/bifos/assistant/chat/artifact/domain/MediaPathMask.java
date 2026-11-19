@@ -14,9 +14,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MediaPathMask {
 
-    /** {@code MEDIA:} 태그와 그 뒤의 경로, 그리고 태그 없이 적은 Hermes 이미지 캐시 폴더의 경로다. 줄 끝의 공백도 함께 뺀다. */
+    /**
+     * {@code MEDIA:} 태그와 그 뒤의 경로, 그리고 태그 없이 적은 Hermes 이미지 캐시 폴더의 경로다. 줄 끝의 공백도 함께 뺀다.
+     *
+     * <p>태그는 낱말의 일부({@code SOCIAL_MEDIA:})가 아니고 뒤가 경로이거나 비었을 때만 잡는다. 캐시 경로는 웹 주소의 일부가 아닐 때만 잡는다.
+     * 화면의 {@code web/src/lib/media-path.ts} 와 같은 규칙이어야 한다.
+     */
     private static final Pattern PATH = Pattern.compile(
-        "[ \\t]*(?:MEDIA:\\S*|(?<![\\w/.-])/[^\\s`'\"()<>]*/cache/generated/images/[^\\s`'\"()<>]*)");
+        "[ \\t]*(?:(?<![\\w])MEDIA:(?:[~/][^\\s`'\"()<>]*|(?=\\s|$))"
+            + "|(?<![\\w/.:~-])~?(?:/[^\\s`'\"()<>]*)?/cache/generated/images/[^\\s`'\"()<>]*)");
     private static final Pattern BLANK_LINES = Pattern.compile("\\n{3,}");
 
 
