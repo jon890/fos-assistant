@@ -263,3 +263,28 @@ test("v0.23 모양은 끝난 run 에 다시 연결하면 끝 사건 하나를 �
     await hermes.close();
   }
 });
+
+test("중지 뒤 처음 사건을 읽어도 run.cancelled 를 보내고 완료로 바꾸지 않는다", async () => {
+  const hermes = await startFakeHermes({ browser: "example-key" });
+  const headers = { Authorization: "Bearer example-key" };
+  try {
+    hermes.holdNextRun();
+    const submitted = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers, body: JSON.stringify({ input: "첫 사건 조회 전 중지" }),
+    });
+    const { run_id } = await submitted.json() as { run_id: string };
+    assert.equal((await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${run_id}/stop`, {
+      method: "POST", headers,
+    })).status, 200);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const wire = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${run_id}/events`, { headers })).text();
+      const events = wire.split("\n").filter((line) => line.startsWith("data:"))
+        .map((line) => JSON.parse(line.slice(5)).event);
+      assert.deepEqual(events, ["run.cancelled"]);
+      const status = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${run_id}`, { headers })).json();
+      assert.equal(status.status, "cancelled");
+    }
+  } finally {
+    await hermes.close();
+  }
+});

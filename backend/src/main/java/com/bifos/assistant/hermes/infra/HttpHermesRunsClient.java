@@ -397,7 +397,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     /**
      * 끝난 실행을 결과로 옮긴다.
      *
-     * <p>v0.21.5 는 실제로 돈 provider 와 모델을 {@code runtime} 에 싣는다. fallback 으로 넘어간 경우도 그 값이다.
+     * <p>Hermes 는 실제로 돈 provider 와 모델을 {@code runtime} 에 싣는다. fallback 으로 넘어간 경우도 그 값이다.
      * 그 값을 {@code runtime} 칸에 따로 둔다. 실행 조회의 {@code model}, {@code provider} 는 요청을 되돌려 줄 뿐이다.
      */
     private HermesRunResult toResult(String apiBaseUrl, String profileName, String runId, String status, JsonNode run) {

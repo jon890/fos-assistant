@@ -18,7 +18,7 @@ export function createFakeHermesState(
    */
   const keys: Record<string, string> = { ...profileKeys };
   const runs = new Map<string, Run>();
-  /** v0.23 모양에서 해제 요청을 받은 run 번호다. */
+  /** 해제 요청을 받은 run 번호다. */
   const resolvedRuns: string[] = [];
   const sessions = new Map<string, Session>();
   /** 자식 session 의 모델과 provider 다. provider 는 session 응답이 아니라 대시보드의 provider 경로가 준다. 비우면 provider 없이 `example-fast` 를 준다. */
@@ -56,7 +56,6 @@ export function createFakeHermesState(
   /** 입력 글과 그 입력의 대본이다. */
   const scripts = new Map<string, DemoScript>();
   let busy = false;
-  /** 실행 조회와 해제 경로가 흉내 낼 Hermes 버전의 모양이다. */
   let readinessOutage: "busy" | "unavailable" | "timeout" | undefined;
   let submitCount = 0;
   let modelOptionsCalls = 0;
@@ -379,10 +378,9 @@ export type FakeHermes = {
   callConnectorTools(profile: string, sessionId: string, lines: readonly string[], token: string): Promise<string>;
   /** 그 profile 에 바인딩 설치로 붙은 플러그인 id 들이다. 옛 설치는 담지 않는다. */
   boundConnectorsOf(profile: string): string[];
-  /** 실행 조회와 해제 경로의 모양을 고른다. v0.23 은 조회에서 `error` 와 `pending_steer` 를 빼고 기록 번호를 싣는다. `reset-controls` 가 v0.21 로 되돌린다. */
-  /** Hermes 가 다시 뜬 것을 흉내 낸다. v0.23 이면 도는 실행이 `unknown` 이 되고, v0.21 이면 실행 기록이 사라진다. */
+  /** Hermes 가 다시 뜬 것을 흉내 낸다. 도는 실행이 `unknown` 이 된다. */
   restartHermes(): void;
-  /** v0.23 모양에서 해제 요청을 받은 run 번호다. 받은 순서대로다. */
+  /** 해제 요청을 받은 run 번호다. 받은 순서대로다. */
   resolvedRuns(): readonly string[];
   holdNextRun(): void;
   /**

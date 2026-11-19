@@ -134,8 +134,8 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", task_
 def event_guard(tool_name: str, args, session_id, tool_call_id):
     """플러그인 도구와 Control Plane MCP 도구가 아닌 호출을 도구 판정에 묻는다. 통과면 None 이다.
 
-    사건 실행 트리의 위험한 도구 호출을 막는 자리다(fos-assistant ADR-20261105 / event-watch). 안전 목록과
-    session 없는 호출은 묻지 않는다. 어떤 예외든 잡아 정해 둔 글로 막는다. 예외를 던지면 Hermes 의 dispatcher
+    사건 실행 트리의 위험한 도구 호출을 막는 자리다(fos-assistant ADR-20261105 / event-watch). 안전 목록은 묻지 않고 통과시키며,
+    안전 목록 밖 호출에 session 이 없으면 묻지 않고 막는다. 어떤 예외든 잡아 정해 둔 글로 막는다. 예외를 던지면 Hermes 의 dispatcher
     바깥에서 판정 없이 나갈 수 있다.
     """
     try:
