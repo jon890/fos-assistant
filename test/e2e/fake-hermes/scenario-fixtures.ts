@@ -64,6 +64,18 @@ export const ARTIFACT_SAME_NAME_PROBE = "같은 이름 결과물 파일 검사";
 /** 실제 MCP 호출로 HTML과 CSS를 저장하는지 보는 입력이다. */
 export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
 
+/** 이 글을 보내면 profile 플러그인처럼 만든 그림 한 장을 Control Plane 에 올리고, Hermes 쪽 경로가 든 답을 한다. */
+export const IMAGE_GENERATE_PROBE = "수채화 고양이 그려 줘";
+
+/** 그림 검사에서 대역이 올리는 제목과 자세한 지시문이다. 지시문은 사용자의 부탁 글과 다르고 더 길다. */
+export const IMAGE_GENERATE_TITLE = "수채화 고양이";
+export const IMAGE_GENERATE_PROMPT =
+  "창가에 앉아 밖을 보는 회색 줄무늬 고양이. 수채화, 번지는 붓 자국, 부드러운 오후 햇살이 왼쪽에서 들어온다. 배경은 흐린 연두색 정원이고 글자는 넣지 않는다.";
+
+/** 그림 검사의 답이다. 실제 모델이 hook 없이 적는 Hermes 쪽 경로를 흉내 낸다. Control Plane 은 내보낼 때 이 경로를 뺀다. */
+export const IMAGE_GENERATE_ANSWER =
+  "수채화 고양이를 만들었다.\n\nMEDIA:/srv/fake-hermes/profiles/dad/cache/generated/images/openai_codex_medium_1.png";
+
 /**
  * 이 글 뒤에 공백과 Memory 번호를 붙여 보내면 그 run 안에서 `memory_read` 를 부르고, 도구 결과의 text 를 답으로 돌려준다.
  */
@@ -207,6 +219,9 @@ export function specialOutputFor(input: string): string | null {
   }
   if (input === ARTIFACT_PROBE || input === ARTIFACT_SAME_NAME_PROBE) {
     return "초안을 만들었다.";
+  }
+  if (input === IMAGE_GENERATE_PROBE) {
+    return IMAGE_GENERATE_ANSWER;
   }
   if (input === "마크다운 보안 검사") {
     return [

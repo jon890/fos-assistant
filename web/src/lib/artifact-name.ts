@@ -2,7 +2,9 @@
 const INDEX_SUFFIX = "/index.html";
 
 function basePath(path: string): string {
-  return path.endsWith(INDEX_SUFFIX) ? path.slice(0, -INDEX_SUFFIX.length) : path;
+  return path.endsWith(INDEX_SUFFIX)
+    ? path.slice(0, -INDEX_SUFFIX.length)
+    : path;
 }
 
 function lastSegment(path: string): string {
@@ -26,7 +28,12 @@ export function artifactNames(paths: string[]): Map<string, string> {
       const base = basePath(path);
       const segments = base.split("/");
       const name = lastSegment(base);
-      return [path, (counts.get(name) ?? 0) > 1 && segments.length > 1 ? segments.slice(-2).join("/") : name];
+      return [
+        path,
+        (counts.get(name) ?? 0) > 1 && segments.length > 1
+          ? segments.slice(-2).join("/")
+          : name,
+      ];
     }),
   );
 }
@@ -34,4 +41,11 @@ export function artifactNames(paths: string[]): Map<string, string> {
 /** 결과물 하나만 볼 때의 이름이다. */
 export function artifactName(path: string): string {
   return artifactNames([path]).get(path) ?? path;
+}
+
+/** 비서가 만든 그림의 제목이다. 파일 이름에서 확장자를 뗀다. 제목이 곧 파일 이름이다. */
+export function imageTitle(path: string): string {
+  const name = lastSegment(path);
+  const dot = name.lastIndexOf(".");
+  return dot <= 0 ? name : name.slice(0, dot);
 }

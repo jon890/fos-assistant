@@ -252,6 +252,8 @@ assistant:
     agent-root: ${ASSISTANT_ARTIFACT_AGENT_ROOT}
     # 파일이 마지막으로 바뀐 때부터 센다. 지우는 시각은 첨부의 cleanup-cron 을 함께 쓴다
     retention-days: 30
+    # 비서가 만든 그림 한 장의 올리기 상한. multipart 의 max-file-size 보다 작게 둔다. 보관함의 파일 하나 상한과는 별개다
+    generated-image-max-bytes: 20971520
     source:
       # 실제 이미지 공급자 호스트는 운영 설정에서 검토해 넣는다. 비어 있으면 주소 방식만 거절한다.
       allowed-hosts: []

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -136,7 +137,8 @@ class ConversationPublicIdTest {
             mock(ModelTierService.class),
             List.of(),
             mock(SourceReadSummaries.class),
-            new AutoTurnNoticeStatuses(List.of())))
+            new AutoTurnNoticeStatuses(List.of()),
+            mock(GeneratedImageService.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }

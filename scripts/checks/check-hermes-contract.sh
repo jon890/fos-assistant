@@ -61,6 +61,9 @@ HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
 # 사진 원본을 native 이미지로 넘기는 경로(도구 등록, 결과 변환, 실패 판정, 사건 필드)와 core 의 Pillow 고정이다(ADR-20261010 / attachment-inspect).
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_attachment_native_contract.py' -v
+# 만든 그림 올리기가 기대는 그림 결과의 모양과 캐시 폴더, hook 의 인자 처리다(ADR-20261119 / generated-image).
+HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
+  python3 -I -m unittest discover -s hermes/tests -p 'test_generated_image_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_bodyless_request_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \

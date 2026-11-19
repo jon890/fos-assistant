@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.turn.application.dto.PendingQueue;
 import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.PendingMessage;
@@ -73,7 +74,7 @@ public final class ChatDtos {
      * @param switchedTo 앞 provider 가 막혀 넘어간 경우 그 답을 만든 provider 와 모델. 넘어가지
      * 않았으면 null
      * @param attachments 이 메시지에 붙은 첨부. 지워진 것도 자리를 남기려고 담는다. 없으면 빈 목록
-     * @param artifacts 이 답의 turn 이 대화 폴더에 만든 HTML. 지워진 것도 담는다. 사용자 메시지와 결과물이 없는
+     * @param artifacts 이 답의 turn 이 대화 폴더에 만든 HTML 과 비서가 만든 그림. 지워진 것도 담는다. 사용자 메시지와 결과물이 없는
      * 답은 빈 목록
      * @param delivery 이 알림 줄이 묶음의 마지막 시도의 마지막 알림 줄이면 그 묶음의 번호와 상태. 아니면 null
      * @param delegations 이 답의 실행이 바로 맡긴 위임. 실행 번호순이다. 답이 아니거나 맡긴 것이 없으면 빈 목록
@@ -187,16 +188,23 @@ public final class ChatDtos {
      * @param autoVault 자동 보관 상태({@code PENDING}, {@code RUNNING}, {@code DONE}, {@code SKIPPED}, {@code FAILED}).
      * 자동 보관 대상이 아니면 null
      * @param autoVaultError {@code FAILED} 일 때 그 까닭의 오류 코드. 아니면 null
+     * @param kind {@code IMAGE} 는 비서가 만든 그림, {@code HTML} 은 결과물 페이지다
+     * @param prompt 그림 지시문. 그림이 아니거나 풀지 못하면 null
+     * @param vaultItemId 그 그림의 살아 있는 보관본 번호. 없거나 그림이 아니면 null
      */
     public record ArtifactView(
-        String path, long byteSize, boolean deleted, String autoVault, String autoVaultError) {
-        static ArtifactView from(ChatArtifact artifact) {
+        String path, long byteSize, boolean deleted, String autoVault, String autoVaultError, String kind, String prompt,
+        Long vaultItemId) {
+        static ArtifactView from(ChatArtifact artifact, GeneratedImageDetail image) {
             return new ArtifactView(
                 artifact.path(),
                 artifact.byteSize(),
                 artifact.isDeleted(),
                 artifact.autoVaultState() == null ? null : artifact.autoVaultState().name(),
-                artifact.autoVaultError());
+                artifact.autoVaultError(),
+                artifact.isGeneratedImage() ? "IMAGE" : "HTML",
+                image == null ? null : image.prompt(),
+                image == null ? null : image.vaultItemId());
         }
     }
 

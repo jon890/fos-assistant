@@ -46,7 +46,14 @@ export default async function FilesPage({
       {vault ? (
         <div className="space-y-3">
           <AutoVaultSetting />
-          <VaultListView />
+          {/* 주소의 `item` 을 useSearchParams 로 읽으므로 Suspense 로 감싼다. */}
+          <Suspense
+            fallback={
+              <p className="text-sm text-muted-foreground">불러오는 중…</p>
+            }
+          >
+            <VaultListView />
+          </Suspense>
         </div>
       ) : (
         // 주소의 `path`, `file` 을 useSearchParams 로 읽으므로 Suspense 로 감싼다.

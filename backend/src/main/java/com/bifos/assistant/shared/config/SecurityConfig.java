@@ -61,7 +61,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/internal/content-draft-jobs/authorize")
                 .permitAll()
                 .requestMatchers(
-                    "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate")
+                    "/internal/hermes/attachment-inspect",
+                    "/internal/hermes/attachment-inspect/validate",
+                    "/internal/hermes/generated-image")
                 .hasRole("MCP")
                 .anyRequest()
                 .authenticated())

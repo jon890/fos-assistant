@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -51,7 +52,8 @@ class SourceReadMessagesTest {
         mock(ModelTierService.class),
         List.of(),
         sourceReads,
-        new AutoTurnNoticeStatuses(List.of()));
+        new AutoTurnNoticeStatuses(List.of()),
+        mock(GeneratedImageService.class));
 
 
     @Test

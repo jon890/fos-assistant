@@ -186,6 +186,13 @@ from .handoff import (  # noqa: F401 - 계약 테스트가 plugin 에서 꺼내 
     report_handoff,
     sign_handoff,
 )
+from .generated_image import (  # noqa: F401 - 계약 테스트가 plugin 에서 꺼내 쓴다
+    TITLE_PREFIX,
+    publish as publish_generated_image,
+    sign_generated_image,
+    split_title,
+    strip_title,
+)
 from .approval_guard import (
     APPROVAL_WRITE_MESSAGE,
     COMPUTER_USE_MESSAGE,
