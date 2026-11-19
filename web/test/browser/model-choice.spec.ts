@@ -22,8 +22,8 @@ type Tier = {
 };
 
 /**
- * 관리자가 세 칸만 채운 그룹이다. 칸 뒤의 모델 이름을 일부러 실어, 화면이 역할과 상관없이 그 값을 그리지 않는지 본다.
- * `MEMBER` 역할에게는 Control Plane 이 이 값을 비워 보낸다.
+ * 관리자가 세 칸만 채운 그룹이다. `ADMIN` 역할이 받는 모양이다. 화면은 역할과 상관없이 칸마다 모델과 effort 를 그리고
+ * provider 는 그리지 않는다. `MEMBER` 역할에게는 Control Plane 이 provider 만 비워 보낸다.
  */
 const FILLED_TIERS: Tier[] = [
   {
@@ -57,12 +57,12 @@ function trigger(page: Page): Locator {
   return page.getByTestId("model-tier-picker");
 }
 
-function slider(page: Page): Locator {
-  return page.getByTestId("model-tier-slider");
+function list(page: Page): Locator {
+  return page.getByTestId("model-tier-list");
 }
 
 function stop(page: Page, label: string): Locator {
-  return slider(page).getByRole("radio", { name: label, exact: true });
+  return list(page).getByRole("radio", { name: label, exact: true });
 }
 
 function isConversationList(url: URL): boolean {
@@ -106,7 +106,12 @@ async function serveTiers(
   );
 }
 
-/** 칸 이름만 담은 목록이다. `MEMBER` 역할이 받는 모양이다. */
+/** provider 를 뺀 목록이다. `MEMBER` 역할이 받는 모양이다. */
+function withoutProvider(tiers: Tier[]): Tier[] {
+  return tiers.map((item) => ({ ...item, provider: null }));
+}
+
+/** 칸 이름만 담은 목록이다. 모델과 effort 를 주지 않던 옛 Control Plane 의 모양이다. */
 function namesOnly(tiers: Tier[]): Tier[] {
   return tiers.map((item) => ({
     ...item,
@@ -116,10 +121,17 @@ function namesOnly(tiers: Tier[]): Tier[] {
   }));
 }
 
-async function openSlider(page: Page): Promise<void> {
+/** 칸 한 줄이다. radio 를 감싼 label 이고 그 안에 칸 이름, 모델 줄, 체크 표시가 있다. */
+function row(page: Page, tier: string): Locator {
+  return list(page).locator("label", {
+    has: page.getByTestId(`model-tier-${tier.toLowerCase()}`),
+  });
+}
+
+async function openList(page: Page): Promise<void> {
   await expect(trigger(page)).toBeEnabled();
   await trigger(page).click();
-  await expect(slider(page)).toBeVisible();
+  await expect(list(page)).toBeVisible();
 }
 
 /** 칸을 고르고 저장 응답까지 기다린다. */
@@ -228,24 +240,38 @@ test("관리자가 칸을 하나도 채우지 않았으면 모델 단추를 그�
   await expect(trigger(page)).toHaveCount(0);
 });
 
-test("슬라이더에는 채운 칸의 이름만 보이고 고급 직접 선택과 내 기본값 설정이 없다", async ({
+test("목록에는 채운 칸만 모델, effort 와 함께 보이고 고급 직접 선택과 내 기본값 설정이 없다", async ({
   page,
 }) => {
   await serveTiers(page, FILLED_TIERS);
   await page.goto("/new");
 
   await expect(trigger(page)).toHaveText("Medium");
-  await openSlider(page);
-  await expect(slider(page).getByRole("radio")).toHaveCount(3);
+  await openList(page);
+  await expect(list(page).getByRole("radio")).toHaveCount(3);
   for (const label of ["Instant", "Medium", "High"])
     await expect(stop(page, label)).toBeVisible();
   // 관리자가 비운 칸은 보이지 않는다.
   await expect(stop(page, "Extra High")).toHaveCount(0);
   await expect(stop(page, "Pro")).toHaveCount(0);
   await expect(stop(page, "Medium")).toBeChecked();
-  // 칸 뒤의 모델은 관리자에게도 대화 화면에서는 그리지 않는다(ADR-063).
-  await expect(slider(page)).not.toContainText("example-");
-  await expect(slider(page).getByRole("combobox")).toHaveCount(0);
+  // 줄마다 그 칸의 모델과 effort 를 보인다(ADR-20261119 / tier-model-names). provider 는 그리지 않는다.
+  await expect(row(page, "INSTANT").getByTestId("model-tier-model")).toHaveText(
+    "example-fast · low",
+  );
+  await expect(row(page, "MEDIUM").getByTestId("model-tier-model")).toHaveText(
+    "example-balanced · medium",
+  );
+  await expect(row(page, "HIGH").getByTestId("model-tier-model")).toHaveText(
+    "example-deep · high",
+  );
+  await expect(list(page)).not.toContainText("openai-codex");
+  // 고른 줄에만 체크 표시가 보인다.
+  await expect(row(page, "MEDIUM").getByTestId("model-tier-check")).toBeVisible();
+  await expect(row(page, "HIGH").getByTestId("model-tier-check")).toBeHidden();
+  // 닫힌 단추는 칸 이름만 보인다.
+  await expect(trigger(page)).not.toContainText("example-");
+  await expect(list(page).getByRole("combobox")).toHaveCount(0);
   await expect(page.getByText("고급 직접 선택")).toHaveCount(0);
   await expect(page.getByText("내 기본값")).toHaveCount(0);
   await expect(
@@ -254,7 +280,85 @@ test("슬라이더에는 채운 칸의 이름만 보이고 고급 직접 선택�
   await expect(page.getByTestId("model-tier-settings")).toHaveCount(0);
 });
 
-test("슬라이더로 고른 칸이 대화에 남고 다음 새 대화가 그 칸에서 시작한다", async ({
+test("MEMBER 역할이 받는 모양에서도 줄마다 모델과 effort 가 보이고 effort 가 빈 칸은 모델만 보인다", async ({
+  page,
+}) => {
+  await serveTiers(page, [
+    ...withoutProvider(FILLED_TIERS),
+    {
+      tier: "PRO",
+      label: "Pro",
+      provider: null,
+      model: "example-pro",
+      reasoningEffort: null,
+    },
+  ]);
+  await page.goto("/new");
+
+  await openList(page);
+  await expect(row(page, "HIGH").getByTestId("model-tier-model")).toHaveText(
+    "example-deep · high",
+  );
+  await expect(row(page, "PRO").getByTestId("model-tier-model")).toHaveText(
+    "example-pro",
+  );
+});
+
+test("모델과 effort 를 주지 않는 응답에는 칸 이름만 보인다", async ({
+  page,
+}) => {
+  await serveTiers(page, namesOnly(FILLED_TIERS));
+  await page.goto("/new");
+
+  await openList(page);
+  await expect(stop(page, "High")).toBeVisible();
+  await expect(list(page).getByTestId("model-tier-model")).toHaveCount(0);
+});
+
+test("폭 360px 에서 다섯 칸의 이름이 잘리지 않고 긴 모델 이름은 줄 안에서 줄인다", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await serveTiers(page, [
+    ...FILLED_TIERS,
+    {
+      tier: "EXTRA_HIGH",
+      label: "Extra High",
+      provider: "openai-codex",
+      model: "example-model-with-a-very-long-name-that-cannot-fit-in-one-row",
+      reasoningEffort: "xhigh",
+    },
+    {
+      tier: "PRO",
+      label: "Pro",
+      provider: "openai-codex",
+      model: "example-pro",
+      reasoningEffort: "max",
+    },
+  ]);
+  await page.goto("/new");
+
+  await openList(page);
+  const names = list(page).getByTestId("model-tier-name");
+  await expect(names).toHaveText([
+    "Instant",
+    "Medium",
+    "High",
+    "Extra High",
+    "Pro",
+  ]);
+  const clipped = await names.evaluateAll((nodes) =>
+    nodes
+      .filter((node) => node.scrollWidth > node.clientWidth)
+      .map((node) => node.textContent),
+  );
+  expect(clipped, "잘린 칸 이름").toEqual([]);
+  const box = await list(page).boundingBox();
+  expect(box!.x + box!.width, "목록 오른쪽 끝(px)").toBeLessThanOrEqual(360);
+  await expectNoHorizontalScroll(page);
+});
+
+test("목록으로 고른 칸이 대화에 남고 다음 새 대화가 그 칸에서 시작한다", async ({
   context,
   page,
   isolatedMember,
@@ -262,7 +366,7 @@ test("슬라이더로 고른 칸이 대화에 남고 다음 새 대화가 그 �
   // 실제로 저장해 사용자 기본 칸이 바뀌는지 본다. 다른 검사에 기본 칸을 남기지 않도록 따로 만든 사용자와 에이전트를 쓴다.
   await setSession(context, isolatedMember);
   const agent = await page.request.post("/api/agents", {
-    data: { name: "슬라이더 검사 비서" },
+    data: { name: "목록 검사 비서" },
   });
   expect(agent.status()).toBe(201);
   const { code: agentCode } = (await agent.json()) as { code: string };
@@ -286,7 +390,7 @@ async function expectChosenTierCarriesOver(page: Page): Promise<void> {
   // 고른 적이 없으면 그룹 기본 칸에서 시작한다.
   await expect(trigger(page)).toHaveText("Medium");
   const target = "High";
-  await openSlider(page);
+  await openList(page);
   await chooseAndWait(page, target);
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(trigger(page)).toHaveText(target);
@@ -298,7 +402,7 @@ async function expectChosenTierCarriesOver(page: Page): Promise<void> {
   // 고른 칸은 사용자의 기본 칸이 되어 다음 새 대화의 처음 위치다.
   await page.goto("/new");
   await expect(trigger(page)).toHaveText(target);
-  await openSlider(page);
+  await openList(page);
   await expect(stop(page, target)).toBeChecked();
 }
 
@@ -308,7 +412,7 @@ test("방향키로 칸을 옮기면 옮긴 칸이 저장된다", async ({ page }
   const conversationId = await createConversation(page);
   await page.goto(`/chat/${conversationId}`);
 
-  await openSlider(page);
+  await openList(page);
   await stop(page, "Medium").focus();
   const saved = page.waitForResponse(
     (response) =>
@@ -337,7 +441,7 @@ test("칸을 저장하는 동안 보내기를 막는다", async ({ page }) => {
   await page.goto(`/chat/${conversationId}`);
   await composer(page).fill("저장 중에 보내기");
 
-  await openSlider(page);
+  await openList(page);
   await stop(page, "High").check();
   // 저장이 끝나기 전에 보낸 메시지가 이전 칸으로 돌지 않게 한다.
   await expect(page.getByRole("button", { name: "보내기" })).toBeDisabled();
@@ -359,7 +463,7 @@ test("저장이 실패하면 단추가 이전 칸으로 돌아가고 알린다",
   );
   await page.goto(`/chat/${conversationId}`);
 
-  await openSlider(page);
+  await openList(page);
   // 저장이 실패하면 고른 칸이 곧바로 이전 칸으로 돌아간다. check() 는 바뀐 상태까지 확인하므로 누르기만 한다.
   await stop(page, "High").click();
 
@@ -393,7 +497,7 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
   );
   await page.goto("/new");
 
-  await openSlider(page);
+  await openList(page);
   // 저장이 실패하면 고른 칸이 곧바로 이전 칸으로 돌아간다. check() 는 바뀐 상태까지 확인하므로 누르기만 한다.
   await stop(page, "High").click();
 
@@ -422,7 +526,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
   const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
 
-  await openSlider(page);
+  await openList(page);
   await chooseAndWait(page, "Instant");
   await page.keyboard.press("Escape");
 
@@ -477,7 +581,7 @@ test("새 대화에서 칸을 먼저 고른 뒤 사진 업로드가 실패하면
     });
   });
   await page.goto("/new");
-  await openSlider(page);
+  await openList(page);
   await chooseAndWait(page, "Instant");
   await page.keyboard.press("Escape");
   await expect(trigger(page)).toHaveText("Instant");
@@ -515,49 +619,49 @@ test("새 대화에서 칸을 먼저 고른 뒤 사진 업로드가 실패하면
   ).toHaveCount(0);
 });
 
-test("좁은 폭에서도 슬라이더가 화면 안에 열리고 입력칸 폭이 남는다", async ({
+test("좁은 폭에서도 목록이 화면 안에 열리고 입력칸 폭이 남는다", async ({
   page,
 }, testInfo) => {
   await serveTiers(page, FILLED_TIERS);
   await fakeTierSaves(page);
   await page.goto("/new");
 
-  await openSlider(page);
-  // 슬라이더는 모델 단추 바로 위에 열린다. 줄인 움직임 설정도 100ms 동안 자리로 옮겨 가므로 자리를 잡을 때까지 본다.
+  await openList(page);
+  // 목록은 모델 단추 바로 위에 열린다. 줄인 움직임 설정도 100ms 동안 자리로 옮겨 가므로 자리를 잡을 때까지 본다.
   await expect
     .poll(
       async () => {
-        const box = await slider(page).boundingBox();
+        const box = await list(page).boundingBox();
         const anchor = await trigger(page).boundingBox();
         if (box === null || anchor === null) return Number.NaN;
         return anchor.y - (box.y + box.height);
       },
-      { message: "단추 위쪽 끝과 슬라이더 아래쪽 끝의 틈(px)" },
+      { message: "단추 위쪽 끝과 목록 아래쪽 끝의 틈(px)" },
     )
     // 틈은 sideOffset 6px 이다. 옮겨 가는 도중의 자리를 재지 않도록 거의 닿을 때까지 기다린다.
     .toBeLessThan(8);
   const viewport = page.viewportSize();
-  const box = await slider(page).boundingBox();
+  const box = await list(page).boundingBox();
   const anchor = await trigger(page).boundingBox();
   expect(
     anchor!.y - (box!.y + box!.height),
     "단추와의 틈(px)",
   ).toBeGreaterThanOrEqual(0);
-  expect(box!.y, "슬라이더 위쪽 끝(px)").toBeGreaterThanOrEqual(0);
-  expect(box!.x, "슬라이더 왼쪽 끝(px)").toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width, "슬라이더 오른쪽 끝(px)").toBeLessThanOrEqual(
+  expect(box!.y, "목록 위쪽 끝(px)").toBeGreaterThanOrEqual(0);
+  expect(box!.x, "목록 왼쪽 끝(px)").toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width, "목록 오른쪽 끝(px)").toBeLessThanOrEqual(
     viewport!.width,
   );
   await expectNoHorizontalScroll(page);
   await page.screenshot({
     path: testInfo.outputPath(
-      `model-tier-slider-open-${testInfo.project.name}.png`,
+      `model-tier-list-open-${testInfo.project.name}.png`,
     ),
   });
 
   await chooseAndWait(page, "High");
   await page.keyboard.press("Escape");
-  await expect(slider(page)).toHaveCount(0);
+  await expect(list(page)).toHaveCount(0);
   await expect(trigger(page)).toHaveText("High");
   await expectNoHorizontalScroll(page);
   const textarea = await composer(page).boundingBox();
@@ -566,7 +670,7 @@ test("좁은 폭에서도 슬라이더가 화면 안에 열리고 입력칸 폭�
   );
   await page.screenshot({
     path: testInfo.outputPath(
-      `model-tier-slider-chosen-${testInfo.project.name}.png`,
+      `model-tier-list-chosen-${testInfo.project.name}.png`,
     ),
   });
 });
@@ -645,7 +749,7 @@ test("칸 저장 때문에 버린 대화 목록 응답은 한 번 더 읽는다"
   );
   await page.goto("/new");
 
-  await openSlider(page);
+  await openList(page);
   const saved = page.waitForResponse(
     (response) =>
       response.request().method() === "PUT" &&

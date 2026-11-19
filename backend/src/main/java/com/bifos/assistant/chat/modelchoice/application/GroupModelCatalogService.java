@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.modelchoice.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.modelchoice.application.dto.CatalogRefresh;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
@@ -59,6 +60,25 @@ public class GroupModelCatalogService {
      */
     public GroupModelCatalog refreshedCatalogFor(Long groupId) {
         return catalogFor(groupId, true);
+    }
+
+
+    /**
+     * 켜진 에이전트의 profile 을 모두 Hermes 에 다시 묻고 결과를 하나로 모은다. 관리자가 화면에서 누르는 「목록 새로
+     * 읽기」 가 쓴다.
+     *
+     * <p>한 profile 이 실패해도 나머지를 끝까지 읽는다. 성공한 profile 은 새 목록을 들고 있는다. 목록은 돌려주지
+     * 않으므로 부른 쪽이 {@link #catalogFor(Long)} 와 {@link #hideCandidates()} 를 다시 읽는다.
+     */
+    public CatalogRefresh refreshAll() {
+        List<CatalogRefresh> results = new ArrayList<>();
+        Set<String> profiles = new LinkedHashSet<>();
+        for (Agent agent : agents.enabledAgents()) {
+            if (profiles.add(agent.hermesProfile())) {
+                results.add(modelOptions.refresh(agent));
+            }
+        }
+        return CatalogRefresh.combine(results);
     }
 
 
