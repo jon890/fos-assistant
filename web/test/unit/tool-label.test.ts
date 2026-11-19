@@ -32,6 +32,14 @@ test("MCP 도구는 마지막 __ 뒤의 이름으로 표를 찾는다", () => {
     "결과물을 저장했어요",
   );
   assert.equal(
+    toolLabel("mcp__fos_assistant__file_space_put", true),
+    "파일 공간에 넣고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__file_space_put", false),
+    "파일 공간에 넣었어요",
+  );
+  assert.equal(
     toolLabel("mcp__fos_assistant__follow_up_propose", true),
     "할 일을 제안하고 있어요",
   );

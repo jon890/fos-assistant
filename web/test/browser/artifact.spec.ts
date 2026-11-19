@@ -179,3 +179,41 @@ test("자동 보관을 켜면 스위치가 남고 답 아래 결과물 옆에 �
     await page.request.put("/api/artifact-vault/auto", { data: { enabled: false } });
   }
 });
+
+test("비서가 내 파일에 넣은 파일은 답 아래에 제목과 내려받기, 내 파일에서 보기로 보이고 지운 파일은 안내만 보인다", async ({ page }) => {
+  const conversationId = await createConversation(page, `파일 줄 검사 ${Date.now()}`);
+  const file = (extra: Record<string, unknown>) => ({
+    path: "reports/가계부.xlsx",
+    byteSize: 2048,
+    deleted: false,
+    autoVault: null,
+    autoVaultError: null,
+    kind: "FILE",
+    prompt: null,
+    vaultItemId: 31,
+    title: "11월 가계부",
+    ...extra,
+  });
+  await page.route(`**/api/chat/conversations/${conversationId}/messages`, async (route) => {
+    const response = await route.fetch();
+    const messages = (await response.json()) as { role: string; artifacts: unknown[] }[];
+    const answer = messages.findLast((message) => message.role === "ASSISTANT");
+    if (answer) answer.artifacts = [file({}), file({ path: "", vaultItemId: 32, deleted: true, title: null })];
+    await route.fulfill({ response, json: messages });
+  });
+  await page.goto(`/chat/${conversationId}`);
+
+  const rows = page.getByTestId("assistant-message").last().getByTestId("message-put-file");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("11월 가계부");
+  await expect(rows.nth(0)).toContainText("표");
+  await expect(rows.nth(0).getByRole("link", { name: "내려받기" })).toHaveAttribute(
+    "href",
+    "/api/artifact-vault/31/content?download=1",
+  );
+  await expect(rows.nth(0).getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute("href", "/files?tab=vault");
+  await expect(rows.nth(1)).toHaveText(/내 파일에서 지운 파일이에요/);
+  await expect(rows.nth(1).getByRole("link")).toHaveCount(0);
+  // 넣은 파일은 결과물 패널로 여는 줄로 그리지 않는다.
+  await expect(page.getByTestId("assistant-message").last().getByTestId("message-artifact")).toHaveCount(0);
+});

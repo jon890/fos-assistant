@@ -11,6 +11,12 @@ export type VaultItem = {
   byteSize: number;
   fileCount: number;
   vaultedAt: string;
+  /** 비서가 붙인 제목이다. 없으면 null 이고 화면이 파일 이름을 쓴다. 옛 서버 응답에는 없다 */
+  title?: string | null;
+  /** 한 줄 설명이다. 없으면 null 이다 */
+  description?: string | null;
+  /** `IMAGE`, `DOCUMENT`, `TABLE` 가운데 하나다. 받는 형식이 아닌 옛 보관본이면 null 이다 */
+  kind?: "IMAGE" | "DOCUMENT" | "TABLE" | null;
 };
 
 /** `GET /api/artifact-vault` 의 응답이다. */
