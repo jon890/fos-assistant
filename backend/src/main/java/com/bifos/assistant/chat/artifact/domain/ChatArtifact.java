@@ -102,6 +102,21 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private int autoVaultAttempts;
 
+    /** 비서가 이미지 도구에 넘긴 그림 지시문. {@link #generationPromptKeyId} 가 있으면 암호문이다. 만든 그림 행에만 있다. */
+    @Column(name = "generation_prompt", columnDefinition = "LONGTEXT")
+    @Getter
+    private String generationPrompt;
+
+    /** 지시문을 암호화한 데이터 key 의 번호. 비어 있으면 지시문은 평문이다. */
+    @Column(name = "generation_prompt_key_id")
+    @Getter
+    private Long generationPromptKeyId;
+
+    /** 같은 올리기가 다시 와도 한 행이 되게 하는 값. 만든 그림 행에만 있다. */
+    @Column(name = "generation_call_key", length = 64, columnDefinition = "CHAR(64)")
+    @Getter
+    private String generationCallKey;
+
 
     private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
         this.conversationId = conversationId;
@@ -148,6 +163,28 @@ public class ChatArtifact extends CreatedAtEntity {
 
     public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize) {
         return new ChatArtifact(conversationId, messageId, path, byteSize);
+    }
+
+
+    /**
+     * fos-ctx 가 올린 그림이다. 답 메시지는 turn 이 끝날 때 묶는다(ADR-20261119 / generated-image).
+     *
+     * @param prompt 저장할 지시문. 암호화했으면 암호문이다
+     * @param promptKeyId 지시문을 암호화한 key 번호. 평문이면 null
+     */
+    public static ChatArtifact generatedImage(
+        Long conversationId, String path, long byteSize, String prompt, Long promptKeyId, String callKey) {
+        ChatArtifact image = new ChatArtifact(conversationId, null, path, byteSize);
+        image.generationPrompt = prompt;
+        image.generationPromptKeyId = promptKeyId;
+        image.generationCallKey = callKey;
+        return image;
+    }
+
+
+    /** 비서가 만든 그림 행인가. HTML 이 부르는 사진은 행이 없으므로 올리기가 만든 행만 참이다. */
+    public boolean isGeneratedImage() {
+        return generationCallKey != null;
     }
 
 

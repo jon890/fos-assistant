@@ -20,6 +20,53 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<ChatArtifact> findByMessageId(Long messageId);
 
 
+    /** 같은 올리기가 다시 왔는지 볼 때 쓴다. */
+    Optional<ChatArtifact> findByGenerationCallKey(String generationCallKey);
+
+
+    /** 그 대화에서 만든 그림 행의 경로다. 지워진 것도 담아 제목이 다시 쓰이지 않게 한다. */
+    @Query("""
+            select a.path from ChatArtifact a
+             where a.conversationId = :conversationId
+               and a.generationCallKey is not null
+               and a.vaultUserId is null
+            """)
+    List<String> findGeneratedImagePaths(@Param("conversationId") Long conversationId);
+
+
+    /**
+     * 그 대화에서 아직 답에 묶이지 않은 그림 행을 이 답에 묶는다(ADR-20261119 / generated-image).
+     *
+     * <p>turn 시작 시각으로 자르지 않는다. 다른 에이전트에게 맡긴 실행은 부모 turn 이 끝난 뒤에 돌 수 있다. 파일을 지운 행은 묶지 않는다.
+     * 트랜잭션은 {@code ChatArtifactWriter} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.messageId = :messageId
+             where a.conversationId = :conversationId
+               and a.messageId is null
+               and a.generationCallKey is not null
+               and a.vaultUserId is null
+               and a.deletedAt is null
+            """)
+    int bindGeneratedImages(@Param("conversationId") Long conversationId, @Param("messageId") Long messageId);
+
+
+    /** 그 사용자가 이 대화의 이 경로들에서 보관한 살아 있는 뿌리 사본이다. 번호 순이라 같은 경로는 뒤의 것이 새것이다. */
+    @Query("""
+            select a from ChatArtifact a
+             where a.vaultUserId = :userId
+               and a.conversationId = :conversationId
+               and a.path in :paths
+               and a.deletedAt is null
+               and a.vaultBundleId is null
+             order by a.id asc
+            """)
+    List<ChatArtifact> findLiveVaultCopies(
+        @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("paths") Collection<String> paths);
+
+
     /** 없는 파일이 보관 기간이 지나 지워진 것인지 가릴 때만 쓴다. */
     boolean existsByConversationIdAndPathAndDeletedAtIsNotNullAndVaultUserIdIsNull(Long conversationId, String path);
 

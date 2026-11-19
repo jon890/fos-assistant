@@ -1,0 +1,189 @@
+package com.bifos.assistant.chat.artifact.application;
+
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
+import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
+import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.artifact.domain.GeneratedImageTitle;
+import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
+import com.bifos.assistant.crypto.domain.SealedText;
+import com.bifos.assistant.crypto.domain.TextCipher;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.Clock;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * 비서가 만든 그림 하나를 대화의 결과물 폴더에 쓰고 결과물 행으로 남긴다(ADR-20261119 / generated-image).
+ *
+ * <p>누구의 어느 대화인지는 부르는 쪽({@code mcp})이 origin 실행에서 정해 넘긴다. 이 서비스는 요청 본문에서 그것을 읽지 않는다.
+ * 답에 묶는 일은 turn 이 끝날 때 {@link ArtifactService#recordTurn} 이 한다.
+ *
+ * <p>이름 정하기부터 행 만들기까지 대화마다 한 번에 하나만 돈다. 겹침을 그 대화의 그림 행으로 보므로, 둘이 함께 돌면 같은 이름을 고른다.
+ * Control Plane 을 한 대만 띄운다는 전제다.
+ */
+@Service
+@Slf4j
+public class GeneratedImageService {
+
+    static final String FOLDER = "generated/";
+    private static final int LOCK_COUNT = 64;
+
+    private final ArtifactStore store;
+    private final ChatArtifactRepository artifacts;
+    private final TextCipher cipher;
+    private final Clock clock;
+    private final long maxBytes;
+    private final ReentrantLock[] locks = new ReentrantLock[LOCK_COUNT];
+
+
+    public GeneratedImageService(
+        ArtifactStore store, ChatArtifactRepository artifacts, TextCipher cipher, Clock clock, ArtifactProperties properties) {
+        this.store = store;
+        this.artifacts = artifacts;
+        this.cipher = cipher;
+        this.clock = clock;
+        this.maxBytes = properties.generatedImageMaxBytes();
+        for (int index = 0; index < LOCK_COUNT; index++) {
+            locks[index] = new ReentrantLock();
+        }
+    }
+
+
+    /**
+     * 그림을 저장한다. 같은 호출의 같은 그림이 다시 오면 처음 저장한 결과를 돌려주고 파일을 다시 쓰지 않는다.
+     *
+     * @param ownerUserId 그 대화의 요청자. 지시문을 이 사용자의 데이터 key 로 암호화한다
+     * @param callKey 올린 호출과 그림을 묶은 값. 되풀이 요청을 한 건으로 만든다
+     * @param title 모델이 붙인 제목. 없으면 null 이나 빈 글이다
+     * @throws ApiException {@link ErrorCode#VALIDATION_FAILED}. 받지 않는 형식이거나 상한을 넘을 때
+     */
+    public GeneratedImageSaved save(
+        Long conversationId, Long ownerUserId, String callKey, String title, String prompt, byte[] image) {
+        String extension = extensionOf(image);
+        ReentrantLock lock = locks[Math.floorMod(conversationId.hashCode(), LOCK_COUNT)];
+        lock.lock();
+        try {
+            Optional<ChatArtifact> existing = artifacts.findByGenerationCallKey(callKey);
+            if (existing.isPresent()) {
+                return new GeneratedImageSaved(GeneratedImageTitle.ofPath(existing.get().path()));
+            }
+            String name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()));
+            String path = FOLDER + name + "." + extension;
+            long byteSize = store.write(conversationId, path, image);
+            try {
+                SealedText sealed = seal(ownerUserId, callKey, prompt == null ? "" : prompt);
+                artifacts.save(ChatArtifact.generatedImage(conversationId, path, byteSize, sealed.content(), sealed.keyId(), callKey));
+            } catch (RuntimeException ex) {
+                removeQuietly(conversationId, path);
+                throw ex;
+            }
+            return new GeneratedImageSaved(name);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+
+    /** 저장한 지시문을 푼다. 풀지 못하면 빈 값이다. 평문으로 둔 지시문은 그대로 돌려준다. */
+    public Optional<String> promptOf(ChatArtifact artifact, Long ownerUserId) {
+        if (artifact.generationPrompt() == null) {
+            return Optional.empty();
+        }
+        if (artifact.generationPromptKeyId() == null) {
+            return Optional.of(artifact.generationPrompt());
+        }
+        return cipher.open(
+            artifact.generationPromptKeyId(), ownerUserId, aad(ownerUserId, artifact.generationCallKey()), artifact.generationPrompt());
+    }
+
+
+    private SealedText seal(Long ownerUserId, String callKey, String prompt) {
+        return cipher.seal(ownerUserId, aad(ownerUserId, callKey), prompt).orElseGet(() -> new SealedText(prompt, null));
+    }
+
+
+    /** 행 번호는 넣을 때 정해지므로 암호문의 자리를 사용자와 호출 값으로 묶는다. 호출 값은 표 전체에서 유일하다. */
+    private static String aad(Long ownerUserId, String callKey) {
+        return "chat_artifact_prompt:user:" + ownerUserId + ":call:" + callKey;
+    }
+
+
+    /** 그 대화의 그림 행(지워진 것 포함)과 겹치지 않는 이름을 고른다. 확장자가 달라도 같은 제목으로 본다. */
+    private String uniqueName(Long conversationId, String base) {
+        Set<String> taken = new HashSet<>();
+        for (String path : artifacts.findGeneratedImagePaths(conversationId)) {
+            taken.add(GeneratedImageTitle.ofPath(path));
+        }
+        if (!taken.contains(base)) {
+            return base;
+        }
+        int number = 2;
+        while (taken.contains(base + " " + number)) {
+            number++;
+        }
+        return base + " " + number;
+    }
+
+
+    /** 파일 머리 바이트로 형식을 정한다. 올린 쪽이 붙인 이름이나 형식 값을 믿지 않는다. */
+    private String extensionOf(byte[] image) {
+        if (image == null || image.length == 0) {
+            throw invalid("generated image is empty");
+        }
+        if (image.length > maxBytes) {
+            throw invalid("generated image is too large");
+        }
+        if (startsWith(image, 0, 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A)) {
+            return "png";
+        }
+        if (startsWith(image, 0, 0xFF, 0xD8, 0xFF)) {
+            return "jpg";
+        }
+        if (startsWith(image, 0, 'R', 'I', 'F', 'F') && startsWith(image, 8, 'W', 'E', 'B', 'P')) {
+            return "webp";
+        }
+        throw invalid("generated image must be PNG, JPEG or WebP");
+    }
+
+
+    private static boolean startsWith(byte[] bytes, int offset, int... expected) {
+        if (bytes.length < offset + expected.length) {
+            return false;
+        }
+        for (int index = 0; index < expected.length; index++) {
+            if ((bytes[offset + index] & 0xFF) != expected[index]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+    /** 행을 만들지 못한 파일을 지운다. 지우지 못해도 행이 없어 보이지 않고 보관 기간 정리가 지운다. */
+    private void removeQuietly(Long conversationId, String path) {
+        try {
+            store.resolveInside(conversationId, path).ifPresent(file -> {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException ex) {
+                    log.warn("could not remove a generated image without a row conversationId={}", conversationId, ex);
+                }
+            });
+        } catch (RuntimeException ex) {
+            log.warn("could not remove a generated image without a row conversationId={}", conversationId, ex);
+        }
+    }
+
+
+    private static ApiException invalid(String message) {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, message);
+    }
+}

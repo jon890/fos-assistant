@@ -234,7 +234,7 @@ class ArtifactWriteServiceTest {
         UUID publicId = UUID.randomUUID();
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
         when(conversation.id()).thenReturn(42L);
-        ArtifactStore store = new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30));
+        ArtifactStore store = new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null));
         store.write(42L, "a.png", new byte[] {1, 2, 3});
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
             new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),

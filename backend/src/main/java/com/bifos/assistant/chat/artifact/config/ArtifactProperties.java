@@ -15,13 +15,15 @@ import org.springframework.validation.annotation.Validated;
  * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 에이전트에게 폴더 자리를 알릴 때 이것을
  * 적는다. 비어 있으면 기동을 멈춘다
  * @param retentionDays 파일이 마지막으로 바뀐 뒤 두는 날 수
+ * @param generatedImageMaxBytes 비서가 만든 그림 한 장의 올리기 상한. 보관함의 파일 하나 상한과는 별개다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.artifact")
-public record ArtifactProperties(String root, String agentRoot, Integer retentionDays) {
+public record ArtifactProperties(String root, String agentRoot, Integer retentionDays, Long generatedImageMaxBytes) {
 
 
     private static final int DEFAULT_RETENTION_DAYS = 30;
+    private static final long DEFAULT_GENERATED_IMAGE_MAX_BYTES = 20L * 1024 * 1024;
 
     public ArtifactProperties {
         // 설정의 자리표시자는 환경 변수가 아예 없을 때만 기동을 멈춘다. 빈 문자열은 여기서 막는다.
@@ -32,5 +34,6 @@ public record ArtifactProperties(String root, String agentRoot, Integer retentio
             throw new IllegalStateException("assistant.artifact.agent-root is required");
         }
         retentionDays = retentionDays == null ? DEFAULT_RETENTION_DAYS : retentionDays;
+        generatedImageMaxBytes = generatedImageMaxBytes == null ? DEFAULT_GENERATED_IMAGE_MAX_BYTES : generatedImageMaxBytes;
     }
 }
