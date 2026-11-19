@@ -565,3 +565,18 @@ APPROVAL_WRITE_POINTS = {
 }
 # 플러그인 의존성 경고가 클래스 메서드 밖에서 부르는 모듈 함수다.
 PLUGIN_DEPENDENCY_HELPERS = ("missing_python_dependencies", "_declared_requirements")
+
+
+# 만든 그림 올리기가 기대는 지점이다(fos-assistant ADR-20261119 / generated-image). plugin 은 이 이름들을 import 하지 않고 동작에만 기댄다.
+# `test_generated_image_contract.py` 가 Hermes 소스에서 본다.
+GENERATED_IMAGE_TOOL = "image_generate"
+# `$HERMES_HOME` 아래에서 그림을 쓰는 폴더다. plugin 은 이 폴더 아래의 파일만 읽고 지운다.
+GENERATED_IMAGE_CACHE_PARTS = ("cache", "generated", "images")
+# provider 의 성공 응답을 만드는 함수와 plugin 이 읽는 키다.
+GENERATED_IMAGE_RESULT = ("agent/image_gen_provider.py", "success_response", frozenset({"success", "image"}))
+# 캐시 폴더를 정하는 파일, 그 안의 상수 이름, provider 쪽에서 `images` 를 붙이는 글이다.
+GENERATED_IMAGE_CACHE_SOURCE = ("agent/provider_media.py", "GENERATED_SUBDIR", '{provider_media.GENERATED_SUBDIR}/images')
+# `pre_tool_call` 의 `modify` 를 원래 인자 뒤에 병합하는 자리다.
+PRE_TOOL_CALL_MODIFY = ("hermes_cli/plugins.py", 'if action == "modify":', "**partial}")
+# `transform_tool_result` 에 도구 인자를 넘기는 호출이다.
+TRANSFORM_RESULT_ARGS = ("model_tools.py", 'invoke_hook("transform_tool_result", tool_name=function_name, args=function_args,')
