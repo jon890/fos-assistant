@@ -36,6 +36,19 @@ export type ModelTier = {
   reasoningEffort: string | null;
 };
 
+/**
+ * 단계를 고르는 곳에 보이는 `<모델> · <강도>` 다. 강도가 비면 모델만이고, 모델이 비면 null 이다.
+ * 강도는 저장된 값을 그대로 보인다(ADR-20261119 / tier-model-names).
+ */
+export function tierModelLine(
+  tier: Pick<ModelTier, "model" | "reasoningEffort">,
+): string | null {
+  if (tier.model === null) return null;
+  return tier.reasoningEffort === null
+    ? tier.model
+    : `${tier.model} · ${tier.reasoningEffort}`;
+}
+
 export type ModelTiers = {
   tiers: ModelTier[];
   userDefaultTier: ModelTierCode | null;

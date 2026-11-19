@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.modelchoice.application;
 
+import com.bifos.assistant.chat.modelchoice.application.dto.CatalogRefresh;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.agent.domain.Agent;
@@ -60,11 +61,22 @@ public class ModelOptionsService {
     private final Duration ttl;
     private final Clock clock;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
-    private final Map<String, Instant> refreshedAt = new ConcurrentHashMap<>();
+    private final Map<String, RefreshState> refreshes = new ConcurrentHashMap<>();
 
 
     /** 다음에 다시 읽을 시각과 마지막으로 읽은 목록이다. */
     private record Cached(Instant rereadAt, HermesModelCatalog catalog) {
+    }
+
+    /**
+     * profile 하나의 다시 읽기 상태다.
+     *
+     * @param attemptedAt 마지막으로 Hermes 에 다시 묻기 시작한 시각. 최소 간격을 이 시각부터 센다
+     * @param succeededAt 마지막으로 다시 읽는 데 성공한 시각. 없으면 null 이다
+     * @param failed 마지막으로 끝난 시도가 실패였는가
+     * @param inFlight 마지막 시도가 아직 Hermes 의 답을 기다리는가. 성패는 호출이 끝나야 적는다
+     */
+    private record RefreshState(Instant attemptedAt, Instant succeededAt, boolean failed, boolean inFlight) {
     }
 
 
@@ -108,19 +120,42 @@ public class ModelOptionsService {
      * 원인도 아니므로 호출한 쪽은 원래 목록으로 판정한 것과 같은 결과를 받는다.
      */
     public ModelOptions refreshedOptionsForAgent(Long groupId, Agent agent) {
+        refresh(agent);
+        return optionsForAgent(groupId, agent);
+    }
+
+
+    /**
+     * 캐시를 건너뛰고 profile 의 목록을 Hermes 에 다시 묻고 그 결과를 돌려준다. 목록은 돌려주지 않는다.
+     *
+     * <p>예외를 내지 않는다. 그 profile 의 목록을 한 번도 읽지 못했어도 실패로 답한다. 그룹의 profile 을 차례로 다시
+     * 읽는 쪽이 한 profile 의 실패에서 멈추지 않게 한다.
+     *
+     * <p>마지막 시도가 {@link #MIN_REFRESH_INTERVAL} 안이면 Hermes 를 부르지 않는다. 그 시도가 실패로 끝났으면
+     * 실패로, 성공했거나 아직 답을 기다리는 중이면 새로 묻지 않은 것으로 답한다. 실패를 새로 묻지 않은 것으로 답하면
+     * 부른 쪽이 옛 목록을 방금 읽은 것으로 안다.
+     */
+    public CatalogRefresh refresh(Agent agent) {
         String profile = agent.hermesProfile();
         Instant now = clock.instant();
-        Instant last = refreshedAt.get(profile);
-        if (last == null || !now.isBefore(last.plus(MIN_REFRESH_INTERVAL))) {
-            refreshedAt.put(profile, now);
-            try {
-                HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile, true);
-                cache.put(profile, new Cached(now.plus(ttl), fresh));
-            } catch (ApiException ex) {
-                log.warn("모델 목록을 건너뛰고 다시 읽지 못해 들고 있던 목록을 쓴다 profile={} code={}", profile, ex.code());
-            }
+        RefreshState before = refreshes.get(profile);
+        if (before != null && now.isBefore(before.attemptedAt().plus(MIN_REFRESH_INTERVAL))) {
+            boolean failed = !before.inFlight() && before.failed();
+            return new CatalogRefresh(
+                failed ? CatalogRefresh.Status.FAILED : CatalogRefresh.Status.REUSED, before.succeededAt());
         }
-        return optionsForAgent(groupId, agent);
+        Instant lastSuccess = before == null ? null : before.succeededAt();
+        refreshes.put(profile, new RefreshState(now, lastSuccess, false, true));
+        try {
+            HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile, true);
+            cache.put(profile, new Cached(now.plus(ttl), fresh));
+            refreshes.put(profile, new RefreshState(now, now, false, false));
+            return new CatalogRefresh(CatalogRefresh.Status.REFRESHED, now);
+        } catch (ApiException ex) {
+            log.warn("모델 목록을 건너뛰고 다시 읽지 못해 들고 있던 목록을 쓴다 profile={} code={}", profile, ex.code());
+            refreshes.put(profile, new RefreshState(now, lastSuccess, true, false));
+            return new CatalogRefresh(CatalogRefresh.Status.FAILED, lastSuccess);
+        }
     }
 
 

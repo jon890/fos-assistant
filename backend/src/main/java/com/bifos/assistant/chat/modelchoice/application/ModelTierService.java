@@ -60,9 +60,9 @@ public class ModelTierService {
     /**
      * 요청자가 고를 수 있는 단계와 기본값이다.
      *
-     * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-063).
-     * 그 밖의 요청자는 단계와 이름만 받는다. 빈 칸은 고를 수 없어 싣지 않는다. ChatGPT 가 요금제마다 칸 수를 달리
-     * 보이는 것과 같다.
+     * <p>단계가 가리키는 모델과 effort 는 역할과 상관없이 준다. 단계를 고르는 곳이 모든 사용자에게 그 값을 보인다
+     * (ADR-20261119 / tier-model-names). provider 는 화면이 그리지 않는 내부 값이라 {@code ADMIN} 역할에게만 준다
+     * (ADR-063). 빈 칸은 고를 수 없어 내지 않는다. ChatGPT 가 요금제마다 칸 수를 달리 보이는 것과 같다.
      */
     @Transactional(readOnly = true)
     public ModelTierOptions optionsFor(CurrentUser user, Agent agent) {
@@ -76,7 +76,7 @@ public class ModelTierService {
             : null;
         return new ModelTierOptions(
             filled.stream()
-                .map(stop -> internal ? view(stop, defaultProvider) : nameOnly(stop))
+                .map(stop -> internal ? view(stop, defaultProvider) : withoutProvider(stop))
                 .toList(),
             users.findById(user.id())
                 .map(it -> tierOf(it.modelDefaultTier()))
@@ -395,7 +395,14 @@ public class ModelTierService {
     }
 
 
-    /** 단계와 이름만 담는다. 가리키는 모델을 싣지 않는 요청자와 mapping 이 빈 단계가 함께 쓴다. */
+    /** provider 를 뺀 단계다. {@code ADMIN} 이 아닌 요청자가 받는다. 모델과 effort 는 단계를 고르는 곳에 보인다. */
+    private static ModelTierOptions.Tier withoutProvider(ModelSetting.Stop definition) {
+        return new ModelTierOptions.Tier(
+            definition.tier(), labelOf(definition.tier()), null, definition.model(), definition.reasoningEffort());
+    }
+
+
+    /** 단계와 이름만 담는다. mapping 이 빈 단계가 쓴다. */
     private static ModelTierOptions.Tier nameOnly(ModelSetting.Stop definition) {
         return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
     }

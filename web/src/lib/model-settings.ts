@@ -58,6 +58,37 @@ export async function getGroupModelCatalog(): Promise<GroupModelCatalog | null> 
   return result.ok ? (result.data?.catalog ?? null) : null;
 }
 
+/** 다시 읽기의 결과다. `REUSED` 는 30초 안이라 새로 묻지 않았다는 뜻이다 */
+export type CatalogRefreshStatus = "REFRESHED" | "REUSED" | "FAILED";
+
+export type CatalogRefresh = {
+  status: CatalogRefreshStatus;
+  /** 켜진 profile 모두가 마지막으로 다시 읽기에 성공한 시각이다. 성공한 적 없는 profile 이 있으면 null 이다 */
+  refreshedAt: string | null;
+};
+
+/**
+ * `POST /api/admin/model-catalog/refresh` 로 켜진 모든 profile 의 목록을 Hermes 에 다시 묻게 한다.
+ * 요청 자체가 실패해도 `FAILED` 로 돌려준다. 화면은 두 경우를 같은 안내로 보인다.
+ */
+export async function refreshGroupModelCatalog(): Promise<CatalogRefresh> {
+  const result = await request<CatalogRefresh>(
+    "/api/admin/model-catalog/refresh",
+    { method: "POST" },
+  );
+  return result.ok && result.data !== null
+    ? result.data
+    : { status: "FAILED", refreshedAt: null };
+}
+
+/** 숨길 모델의 후보만 다시 읽는다. 읽지 못했거나 목록 없이 왔으면 null 이다 */
+export async function getHiddenModelCandidates(): Promise<GroupModelCatalog | null> {
+  const result = await request<{ catalog: GroupModelCatalog | null }>(
+    "/api/admin/model-hidden/candidates",
+  );
+  return result.ok ? (result.data?.catalog ?? null) : null;
+}
+
 /**
  * 숨김 설정과 숨길 모델의 후보를 함께 읽는다. 후보를 읽지 못했으면 `catalogMissing` 이 참이고, 그때도 저장된
  * 숨김을 풀 수 있다. 숨김 목록을 읽지 못하면 실패다.
