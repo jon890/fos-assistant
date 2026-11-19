@@ -19,6 +19,7 @@ public class McpToolCatalog {
     private final McpContentDraftSnapshots contentSnapshots;
     private final McpFinancialLimitTools financialLimits;
     private final McpApprovalResumeTool approvalResume;
+    private final McpFileSpaceTools fileSpace;
 
 
     public List<Map<String, Object>> tools() {
@@ -40,7 +41,7 @@ public class McpToolCatalog {
                 "name",
                 "artifact_write",
                 "description",
-                "대화의 결과물에 쓸 파일을 저장한다. conversation_id에는 대화 UUID, path에는 폴더 안 상대 경로를 준다. content로 html 또는 css 본문을 쓰거나 source_url로 png, jpg, jpeg, gif, webp 이미지를 가져온다. 두 방식은 하나만 쓰며 파일 하나는 5MB를 넘을 수 없다. 같은 path는 새 내용으로 바뀐다.",
+                "대화의 결과물에 쓸 파일을 저장한다. conversation_id에는 대화 UUID, path에는 폴더 안 상대 경로를 준다. content로 html 또는 css 본문을 쓰거나 source_url로 png, jpg, jpeg, gif, webp 이미지를 가져온다. 두 방식은 하나만 쓰며 파일 하나는 5MB를 넘을 수 없다. 같은 path는 새 내용으로 바뀐다. HTML에는 title에 짧은 한국어 제목, description에 한 줄 설명을 붙인다. 사용자의 파일 공간(내 파일)에 그 제목으로 보인다.",
                 "inputSchema",
                 Map.of(
                     "type", "object",
@@ -50,7 +51,9 @@ public class McpToolCatalog {
                         "conversation_id", Map.of("type", "string"),
                         "path", Map.of("type", "string"),
                         "content", Map.of("type", "string"),
-                        "source_url", Map.of("type", "string")),
+                        "source_url", Map.of("type", "string"),
+                        "title", Map.of("type", "string"),
+                        "description", Map.of("type", "string")),
                     "required", List.of("conversation_id", "path"),
                     "oneOf",
                     List.of(
@@ -157,6 +160,7 @@ public class McpToolCatalog {
             financialLimits.readDefinition(),
             financialLimits.changeDefinition(),
             approvalResume.definition(),
+            fileSpace.definition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

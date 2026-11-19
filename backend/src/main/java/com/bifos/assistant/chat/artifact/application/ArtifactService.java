@@ -51,6 +51,21 @@ public class ArtifactService {
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
         + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.\n";
 
+    /**
+     * 파일 공간 규칙이다(스펙 workspace REQ7, REQ8). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
+     *
+     * <p>첫 줄은 도구가 없어도 맞는 안내다. 사용자가 「파일 공간」 을 말했을 때 되묻지 않게 한다.
+     */
+    static final String FILE_SPACE_RULES = "[파일 공간]\n"
+        + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
+        + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
+        + "아래 네 줄은 file_space_put 도구가 있을 때만 따른다.\n"
+        + "- 사용자에게 줄 파일(엑셀, PDF, 문서, CSV 등)을 만들었거나 사용자가 파일 공간에 넣어 달라고 하면 file_space_put 으로 넣는다."
+        + " 짧은 한국어 제목과 한 줄 설명을 붙인다.\n"
+        + "- 이미 들어 있는 것(자동으로 들어가는 HTML 과 그림, 결과가 already 인 것)은 다시 넣지 않고 이미 있다고 답한다.\n"
+        + "- 도구가 실패하면 넣었다고 답하지 않고 까닭을 알린다.\n"
+        + "- 다른 에이전트에게 맡긴 일에서 만든 파일은 그 파일을 만든 에이전트가 직접 넣는다. 맡길 때 넣어 달라고 함께 적는다.\n";
+
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
     private final ChatArtifactWriter writer;
@@ -75,6 +90,7 @@ public class ArtifactService {
             // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
             + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
             + IMAGE_RULES
+            + FILE_SPACE_RULES
             + "\n"
             + SkillAgentNotice.PARAGRAPH;
     }
@@ -94,6 +110,14 @@ public class ArtifactService {
             return;
         }
         bindGeneratedImages(conversationId, messageId);
+        bindChangedHtml(conversationId, messageId, turnStartedAt);
+        // HTML 을 묶은 뒤에 본다. 같은 답에 같은 경로의 HTML 줄이 있으면 넣은 파일 줄을 겹쳐 보이지 않는다.
+        bindPutFiles(conversationId, messageId);
+    }
+
+
+    /** 바뀐 HTML 을 답에 묶는다. 훑기가 실패하거나 바뀐 것이 없으면 여기서만 멈춘다. */
+    private void bindChangedHtml(Long conversationId, Long messageId, Instant turnStartedAt) {
         List<ArtifactFoundFile> found;
         try {
             found = store.changedHtmlSince(conversationId, turnStartedAt);
@@ -119,12 +143,24 @@ public class ArtifactService {
                 continue;
             }
             try {
-                artifacts.save(
-                    ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize()));
+                // artifact_write 가 제목을 받아 둔 행이 있으면 그 행을 묶는다. 제목이 보관본으로 옮겨진다.
+                if (!writer.bindTitled(conversationId, file.path(), messageId, file.byteSize())) {
+                    artifacts.save(ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize()));
+                }
             } catch (RuntimeException ex) {
                 // 한 파일이 실패해도 나머지는 묶는다. 경로가 칸 길이를 넘는 것도 여기로 온다.
                 log.warn("could not record an artifact conversationId={} messageId={}", conversationId, messageId, ex);
             }
+        }
+    }
+
+
+    /** 넣기 도구가 넣은 파일을 이 답에 묶는다(ADR-20261119 / file-space-put). 실패해도 밖으로 던지지 않는다. */
+    private void bindPutFiles(Long conversationId, Long messageId) {
+        try {
+            writer.bindPutFiles(conversationId, messageId);
+        } catch (RuntimeException ex) {
+            log.warn("could not bind put files of a turn conversationId={} messageId={}", conversationId, messageId, ex);
         }
     }
 

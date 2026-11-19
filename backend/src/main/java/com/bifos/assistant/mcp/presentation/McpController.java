@@ -11,6 +11,7 @@ import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
+import com.bifos.assistant.mcp.application.McpFileSpaceTools;
 import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
@@ -56,6 +57,7 @@ public class McpController {
     private static final String MEMORY_READ = "memory_read";
     private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
+    private static final String FILE_SPACE_PUT = McpFileSpaceTools.PUT;
     private static final String AGENT_LIST = "agent_list";
     private static final String AGENT_STATUS = "agent_status";
     private static final String AGENT_DELEGATE = "agent_delegate";
@@ -75,10 +77,11 @@ public class McpController {
         FOLLOW_UP_PROPOSE,
         McpMediaObservationTools.LIST);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
-    private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE);
+    private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE, FILE_SPACE_PUT);
 
     private final McpToolService tools;
     private final McpArtifactCalls artifactCalls;
+    private final McpFileSpaceCalls fileSpaceCalls;
     private final McpCallerResolver callers;
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
@@ -96,6 +99,7 @@ public class McpController {
             Map.entry(MEMORY_READ, this::readMemory),
             Map.entry(MEMORY_SEARCH, this::searchMemory),
             Map.entry(ARTIFACT_WRITE, (caller, id, args) -> artifactCalls.writeArtifact(caller, id, args)),
+            Map.entry(FILE_SPACE_PUT, (caller, id, args) -> fileSpaceCalls.put(caller, id, args)),
             Map.entry(AGENT_LIST, this::listAgents),
             Map.entry(AGENT_STATUS, this::agentStatus),
             Map.entry(AGENT_DELEGATE, this::agentDelegate),
@@ -195,7 +199,7 @@ public class McpController {
         if (!CHECK_TREE_TOOLS.contains(toolName)) {
             // 살펴보기 줄을 한 번만 읽어 트리인지와 쓰기 허용을 함께 본다.
             Optional<ProactiveCheck> check = checkGuard.checkOf(caller.originExecution());
-            if (check.isPresent() && !writeAllowedInCheck(toolName, check.get(), arguments)) {
+            if (check.isPresent() && !writeAllowedInCheck(toolName, check.get(), caller, arguments)) {
                 return response(id, tools.notAllowedInCheck());
             }
         }
@@ -206,10 +210,16 @@ public class McpController {
     /**
      * 쓰기 도구를 허용한 살펴보기가 이 쓰기 도구를 받는가(ADR-082). 결과물은 그 살펴보기의 점검 대화에만 쓴다. 요청한 대화가 그 대화가
      * 아니거나 대화 식별자를 읽지 못하면 받지 않는다. 같은 사용자의 다른 대화에 웹 결과에서 온 글을 쓰지 않게 하기 위해서다.
+     * {@code file_space_put} 은 대화 인자가 없어 origin 실행의 대화로 본다.
      */
-    private boolean writeAllowedInCheck(String toolName, ProactiveCheck check, JsonNode arguments) {
+    private boolean writeAllowedInCheck(String toolName, ProactiveCheck check, McpCaller caller, JsonNode arguments) {
         if (!CHECK_TREE_WRITE_TOOLS.contains(toolName) || !check.writesAllowed()) {
             return false;
+        }
+        if (FILE_SPACE_PUT.equals(toolName)) {
+            // 이 도구에는 대화 인자가 없다. origin 실행의 대화가 점검 대화인지로 본다.
+            return check.conversationId() != null
+                && check.conversationId().equals(caller.originExecution().conversationId());
         }
         JsonNode conversationId = arguments.get("conversation_id");
         if (conversationId == null

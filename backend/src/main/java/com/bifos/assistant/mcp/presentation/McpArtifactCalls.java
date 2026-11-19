@@ -31,7 +31,9 @@ public class McpArtifactCalls {
         if (!onlyArtifactFields(arguments)
             || !text(arguments, "conversation_id")
             || !text(arguments, "path")
-            || !exactlyOneText(arguments, "content", "source_url")) {
+            || !exactlyOneText(arguments, "content", "source_url")
+            || !optionalText(arguments, "title")
+            || !optionalText(arguments, "description")) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         String conversationId = arguments.get("conversation_id").asString();
@@ -50,7 +52,8 @@ public class McpArtifactCalls {
                 id,
                 tools.writeArtifact(
                     caller,
-                    new ArtifactWriteRequest(parsed, value.path(), value.content(), value.sourceUrl())));
+                    new ArtifactWriteRequest(
+                        parsed, value.path(), value.content(), value.sourceUrl(), value.title(), value.description())));
         } catch (ApiException ex) {
             return invalidParams(id, artifactValidationReason(ex));
         }
@@ -58,8 +61,15 @@ public class McpArtifactCalls {
 
 
     private static boolean onlyArtifactFields(JsonNode arguments) {
-        Set<String> allowed = Set.of("conversation_id", "path", "content", "source_url");
+        Set<String> allowed = Set.of("conversation_id", "path", "content", "source_url", "title", "description");
         return allowed.containsAll(arguments.propertyNames());
+    }
+
+
+    /** 선택 인자다. 없거나 {@code null} 이거나 글이다. */
+    private static boolean optionalText(JsonNode arguments, String name) {
+        JsonNode value = arguments.get(name);
+        return value == null || value.isNull() || value.isTextual();
     }
 
 

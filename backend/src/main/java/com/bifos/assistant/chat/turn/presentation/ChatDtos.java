@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
+import com.bifos.assistant.chat.artifact.application.dto.PutFileDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.PendingMessage;
@@ -182,19 +183,21 @@ public final class ChatDtos {
 
     /**
      * 답에 묶인 결과물 파일 하나다. 화면이 대화의 공개 식별자와 이 경로로 본문 주소를 만든다.
-     * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
-     * @param byteSize 답에 묶을 때의 크기
-     * @param deleted 보관 기간이 지나 파일을 지웠다
+     * {@code FILE} 은 넣기 도구가 「내 파일」 에 넣은 파일이라 대화 폴더의 파일이 아니다. 화면은 {@code vaultItemId} 로 주소를 만든다.
+     * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다. {@code FILE} 은 보관본의 경로이고 지웠으면 빈 글이다
+     * @param byteSize 답에 묶을 때의 크기. {@code FILE} 은 묶음 전체의 크기다
+     * @param deleted 보관 기간이 지나 파일을 지웠다. {@code FILE} 은 「내 파일」 에서 지웠다
      * @param autoVault 자동 보관 상태({@code PENDING}, {@code RUNNING}, {@code DONE}, {@code SKIPPED}, {@code FAILED}).
      * 자동 보관 대상이 아니면 null
      * @param autoVaultError {@code FAILED} 일 때 그 까닭의 오류 코드. 아니면 null
-     * @param kind {@code IMAGE} 는 비서가 만든 그림, {@code HTML} 은 결과물 페이지다
+     * @param kind {@code IMAGE} 는 비서가 만든 그림, {@code HTML} 은 결과물 페이지, {@code FILE} 은 넣기 도구가 넣은 파일이다
      * @param prompt 그림 지시문. 그림이 아니거나 풀지 못하면 null
-     * @param vaultItemId 그 그림의 살아 있는 보관본 번호. 없거나 그림이 아니면 null
+     * @param vaultItemId 그 그림이나 넣은 파일의 살아 있는 보관본 번호. 없으면 null
+     * @param title {@code FILE} 의 제목. 없으면 null 이고 화면이 파일 이름을 쓴다
      */
     public record ArtifactView(
         String path, long byteSize, boolean deleted, String autoVault, String autoVaultError, String kind, String prompt,
-        Long vaultItemId) {
+        Long vaultItemId, String title) {
         static ArtifactView from(ChatArtifact artifact, GeneratedImageDetail image) {
             return new ArtifactView(
                 artifact.path(),
@@ -204,7 +207,14 @@ public final class ChatDtos {
                 artifact.autoVaultError(),
                 artifact.isGeneratedImage() ? "IMAGE" : "HTML",
                 image == null ? null : image.prompt(),
-                image == null ? null : image.vaultItemId());
+                image == null ? null : image.vaultItemId(),
+                null);
+        }
+
+
+        static ArtifactView from(PutFileDetail file) {
+            return new ArtifactView(
+                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title());
         }
     }
 
