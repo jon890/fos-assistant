@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultQuery;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.domain.VaultFileType;
 import com.bifos.assistant.chat.artifact.domain.VaultLabel;
+import com.bifos.assistant.chat.artifact.infra.ArtifactPutVaultIds;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultRow;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
@@ -41,6 +42,14 @@ public class ArtifactVaultFinder {
     private final ArtifactVaultMeta metas;
     private final ConversationRepository conversations;
     private final ArtifactVaultProperties properties;
+    private final ArtifactPutVaultIds putVaultIds;
+
+
+    /** 그 대화에서 넣기 도구로 넣은 보관본의 번호다. 지운 것은 없다. 주인과 대화는 부르는 쪽이 정했다. */
+    @Transactional(readOnly = true)
+    public List<Long> putIdsOf(Long ownerUserId, Long conversationId) {
+        return putVaultIds.findPutVaultIds(ownerUserId, conversationId);
+    }
 
 
     /** 조건에 맞는 보관본 한 쪽과 용량이다. 대화 주인 확인은 부르는 쪽이 한다. */

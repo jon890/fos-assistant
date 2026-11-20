@@ -1,5 +1,6 @@
 package com.bifos.assistant.quality.application;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactVaultFinder;
 import com.bifos.assistant.chat.artifact.application.ArtifactVaultService;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -37,6 +38,7 @@ class DeployCheckCleaner {
 
     private final ChatService chat;
     private final ArtifactVaultService vault;
+    private final ArtifactVaultFinder vaultFinder;
     private final MemoryService memories;
     private final EvaluationUserService evaluationUsers;
     private final QualityRunRepository runs;
@@ -48,7 +50,7 @@ class DeployCheckCleaner {
     /** 그 평가 대화와, 그 대화에서 파일 공간에 넣은 보관본을 지운다. 첨부와 결과물은 대화 정리가 함께 지운다. */
     void dropConversation(CurrentUser evaluation, Long conversationId) {
         try {
-            for (Long id : vault.putIdsOf(evaluation.id(), conversationId)) {
+            for (Long id : vaultFinder.putIdsOf(evaluation.id(), conversationId)) {
                 vault.delete(evaluation.id(), id);
             }
             chat.delete(evaluation, conversationId);

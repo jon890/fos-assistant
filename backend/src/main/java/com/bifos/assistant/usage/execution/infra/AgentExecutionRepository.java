@@ -266,10 +266,6 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByConversationIdAndParentExecutionIdIsNullAndAgentIdNotOrderByIdAsc(Long conversationId, Long agentId);
 
 
-    /** 그 대화의 루트 실행을 만든 순서로 읽는다. 배포 뒤 확인이 기능 하나의 turn 들을 모은다. */
-    List<AgentExecution> findByConversationIdAndParentExecutionIdIsNullOrderByIdAsc(Long conversationId);
-
-
     /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
     @Query("""
             select distinct e.parentExecutionId from AgentExecution e

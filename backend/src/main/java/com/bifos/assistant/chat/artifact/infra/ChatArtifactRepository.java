@@ -272,19 +272,6 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     Optional<ArtifactVaultRow> findVaulted(@Param("id") Long id, @Param("userId") Long userId);
 
 
-    /** 그 대화에서 에이전트의 넣기 도구로 넣은, 지우지 않은 보관본 뿌리 행의 번호다. 배포 뒤 확인이 판정과 정리에 쓴다. */
-    @Query("""
-            select a.id from ChatArtifact a
-             where a.vaultUserId = :userId
-               and a.conversationId = :conversationId
-               and a.vaultOrigin is not null
-               and a.vaultBundleId is null
-               and a.deletedAt is null
-             order by a.id
-            """)
-    List<Long> findPutVaultIds(@Param("userId") Long userId, @Param("conversationId") Long conversationId);
-
-
     Optional<ChatArtifact> findByIdAndVaultUserId(Long id, Long vaultUserId);
 
 

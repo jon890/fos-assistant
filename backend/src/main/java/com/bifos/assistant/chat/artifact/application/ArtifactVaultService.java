@@ -244,13 +244,6 @@ public class ArtifactVaultService {
     }
 
 
-    /** 그 대화에서 넣기 도구로 넣은 보관본의 번호다. 지운 것은 없다. 주인과 대화는 부르는 쪽이 정했다. */
-    @Transactional(readOnly = true)
-    public List<Long> putIdsOf(Long ownerUserId, Long conversationId) {
-        return rows.findPutVaultIds(ownerUserId, conversationId);
-    }
-
-
     /** 주인의 보관 목록이다. 새로 보관한 것이 먼저다. 묶음은 한 줄이다. 본문은 풀지 않는다. */
     public List<ArtifactVaultItem> list(Long ownerUserId) {
         return rows.listVaulted(ownerUserId).stream()

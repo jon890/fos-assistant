@@ -1,6 +1,6 @@
 package com.bifos.assistant.quality.application;
 
-import com.bifos.assistant.chat.artifact.application.ArtifactVaultService;
+import com.bifos.assistant.chat.artifact.application.ArtifactVaultFinder;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.VaultFileType;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
@@ -19,6 +19,7 @@ import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ConversationRootExecutions;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,15 +41,16 @@ import org.springframework.stereotype.Component;
 class DeployCheckObserver {
 
     private final AgentExecutionRepository executions;
+    private final ConversationRootExecutions rootExecutions;
     private final ExecutionEventRepository events;
     private final ChatService chat;
-    private final ArtifactVaultService vault;
+    private final ArtifactVaultFinder vault;
     private final ConnectorActionRepository connectorActions;
 
 
     /** 그 대화의 루트 실행이다. 만든 순서다. 사진 조회의 두 turn, 위임의 자동 turn 이 모두 든다. */
     List<AgentExecution> roots(Long conversationId) {
-        return executions.findByConversationIdAndParentExecutionIdIsNullOrderByIdAsc(conversationId);
+        return rootExecutions.findByConversationIdAndParentExecutionIdIsNullOrderByIdAsc(conversationId);
     }
 
 
