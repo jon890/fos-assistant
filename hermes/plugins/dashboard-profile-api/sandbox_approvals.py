@@ -3,6 +3,7 @@ from __future__ import annotations
 
 # docker 실행 공간에서만 API 경로의 execute_code 를 승인 없이 돌린다(ADR-20261008 / execute-code-unattended).
 # local profile 의 execute_code 는 Hermes 컨테이너에서 돌아 다른 profile 의 `.env` 에 닿으므로 이 키를 남기지 않는다.
+# 도구 저장은 이제 local 을 쓰지 않는다(ADR-20261120 / no-local-shell). docker 가 아닌 쪽은 그 전의 설정을 다루던 경로다.
 UNATTENDED_APPROVAL_KEY = "unattended_mode"
 
 
