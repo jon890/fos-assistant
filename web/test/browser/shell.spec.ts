@@ -71,7 +71,7 @@ test("모바일 머리줄 제목을 누르면 홈으로 가고 새 대화 상태
   await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
-  await page.goto("/usage");
+  await page.goto("/tasks");
   await expect(home).toHaveText("검사용 비서");
   await home.click();
   await expect(page).toHaveURL(/\/new$/);
@@ -127,25 +127,72 @@ test("존재하지 않는 주소는 새 대화 링크를 보인다", async ({ pa
     .toHaveAttribute("href", "/new");
 });
 
-test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", async ({ page, context }, testInfo) => {
-  await page.goto("/usage");
+test("사이드바는 대화 화면에 있고 대화 중심의 줄만 두며 로그인 화면에는 없다", async ({ page, context }, testInfo) => {
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
   await expect(sidebar).toBeVisible();
-  // 사이드바는 맨 위의 「새 대화」 와 「지금 볼 것」, 대화 목록, 주요 화면 메뉴, 맨 아래 줄이다. 관리자 입구는 메뉴가 아니라 맨 아래 줄에 있다.
-  await expect(sidebar.getByRole("navigation", { name: "대화 목록" })).toBeVisible();
+  // 위에서부터 앱 이름 줄, 대화방, 새 대화, 대화 검색, 지금 볼 것, 예약 작업과 기억, 대화 목록, 이름 줄이다(spec 의 REQ1).
   const menu = sidebar.getByRole("navigation", { name: "주요 화면" });
-  await expect(menu.getByRole("link")).toHaveText([/^에이전트/, /^외부 서비스 연결/, /^예약 작업/, /^기억/, /^사용량/, /^파일 공간/, /^내 브라우저/, /^개발 문서/]);
-  await expect(menu.getByRole("group", { name: "고급" })).toBeVisible();
-  await expect(sidebar.getByRole("link", { name: /^지금 볼 것/ })).toBeVisible();
-  await expect(menu.getByRole("link", { name: /^지금 볼 것/ })).toHaveCount(0);
-  await expect(sidebar.getByTestId("admin-entry")).toBeVisible();
-  await expect(menu.getByTestId("admin-entry")).toHaveCount(0);
+  await expect(menu.getByRole("link")).toHaveText([/^예약 작업/, /^기억/]);
+  await expect(sidebar.getByRole("navigation", { name: "대화 목록" })).toBeVisible();
+  for (const gone of ["에이전트", "외부 서비스 연결", "사용량", "파일 공간", "내 브라우저", "개발 문서"])
+    await expect(sidebar.getByRole("link", { name: gone, exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole("group", { name: "고급" })).toHaveCount(0);
+  await expect(sidebar.getByTestId("admin-entry")).toHaveCount(0);
+  const order = ["대화 검색", "지금 볼 것", "예약 작업", "기억", "대화 목록", "계정 메뉴"];
+  const tops: number[] = [];
+  tops.push((await sidebar.getByRole("searchbox", { name: "대화 검색" }).boundingBox())!.y);
+  tops.push((await sidebar.getByRole("link", { name: /^지금 볼 것/ }).boundingBox())!.y);
+  tops.push((await menu.getByRole("link", { name: "예약 작업", exact: true }).boundingBox())!.y);
+  tops.push((await menu.getByRole("link", { name: /^기억/ }).boundingBox())!.y);
+  tops.push((await sidebar.getByRole("navigation", { name: "대화 목록" }).boundingBox())!.y);
+  tops.push((await sidebar.getByRole("button", { name: "계정 메뉴" }).boundingBox())!.y);
+  expect(tops, `줄의 차례가 ${order.join(", ")} 이어야 한다`).toEqual([...tops].sort((a, b) => a - b));
+  await expect(page.locator("nav[aria-label*='탭']")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
+
+  await menu.getByRole("link", { name: "예약 작업", exact: true }).click();
+  await expect(page).toHaveURL(/\/tasks$/);
+  await openSidebar(page, testInfo);
+  await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: /^기억/ }).click();
+  await expect(page).toHaveURL(/\/memory$/);
+
   await context.clearCookies();
   await page.goto("/signin");
   await expect(page.getByRole("complementary", { name: "사이드바" })).toHaveCount(0);
+});
+
+test("알림 단추는 사이드바 맨 위 앱 이름 옆에 있고 서랍 닫기 단추와 겹치지 않는다", async ({ page }, testInfo) => {
+  await page.goto("/new");
+  await openSidebar(page, testInfo);
+  const sidebar = page.getByRole("complementary", { name: "사이드바" });
+  const bell = sidebar.getByRole("link", { name: /^알림/ });
+  await expect(bell).toBeVisible();
+  const home = sidebar.getByRole("link", { name: "검사용 비서 홈", exact: true });
+  const bellBox = (await bell.boundingBox())!;
+  const homeBox = (await home.boundingBox())!;
+  // 같은 줄이다.
+  expect(Math.abs(bellBox.y + bellBox.height / 2 - (homeBox.y + homeBox.height / 2))).toBeLessThan(8);
+  const account = (await sidebar.getByRole("button", { name: "계정 메뉴" }).boundingBox())!;
+  expect(bellBox.y).toBeLessThan(account.y);
+  if (testInfo.project.name === "mobile") {
+    const close = (await page.getByRole("button", { name: "사이드바 닫기" }).boundingBox())!;
+    const overlaps = bellBox.x < close.x + close.width && close.x < bellBox.x + bellBox.width
+      && bellBox.y < close.y + close.height && close.y < bellBox.y + bellBox.height;
+    expect(overlaps, "알림 단추와 서랍 닫기 단추가 겹친다").toBe(false);
+    // 휴대폰 위 막대의 알림 단추는 그대로다.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("banner").getByRole("link", { name: /^알림/ })).toBeVisible();
+  }
+});
+
+test("화면 높이가 낮아도 사이드바 맨 아래 이름 줄이 보인다", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: page.viewportSize()?.width ?? 640, height: 320 });
+  await page.goto("/new");
+  await openSidebar(page, testInfo);
+  await expect(page.getByRole("button", { name: "계정 메뉴" })).toBeInViewport({ ratio: 1 });
 });
 
 test("사진을 먼저 올려 대화가 생겨도 미리보기가 남고 다른 대화를 고르면 서버에서 지운다", async ({ page }, testInfo) => {

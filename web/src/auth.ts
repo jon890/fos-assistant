@@ -24,6 +24,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: requireEnv("AUTH_GOOGLE_ID"),
       clientSecret: requireEnv("AUTH_GOOGLE_SECRET"),
+      // 늘 계정 고르기 화면을 보인다. 같은 기기에서 로그아웃한 뒤 다른 가족이 자기 계정을 고를 수 있어야 한다
+      // (docs/features/app-shell/spec.md 의 DECISION23).
+      authorization: { params: { prompt: "select_account" } },
     }),
   ],
   callbacks: {

@@ -1,0 +1,82 @@
+import { expect, setSession, test } from "./fixtures.ts";
+import { openAccountMenu } from "./helpers.ts";
+import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
+
+// 이름 메뉴의 로그아웃을 본다(docs/features/app-shell/spec.md 의 REQ6). 세션은 테스트마다 자기 context 에만 있다.
+
+async function createConversation(page: Page, title: string): Promise<string> {
+  const response = await page.request.post("/api/chat", { data: { text: title, agentCode: "browser" } });
+  expect(response.ok()).toBeTruthy();
+  return ((await response.json()) as { conversationId: string }).conversationId;
+}
+
+async function signedInUser(context: BrowserContext, prefix: string, testInfo: { project: { name: string } }) {
+  const user = { email: `${prefix}-${testInfo.project.name}-${Date.now()}@example.com`, name: "로그아웃 검사" };
+  await setSession(context, user);
+  return user;
+}
+
+test("로그아웃하면 로그인 화면으로 가고 뒤로 가기와 저장한 주소로는 화면이 열리지 않는다", async ({ context, page }, testInfo) => {
+  const user = await signedInUser(context, "signout", testInfo);
+  const title = `로그아웃 전 대화 ${Date.now()}`;
+  const id = await createConversation(page, title);
+  await page.goto("/new");
+  await page.goto(`/chat/${id}`);
+
+  await openAccountMenu(page, testInfo);
+  await page.getByRole("menuitem", { name: "로그아웃" }).click();
+  await expect(page).toHaveURL(/\/signin$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/signin$/);
+  await page.goto(`/chat/${id}`);
+  await expect(page).toHaveURL(/\/signin$/);
+
+  // 데이터는 지워지지 않는다. 같은 사용자로 다시 들어오면 대화가 목록에 그대로다.
+  await setSession(context, user);
+  await page.goto("/new");
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
+  await expect(page.getByRole("navigation", { name: "대화 목록" }).locator(`a[href="/chat/${id}"]`)).toBeVisible();
+});
+
+test("로그아웃은 다른 브라우저의 로그인을 풀지 않는다", async ({ browser, context, page }, testInfo) => {
+  const user = await signedInUser(context, "signout-other", testInfo);
+  const other = await browser.newContext();
+  try {
+    await setSession(other, user);
+    await page.goto("/new");
+    await openAccountMenu(page, testInfo);
+    await page.getByRole("menuitem", { name: "로그아웃" }).click();
+    await expect(page).toHaveURL(/\/signin$/);
+
+    const otherPage = await other.newPage();
+    await otherPage.goto("/new");
+    await expect(otherPage).toHaveURL(/\/new$/);
+  } finally {
+    await other.close();
+  }
+});
+
+for (const failure of ["500", "끊김"] as const) {
+  test(`로그아웃 요청이 ${failure} 이면 안내가 보이고 화면은 그대로다`, async ({ page }, testInfo) => {
+    await page.route("**/signout", (route) =>
+      failure === "500" ? route.fulfill({ status: 500 }) : route.abort("internetdisconnected"),
+    );
+    await page.goto("/new");
+    await openAccountMenu(page, testInfo);
+    await page.getByRole("menuitem", { name: "로그아웃" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "로그아웃하지 못했어요" })).toBeVisible();
+    await expect(page).toHaveURL(/\/new$/);
+  });
+}
+
+test("bfcache 에서 돌아온 문서는 다시 읽는다", async ({ page }) => {
+  await page.goto("/new");
+  await page.evaluate(() => {
+    (window as Window & { beforeReload?: boolean }).beforeReload = true;
+  });
+  const reloaded = page.waitForEvent("load");
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+  await reloaded;
+  expect(await page.evaluate(() => (window as Window & { beforeReload?: boolean }).beforeReload)).toBeUndefined();
+});

@@ -124,3 +124,17 @@ export async function openTodo(page: Page) {
   if (!(await tab.isVisible())) await page.getByTestId("todo-summary").click();
   await expect(tab).toBeVisible();
 }
+
+/**
+ * 사이드바 맨 아래의 이름 메뉴를 연다. 좁은 폭이면 서랍을 먼저 연다.
+ *
+ * <p>설정, 관리자 화면, 화면 밝기, 로그아웃이 이 메뉴에 있다(docs/features/app-shell/spec.md 의 REQ3).
+ */
+export async function openAccountMenu(page: Page, testInfo: TestInfo) {
+  const trigger = page.getByRole("button", { name: "계정 메뉴" });
+  if (testInfo.project.name === "mobile" && !(await trigger.isVisible())) {
+    await page.getByRole("button", { name: "사이드바 열기" }).click();
+  }
+  await trigger.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+}
