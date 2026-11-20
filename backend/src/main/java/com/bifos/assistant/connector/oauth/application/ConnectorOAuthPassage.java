@@ -41,20 +41,16 @@ public class ConnectorOAuthPassage {
         if (mark.nonce() != null) {
             // 대기 표식은 확인 도구가 쓴다. 연결 상태를 보지 않는다.
             return Optional.of(tokens.pending(mark.connectionId(), mark.nonce())
-                .map(found -> new ConnectorOAuthRefresh(Outcome.OK, found)).orElse(failed(Outcome.MISSING)));
+                .map(found -> new ConnectorOAuthRefresh(Outcome.OK, found)).orElse(new ConnectorOAuthRefresh(Outcome.MISSING, null)));
         }
         ConnectorConnection connection = connections.findById(mark.connectionId()).orElse(null);
         if (connection == null || connection.status() == ConnectionStatus.DISCONNECTED || !connection.fields().auth().usesOAuth()) {
-            return Optional.of(failed(Outcome.MISSING));
+            return Optional.of(new ConnectorOAuthRefresh(Outcome.MISSING, null));
         }
         if (connection.fields().auth().reconnectRequired()) {
-            return Optional.of(failed(Outcome.GRANT_REVOKED));
+            return Optional.of(new ConnectorOAuthRefresh(Outcome.GRANT_REVOKED, null));
         }
         return Optional.of(tokens.refresh(mark.connectionId(), FRESH));
     }
 
-
-    private static ConnectorOAuthRefresh failed(Outcome outcome) {
-        return new ConnectorOAuthRefresh(outcome, null);
-    }
 }
