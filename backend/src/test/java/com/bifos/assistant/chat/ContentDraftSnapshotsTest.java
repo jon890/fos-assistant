@@ -1,5 +1,13 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftImages;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
+import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
+import tools.jackson.databind.JsonNode;
+import java.nio.file.Path;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.lang.reflect.Proxy;
@@ -75,11 +83,11 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     @Autowired
     ContentDraftBindingAccess bindingAccess;
     @Autowired
-    com.bifos.assistant.chat.contentdraft.application.ContentDraftImages draftImages;
+    ContentDraftImages draftImages;
     @Autowired
-    com.bifos.assistant.chat.artifact.application.GeneratedImageService generatedImages;
+    GeneratedImageService generatedImages;
     @Autowired
-    com.bifos.assistant.chat.artifact.infra.ArtifactStore artifactStore;
+    ArtifactStore artifactStore;
     @Autowired
     ContentDraftSnapshotRepository snapshotRows;
     final ContentDraftJobRows jobRows = new ContentDraftJobRows(() -> snapshotRows);
@@ -483,7 +491,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     @DisplayName("원고에 넣은 그림 사본은 snapshot 입력에서 사진과 같은 폴더의 파일이고 그 파일이 그림과 바이트가 같다")
     void resolvesGeneratedImageCopyLikePhotos() throws Exception {
         byte[] png = new byte[96];
-        java.util.Arrays.fill(png, (byte)61);
+        Arrays.fill(png, (byte)61);
         System.arraycopy(new byte[] {(byte)0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, 0, png, 0, 8);
         generatedImages.save(conversation.id(), owner.id(), "call-" + UUID.randomUUID(), "글 머리 그림", "지시문", png);
         try {
@@ -494,7 +502,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             blocks.addObject().put("type", "image").put("assetId", image.assetId());
             blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
             var withImage = drafts.create(owner, conversation.id(), reader.read(node)).draft().draftId();
-            var sent = new java.util.concurrent.atomic.AtomicReference<tools.jackson.databind.JsonNode>();
+            var sent = new AtomicReference<JsonNode>();
             doAnswer(call -> {
                 sent.set(call.getArgument(3));
                 return ContentDraftSnapshotHash.compile(call.getArgument(2), call.getArgument(3));
@@ -510,7 +518,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             assertThat(copy.path("fileName").asString()).isEqualTo(image.fileName());
             assertThat(copy.path("photoDir").asString()).isEqualTo(original.path("photoDir").asString()).isEqualTo(image.photoDir());
             assertThat(copy.path("ordinal").asInt()).as("보낸 사진 뒤에 잇는다").isGreaterThan(original.path("ordinal").asInt());
-            var file = java.nio.file.Path.of(properties.root(), "users", com.bifos.assistant.chat.attachment.infra.AttachmentStore.userDirectoryKey(owner.id()),
+            var file = Path.of(properties.root(), "users", AttachmentStore.userDirectoryKey(owner.id()),
                 conversation.id().toString(), image.fileName());
             assertThat(Files.readAllBytes(file)).as("worker 가 올리는 파일").containsExactly(png);
         } finally {

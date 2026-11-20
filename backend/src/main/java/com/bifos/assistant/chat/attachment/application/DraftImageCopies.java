@@ -23,7 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * 만든 그림을 블로그 원고에 넣으려고 만드는 사진 첨부 사본이다(ADR-20261120 / generated-image-draft).
  *
- * <p>사본은 보통 사진과 같은 폴더와 이름 규칙을 써서 원고와 미리보기, 네이버 임시저장이 고칠 것 없이 읽는다.
+ * <p>사본은 보통 사진과 같은 폴더와 이름 규칙을 써서 원고와 미리보기, 플러그인의 저장 worker 가 고칠 것 없이 읽는다.
  * 메시지에는 묶지 않아 대화 화면과 사진 순번에 나오지 않는다. 보관 기간은 사진을 올릴 때와 같다.
  *
  * <p>부르는 쪽이 요청자가 대화 주인임을 확인하고 {@code ChatContentMutationCoordinator} 의 트랜잭션 안에서 부른다.

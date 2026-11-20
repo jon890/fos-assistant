@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -61,7 +62,7 @@ class ContentDraftImageToolTest {
     AgentRepository agents;
 
     @Autowired
-    com.bifos.assistant.usage.execution.infra.AgentExecutionRepository executions;
+    AgentExecutionRepository executions;
 
     @Autowired
     ConversationRepository conversations;
