@@ -376,6 +376,16 @@ public class FollowUpService {
 
 
     /**
+     * 같은 제목의 열린 줄이 있으면 제안은 받아들인다. 에이전트가 사용자가 시킨 할 일을 바로 만들 때 쓴다. 트랜잭션 안에서 부른다.
+     *
+     * @return 제안을 받아들였으면 참, 이미 챙기는 줄이면 거짓, 열린 줄이 없으면 빈 값
+     */
+    Optional<Boolean> acceptOpenTitle(CurrentUser user, String key, Instant now) {
+        return openTitle(user, key, now).map(found -> "accepted".equals(found.action()));
+    }
+
+
+    /**
      * 더하기가 돌려줄 줄과 로그에 적을 동작이다.
      *
      * @param action 새로 만들었으면 {@code created}, 같은 열린 줄을 돌려줬으면 {@code reused}, 제안을 받아들였으면
@@ -423,7 +433,7 @@ public class FollowUpService {
 
 
     /** 앞뒤 공백을 지운 제목이다. 비었거나 {@link #TITLE_MAX} 자를 넘으면 400 이다. */
-    private static String requireTitle(String title) {
+    static String requireTitle(String title) {
         String stripped = title == null ? "" : title.strip();
         int length = stripped.codePointCount(0, stripped.length());
         if (length < 1 || length > TITLE_MAX) {

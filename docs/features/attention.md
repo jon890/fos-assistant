@@ -328,12 +328,13 @@ sequenceDiagram
 ### 제안 도구
 
 Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 트리에서도 이 도구를 받는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)).
-관리자의 쓰기 도구 허용 설정과 관계없이 `PROPOSED` 만 만든다.
-판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 도구 정의와 결과 글은 `McpToolService.tools` 와 `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
+**사용자가 직접 시킨 할 일만 바로 챙기는 `OPEN` 으로 만들고, 그 밖에는 `PROPOSED` 만 만든다**([ADR-20261120 / agent-service-writes](../../backend/docs/adr/ADR-20261120-agent-service-writes.md)). 바로 만드는 것은 모델이 `requested` 를 주었고, 사람이 보낸 메시지의 실행(그 대화가 바깥 글을 읽지 않음)이거나 예약 작업의 실행일 때다. 스스로 판단한 할 일, 먼저 살펴보기와 맡긴 실행, 바깥 글을 읽은 대화의 할 일은 관리자의 쓰기 도구 허용 설정과 관계없이 제안이다.
+챙기는 할 일을 읽는 `follow_up_list` 와 끝내는 `follow_up_done` 도 같은 서버에 있다. 끝내기는 바로 만드는 조건과 같은 실행에서만 상태를 바꾼다.
+판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 실행 출처의 판정과 대상 찾기는 [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」 가, 도구 정의와 결과 글은 `McpToolCatalog`, `McpFollowUpTools`, `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다. 대화가 없는 실행에서 부르면 거절한다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/hooks.py` 의 `REQUIRED_TOOLS` 에 넣는다
-- **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
+- **실행 사건에 할 일 도구(제안, 목록, 끝내기)의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
 - 값이 틀린 인자에는 `isError` 와 무엇이 틀렸는지 한 줄로 답한다. 모델이 고쳐 다시 부를 수 있게 하려는 것이다
 
 ### 제안 억제
@@ -346,6 +347,8 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 | 같은 대화에서 `REJECTED_COOLDOWN` 안에 `REJECTED` 된 같은 `title_key` 가 있다 | 거절한다 |
 | 같은 대화의 `PROPOSED` 가 `MAX_OPEN_PROPOSALS_PER_CONVERSATION` 에 닿았다 | 거절한다. 점검 대화는 `CHECK_PROPOSAL_WINDOW` 안에 만든 제안만 센다 |
 | 한 실행이 `MAX_PROPOSALS_PER_EXECUTION` 만큼 이미 제안했다 | 거절한다 |
+
+바로 챙기는 줄은 위 표의 억제 규칙을 쓰지 않는다. 같은 제목의 제안이 있으면 받아들이고, 한 실행의 상한은 `FollowUpAgentRequests` 가 따로 갖는다.
 
 「한 실행」 은 호출의 origin 실행이다. 그 실행이 부른 하위 에이전트의 호출도 함께 센다.
 두 상한은 세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 한두 개 넘을 수 있다.

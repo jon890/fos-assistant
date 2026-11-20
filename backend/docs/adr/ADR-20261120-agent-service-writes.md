@@ -36,4 +36,5 @@
 ### 결과
 
 - 새 서비스 쓰기 도구를 더할 때 위 표의 어느 줄인지 먼저 정한다
-- 먼저 살펴보기에서 받는 도구는 `McpController` 의 세 목록(`CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_TASK_TOOLS`)이 갖는다
+- 먼저 살펴보기에서 받는 도구는 `McpController` 의 세 목록(`CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_DIRECT_TOOLS`)이 갖는다
+- 사용자가 직접 시킨 일인지는 모델의 인자와 실행 출처를 함께 본다. 판정은 [`design.md`](../../../docs/features/service-concepts/design.md) 의 「PR3 할 일과 기억 도구」 가 갖는다

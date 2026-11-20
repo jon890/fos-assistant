@@ -4,6 +4,8 @@ package com.bifos.assistant.followup.application.dto;
 public enum FollowUpProposalOutcome {
     /** 새 {@code PROPOSED} 줄을 만들었다. */
     CREATED,
+    /** 사용자가 직접 시킨 할 일이라 바로 챙기는 {@code OPEN} 줄을 만들었거나, 같은 제목의 제안을 받아들였다. */
+    OPENED,
     /** 같은 사용자에게 같은 제목의 열린 줄이 있어 새 줄을 만들지 않았다. */
     DUPLICATE,
     /** 같은 대화에서 30일 안에 거절한 제목이다. */
