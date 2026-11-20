@@ -45,14 +45,14 @@ test("공개 식별자 모양이 아니면 읽음을 부르지 않고 알림 목
     return { ok: false, status: 404 };
   });
   assert.equal(called, false);
-  assert.equal(target, "/notifications");
+  assert.equal(target, "/now?tab=notifications");
 });
 
 test("갈 곳이 없거나 읽음이 실패하면 알림 목록으로 가고 예약 작업은 그 작업으로 간다", () => {
   const cases: [MarkReadResult, string][] = [
-    [{ ok: true, data: view({ kind: "DEFAULT_TOOLS_PENDING", targetType: null, targetId: null }) }, "/notifications"],
-    [{ ok: false, status: 404 }, "/notifications"],
-    [{ ok: false, status: 502 }, "/notifications"],
+    [{ ok: true, data: view({ kind: "DEFAULT_TOOLS_PENDING", targetType: null, targetId: null }) }, "/now?tab=notifications"],
+    [{ ok: false, status: 404 }, "/now?tab=notifications"],
+    [{ ok: false, status: 502 }, "/now?tab=notifications"],
     [{ ok: true, data: view({ kind: "TASK_SUCCEEDED", targetType: "TASK", targetId: "t1" }) }, "/tasks/t1"],
     [{ ok: true, data: view({ kind: "EVENT_WATCH_FAILED", targetType: "CONNECTIONS", targetId: null }) }, "/connections"],
   ];

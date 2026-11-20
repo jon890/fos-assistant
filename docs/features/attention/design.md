@@ -121,7 +121,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | `web/src/app/settings/notifications/page.tsx` 와 부품, `web/src/components/shell/settings-area.ts` | 설정 묶음 「알림」. `SETTINGS_GROUPS` 에 묶음을 더하고, `/settings/...` 아래면 늘 「에이전트」 를 고르던 `selectedSettingsHref` 를 `/settings` 자체만 「에이전트」 로 고치게 바꾼다. [화면 틀 스펙](../app-shell/spec.md) 의 묶음 설명도 함께 고친다. PR1 은 이 기기 상태와 기기 목록, PR2 는 기기 이름 고치기와 지우기, 묶음 스위치, 조용한 시간 | PR1, PR2 |
 | `web/src/lib/push.ts` | 지원과 허락 상태, iOS 판정, 기기 이름, 구독 만들기와 끊기, 주소 해시 | PR1 |
 | `web/src/app/api/push/**` | Control Plane 으로 넘기는 경로 | PR1, PR2 |
-| `web/src/app/n/[notificationId]/page.tsx` | 서버에서 읽음 표시를 부르고 `notificationHref` 로 `redirect`. 갈 곳이 없거나 읽기가 404 면 알림 목록(`/notifications`, 화면 틀 PR4 뒤에는 그 넘김을 따른다). 로그인이 없으면 `/signin?next=` 로 보낸다 | PR1 |
+| `web/src/app/n/[notificationId]/page.tsx` | 서버에서 읽음 표시를 부르고 `notificationHref` 로 `redirect`. 갈 곳이 없거나 읽기가 404 면 알림 목록(「지금 볼 것」 의 알림 탭 `/now?tab=notifications`. 전의 주소 `/notifications` 의 넘김을 거치지 않고 바로 연다). 로그인이 없으면 `/signin?next=` 로 보낸다 | PR1 |
 | `web/src/app/signin/page.tsx` | `next` 를 받아 `redirectTo` 로 넘긴다. 디코딩한 값이 `/` 로 시작하고 `//`, `\`, 제어 문자가 없는 같은 사이트 경로만 받고 아니면 `/`. Auth.js 의 `redirectTo` 가 다른 출처를 거르는지도 테스트로 본다 | PR1 |
 | 이름 메뉴의 로그아웃 | 서비스 워커 구독이 있으면 해제 API 와 `unsubscribe()` 를 2초 안에서 기다린 뒤 지금처럼 `/signout` 을 부른다. 실패해도 로그아웃은 막지 않는다 | PR1 |
 

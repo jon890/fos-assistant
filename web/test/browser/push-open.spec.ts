@@ -32,9 +32,9 @@ test("로그인이 없으면 열기 주소를 next 로 붙여 로그인 화면�
 test("없는 알림이나 모양이 틀린 주소는 알림 목록을 연다", async ({ page }) => {
   // 실제 Control Plane 이 없는 알림에 404 를 답한다.
   await page.goto(`/n/${randomUUID()}`);
-  await expect(page).toHaveURL(/\/notifications$/);
+  await expect(page).toHaveURL(/\/now\?tab=notifications$/);
   await page.goto("/n/not-a-public-id");
-  await expect(page).toHaveURL(/\/notifications$/);
+  await expect(page).toHaveURL(/\/now\?tab=notifications$/);
 });
 
 /** 로그인 화면에서 단추를 누른 뒤 Auth.js 가 남긴 돌아갈 주소 쿠키를 읽는다. */

@@ -3,7 +3,7 @@
 // 캐시는 두지 않는다. 화면을 오프라인으로 보이는 일은 이 기능의 범위가 아니다.
 
 /** 글을 읽지 못했을 때 여는 곳이다. 알림 목록이다. */
-const FALLBACK_URL = "/notifications";
+const FALLBACK_URL = "/now?tab=notifications";
 
 /** 같은 사이트 경로만 받는다. `//` 로 시작하면 다른 출처로 가는 주소라 받지 않는다. */
 function sameSitePath(value) {

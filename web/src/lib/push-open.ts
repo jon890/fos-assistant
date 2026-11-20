@@ -8,7 +8,7 @@ import { notificationHref, type NotificationView } from "./notification.ts";
  */
 
 /** 갈 곳이 없거나 읽음 표시가 실패했을 때 여는 곳이다. 「지금 볼 것」 의 알림 목록이다. */
-export const NOTIFICATION_LIST_PATH = "/notifications";
+export const NOTIFICATION_LIST_PATH = "/now?tab=notifications";
 
 /** 읽음 표시 결과다. `callControlPlane` 의 결과와 모양이 같다. */
 export type MarkReadResult =
