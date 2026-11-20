@@ -351,6 +351,28 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(self.tree("alice"), before)
         self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
 
+    def test_sandbox_required_connector_binds_on_a_profile_covered_by_default(self):
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=True, profiles={}))
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIs(response.body["changed"], True)
+
+    def test_sandbox_required_connector_is_rejected_when_isolate_unlisted_is_false(self):
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=False, profiles={}))
+        before = self.tree("alice")
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(self.tree("alice"), before)
+
     def test_sandbox_required_connector_binds_on_a_profile_in_the_policy(self):
         """그 profile 이 정책에 있으면 셸이 켜져 있지 않아도 설치가 성공한다."""
         demo, _ = self.bind_fixture()
