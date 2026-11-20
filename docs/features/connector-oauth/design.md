@@ -112,7 +112,7 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | 정의 해석(`connector_launch.py` 의 `_launcher_parts`, `_launcher_current`, `_launcher_inner`) | `@oauth=` 인자를 칸과 따로 읽는다. 낡은 정의 판정과 `${..}` env 만들기에서 칸으로 세지 않는다 |
 | 실행기(`connector_launcher.py` 의 `_parse_args`) | `@oauth` 가 있으면 OAuth 파일을 풀어 `token_url` 을 그 env 에 넣는다. 파일이 없으면(붙여 넣기 연결) 빈 값이다 |
 | 직접 실행(`connector_run.py` 가 부르는 `connector_launch.py` 의 `_binding_env`) | 승인한 쓰기와 금융 준비도 같은 OAuth 파일을 읽어 넣는다 |
-| 확인·선택지 호출(`call`, `list`) | 본문 모양 검사에 `oauth` key 를 더한다. `oauth: "current"` 면 본 자리의 보관 파일과 OAuth 파일을, `oauth: "pending"` 이면 대기 보관 파일의 칸 값과 대기 OAuth 파일의 `token_url` 을 넣는다. 처음 연결은 본 자리 보관 파일이 없어도 된다 |
+| 확인·선택지 호출(`call`) | 본문 모양 검사에 `oauth` key 를 더한다. `oauth: "current"` 면 본 자리의 보관 파일과 OAuth 파일을, `oauth: "pending"` 이면 대기 보관 파일의 칸 값과 대기 OAuth 파일의 `token_url` 을 넣는다. 처음 연결은 본 자리 보관 파일이 없어도 된다 |
 
 단추 연결을 선언하는 플러그인은 `assistant.json` 에 확인 도구를 선언한다. Control Plane 은 이 도구를 `call` 로 부른다. `/tools` 는 `assistant.json` 이 없는 표준 플러그인의 확인 경로다.
 
@@ -244,7 +244,7 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 | 문서 | 바꿀 것 |
 | --- | --- |
 | [`hermes/connectors/README.md`](../../../hermes/connectors/README.md) | 「assistant.json」 표에 `oauth`, 「비밀값과 권한」 에 토큰 통로를 쓰는 규칙 |
-| [`hermes/plugins/dashboard-profile-api/README.md`](../../../hermes/plugins/dashboard-profile-api/README.md) | `connector-oauth` 경로, OAuth 파일, `call`·`list` 본문의 `oauth` |
+| [`hermes/plugins/dashboard-profile-api/README.md`](../../../hermes/plugins/dashboard-profile-api/README.md) | `connector-oauth` 경로, OAuth 파일, `call` 본문의 `oauth` |
 | [`docs/features/connector.md`](../connector.md) | 등록 표에 단추 흐름, 해제에 취소 |
 | [`docs/code-architecture.md`](../../code-architecture.md) | 「플러그인 비밀값을 두는 곳」 에 OAuth 파일과 access token 의 자리 |
 | [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) | `connector_connection.fields` 의 `auth`, 알림의 `ADMIN_SECRETS`(목록 화면이라 공개 번호 없이 가리킨다. `NotificationTargetType.list()` 와 웹의 알림 이동이 함께 바뀐다) |
