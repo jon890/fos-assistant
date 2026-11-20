@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "./merge-ready.mjs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DEFAULT_RULES, EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, loadRules, remergeReasons } from "./merge-ready.mjs";
 
 const REQUIRED = ["unit", "backend"];
 const ok = (name: string) => ({ name, state: "SUCCESS", startedAt: "2026-10-12T01:00:00Z" });
@@ -85,38 +88,59 @@ test("같은 파일을 고쳤으면 다시 합친다", () => {
   assert.match(reasons[0], /같은 파일.*web\/src\/b\.ts/);
 });
 
-test("마이그레이션, 빌드와 의존성, test/repo, 공유 계약은 어느 쪽이 건드려도 다시 합친다", () => {
-  const cases: [string, string][] = [
-    ["backend/src/main/resources/db/migration/V20261012000000__a.sql", "마이그레이션"],
-    ["backend/build.gradle.kts", "빌드와 의존성"],
-    ["web/pnpm-lock.yaml", "빌드와 의존성"],
-    ["backend/gradle/libs.versions.toml", "빌드와 의존성"],
-    ["backend/gradle/wrapper/gradle-wrapper.properties", "빌드와 의존성"],
-    ["hermes/connectors/naver-blog/scripts/test.Dockerfile", "빌드와 의존성"],
-    ["hermes/connectors/gmail/package.json", "빌드와 의존성"],
-    ["test/repo/doc-files.test.ts", "test/repo"],
-    ["hermes/docs/hermes-contract.md", "공유 계약"],
-    ["hermes/connectors/gmail/tests/contracts.test.ts", "공유 계약"],
-    ["test/resources/connector-argument-catalog.json", "공유 계약"],
-    ["test/fixtures/connector-tool-descriptions.json", "공유 계약"],
-    ["test/support/pick-port.ts", "공유 계약"],
-    ["test/e2e/fake-hermes/run-routes.ts", "공유 계약"],
-    ["hermes/tests/fixtures/toss-trading-contract.py", "공유 계약"],
-    ["scripts/ci/ci-paths.mjs", "공유 계약"],
-    ["scripts/dev/check-local.sh", "공유 계약"],
-    [".github/workflows/ci.yml", "공유 계약"],
+test("빌드와 의존성, test/repo, CI 판정 파일은 한쪽만 건드려도 다시 합친다", () => {
+  const files = [
+    "backend/build.gradle.kts",
+    "web/pnpm-lock.yaml",
+    "backend/gradle/libs.versions.toml",
+    "backend/gradle/wrapper/gradle-wrapper.properties",
+    "hermes/connectors/naver-blog/scripts/test.Dockerfile",
+    "hermes/connectors/gmail/package.json",
+    "test/repo/doc-files.test.ts",
+    "scripts/ci/ci-paths.mjs",
+    "scripts/dev/check-local.sh",
+    ".github/workflows/ci.yml",
   ];
-  for (const [file, label] of cases) {
+  for (const file of files) {
     const fromMain = remergeReasons(["web/src/a.ts"], [file]);
     assert.equal(fromMain.length, 1, file);
-    assert.match(fromMain[0], new RegExp(`^main 이 .*${label}`), file);
+    assert.match(fromMain[0], /^main 이 공용 경로/, file);
     const fromPr = remergeReasons([file], ["web/src/x.ts"]);
-    assert.match(fromPr[0], new RegExp(`^PR 이 .*${label}`), file);
+    assert.match(fromPr[0], /^PR 이 공용 경로/, file);
   }
 });
 
+test("마이그레이션을 main 만 바꿨으면 다시 합치지 않는다", () => {
+  const migration = "backend/src/main/resources/db/migration/V20261012000000__a.sql";
+  assert.deepEqual(remergeReasons(["web/src/a.ts"], [migration]), []);
+  assert.deepEqual(remergeReasons([migration], ["web/src/a.ts"]), []);
+});
+
+test("PR 과 main 이 둘 다 마이그레이션을 더했으면 다시 합친다", () => {
+  const reasons = remergeReasons(["backend/src/main/resources/db/migration/V20261012000000__a.sql"], ["backend/src/main/resources/db/migration/V20261013000000__b.sql"]);
+  assert.equal(reasons.length, 1);
+  assert.match(reasons[0], /둘 다 migration 묶음/);
+});
+
+test("Hermes 계약과 테스트 지원 코드도 양쪽이 바꿨을 때만 다시 합친다", () => {
+  const groups: [string, string, string][] = [
+    ["hermes/docs/hermes-contract.md", "test/e2e/fake-hermes/run-routes.ts", "hermes_contract"],
+    ["test/resources/connector-argument-catalog.json", "test/support/pick-port.ts", "test_support"],
+  ];
+  for (const [a, b, name] of groups) {
+    assert.deepEqual(remergeReasons(["web/src/a.ts"], [a]), [], a);
+    assert.match(remergeReasons([a], [b])[0] ?? "", new RegExp(name), a);
+  }
+});
+
+test("설정의 규칙을 넘기면 그 규칙으로 판정한다", () => {
+  const rules = { sharedPaths: ["^only-here/"], sharedGroups: {} };
+  assert.match(remergeReasons(["a.ts"], ["only-here/x"], rules)[0], /공용 경로/);
+  assert.deepEqual(remergeReasons(["a.ts"], ["test/repo/x.ts"], rules), []);
+});
+
 test("비슷하지만 위험 경로가 아닌 파일은 직전 CI 를 쓴다", () => {
-  const negatives = ["test/repo-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md", "test/fixtures-old/a.json"];
+  const negatives = ["test/repo-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md"];
   for (const file of negatives) {
     assert.deepEqual(remergeReasons(["web/src/a.ts"], [file]), [], file);
   }
@@ -168,7 +192,7 @@ test("head 가 main 을 포함하지 않으면 CI 시작 시각의 main 과 PR �
   });
   const facts = collect("7", run);
   assert.equal(facts.containsMain, false);
-  assert.match(facts.remergeReasons.join(), /main 이 빌드와 의존성/);
+  assert.match(facts.remergeReasons.join(), /main 이 공용 경로/);
 });
 
 test("조회하는 동안 head 가 바뀌었으면 대기다", () => {
@@ -249,4 +273,37 @@ test("PR 번호가 없거나 숫자가 아니면 종료 코드 2 로 끝난다",
   assert.match(out[0], /사용법/);
   const result = spawnSync("node", ["scripts/pr/merge-ready.mjs"], { encoding: "utf8" });
   assert.equal(result.status, EXIT.LOOKUP);
+});
+
+// loadRules 가 읽는 설정 위치를 임시 폴더로 바꿔 보인다. git 호출은 주 checkout 을 임시 폴더로 돌려주는 대역이다.
+function rulesFrom(queue: object, where: "default" | "env") {
+  const root = mkdtempSync(join(tmpdir(), "merge-ready-"));
+  const dir = where === "env" ? join(root, "custom-orch") : join(root, ".orch");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.json"), JSON.stringify({ queue }));
+  const before = process.env.ORCH_DIR;
+  if (where === "env") process.env.ORCH_DIR = dir;
+  else delete process.env.ORCH_DIR;
+  try {
+    return loadRules(() => ({ status: 0, stdout: `${join(root, ".git")}\n`, stderr: "" }));
+  } finally {
+    if (before === undefined) delete process.env.ORCH_DIR;
+    else process.env.ORCH_DIR = before;
+  }
+}
+
+test("설정의 shared_paths 가 문자열이어도 읽는다", () => {
+  const rules = rulesFrom({ shared_paths: "^custom/" }, "default");
+  assert.match(remergeReasons(["a.ts"], ["custom/policy.txt"], rules)[0], /공용 경로/);
+});
+
+test("ORCH_DIR 이 가리키는 설정을 문자열과 배열 모두 읽는다", () => {
+  for (const shared_paths of ["^custom/", ["^custom/"]]) {
+    const rules = rulesFrom({ shared_paths }, "env");
+    assert.match(remergeReasons(["a.ts"], ["custom/policy.txt"], rules)[0], /공용 경로/);
+  }
+});
+
+test("설정 파일이 없으면 기본값을 쓴다", () => {
+  assert.equal(loadRules(() => ({ status: 1, stdout: "", stderr: "" })), DEFAULT_RULES);
 });

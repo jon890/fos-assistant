@@ -118,6 +118,35 @@ function CaptureEditor({ actions }: { actions: Actions }) {
   );
 }
 
+/**
+ * 합친 옛 기억의 제목이다. 합친 글에서 사실이 빠졌는지 대조하게 보인다(스펙 DECISION24). 합치기가 아니면 그리지 않는다.
+ * 모델이 쓴 제목이라 평문으로만 그린다(ADR-009).
+ */
+function ReplacedTitles({ capture }: { capture: MemoryCapture }) {
+  const titles = capture.replacedTitles ?? [];
+  if (titles.length === 0) return null;
+  const pending = capture.status === "PROPOSED";
+  return (
+    <div
+      data-testid="memory-capture-replaced"
+      className="mt-1 text-xs text-muted-foreground"
+    >
+      <p>
+        {pending
+          ? `받아들이면 ${titles.length}개를 합쳐요`
+          : `${titles.length}개를 합쳤어요`}
+      </p>
+      <ul className="list-disc pl-4">
+        {titles.map((title, index) => (
+          <li key={`${index}-${title}`} className="break-words">
+            {title}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function CaptureError({ actions }: { actions: Actions }) {
   return actions.error ? (
     <p role="alert" className="mt-1 text-xs text-destructive">
@@ -152,6 +181,7 @@ function ProposalCard({
       ) : null}
       <p className="mt-1 font-semibold">{capture.title}</p>
       <p className="mt-1 whitespace-pre-wrap">{capture.content}</p>
+      <ReplacedTitles capture={capture} />
       <CaptureEditor actions={actions} />
       <CaptureError actions={actions} />
       {actions.mode === null ? (
@@ -241,6 +271,7 @@ function RememberedLine({
           {capture.content}
         </p>
       )}
+      <ReplacedTitles capture={capture} />
       <CaptureEditor actions={actions} />
       <CaptureError actions={actions} />
     </div>

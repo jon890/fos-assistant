@@ -2,8 +2,10 @@ package com.bifos.assistant.memory.domain.entity;
 
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
+import com.bifos.assistant.memory.domain.ReplacedMemoryIdsConverter;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -12,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -70,6 +73,15 @@ public class MemoryCapture extends CreatedAtEntity {
     @Column(name = "undone_at")
     private Instant undoneAt;
 
+    /**
+     * 합치기에서 새 기억이 대신한 옛 기억 번호다. 바로 저장은 실제로 대신한 번호, 제안은 받아들일 때 대신할 번호이고, 받아들이면 실제로 대신한 번호로 고친다.
+     * 합치기가 아니면 빈 목록이다.
+     */
+    @Convert(converter = ReplacedMemoryIdsConverter.class)
+    @Column(name = "replaced_memory_ids", length = 512)
+    @Getter(AccessLevel.NONE)
+    private List<Long> replacedMemoryIds = List.of();
+
 
     public static MemoryCapture of(
         Long memoryId,
@@ -90,6 +102,19 @@ public class MemoryCapture extends CreatedAtEntity {
         capture.previousStatus = previousStatus;
         capture.externalRead = externalRead;
         return capture;
+    }
+
+
+    /** 대신한(제안이면 대신할) 옛 기억 번호다. 칸이 비었으면 빈 목록이다. */
+    public List<Long> replacedMemoryIds() {
+        return replacedMemoryIds == null ? List.of() : replacedMemoryIds;
+    }
+
+
+    /** 대신한(제안이면 대신할) 옛 기억 번호를 적는다. */
+    public MemoryCapture replacing(List<Long> ids) {
+        replacedMemoryIds = List.copyOf(ids);
+        return this;
     }
 
 
