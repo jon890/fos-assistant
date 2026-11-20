@@ -343,7 +343,7 @@ class ConnectorConnectionControllerTest {
     void adminConfirmUsesAgentPathAndHidesPrefixesAndValues() throws Exception {
         when(bindingService.confirmApplied(ADMIN, AGENT, DEMO, SHOWN))
             .thenReturn(new AgentConnectionView(
-                DEMO, "검사용 메모", ConnectionStatus.READY, true, BindingStatus.READY, false, 3, List.of()));
+                DEMO, "검사용 메모", ConnectionStatus.READY, true, BindingStatus.READY, false, 3, List.of(), List.of()));
 
         mvc.perform(post("/api/v1/admin/agents/" + AGENT + "/connections/" + DEMO + "/confirm")
             .contentType(MediaType.APPLICATION_JSON)

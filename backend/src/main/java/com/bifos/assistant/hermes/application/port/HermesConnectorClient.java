@@ -82,9 +82,28 @@ public interface HermesConnectorClient {
      * @param cycleAvailable 재시작이 필요한 까닭이 그 서버만 껐다 켜서 풀리는 것뿐인가(ADR-20261120 / connector-auto-apply).
      * 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
      * @param cycleOff 그 서버가 설정에서 꺼진 채 남았는가. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
+     * @param skippedSkills 붙이기가 설치하지 못한 에이전트용 스킬과 까닭(ADR-20261120 / plugin-agent-skills). 떼기와 옛 대시보드
+     * plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다
      */
     record InstallResult(
-        boolean restartRequired, boolean pluginUpdated, boolean reloadPending, boolean cycleAvailable, boolean cycleOff) {
+        boolean restartRequired,
+        boolean pluginUpdated,
+        boolean reloadPending,
+        boolean cycleAvailable,
+        boolean cycleOff,
+        List<SkippedSkill> skippedSkills) {
+
+        public InstallResult {
+            skippedSkills = skippedSkills == null ? List.of() : List.copyOf(skippedSkills);
+        }
+
+
+        /** 빠진 스킬을 모르는 설치 결과다. */
+        public InstallResult(
+            boolean restartRequired, boolean pluginUpdated, boolean reloadPending, boolean cycleAvailable, boolean cycleOff) {
+            this(restartRequired, pluginUpdated, reloadPending, cycleAvailable, cycleOff, List.of());
+        }
+
 
         /** 반영 예정을 모르는 설치 결과다. {@code reloadPending} 은 거짓이다. */
         public InstallResult(boolean restartRequired, boolean pluginUpdated) {
@@ -95,6 +114,19 @@ public interface HermesConnectorClient {
         /** 껐다 켜기를 모르는 설치 결과다. 두 칸은 거짓이다. */
         public InstallResult(boolean restartRequired, boolean pluginUpdated, boolean reloadPending) {
             this(restartRequired, pluginUpdated, reloadPending, false, false);
+        }
+    }
+
+    /**
+     * 설치하지 못한 에이전트용 스킬 하나다.
+     *
+     * @param name 스킬 이름
+     * @param reasons 대시보드가 정한 까닭 낱말. Control Plane 은 뜻을 묶지 않고 그대로 옮긴다
+     */
+    record SkippedSkill(String name, List<String> reasons) {
+
+        public SkippedSkill {
+            reasons = List.copyOf(reasons);
         }
     }
 
