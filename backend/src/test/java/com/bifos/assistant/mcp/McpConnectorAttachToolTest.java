@@ -28,6 +28,7 @@ import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.dto.CallResult;
+import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
@@ -315,6 +316,26 @@ class McpConnectorAttachToolTest {
 
 
     @Test
+    @DisplayName("에이전트 하나에만 붙는 연결이 이미 다른 에이전트에 붙어 있으면 카드 없이 까닭과 연결 화면 링크를 돌려준다")
+    void refusesSingleBindingAttachedElsewhere() throws Exception {
+        ConnectorManifest single = new ConnectorManifest(DEMO, "검사용 메모", "", MANIFEST.fields(), "list_scopes", "attachdemo", 2,
+            MANIFEST.tools(), List.of(), ConnectorAppearance.NONE, true, false, null);
+        when(connector.readCatalog()).thenReturn(List.of(single));
+        connect();
+        Agent elsewhere = agents.save(Agent.of(
+            "attach-other-agent", "다른 비서", PROFILE + "-2", "http://runtime.test/p/" + PROFILE + "-2", CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
+        bindingService.bind(current(dad), elsewhere.code(), DEMO);
+
+        JsonNode result = call(DEMO);
+
+        assertThat(isError(result)).isTrue();
+        assertThat(text(result)).contains("single_binding", "\"link\":\"/connections/" + DEMO + "\"");
+        assertThat(actions.findAll()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("다른 사용자가 연결한 서비스는 내 연결이 아니라서 카드 없이 연결 화면 링크를 준다")
     void othersConnectionIsNotMine() throws Exception {
         AppUser other = users.save(AppUser.of("attach-mom-" + UUID.randomUUID() + "@example.com", "엄마", 4472L, UserRole.MEMBER));
@@ -341,7 +362,7 @@ class McpConnectorAttachToolTest {
         assertThat(actions.findById(card.id()).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
         assertThat(bindings.findAll()).isEmpty();
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
-        assertThat(notices()).containsExactly("「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 그 화면에서 상태를 확인해 주세요");
+        assertThat(notices()).containsExactly("「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 외부 서비스 연결 화면에서 상태를 확인해 주세요");
     }
 
 
@@ -425,7 +446,7 @@ class McpConnectorAttachToolTest {
         jdbc.update("DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE title = ?)", TITLE_OF_CHAT);
         jdbc.update("DELETE FROM conversation WHERE title = ?", TITLE_OF_CHAT);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        jdbc.update("DELETE FROM agent WHERE hermes_profile = ?", PROFILE);
+        jdbc.update("DELETE FROM agent WHERE hermes_profile IN (?, ?)", PROFILE, PROFILE + "-2");
     }
 
 

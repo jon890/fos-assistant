@@ -38,12 +38,21 @@ public final class ControlPlaneActions {
         CONNECTOR_ATTACH,
         new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "이 에이전트에 붙이기", false, Set.of("connector_id", "agent_code")));
 
+    private static final Map<String, String> SCREENS = Map.of(
+        TASK_DELETE, "예약 작업 화면", MEMORY_FORGET, "기억 화면", CONNECTOR_ATTACH, "외부 서비스 연결 화면");
+
     private static final Map<String, Map<String, String>> LABELS = Map.of(
         TASK_DELETE, Map.of("task", "작업", "next_run", "다음 실행", "task_id", "작업 번호"),
         MEMORY_FORGET, Map.of("memory", "기억", "content", "내용", "scope", "범위", "memory_id", "기억 번호", "revision", "버전"),
         CONNECTOR_ATTACH,
         Map.of("connector", "서비스", "agent", "에이전트", "tools", "쓸 수 있게 되는 도구", "caution", "주의", "connector_id", "서비스 번호",
             "agent_code", "에이전트 번호"));
+
+
+    /** 그 동작의 결과를 사용자가 확인할 화면의 이름이다. 결과를 적지 못한 줄의 알림 줄이 쓴다. */
+    public static String screen(String toolName) {
+        return toolName == null ? "그 화면" : SCREENS.getOrDefault(toolName, "그 화면");
+    }
 
 
     /** 그 동작의 등록 이름이다. */

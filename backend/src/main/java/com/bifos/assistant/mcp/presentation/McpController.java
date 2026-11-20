@@ -84,7 +84,7 @@ public class McpController {
         FOLLOW_UP_PROPOSE,
         McpConnectorListTool.NAME,
         McpMediaObservationTools.LIST,
-        // 읽기와, 지우지 않고 승인 카드만 띄우는 지우기는 늘 받는다(스펙 service-concepts DECISION32).
+        // 읽기와, 바꾸지 않고 승인 카드만 띄우는 지우기와 붙이기는 늘 받는다(스펙 service-concepts DECISION32).
         McpTaskTools.LIST,
         McpTaskTools.DELETE,
         McpFollowUpTools.LIST, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);

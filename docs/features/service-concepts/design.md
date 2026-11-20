@@ -231,7 +231,8 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | 3 | 요청자의 에이전트지만 그룹에 공개했다 | `agent_not_private` | `/connections/{id}` |
 | 4 | 내 연결이 `READY` 가 아니다 | `not_connected` | `/connections/{id}?agent=<code>` |
 | 5 | 이미 이 에이전트에 붙어 있다 | `already_attached`. 오류가 아니다. `thisAgent` 로 지금 쓸 수 있는지(`ready`, `pending`)를 함께 준다 | 없음 |
-| 6 | 그 밖 | `approval_requested` | 없음 |
+| 6 | `single_binding` 플러그인이고 그 연결이 이미 다른 에이전트에 붙어 있다 | `single_binding` | `/connections/{id}` |
+| 7 | 그 밖 | `approval_requested` | 없음 |
 
 같은 실행이 같은 플러그인으로 다시 불렀는데 앞 카드가 이미 끝났으면 `closed` 와 그 상태를, 요청하다 예외가 나면 `unavailable` 을 돌려준다. 둘 다 `isError` 다.
 
@@ -257,7 +258,7 @@ PR2 의 Control Plane 승인 줄과 같다(위 「지우기 승인 카드」). �
 2. 트랜잭션 밖에서 `ConnectorAttachRunner` 가 `ConnectorBindingService.bind` 를 부른다. 주인, 비공개, 연결 준비, `single_binding`, 스킬 이름 겹침은 화면과 같은 검사가 승인하는 때에 다시 본다
 3. 승인 줄을 다시 잠가 아직 `EXECUTING` 이면 `SUCCEEDED` 나 `FAILED` 와 알림 글을 적는다
 
-2에서 서버가 내려가면 줄이 `EXECUTING` 으로 남고, 지금의 정리(`markInterrupted`, `markStale`)가 결과를 모르는 줄(`UNKNOWN`)로 끝낸다. 그 줄의 알림 줄은 「「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 그 화면에서 상태를 확인해 주세요」 다. 다시 실행하지 않는다.
+2에서 서버가 내려가면 줄이 `EXECUTING` 으로 남고, 지금의 정리(`markInterrupted`, `markStale`)가 결과를 모르는 줄(`UNKNOWN`)로 끝낸다. 그 줄의 알림 줄은 「「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 외부 서비스 연결 화면에서 상태를 확인해 주세요」 다. 다시 실행하지 않는다.
 
 알림 줄은 화면의 사용 시점 안내(`boundReadiness`)와 같은 나눔이다(스펙 DECISION26).
 

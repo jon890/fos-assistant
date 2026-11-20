@@ -50,7 +50,6 @@ public class ControlPlaneApprovals {
     /** 동작이 예외로 끝난 줄의 {@code errorCode} 다. */
     static final String FAILED = "control_plane_failed";
     private static final String UNREADABLE = "요청 내용을 읽을 수 없어 실행하지 않았어요";
-    private static final String INTERRUPTED = "요청을 처리하다 문제가 생겼어요. 그 화면에서 상태를 확인한 뒤 다시 요청해 주세요";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final ConnectorActionRepository actions;
     private final ConnectorActionBodies bodies;
@@ -130,7 +129,9 @@ public class ControlPlaneApprovals {
         } catch (RuntimeException ex) {
             // 승인은 이미 커밋됐다. 예외를 내보내면 줄이 EXECUTING 으로 남으므로 실패로 끝내 사용자가 다시 요청하게 한다.
             log.warn("control plane action failed actionId={} tool={} kind={}", actionId, begun.runner().toolName(), ex.getClass().getSimpleName());
-            outcome = ControlPlaneActionOutcome.failed(INTERRUPTED);
+            String tool = begun.runner().toolName();
+            outcome = ControlPlaneActionOutcome.failed("「" + ControlPlaneActions.policy(tool).orElseThrow().title() + "」 요청을 처리하다 문제가 생겼어요. "
+                + ControlPlaneActions.screen(tool) + "에서 상태를 확인한 뒤 다시 요청해 주세요");
         }
         ControlPlaneActionOutcome result = outcome;
         return transactions.execute(status -> finish(user, actionId, result));

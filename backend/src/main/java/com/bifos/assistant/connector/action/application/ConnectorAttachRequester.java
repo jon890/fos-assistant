@@ -67,6 +67,7 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
         }
         ConnectorSummary summary = found.get();
         String screen = CONNECTIONS + "/" + summary.id();
+        // 에이전트 없는 실행(agentId 가 null)은 findById 가 빈 값을 준다. 주인이 아닌 것과 같게 답한다.
         Optional<Agent> agent = agents.findById(agentId)
             .filter(candidate -> !candidate.isDeleted())
             .filter(candidate -> Objects.equals(candidate.ownerUserId(), user.id()));
@@ -99,6 +100,12 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
                 null);
             body.put("thisAgent", ready ? "ready" : "pending");
             return body;
+        }
+        if (summary.singleBinding() && !summary.bindings().isEmpty()) {
+            return result("single_binding",
+                "이 연결은 에이전트 하나에만 붙일 수 있는데 이미 다른 에이전트에 붙어 있다. 카드를 띄우지 않았다. link 의 화면에서 그 에이전트에서 뗀 뒤 "
+                    + "다시 부탁하라고 안내한다.",
+                screen);
         }
         Map<String, String> args = new LinkedHashMap<>();
         args.put("connector", summary.title());
