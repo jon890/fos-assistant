@@ -598,3 +598,17 @@ IMAGE_SOURCE_HOST_READ = ("tools/image_source.py", "_MEDIA_CACHE_SUBDIRS")
 # 이미지 서비스(openai-codex)가 받는 입력 장수와, 넘는 것을 버리는 자리다. plugin 의 `MAX_SOURCES` 가 같은 값이다.
 IMAGE_SOURCE_LIMIT = ("plugins/image_gen/openai-codex/__init__.py", "_MAX_REFERENCE_IMAGES", 16,
                       "collect_source_images(image_url, reference_image_urls, limit=_MAX_REFERENCE_IMAGES)")
+# `image_generate` 의 비율 값과, 비율을 빼면 쓰는 기본값이다(fos-assistant 스펙 generated-image REQ26).
+# Control Plane 의 `ArtifactService.IMAGE_RULES` 가 이 값으로 비율을 늘 적게 한다. 기본값이 가로라 빼면 한 사람의 정사각이 지켜지지 않는다.
+IMAGE_ASPECT_RATIOS = ("agent/image_gen_provider.py",
+                       'VALID_ASPECT_RATIOS: tuple[str, ...] = ("landscape", "square", "portrait")',
+                       'DEFAULT_ASPECT_RATIO = "landscape"')
+# 비율이 모델에게 보이고 이미지 서비스까지 가는 자리다. 하나라도 바뀌면 그림 규칙이 적은 비율이 그림에 닿지 않을 수 있다.
+IMAGE_ASPECT_RATIO_PATH = (
+    ("tools/image_generation_tool.py", '"enum": list(VALID_ASPECT_RATIOS)'),
+    ("tools/image_generation_tool.py", 'aspect_ratio = args.get("aspect_ratio", DEFAULT_ASPECT_RATIO)'),
+    ("tools/image_generation_tool.py", "_dispatch_to_plugin_provider(prompt, aspect_ratio,"),
+    ("tools/image_generation_tool.py", 'kwargs: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}'),
+    ("plugins/image_gen/openai-codex/__init__.py", "aspect = resolve_aspect_ratio(aspect_ratio)"),
+    ("plugins/image_gen/openai-codex/__init__.py", "size = size_for(aspect)"),
+)

@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
+import com.bifos.assistant.connector.action.domain.ControlPlaneActions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.NotificationTarget;
@@ -82,8 +83,9 @@ public class ConnectorActionSignals {
         if (action.conversationId() == null) {
             return;
         }
-        String toolTitle = ConnectorActionView.titleOf(
-            manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())));
+        String toolTitle = ConnectorActionView.titleOf(ControlPlaneActions.owns(action)
+            ? ControlPlaneActions.policy(action.toolName())
+            : manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())));
         conversations
             .publicIdOf(action.conversationId())
             .ifPresent(conversationId -> notifications.notify(

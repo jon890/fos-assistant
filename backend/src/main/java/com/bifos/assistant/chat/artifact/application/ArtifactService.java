@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactFile;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.artifact.infra.ArtifactFoundFile;
@@ -38,17 +39,31 @@ import org.springframework.stereotype.Service;
 public class ArtifactService {
 
     /**
-     * 그림 만들기와 고치기 규칙이다(스펙 generated-image REQ4, REQ6, REQ10, REQ15~REQ17). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
+     * 그림 만들기와 고치기 규칙이다(스펙 generated-image REQ4, REQ6, REQ10, REQ15~REQ17, REQ24~REQ26). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
+     *
+     * <p>{@code aspect_ratio} 를 늘 적게 한다. 빼면 Hermes 가 {@code landscape} 로 만들어 한 사람이나 물건 하나의 정사각이 지켜지지 않는다.
+     * 값 셋은 {@code hermes/tests/hermes_contract.py} 의 {@code IMAGE_ASPECT_RATIOS} 가 Hermes 소스와 대조한다.
      *
      * <p>{@code 제목:} 줄은 fos-ctx 가 떼어 제목으로 쓴다. 글자를 바꾸면 {@code hermes/plugins/fos-ctx/generated_image.py} 의
      * {@code TITLE_PREFIX} 도 함께 바꾼다. {@code attachment:} 와 {@code generated:} 는 같은 plugin 의 {@code image_source.py} 가 읽는다.
      */
-    static final String IMAGE_RULES = "아래 여덟 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
+    static final String IMAGE_RULES = "아래 열두 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
         + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
         + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
-        + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
+        + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 한국어로 자세히 쓴다.\n"
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
+        + "- 사람이 나오는 그림을 새로 그릴 때는 지시문에 「인물 N명」 처럼 인물 수를 숫자로 적고,"
+        + " 사람마다 「- 인물1: 생김새(나이대, 머리, 체격), 옷, 신발」 처럼 한 줄씩 적는다.\n"
+        + "- 같은 인물이 나오는 다음 장면을 그릴 때는 사용자가 「이어서」 라고 하지 않아도 앞 그림을 reference_image_urls 에 generated:<그림 제목> 으로 넣는다."
+        + " 바탕(image_url)에 넣지 않고 구도는 새로 잡는다. 앞 지시문의 인물 줄을 글자 그대로 다시 적고,"
+        + " 아래 「이 대화에서 만든 그림」 에서 앞 그림 제목 뒤에 참고 링크가 있으면 그 링크도 link: 로 함께 넣는다."
+        + " 그 링크만 쓸 수 없다는 결과를 받으면 링크를 빼고 앞 그림만 참고로 다시 그리고, 링크 사진을 쓰지 못했다고 답에 적는다."
+        + " 앞 그림이 「이 대화에서 만든 그림」 에 없거나 앞 그림을 쓸 수 없다는 결과를 받으면 참고 없이 인물 줄만으로 그리고, 앞 그림을 참고하지 못했다고 답에 적는다.\n"
+        + "- aspect_ratio 는 늘 적는다. 사용자가 비율이나 구도를 말했거나 쓰임새로 분명하면 그것을 따른다"
+        + "(프로필 사진은 얼굴 위주로 square, 블로그 대표 사진은 landscape)."
+        + " 그렇지 않으면 사람이나 동물 여럿, 풍경, 물건 여럿은 landscape, 한 사람이나 동물 하나, 물건 하나는 square 다."
+        + " 얼굴 위주로 정한 때가 아니면 사람은 머리부터 발까지 들어오고 얼굴이 잘 보이게 지시문에 적는다.\n"
         + "- 이 대화에 보낸 사진이나 이 대화에서 만든 그림을 바탕으로 고칠 때는 바탕 한 장을 image_url 에, 참고할 것을 reference_image_urls 에 넣는다."
         + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적는다.\n"
         + "- 사용자가 이 대화에 보낸 링크(상품 페이지나 사진 주소)의 사진을 바탕이나 참고로 쓸 때는 link:<사용자가 보낸 주소 그대로> 로 적는다."
@@ -56,7 +71,10 @@ public class ArtifactService {
         + "- 바탕과 참고에는 attachment:, generated:, link: 가리킴만 쓰고 파일 경로나 맨 주소는 쓰지 않는다.\n"
         + "- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다."
         + " 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다.\n"
+        + "- 올린 사진이나 만든 그림을 바탕(image_url)으로 고칠 때는 인물 수와 사람별 줄을 적지 않고, 바탕에 없는 사람을 더할 때만 그 사람의 줄을 적는다."
+        + " aspect_ratio 는 바탕 사진의 비율에 가까운 것을 고른다.\n"
         + "- 그림을 만들지 못했거나 쓸 수 없는 사진이나 링크라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진이나 링크와 그 까닭)과 다시 부탁하는 방법을 답한다."
+        + " 다만 다음 장면에서 앞 그림(generated:)이나 다시 넣은 링크만 쓸 수 없으면 위 다음 장면 줄대로 그것을 빼고 다시 그린다."
         + " 링크를 쓸 수 없으면 사진을 직접 올리는 방법도 알린다.\n";
 
     /** 실행 입력에 제목을 적는 만든 그림의 수다. 새것부터 센다(스펙 generated-image REQ17). */
@@ -127,20 +145,32 @@ public class ArtifactService {
             // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
             + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
             + IMAGE_RULES
-            + imageTitles(conversation.id())
+            + imageTitles(conversation)
             + (sandboxed ? SANDBOX_FILE_SPACE_RULES : FILE_SPACE_RULES)
             + "\n"
             + SkillAgentNotice.PARAGRAPH;
     }
 
 
-    /** 파일이 남은 만든 그림의 제목 줄이다. 없으면 빈 글이다. 모델이 고칠 그림을 제목으로 가리킬 수 있게 한다. */
-    private String imageTitles(Long conversationId) {
-        List<String> titles = images.liveTitles(conversationId, IMAGE_TITLE_LIMIT);
-        if (titles.isEmpty()) {
+    /**
+     * 파일이 남은 만든 그림의 제목 줄이다. 없으면 빈 글이다. 모델이 고칠 그림을 제목으로 가리킬 수 있게 한다.
+     *
+     * <p>그림이 참고한 링크는 제목 뒤에 붙인다(스펙 generated-image REQ25). {@code link:} 가리킴의 길이 상한을 넘는 링크는 다시 받을 수 없어
+     * 적지 않는다.
+     */
+    private String imageTitles(Conversation conversation) {
+        List<GeneratedImageMention> mentions = images.liveMentions(conversation.id(), conversation.userId(), IMAGE_TITLE_LIMIT);
+        if (mentions.isEmpty()) {
             return "";
         }
-        return "이 대화에서 만든 그림: " + titles.stream().map(title -> "「" + title + "」").collect(Collectors.joining(", ")) + "\n";
+        return "이 대화에서 만든 그림: " + mentions.stream().map(ArtifactService::mention).collect(Collectors.joining(", ")) + "\n";
+    }
+
+
+    private static String mention(GeneratedImageMention image) {
+        List<String> links = image.sourceLinks().stream().filter(link -> link.length() <= GeneratedImageMention.MAX_LINK_CHARS).toList();
+        String title = "「" + image.title() + "」";
+        return links.isEmpty() ? title : title + "(참고 링크: " + String.join(", ", links) + ")";
     }
 
 

@@ -332,6 +332,18 @@ public class Task extends AuditedEntity {
     }
 
 
+    /**
+     * 결과를 쌓을 대화를 처음 저장하기 전에 정한다. 에이전트가 대화에서 만든 작업이 부탁한 그 대화에 이어 쌓이게 한다(스펙
+     * service-concepts DECISION29). {@code SINGLE} 작업만 정할 수 있다.
+     */
+    public void presetConversation(Long conversationId) {
+        if (id != null || kind != TaskKind.TURN || conversationMode != ConversationMode.SINGLE) {
+            throw new IllegalStateException("only a new SINGLE task can preset its conversation");
+        }
+        this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
+    }
+
+
     /** 매일 깨우기의 켜짐 상태를 바꾼다. */
     public void changeCheckEnabled(boolean enabled) {
         if (kind != TaskKind.CHECK) {
