@@ -76,6 +76,7 @@ from .connector_vault import (
     VAULT_ROUTES,
     _connector_vault_request,
 )
+from .connector_oauth import OAUTH_ACTIONS, OAUTH_PREFIX, _connector_oauth_request
 
 from .env import (
     _check_env_delete,
@@ -315,6 +316,14 @@ def _install_gate() -> bool:
             # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다. 보관 파일 잠금을 먼저 잡으므로
             # 본문을 읽은 뒤 요청 처리가 두 잠금을 잡는다. 설치는 전역 잠금만 잡아 순서가 거꾸로 되지 않는다.
             return await _connector_vault_request(request, PROFILE_WRITE_LOCK)
+
+        oauth_action = path[len(OAUTH_PREFIX):] if path.startswith(OAUTH_PREFIX) else None
+        if oauth_action is not None and oauth_action in OAUTH_ACTIONS and method == "POST":
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            # 보관 파일 잠금만 잡고 서비스를 부른다. 본 보관 파일을 쓰는 commit 만 그 뒤 전역 잠금을 잡는다.
+            return await _connector_oauth_request(request, oauth_action, PROFILE_WRITE_LOCK)
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None

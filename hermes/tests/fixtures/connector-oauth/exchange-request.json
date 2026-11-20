@@ -1,0 +1,11 @@
+{
+  "vault": "c1",
+  "connector": "demo-notes",
+  "nonce": "nonce-from-begin",
+  "client_id": "Iv1.example",
+  "client_secret": "client-secret-example",
+  "code": "code-from-redirect",
+  "code_verifier": "pkce-verifier-example",
+  "redirect_uri": "https://assistant.example/api/connections/oauth/callback",
+  "token_url": "https://assistant.example/internal/connector-token/k1.signature"
+}

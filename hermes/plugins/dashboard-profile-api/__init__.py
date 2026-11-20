@@ -25,7 +25,15 @@ Hermes core 는 고치지 않는다.
 | `POST /api/connectors/<id>/tools` | 후보 값이나 보관 파일의 값으로 표준 플러그인(`schema: 3`)의 MCP 서버에 붙어 도구 이름과 읽기 표시만 받는다 |
 | `GET PUT /api/connectors` | 플러그인의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
-| `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 |
+| `DELETE /api/connector-vault` | 보관 파일 하나와 그 OAuth 파일, 대기 파일을 지운다 |
+| `POST /api/connector-oauth/authorize-url` | 단추 연결 플러그인의 제공자 로그인 주소를 만든다 |
+| `POST /api/connector-oauth/begin` | 단추 밖 칸 값을 대기 보관 파일에 쓰고 흐름 표식(`nonce`)을 낸다 |
+| `POST /api/connector-oauth/exchange` | 받은 코드를 토큰으로 바꿔 대기 OAuth 파일에 refresh token 을 쓰고 access token 을 낸다 |
+| `POST /api/connector-oauth/commit` | 대기 파일 둘을 본 자리로 옮긴다 |
+| `POST /api/connector-oauth/discard` | 대기 파일을 지우고 GitHub 은 그 흐름의 access token 하나를 취소한다 |
+| `POST /api/connector-oauth/refresh` | OAuth 파일의 refresh token 으로 access token 을 받고 바뀐 refresh token 을 쓴다 |
+| `POST /api/connector-oauth/revoke` | 제공자에 허락 취소를 보낸다. 파일은 지우지 않는다 |
+| `POST /api/connector-oauth/token-url` | OAuth 파일의 토큰 통로 주소만 바꾼다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 플러그인의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
