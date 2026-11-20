@@ -23,8 +23,8 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connectors/<id>/tools` | 표준 플러그인(`schema: 3`)의 연결 확인. 후보 값이나 보관 파일의 값으로 MCP 서버에 붙어 `tools/list` 만 받는다. 도구는 부르지 않는다 | `{values}` 또는 `{vault}`. 둘 가운데 정확히 하나다. 시간 제한과 동시 한도는 `call` 과 같다 | `{ok: true, tools: [{name, read_only}]}`. `read_only` 는 `readOnlyHint` 가 참일 때만 참이다. 붙지 못하면 `{ok: false, error: "unavailable"}`, 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다 | 400 `schema: 3` 이 아닌 플러그인, 본문 모양 |
 | `GET /api/connectors?profile=<p>` | 플러그인의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 플러그인 표식이 모두 없다 |
 | `PUT /api/connectors` | profile 에 플러그인을 붙이고 뗀다 | `enabled: true` 는 `{profile, plugin, enabled: true, bind: {vault}, sandbox_owner?, owner_browser?}` 이며 `bind.vault` 가 필수다. Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 플러그인은 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 플러그인은 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 플러그인에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 플러그인은 이 값을 쓰지 않는다. `enabled: false` 는 `{profile, plugin, enabled: false}` 로 바인딩을 뗀다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. 붙이기는 `skipped_skills: [{name, reasons}]` 도 낸다(빠진 에이전트용 스킬과 까닭, 이름 순, 「바뀐 것 없음」 에도 있다). 떼기와 옛 대시보드 plugin 은 이 칸을 내지 않는다. 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 플러그인의 것이다, `enabled: true` 인데 `bind.vault` 가 없거나 `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 플러그인에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 플러그인을 붙이는데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 넣지 않는다. 400 그 플러그인에 `sandbox_owner` 가 없다 |
-| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 플러그인, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 플러그인의 것이다. 503 「key 필수」 인데 보관 파일 key 를 쓸 수 없거나 쓰기가 실패했다 |
-| `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
+| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}` 와 선택 키 `oauth`(boolean). `values` 는 `fields[].key` 를 키로 한 값이다. `oauth` 가 참이면 단추로 채우는 칸(`oauth.fields`)이 비어도 받고, 거짓이거나 없으면 그 연결의 OAuth 파일을 지운다(붙여 넣기로 바꾸기) | `{ok: true}` | 400 형식, 운영 목록에 없는 플러그인, 칸 선언과 맞지 않는 값, `oauth` 선언이 없는 플러그인의 `oauth: true`. 409 같은 이름의 보관 파일이 다른 플러그인의 것이다. 503 「key 필수」 인데 보관 파일 key 를 쓸 수 없거나 쓰기가 실패했다 |
+| `DELETE /api/connector-vault` | 보관 파일 하나와 그 OAuth 파일, 대기 파일을 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 플러그인의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
 | `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 `approve` 로 둔다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?, ensure_image_service?}`. `ensure_image_service` 는 참 거짓 값이고, 참이면 같은 쓰기에서 profile 설정에 이미지 서비스를 넣는다(아래 「이미지 서비스」). `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이다. 도구 저장의 판정은 바꾸지 않고 스크립트 스킬 게시의 `skill_root` 검사에만 쓴다. 옛 Control Plane 호환으로 받는다 | 200 | [ADR-029](../../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
@@ -239,7 +239,19 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 key 가 준비되지 않고 「key 필수」 가 꺼져 있으면 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 평문이다. 빈 선택 칸은 넣지 않는다. 칸이 없는 플러그인은 빈 `values` 다.
 읽기는 둘을 모두 받는다. v2 는 그 `key_id` 의 key 가 key 파일에 있으면 활성 key 가 아니어도 푼다. 쓰기 전의 소유 확인은 풀지 않고 `connector` 만 본다. 모양을 읽지 못하는 파일은 경고를 남기고 덮어쓴다.
 plugin 이 올라올 때 평문 파일과 옛 key 의 파일을 활성 key 로 다시 쓰고, 다시 읽어 값이 같은지 본다. 깨진 파일과 풀지 못하는 파일은 건드리지 않는다. 쓰다 남은 임시 파일은 지운다. 남은 평문 파일, 옛 key 파일, 풀지 못한 파일의 수를 info 한 줄로, 그 파일 이름을 warning 한 줄로 남긴다. 운영 값과 동작은 [`hermes/README.md`](../../README.md) 의 「운영 값」 과 [ADR-20261103 / connector-vault-key](../../docs/adr/ADR-20261103-connector-vault-key.md) 가 갖는다.
-값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
+값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 넣지 않는다. 쓰기와 지우기는 그 보관 파일의 잠금 다음 profile 쓰기 잠금 안에서 하고, 바인딩 설치는 profile 쓰기 잠금만 잡고 보관 파일을 읽는다.
+
+**단추로 연결한 연결은 보관 파일 옆에 OAuth 파일과 대기 파일을 둔다**([ADR-20261120 / connector-oauth](../../../docs/adr/ADR-20261120-connector-oauth.md)).
+
+| 파일 | 담는 것 | 지우는 때 |
+| --- | --- | --- |
+| `<vault>.oauth` | `{provider, refresh_token, granted_scopes, token_url}` | 보관 파일 `DELETE`, `oauth` 없는 `PUT` |
+| `<vault>.oauth.pending` | 단추 흐름 하나의 OAuth 칸과 `nonce`. 교환 전에는 `refresh_token` 이 빈 값이다 | commit, discard, 보관 파일 `DELETE`, 10분 뒤 |
+| `<vault>.pending` | 단추 밖 칸 값. 보관 파일과 같은 형식이다 | 위와 같다 |
+
+OAuth 파일은 보관 파일과 같은 key 로 암호화하고 AAD 는 `connector-oauth:<vault>:<connector>` 다. key 가 준비되지 않았으면 `{"v": 1, "connector", "oauth"}` 평문이다. 기동 이관은 세 파일도 새 key 로 다시 쓰고 같은 수에 센다. 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
+OAuth 파일은 실행기 정의의 보관 파일 리비전에 들어가지 않는다. 그래서 갱신으로 refresh token 이 바뀌어도 재시작 대기가 되지 않는다. commit 은 대기 보관 파일 값을 보관 파일 쓰기로 다시 써서 값이 같으면 보관 파일을 바꾸지 않는다.
+보관 파일 id 마다 잠금이 있고 profile 쓰기 잠금보다 먼저 잡는다. 갱신과 취소는 보관 파일 잠금만 잡고 서비스를 부른다.
 이미 있는 파일이 지금 쓸 모양과 같은 값이면 다시 쓰지 않는다. 같은 값으로 다시 등록해도 실행기 정의의 보관 파일 리비전이 바뀌지 않는다.
 
 **로컬 플러그인의 서버는 실행기(`connector_launcher.py`)로 띄운다.**

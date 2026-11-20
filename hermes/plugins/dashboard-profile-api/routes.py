@@ -312,9 +312,9 @@ def _install_gate() -> bool:
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
-            # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다.
-            async with PROFILE_WRITE_LOCK:
-                return await _connector_vault_request(request)
+            # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다. 보관 파일 잠금을 먼저 잡으므로
+            # 본문을 읽은 뒤 요청 처리가 두 잠금을 잡는다. 설치는 전역 잠금만 잡아 순서가 거꾸로 되지 않는다.
+            return await _connector_vault_request(request, PROFILE_WRITE_LOCK)
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
