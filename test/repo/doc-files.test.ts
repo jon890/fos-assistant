@@ -40,6 +40,7 @@ const OUTSIDE_DOCS = [
   /\/skills\/(?:.+\/)?SKILL\.md$/,
   /^hermes\/connectors\/[^/]+\/ICON-SOURCE\.md$/,
   /^tasks\//,
+  /^\.claude\/spec-overlay\.md$/,
 ];
 
 /** 한 파일이 둘 수 있는 자리인지 판정한다. ADR 은 `adr-index.test.ts` 가 따로 본다. */
@@ -111,7 +112,7 @@ test("모듈 docs 의 정해진 이름과 예외는 통과하고 새 주제 파�
   for (const file of ["docs/prd.md", "docs/code-architecture.md", "backend/docs/data-schema.md", "web/docs/code-architecture.md", "docs/privacy.md", "docs/adr/INDEX.md", "backend/docs/adr/archive/ADR-006-x.md", "docs/features/agent-skill.md", "docs/features/chat.md", "docs/features/gmail-connector.md", "docs/features/tossinvest-connector.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
-  for (const file of ["backend/docs/flow.md", "web/docs/flow.md", "web/docs/prd.md", "docs/flow.md", "docs/data-schema.md", "docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "docs/features/x/y.md", "backend/docs/features/x.md", "docs/features/Chat.md", "docs/features/no-such-service-connector.md", "notes.md", "hermes/plugins/x/NOTES.md"]) {
+  for (const file of ["backend/docs/flow.md", "web/docs/flow.md", "web/docs/prd.md", "docs/flow.md", "docs/data-schema.md", "docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "docs/features/x/y.md", "backend/docs/features/x.md", "docs/features/Chat.md", "docs/features/no-such-service-connector.md", "notes.md", ".claude/notes.md", "hermes/plugins/x/NOTES.md"]) {
     assert.notEqual(problemOf(file), undefined, file);
   }
 });
@@ -158,7 +159,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
 });
 
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
-  for (const file of ["README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
+  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
 });
