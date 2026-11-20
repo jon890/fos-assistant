@@ -7,6 +7,6 @@ import test from "node:test";
 
 test("Python 파일은 Hermes runtime·plugin과 그 테스트에만 둔다", () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
-  const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.py"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
+  const files = execFileSync("git", ["ls-files", "-z", "--cached", "--", "*.py"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
   assert.deepEqual(files.filter(file => existsSync(new URL(`../../${file}`, import.meta.url)) && !/^hermes\/(plugins|runtime|tests)\//.test(file)), []);
 });
