@@ -298,6 +298,8 @@ public enum ErrorCode {
      * <p>재시작한 뒤에 들어온 설치는 떠 있는 gateway 가 아직 보지 못했기 때문이다.
      */
     CONNECTOR_RESTART_AGAIN(HttpStatus.CONFLICT),
+    /** 재시작 대기 줄의 다시 확인인데 그 대기 뒤에 공유 gateway 가 아직 다시 뜨지 않았다. 옛 값으로 {@code READY} 가 되는 것을 막는다. */
+    CONNECTOR_RESTART_NOT_DONE(HttpStatus.CONFLICT),
     /** 관리자 반영 완료가 다시 읽은 설치에서 켜짐, configured, 정책 hook, 방식 가운데 하나가 맞지 않음을 봤다. */
     CONNECTOR_INSTALL_MISMATCH(HttpStatus.CONFLICT),
     /** 관리자 반영 완료의 probe 가 실패했거나 도구를 내지 않았거나, 옛 바인딩의 켜진 내장 도구가 선언과 다르다. */
