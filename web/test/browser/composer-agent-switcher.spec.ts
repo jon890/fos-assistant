@@ -100,3 +100,41 @@ test("이름표로 다른 에이전트를 고르고 보내면 그 에이전트�
     await expect(page.getByRole("menuitemradio")).toHaveCount(0);
   }
 });
+
+test("「＋」 를 누르면 메뉴 없이 사진을 고르는 창이 바로 열리고 고른 사진이 붙는다", async ({ page }, testInfo) => {
+  await narrowOnMobile(page, testInfo);
+  await page.goto("/new");
+  await expectPickedAgent(page, "브라우저 비서");
+
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByTestId("composer-shell").getByRole("button", { name: "사진 첨부" }).click(),
+  ]);
+  expect(chooser.isMultiple()).toBe(true);
+  await chooser.setFiles([
+    {
+      name: "plus.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    },
+  ]);
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(1);
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  await expect(page.getByRole("menu")).toHaveCount(0);
+});
+
+test("에이전트 목록을 읽지 못하면 휴대폰 위 막대 가운데에 홈 링크가 그대로 있다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "위 막대는 좁은 폭에만 있다");
+  await narrowOnMobile(page, testInfo);
+  await page.route("**/api/agents", async (route) => {
+    await route.fulfill({ status: 500, body: "{}" });
+  });
+  await page.goto("/new");
+
+  await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("link", { name: /홈$/ })).toBeVisible();
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
+});

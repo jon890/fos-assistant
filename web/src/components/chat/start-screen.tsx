@@ -91,7 +91,7 @@ export function StartAgentSwitcher({
   onSelect,
   locked,
 }: SwitcherProps) {
-  const titleSlot = useShellTitleSlot();
+  // 이름표가 없으면 위 막대 가운데 자리를 차지하지 않는다. 그 자리의 홈 링크가 그대로 남는다.
   if (agentsError || (!loading && agents.length === 0)) return null;
   const switcher = loading ? (
     <AgentSwitcherSkeleton />
@@ -111,9 +111,15 @@ export function StartAgentSwitcher({
       >
         {switcher}
       </div>
-      {titleSlot ? createPortal(switcher, titleSlot) : null}
+      <TitleSlotPortal>{switcher}</TitleSlotPortal>
     </>
   );
+}
+
+/** 휴대폰 위 막대 가운데 자리를 차지하고 그 안에 그린다. 그릴 것이 있을 때만 이 부품을 둔다 */
+function TitleSlotPortal({ children }: { children: React.ReactNode }) {
+  const titleSlot = useShellTitleSlot();
+  return titleSlot ? createPortal(children, titleSlot) : null;
 }
 
 type PromptsProps = {
