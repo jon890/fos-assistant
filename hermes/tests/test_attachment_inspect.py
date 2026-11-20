@@ -64,6 +64,20 @@ class AttachmentInspectTest(unittest.TestCase):
         self.plugin.register(Context())
         self.assertEqual(registered["name"], "attachment_inspect")
         self.assertFalse(registered.get("override", False))
+        schema = registered["schema"]["parameters"]
+        self.assertNotIn("additionalProperties", schema)
+        for field in ("_fos_ctx", "_fos_inspect"):
+            self.assertNotIn(field, schema["properties"])
+            self.assertNotIn(field, schema["required"])
+
+    def test_handler_accepts_hook_context_but_rejects_unknown_arguments(self):
+        args = {"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}}
+        self.assertTrue(self.inspect.valid_args(args))
+        invalid = {**args, "unknown": True}
+        self.assertFalse(self.inspect.valid_args(invalid))
+        with patch.object(self.inspect, "supervise") as supervise:
+            self.assertEqual(self.inspect.handle(invalid), self.inspect.failure())
+            supervise.assert_not_called()
 
     def test_top_level_compression_and_subagent_chains_are_distinct(self):
         context = importlib.import_module(self.plugin.__name__ + ".context")
