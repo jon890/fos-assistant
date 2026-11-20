@@ -13,61 +13,28 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { toolKind } from "../../web/src/lib/tool-kind.ts";
-import { toolLabel } from "../../web/src/lib/tool-label.ts";
+import { LABELED_TOOLS, toolLabel } from "../../web/src/lib/tool-label.ts";
 
 const ROOT = join(import.meta.dirname, "../..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
+const quoted = (text: string) => [...text.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
 
 const MCP_DIR = "backend/src/main/java/com/bifos/assistant/mcp/application";
 const MCP_PREFIX = "mcp__fos_assistant__";
 
 /**
- * Hermes 의 toolset 마다 든 내장 도구다. 손으로 옮긴 목록이고 원본은 고정 버전 Hermes 의 `toolsets.py` 의 `TOOLSETS` 다
- * (버전은 `hermes/tests/hermes_contract.py` 의 `HERMES_VERSION`). 여러 toolset 을 묶은 플랫폼 묶음(`hermes-*`, `coding` 등)은 뺐다.
- * 합친 이름이 계약의 `HERMES_BUILTIN_TOOLS` 와 같은지 아래 테스트가 본다. Hermes 를 올려 그 목록이 바뀌면 여기도 고친다.
+ * Hermes 의 toolset 마다 든 내장 도구다. `hermes/tests/hermes_contract.py` 의 `HERMES_TOOLSETS` 를 읽는다.
+ * 그 표가 고정 버전 Hermes 의 `TOOLSETS` 와 같은지는 `hermes/tests/test_tool_guard_contract.py` 가 본다.
  */
-const HERMES_TOOLSETS: Record<string, string[]> = {
-  web: ["web_search", "web_extract"],
-  search: ["web_search"],
-  x_search: ["x_search"],
-  vision: ["vision_analyze"],
-  video: ["video_analyze"],
-  image_gen: ["image_generate"],
-  video_gen: ["video_generate", "xai_video_edit", "xai_video_extend"],
-  computer_use: ["computer_use"],
-  terminal: ["terminal", "process_manage"],
-  skills: ["skills_list", "skill_view", "skill_manage"],
-  browser: ["browser_exec", "browser_cdp", "browser_dialog", "browser_vault"],
-  cronjob: ["cronjob_manage"],
-  file: ["read_file", "write_file", "patch", "search_files"],
-  tts: ["text_to_speech"],
-  todo: ["todo_list"],
-  memory: ["memory"],
-  session_search: ["session_search"],
-  connections: ["manage_connections"],
-  project: ["desktop_project"],
-  desktop_ui: [
-    "read_terminal", "close_terminal", "desktop_preview", "drive_preview", "annotate_preview",
-    "read_window_below", "focus_pane", "react_to_message", "gui_tour", "show_tip", "set_theme",
-  ],
-  onboarding: ["setup_beat"],
-  catalog: ["manage_catalog"],
-  clarify: ["clarify"],
-  code_execution: ["execute_code"],
-  delegation: ["delegate_task"],
-  kanban: [
-    "kanban_show", "kanban_list", "kanban_complete", "kanban_block", "kanban_request_review",
-    "kanban_request_changes", "kanban_heartbeat", "kanban_comment", "kanban_create", "kanban_link",
-    "kanban_unblock", "kanban_attach", "kanban_attach_url", "kanban_attachments",
-  ],
-  discord: ["discord"],
-  discord_admin: ["discord_admin"],
-  feishu_doc: ["feishu_doc_read"],
-  feishu_drive: [
-    "feishu_drive_list_comments", "feishu_drive_list_comment_replies",
-    "feishu_drive_reply_comment", "feishu_drive_add_comment",
-  ],
-};
+function hermesToolsets(): Record<string, string[]> {
+  const source = read("hermes/tests/hermes_contract.py");
+  const start = source.indexOf("HERMES_TOOLSETS = {");
+  assert.notEqual(start, -1, "HERMES_TOOLSETS 를 찾지 못했다");
+  const body = source.slice(start, source.indexOf("\n}\n", start));
+  const entries = [...body.matchAll(/^ {4}"([^"]+)": \(([^)]*)\),$/gm)];
+  assert.equal(entries.length, (body.match(/^ {4}"/gm) ?? []).length, "HERMES_TOOLSETS 의 줄을 모두 읽지 못했다");
+  return Object.fromEntries(entries.map(([, name, tools]) => [name!, quoted(tools!)]));
+}
 
 /**
  * 켤 수 있지만 내장 도구가 없는 toolset 이다. 도구 이름은 다른 곳이 갖는다.
@@ -77,7 +44,6 @@ const HERMES_TOOLSETS: Record<string, string[]> = {
  */
 const NON_BUILTIN_TOOLSETS = new Set(["fos-assistant", "fos-attachments", "homeassistant", "spotify"]);
 
-const quoted = (text: string) => [...text.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
 
 /** Python 의 `NAME = frozenset({...})` 안의 글자들이다. */
 function pythonSet(source: string, name: string): string[] {
@@ -125,6 +91,9 @@ function definedNames(body: string, source: string): string[] {
   );
 }
 
+/** `McpToolCatalog` 필드 가운데 도구 정의를 내지 않는 것이다. 이 밖의 필드 호출은 정의를 읽지 못하면 실패한다. */
+const CATALOG_NON_TOOL_FIELDS = new Set(["delegationProperties"]);
+
 function controlPlaneTools(): string[] {
   const catalog = read(join(MCP_DIR, "McpToolCatalog.java"));
   const body = methodBody(catalog, "tools");
@@ -132,12 +101,20 @@ function controlPlaneTools(): string[] {
     [...catalog.matchAll(/private final (\w+) (\w+);/g)].map(([, type, field]) => [field!, type!]),
   );
   const names = definedNames(body, catalog);
-  for (const [, field, method] of body.matchAll(/\b([a-z]\w*)\.(\w+)\(\)/g)) {
-    const type = fields.get(field!);
-    const file = join(MCP_DIR, `${type}.java`);
-    if (!type || !existsSync(join(ROOT, file))) continue;
+  assert.equal(
+    names.length,
+    (body.match(/Map\.of\(\s*"name"/g) ?? []).length,
+    "McpToolCatalog 안에 직접 쓴 정의의 이름을 모두 읽지 못했다",
+  );
+  for (const [call, field, method, args] of body.matchAll(/\b([a-z]\w*)\.(\w+)\(([^)]*)\)/g)) {
+    if (CATALOG_NON_TOOL_FIELDS.has(field!) || !fields.has(field!)) continue;
+    assert.equal(args!.trim(), "", `${call} 는 인자를 받아 정의를 읽지 못한다`);
+    const file = join(MCP_DIR, `${fields.get(field!)}.java`);
+    assert.ok(existsSync(join(ROOT, file)), `${call} 의 정의 파일 ${file} 이 없다`);
     const source = read(file);
-    names.push(...definedNames(methodBody(source, method!), source));
+    const defined = definedNames(methodBody(source, method!), source);
+    assert.ok(defined.length > 0, `${call} 에서 도구 이름을 읽지 못했다`);
+    names.push(...defined);
   }
   return names;
 }
@@ -145,7 +122,10 @@ function controlPlaneTools(): string[] {
 function fosCtxTools(): string[] {
   const dir = "hermes/plugins/fos-ctx";
   const init = read(join(dir, "__init__.py"));
-  return [...init.matchAll(/register_tool\(name=(\w+)/g)].map(([, ident]) => {
+  const calls = (init.match(/register_tool\(/g) ?? []).length;
+  const found = [...init.matchAll(/register_tool\(name=(\w+)/g)];
+  assert.equal(found.length, calls, "register_tool 호출을 모두 읽지 못했다");
+  return found.map(([, ident]) => {
     const imported = new RegExp(`from \\.(\\w+) import [^\\n]*\\b(\\w+) as ${ident}\\b`).exec(init);
     const source = imported ? read(join(dir, `${imported[1]}.py`)) : init;
     const constant = imported ? imported[2] : ident;
@@ -159,15 +139,25 @@ function fosCtxTools(): string[] {
 function reachableToolsets(): string[] {
   const policy = read("backend/src/main/java/com/bifos/assistant/agent/domain/AgentToolPolicy.java");
   const template = read("hermes/profile-template/config.yaml.template");
-  const section = template.slice(template.indexOf("platform_toolsets:"));
-  const apiServer = section.slice(section.indexOf("api_server:"), section.indexOf("\n\n"));
-  const platform = [...apiServer.matchAll(/^\s+- (\S+)$/gm)].map((match) => match[1]!);
+  const lines = template.split("\n");
+  const head = lines.findIndex(
+    (line, i) => line.trim() === "api_server:" && lines[i - 1]?.trim() === "platform_toolsets:",
+  );
+  assert.notEqual(head, -1, "platform_toolsets.api_server 를 찾지 못했다");
+  const platform: string[] = [];
+  for (const line of lines.slice(head + 1)) {
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    const item = /^\s+- (\S+)$/.exec(line);
+    if (!item) break;
+    platform.push(item[1]!);
+  }
   assert.ok(platform.length > 0, "platform_toolsets.api_server 를 읽지 못했다");
   return [...new Set([...javaSet(policy, "OWNER_TOOLSETS"), ...javaSet(policy, "ADMIN_TOOLSETS"), ...platform])];
 }
 
 function reachableBuiltinTools(): string[] {
-  return reachableToolsets().flatMap((toolset) => HERMES_TOOLSETS[toolset] ?? []);
+  const toolsets = hermesToolsets();
+  return reachableToolsets().flatMap((toolset) => toolsets[toolset] ?? []);
 }
 
 function assertNamed(name: string) {
@@ -176,16 +166,9 @@ function assertNamed(name: string) {
   assert.notEqual(toolKind(name).id, "other", `${name} 의 종류가 없다`);
 }
 
-test("손으로 옮긴 toolset 목록은 Hermes 계약의 내장 도구 목록과 같다", () => {
-  const contract = new Set(pythonSet(read("hermes/tests/hermes_contract.py"), "HERMES_BUILTIN_TOOLS"));
-  const copied = new Set(Object.values(HERMES_TOOLSETS).flat());
-  assert.deepEqual([...copied].filter((name) => !contract.has(name)), [], "계약에 없는 도구");
-  assert.deepEqual([...contract].filter((name) => !copied.has(name)), [], "toolset 목록에 빠진 도구");
-});
-
 test("에이전트에 켤 수 있는 toolset 은 모두 도구 목록을 안다", () => {
   const unknown = reachableToolsets().filter(
-    (toolset) => !Object.hasOwn(HERMES_TOOLSETS, toolset) && !NON_BUILTIN_TOOLSETS.has(toolset),
+    (toolset) => !Object.hasOwn(hermesToolsets(), toolset) && !NON_BUILTIN_TOOLSETS.has(toolset),
   );
   assert.deepEqual(unknown, []);
 });
@@ -215,4 +198,30 @@ test("에이전트에 켤 수 있는 Hermes 내장 도구는 모두 한국어 �
 test("fos-ctx 가 등록하는 도구와 MCP 도구 찾기 중계는 한국어 이름과 종류가 있다", () => {
   for (const name of fosCtxTools()) assertNamed(name);
   for (const name of pythonSet(read("hermes/tests/hermes_contract.py"), "TOOL_GUARD_BRIDGE")) assertNamed(name);
+});
+
+/**
+ * 문장 표에 있지만 지금 등록하는 곳이 없는 이름이다. 지난 대화의 작업 과정이 이 이름으로 남아 있다.
+ * - `memory_link`: 기억 잇기 도구. 대체 제안으로 바뀌며 등록에서 빠졌다
+ * - `task_*`: #818 이 Control Plane MCP 에 등록한다. 머지 전에 먼저 넣어 둔다
+ */
+const UNREGISTERED_LABELS = new Set([
+  "memory_link",
+  "task_list",
+  "task_create",
+  "task_update",
+  "task_set_state",
+  "task_delete",
+]);
+
+test("문장 표의 도구는 모두 등록하는 곳이 있다", () => {
+  const registered = new Set([
+    ...controlPlaneTools(),
+    ...Object.values(hermesToolsets()).flat(),
+    ...fosCtxTools(),
+    ...pythonSet(read("hermes/tests/hermes_contract.py"), "TOOL_GUARD_BRIDGE"),
+  ]);
+  const stale = LABELED_TOOLS.filter((name) => !registered.has(name) && !UNREGISTERED_LABELS.has(name));
+  assert.deepEqual(stale, []);
+  for (const name of LABELED_TOOLS) assertNamed(name);
 });

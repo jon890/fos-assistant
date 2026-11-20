@@ -226,6 +226,9 @@ const LABELS: Record<string, Label> = {
   },
 };
 
+/** 문장 표에 있는 도구 이름이다. 등록되지 않은 이름이 표에 남지 않는지 `test/repo/tool-label-coverage.test.ts` 가 본다. */
+export const LABELED_TOOLS: readonly string[] = Object.keys(LABELS);
+
 /** 표에 없는 MCP 도구다. 도구 이름 원문을 보이지 않고 연결된 서비스를 썼다고만 알린다. */
 const CONNECTED: Label = {
   running: "연결된 서비스를 쓰고 있어요",
