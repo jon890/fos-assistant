@@ -270,7 +270,7 @@ async def _check_config_update(request):
                 _sandbox_prepare_connector_output(sandbox, profile, owner)
                 prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                 updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
-                updated = _with_sandbox_approvals(saved, updated, True)
+                updated = _with_sandbox_approvals(saved, updated)
                 request.state.fos_checked_attachments = (sandbox, owner, prepared)
             except OSError:
                 return _sandbox_unavailable()
