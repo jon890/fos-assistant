@@ -1,4 +1,5 @@
 import {
+  Bell,
   BookOpen,
   Bot,
   FolderOpen,
@@ -18,6 +19,10 @@ export type SettingsGroup = { label: string; links: readonly SettingsLink[] };
  */
 export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   { label: "비서", links: [{ href: "/agents", label: "에이전트", icon: Bot }] },
+  {
+    label: "알림",
+    links: [{ href: "/settings/notifications", label: "알림", icon: Bell }],
+  },
   {
     label: "연결",
     links: [
@@ -58,10 +63,10 @@ export function isSettingsArea(pathname: string, hasSession: boolean): boolean {
 }
 
 /**
- * 경로에서 골라진 줄의 주소를 정한다. `/settings` 는 처음 보이는 「에이전트」 다.
+ * 경로에서 골라진 줄의 주소를 정한다. `/settings` 자체는 처음 보이는 「에이전트」 고, 그 아래 주소는 자기 줄이다.
  */
 export function selectedSettingsHref(pathname: string): string | null {
-  if (under(pathname, SETTINGS_PATH)) return "/agents";
+  if (pathname === SETTINGS_PATH) return "/agents";
   for (const group of SETTINGS_GROUPS)
     for (const link of group.links)
       if (under(pathname, link.href)) return link.href;
