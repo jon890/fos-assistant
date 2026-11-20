@@ -162,7 +162,7 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | ID | 해결 방법 |
 | --- | --- |
 | REQ15 | `ContextAssembler.SEARCH_INSTRUCTIONS` 의 「출처」 문장을 `### 출처` 와 `- [기관 · 문서 이름](주소)` 꼴, 주소를 글자로 쓰지 않기, 목록 안 한 번으로 바꾼다 |
-| REQ16 | `RESPONSE_INSTRUCTIONS`(모든 실행 공통)에 답 모양 규칙을 더한다. 표 구분 줄 규칙과 예시는 그대로 둔다 |
+| REQ16 | `AnswerFormatInstructions.RESPONSE_INSTRUCTIONS`(모든 실행 공통)에 답 모양 규칙을 더한다. 표 구분 줄 규칙과 예시는 그대로 둔다. `ContextAssembler` 가 파일 길이 상한을 넘어 이 글을 따로 뗐다 |
 | REQ17 | 채팅 마크다운 부품에 글 안의 줄바꿈 한 번을 `br` 로 바꾸는 작은 rehype 플러그인을 더한다. 코드 안과 블록 사이는 건드리지 않는다. 흐림 플러그인이 글자의 원문 위치로 구간을 찾으므로 그 뒤에 돈다 |
 | REQ18 | 채팅 마크다운 부품에 제목, 인용, 구분선, 굵은 글자 요소와 본문 글자 토큰을 더한다. 작업 과정 블록은 `density="compact"` 로 지금 크기와 간격을 쓴다. 출처 절은 rehype 플러그인이 최상위의 글이 「출처」 인 제목부터 다음 제목 앞까지를 `section` 하나로 감싸고 그 `section` 에 모양을 준다 |
 | REQ19 | 개발 문서의 `MermaidBlock` 과 `mermaidRenderId` 를 공용 자리로 옮겨 두 마크다운 부품이 함께 쓴다. remark 플러그인이 닫는 줄이 없는 코드 블록에 `data-open` 을 달고, 채팅 부품은 `streaming` 이면서 그 표시가 있으면 코드로 둔다. 부품 묶음은 `density` 와 `streaming` 으로 고정해 흐르는 동안 그림이 다시 붙지 않게 한다 |
@@ -172,7 +172,8 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 
 | 자리 | 맡는 것 |
 | --- | --- |
-| `context/application/ContextAssembler` | 두 지침 글 |
+| `context/application/AnswerFormatInstructions` | 「답변 형식」 절 글 |
+| `context/application/ContextAssembler` | 「최신 정보와 출처」 절 글과 범위마다 절을 잇는 순서 |
 | `web/src/components/ui/mermaid-block.tsx`, `web/src/lib/mermaid.ts` | 옮긴 Mermaid 그리기와 id 만들기. 개발 문서와 채팅이 함께 쓴다 |
 | `web/src/components/chat/markdown.tsx` | 채팅 마크다운 부품, 플러그인 순서 |
 | `web/src/components/chat/markdown-components.tsx` | 요소마다의 모양과 `density` 묶음, mermaid 와 코드 블록 고르기 |
