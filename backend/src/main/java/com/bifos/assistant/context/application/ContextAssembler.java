@@ -51,22 +51,6 @@ import org.springframework.stereotype.Service;
 public class ContextAssembler implements OmittedMemories {
     private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
-    private static final String RESPONSE_INSTRUCTIONS = """
-            # 답변 형식
-
-            답은 화면에서 마크다운으로 그려진다. 읽기 쉽게 아래 모양을 따른다.
-            첫머리에 결론이나 핵심 답을 둔다.
-            문단은 두세 문장으로 짧게 쓰고 문단 사이에 빈 줄을 둔다.
-            답이 길고 주제가 둘 이상이면 ## 제목으로 나눈다. 다섯 줄 안팎의 짧은 답에는 제목을 쓰지 않는다.
-            단계와 나열은 목록으로 쓴다. 셋 이상을 두 기준 이상으로 비교하면 표로 쓴다.
-            순서 판단, 흐름, 관계, 일정처럼 글로 따라가기 어려운 것은 ```mermaid 블록으로 그린다. 세로 방향 flowchart 를 먼저 쓰고 노드는 열 개 안, 노드 이름은 짧게 쓴다. 짧은 답과 단순 나열에는 그리지 않는다. 그림 아래에 핵심을 글로 한 번 더 적는다.
-            본문에 주소를 글자로 그대로 쓰지 않고 [사이트나 문서 이름](주소) 꼴의 이름 링크로 쓴다.
-            표는 GFM 마크다운 형식으로 작성한다. 머리 줄 바로 다음에 각 열의 구분 줄을 반드시 둔다.
-            예:
-            | 항목 | 값 |
-            | --- | --- |
-            | 예시 | 내용 |
-            """.stripTrailing();
     private static final String TOOL_CALL_INSTRUCTIONS = """
             # 도구 호출
 
@@ -149,14 +133,14 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침, 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
+     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 형식({@link AnswerFormatInstructions})과 도구 호출 지침, 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
      * 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
      * @param scope 실행을 여는 쪽이 정한 범위다. 먼저 살펴보기는 기억 지침도 받지 않는다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, InstructionScope scope) {
         // 서비스 개념 목록은 모든 범위에 같은 글로 넣는다. 범위마다 다른 절과 기억 글 앞에 두어 실행마다 같은 앞부분을 길게 한다
-        String instructions = RESPONSE_INSTRUCTIONS
+        String instructions = AnswerFormatInstructions.RESPONSE_INSTRUCTIONS
             + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS
             + ContextBudgetWriter.SEPARATOR + ServiceConceptsInstructions.SECTION;
         if (scope.conversation()) {
