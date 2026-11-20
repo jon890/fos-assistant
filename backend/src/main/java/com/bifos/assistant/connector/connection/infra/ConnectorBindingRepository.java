@@ -36,6 +36,11 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
     boolean existsByAgentId(Long agentId);
 
 
+    /** 그 플러그인들의 바인딩 번호다. 브라우저 중계 서명 비밀을 바꾼 뒤 다시 설치할 대상이다. */
+    @Query("select b.id from ConnectorBinding b where b.connection.connectorId in :connectorIds order by b.id")
+    List<Long> findIdsByConnectorIdIn(@Param("connectorIds") Collection<String> connectorIds);
+
+
     /** 관리자 목록이 같은 그룹 사용자의 바인딩을 한 번에 읽는다. */
     List<ConnectorBinding> findByConnectionUserIdIn(Collection<Long> userIds);
 

@@ -19,7 +19,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「먼저 살펴보기 표」 | `proactive_check` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
-| 「암호화 key 표」 | `user_data_key` |
+| 「암호화 key 표」 | `user_data_key`, `server_secret` |
 
 ## 첨부 삭제 요청
 
@@ -82,6 +82,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `conversation` | `pending_messages` | 아직 |
+| `server_secret` | `sealed_value` | 함. 데이터 key 없이 KEK 로 바로 감싼다. 값이 비면 NULL 이다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)) |
 | `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
 | `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
@@ -109,6 +110,7 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+`server_secret` 은 사용자, 그룹, 에이전트 어디에도 속하지 않는 서버 비밀값이라 예외로 더했다(서버 비밀값 스펙 DECISION5, 사용자 2026-11-20).
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
 
 **예외: 웹 푸시 기기는 사용자와 1:N 이지만 `app_user.push_devices` 의 JSON 컬럼에 둔다.** 사용자가 새 테이블 대신 고른 것이다(2026-11-20). 사용자가 몇 명뿐이라 다른 사용자 줄에서 같은 주소를 `LIKE` 로 찾아도 몇 줄이고, 같은 주소가 두 사용자에게 남지 않는 것은 DB 의 유일 제약 대신 서버 안의 등록 잠금이 지킨다(서버 한 대 전제). 근거와 버린 대안은 [ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md) 가 갖는다.
@@ -372,6 +374,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `description`, `icon`, `color` 는 화면과 위임 도구 `agent_list` 가 쓰는 한 줄 소개와 이름표다. Hermes 는 읽지 않는다. 비면 화면이 할 수 있는 일, 이름 첫 글자, `code` 로 정한 자동 색으로 대신 그린다. 고를 수 있는 값과 상한은 `AgentIntroduction` 과 `AgentColor` 가 갖는다([에이전트 팀](../../docs/features/agent-team.md))
 - 첫 로그인에 만든 에이전트(기본 비서)는 이름이 「비서」 다. `V20261105074407` 이 이미 있던 첫 에이전트 가운데 이름이 사용자 표시 이름 그대로이고 주인이 그 사람인 줄만 「비서」 로 바꾸고 소개를 채웠다. 사람이 저장한 것이 아니어서 `updated_at` 은 바꾸지 않았다
 - `pending_default_toolsets` 는 Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름을 쉼표로 이은 글이다. 지금은 `image_gen` 만 들어간다. `V20261105074418` 이 이미 있던 기본 비서에 한 번 넣었고 새 기본 비서는 첫 로그인이 넣는다. 켜졌거나 관리자가 그 도구를 끄면 NULL 이다. 그룹에 공개했거나 지운 에이전트도 비운다. 엔티티 저장은 이 컬럼을 쓰지 않고 `AgentRepository` 의 전용 쿼리만 쓴다([ADR-20261119 / image-gen-defaults](../../docs/adr/ADR-20261119-image-gen-defaults.md))
+- `sandbox_check_pending` 은 Control Plane 기동 작업이 local 로 켜졌을 수 있는 셸을 한 번 점검해야 하는 에이전트다. `V20261105074434` 가 그때 있던 에이전트에 한 번 참을 넣었고, 새 에이전트는 거짓으로 만든다. 점검을 끝내면 거짓이다. 참인 에이전트만 실행 공간 정책 밖일 때 셸 계열이 꺼진다. 엔티티 저장은 이 컬럼을 쓰지 않고 `AgentRepository` 의 전용 쿼리만 쓴다([ADR-20261120 / no-local-shell](../../docs/adr/ADR-20261120-no-local-shell.md))
 - 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
 **에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).
@@ -1139,6 +1142,19 @@ action을 지우면 실행 내용도 지운다.
 
 **이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.** 사용자를 지우는 흐름이 생기면 이 줄을 지워 본문을 없앤다.
 본문 칸 쪽은 이 표에 외래 키를 두지 않는다. 이 줄을 지우는 길을 막지 않기 위해서다.
+
+### server_secret
+
+서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
+결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
+
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
+- `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
+- `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)
+- `meta_json` 은 비밀이 아닌 부가 값이다. 원문이나 앞부분을 넣지 않는다
+- `updated_by` 는 바꾼 사용자 번호이고 외래 키가 없다. 기동 때 옛 설정에서 가져온 값이면 NULL 이다
+- KEK 를 바꾸면 `DataKeyRewrapper` 가 `user_data_key` 와 함께 이 표의 옛 KEK 줄도 다시 감싼다
 
 ## 옛 문서 경로
 

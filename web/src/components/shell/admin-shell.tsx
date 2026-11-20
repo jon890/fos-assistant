@@ -9,6 +9,7 @@ import {
   Cpu,
   Globe,
   HardDrive,
+  KeyRound,
   LayoutDashboard,
   Menu,
   Plug,
@@ -55,6 +56,7 @@ const GROUPS = [
       { href: "/admin/connections", label: "외부 서비스 연결", icon: Plug },
       { href: "/admin/browsers", label: "브라우저", icon: Globe },
       { href: "/admin/workspaces", label: "파일 공간", icon: HardDrive },
+      { href: "/admin/secrets", label: "서버 비밀값", icon: KeyRound },
     ],
   },
 ] as const;

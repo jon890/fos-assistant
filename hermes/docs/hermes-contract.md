@@ -2023,9 +2023,9 @@ scheme, host, port 가운데 하나라도 다른 곳으로 가면 `Authorization
 ### profile 별 적용
 
 대시보드 plugin 은 유효한 `FOS_ASSISTANT_SANDBOX` 정책의 `profiles` 에 등록된 profile 만 docker 실행 공간으로 보낸다.
-미등록 profile 은 셸 도구 저장을 허용하고 local 로 둔다. 정책 자체가 없거나 잘못됐으면 저장을 거절한다.
-도구 저장 때 backend 가 바뀌므로 정책만 수정해서 이미 저장된 profile 의 실행 공간이 바뀌지는 않는다.
-정책에서 profile 을 빼면 다음 셸 저장에서 local 로 돌아간다.
+미등록 profile 의 셸 도구 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. 정책 자체가 없거나 잘못됐으면 `reason` 없는 409 다. 어느 경우도 local 로 켜지 않는다([ADR-20261120 / no-local-shell](../../docs/adr/ADR-20261120-no-local-shell.md)).
+도구 저장 때 backend 가 바뀌므로 정책만 수정해서 이미 저장된 profile 의 실행 공간이 바뀌지는 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장해 지금 정책을 반영한다.
+정책에서 profile 을 빼면 다음 셸 저장이 409 `unlisted` 이고, Control Plane 의 기동 작업이 그 에이전트의 실행 공간 도구를 끈다.
 정책 형식과 env, 망, 마운트 검증은 [`hermes/README.md`](../README.md)의 「셸 실행 공간」이 갖는다.
 
 token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
