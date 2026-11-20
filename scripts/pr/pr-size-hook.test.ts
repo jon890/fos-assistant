@@ -3,11 +3,12 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { MAX_LINES } from "./pr-size.mjs";
 import { WARN_RATIO, advice, isGitCommit, shouldSkip } from "./pr-size-hook.mjs";
 
-const SCRIPT = new URL("./pr-size-hook.mjs", import.meta.url).pathname;
+const SCRIPT = fileURLToPath(new URL("./pr-size-hook.mjs", import.meta.url));
 const WARN_AT = Math.ceil(MAX_LINES * WARN_RATIO);
 // 테스트 자식이 CI 출력이나 다른 저장소의 PR 을 보지 않게 한다.
 const ENV = { ...process.env };

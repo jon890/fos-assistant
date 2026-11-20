@@ -6,11 +6,11 @@
 // 설정은 저장소 root 의 .claude/settings.json 에 있다.
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const WARN_RATIO = 0.8;
 const EXCEPTION_LABEL = "규모:예외";
-const SIZE_SCRIPT = new URL("./pr-size.mjs", import.meta.url).pathname;
+const SIZE_SCRIPT = fileURLToPath(new URL("./pr-size.mjs", import.meta.url));
 
 // 명령 안에 git commit 이 있는지 본다. `git add . && git commit -m ...`, `git -C dir commit` 도 잡는다.
 export function isGitCommit(command) {
