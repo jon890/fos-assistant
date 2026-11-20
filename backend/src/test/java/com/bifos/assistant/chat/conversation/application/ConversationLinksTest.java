@@ -61,6 +61,19 @@ class ConversationLinksTest {
 
 
     @Test
+    @DisplayName("추적 링크 안의 다른 주소, 퍼센트 인코딩한 공백 앞부분, 한글 뒤에 붙은 주소는 맞지 않는다")
+    void rejectsAddressesInsideOtherWords() {
+        userSays("https://t.example.com/r?u=https://shop.example.com/x 와 shop.example.com/a%20b 와 상품shop.example.com/y");
+
+        assertThat(find("https://shop.example.com/x")).isEmpty();
+        assertThat(find("shop.example.com/a")).isEmpty();
+        assertThat(find("shop.example.com/y")).isEmpty();
+        assertThat(find("https://t.example.com/r?u=https://shop.example.com/x")).isPresent();
+        assertThat(find("shop.example.com/a%20b")).isPresent();
+    }
+
+
+    @Test
     @DisplayName("잘못된 퍼센트 인코딩이 든 메시지도 예외 없이 판정한다")
     void toleratesBrokenPercentEncoding() {
         userSays("할인 100% shop.example.com/sale?p=1 여기 %ZZ shop.example.com/bad?p=%ZZ");

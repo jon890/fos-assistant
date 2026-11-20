@@ -21,16 +21,23 @@ import org.springframework.transaction.annotation.Transactional;
  * 모델이 가리킨 링크가 요청자가 그 대화에 보낸 메시지에 있는지 확인한다(ADR-20261120 / link-image-source, 스펙 generated-image DECISION43).
  *
  * <p>같은 주소로 보는 범위는 앞의 {@code https://} 나 {@code http://} 유무, 호스트의 대소문자, 퍼센트 인코딩 차이뿐이다. 비서가 파라미터를 지우거나
- * 짧은 주소를 펼친 주소는 대화에 없는 주소다. 메시지 글을 미리 자르지 않는다. 한글 경로가 한글에서 잘리기 때문이다.
+ * 짧은 주소를 펼친 주소는 대화에 없는 주소다.
+ *
+ * <p>메시지를 공백으로 나눈 낱말 하나가 주소 하나다. 낱말 앞의 여는 괄호와 따옴표, 끝의 문장 부호를 떼고 앞의 scheme 만 뗀다. 그 낱말 전체가
+ * 가리킨 주소와 같거나, 낱말을 주소에 쓸 수 없는 첫 문자(한글 조사 등)에서 자른 앞부분이 같을 때만 맞는다. 한글 경로를 그대로 붙여 넣은 주소는 낱말
+ * 전체로 맞는다. 낱말 가운데의 다른 주소(추적 링크 안의 주소)나 주소의 앞부분은 맞지 않는다.
  */
 @Service
 @RequiredArgsConstructor
 public class ConversationLinks {
     private static final Pattern SCHEME = Pattern.compile("(?i)https?://");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    /** 메시지에서 주소 앞에 붙어도 주소로 보지 않는 여는 괄호와 따옴표다. */
+    private static final String LEADING = "([{<\"'「『“‘";
     /** 주소에 쓸 수 있는 ASCII 문자(RFC 3986 의 unreserved, reserved 와 {@code %})다. 이것이 아닌 문자가 주소의 경계다. */
     private static final String URL_CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#[]@!$&'()*+,;=%";
     /** 메시지에서 주소 끝에 붙어도 주소로 보지 않는 문장 부호다. */
-    private static final String TRAILING = ".,)!?";
+    private static final String TRAILING = ".,)!?]}>\"'」』”’;:";
 
     private final ChatMessageRepository messages;
 
@@ -53,59 +60,47 @@ public class ConversationLinks {
             if (content == null || ChatMessage.UNREADABLE_CONTENT.equals(content)) {
                 continue;
             }
-            if (contains(comparable(SCHEME.matcher(content).replaceAll(" ")), target.get())) {
-                return target.get().fetchUri();
+            for (String word : WHITESPACE.split(content)) {
+                if (target.get().matches(word)) {
+                    return target.get().fetchUri();
+                }
             }
         }
         return Optional.empty();
     }
 
 
-    private static boolean contains(String text, Target target) {
-        int from = 0;
-        while (true) {
-            int index = indexOfIgnoreCaseHost(text, target, from);
-            if (index < 0) {
-                return false;
-            }
-            if ((index == 0 || isBoundary(text.charAt(index - 1))) && endsAtBoundary(text, index + target.length())) {
-                return true;
-            }
-            from = index + 1;
+    /** 낱말 하나를 주소로 다듬는다. 앞의 여는 괄호와 따옴표, 끝의 문장 부호와 조각을 떼고 앞의 scheme 만 뗀다. */
+    private static String trimWord(String word) {
+        int begin = 0;
+        int finish = word.length();
+        while (begin < finish && LEADING.indexOf(word.charAt(begin)) >= 0) {
+            begin++;
         }
+        while (finish > begin && TRAILING.indexOf(word.charAt(finish - 1)) >= 0) {
+            finish--;
+        }
+        String trimmed = word.substring(begin, finish);
+        Matcher scheme = SCHEME.matcher(trimmed);
+        if (scheme.lookingAt()) {
+            trimmed = trimmed.substring(scheme.end());
+        }
+        int hash = trimmed.indexOf('#');
+        return hash >= 0 ? trimmed.substring(0, hash) : trimmed;
     }
 
 
-    /** 호스트 부분만 대소문자 없이, 나머지는 글자 그대로 맞는 첫 자리다. */
-    private static int indexOfIgnoreCaseHost(String text, Target target, int from) {
-        for (int i = from; i + target.length() <= text.length(); i++) {
-            if (text.regionMatches(true, i, target.host(), 0, target.host().length())
-                && text.startsWith(target.rest(), i + target.host().length())) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-
-    private static boolean endsAtBoundary(String text, int end) {
-        if (end < text.length() && text.charAt(end) == '#') {
-            // 조각은 받을 주소에서 버리므로 메시지 쪽 조각의 시작도 주소의 끝으로 본다.
-            return true;
-        }
-        int index = end;
-        while (index < text.length() && TRAILING.indexOf(text.charAt(index)) >= 0) {
+    /** 주소에 쓸 수 없는 첫 문자 앞까지다. 그 문자가 없으면 낱말 전체다. 끝의 문장 부호도 뗀다. */
+    private static String urlPrefix(String word) {
+        int index = 0;
+        while (index < word.length() && URL_CHARACTERS.indexOf(word.charAt(index)) >= 0) {
             index++;
         }
-        if (index == end) {
-            return end == text.length() || isBoundary(text.charAt(end));
+        int finish = index;
+        while (finish > 0 && TRAILING.indexOf(word.charAt(finish - 1)) >= 0) {
+            finish--;
         }
-        return index == text.length() || isBoundary(text.charAt(index));
-    }
-
-
-    private static boolean isBoundary(char character) {
-        return URL_CHARACTERS.indexOf(character) < 0;
+        return word.substring(0, finish);
     }
 
 
@@ -163,8 +158,17 @@ public class ConversationLinks {
         }
 
 
-        int length() {
-            return host.length() + rest.length();
+        /** 메시지의 낱말 하나가 이 주소인가. 낱말 전체나 주소에 쓸 수 없는 첫 문자 앞까지가 같아야 한다. */
+        boolean matches(String word) {
+            String trimmed = trimWord(word);
+            return sameAs(comparable(trimmed)) || sameAs(comparable(urlPrefix(trimmed)));
+        }
+
+
+        private boolean sameAs(String candidate) {
+            return candidate.length() == host.length() + rest.length()
+                && candidate.regionMatches(true, 0, host, 0, host.length())
+                && candidate.startsWith(rest, host.length());
         }
 
 
