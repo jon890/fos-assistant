@@ -42,7 +42,10 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -52,6 +55,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class HttpHermesConnectorClientTest {
     private static final String BASE = "https://dashboard.example.test";
     private static final String DEMO = "demo-notes";
@@ -125,7 +129,7 @@ class HttpHermesConnectorClientTest {
 
     @Test
     @DisplayName("정상 OAuth 선언은 읽고 어긋난 선언만 비워 수동 입력 칸을 유지한다")
-    void readsOAuthAndKeepsManualFieldsForMalformedDeclarations() {
+    void readsOAuthAndKeepsManualFieldsForMalformedDeclarations(CapturedOutput output) {
         String oauth = """
             "oauth":{"provider":"github","app_scope":"plugin","fields":["token"],
             "settings_url":"https://accounts.example.test/settings","install_settings_url":"https://accounts.example.test/installations"}
@@ -133,10 +137,11 @@ class HttpHermesConnectorClientTest {
         String item = CATALOG.strip().substring(1, CATALOG.strip().length() - 1);
         String withOAuth = item.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\"," + oauth);
         String brokenFields = withOAuth.replace("\"fields\":[\"token\"]", "\"fields\":[\"scope\"]");
-        String brokenProvider = withOAuth.replace("\"github\"", "\"unknown\"");
+        String brokenProvider = withOAuth.replace("\"github\"", "\"provider-test-value\"");
+        String brokenScope = withOAuth.replace("\"app_scope\":\"plugin\"", "\"app_scope\":\"shared\"");
         String brokenUrl = withOAuth.replace("https://accounts.example.test/settings", "javascript:alert(1)");
         String standard = withOAuth.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\",\"schema\":3");
-        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenUrl, standard, item)) + "]";
+        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenScope, brokenUrl, standard, item)) + "]";
         server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
 
@@ -148,6 +153,13 @@ class HttpHermesConnectorClientTest {
             assertThat(manifest.oauth()).isNull();
             assertThat(manifest.fields()).extracting(ConnectorField::key).containsExactly("token", "scope");
         });
+        assertThat(output.getAll()).contains(
+            "connector demo-notes OAuth 선언을 읽지 못했다: 지원하지 않는 제공자다",
+            "제공자의 앱 범위와 app_scope 가 맞지 않는다",
+            "fields 는 겹치지 않는 비밀 칸 목록이어야 한다",
+            "설정 주소는 올바른 HTTPS 주소여야 한다",
+            "표준 플러그인은 단추 연결을 선언할 수 없다")
+            .doesNotContain("provider-test-value", "javascript:alert(1)");
         server.verify();
     }
 

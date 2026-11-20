@@ -77,42 +77,53 @@ final class ConnectorCatalogDecoder {
         }
         try {
             if (standard) {
-                throw new IllegalStateException();
+                throw new IllegalStateException("표준 플러그인은 단추 연결을 선언할 수 없다");
             }
             return readOAuth(declared, fields);
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            log.warn("connector {} OAuth 선언의 모양이 맞지 않는다", text(item, "id"));
+        } catch (IllegalStateException ex) {
+            // 선언 원문은 남기지 않는다. 아래 검사에서 정한 까닭만 출력한다.
+            String reason = ex.getMessage() == null ? "비밀 칸 목록의 형식이 틀렸다" : ex.getMessage();
+            log.warn("connector {} OAuth 선언을 읽지 못했다: {}", text(item, "id"), reason);
             return null;
         }
     }
 
 
     private static ConnectorOAuthDeclaration readOAuth(JsonNode declared, List<ConnectorField> fields) {
-        String provider = requiredText(declared, "provider");
+        String provider = text(declared, "provider");
         AppScope scope = switch (provider) {
             case "github" -> AppScope.PLUGIN;
             case "google" -> AppScope.SHARED;
-            default -> throw new IllegalStateException();
+            case null, default -> throw new IllegalStateException("지원하지 않는 제공자다");
         };
         String expectedScope = scope == AppScope.PLUGIN ? "plugin" : "shared";
+        if (!expectedScope.equals(text(declared, "app_scope"))) {
+            throw new IllegalStateException("제공자의 앱 범위와 app_scope 가 맞지 않는다");
+        }
         List<String> keys = names(declared.get("fields"));
         List<String> secretKeys = fields.stream().filter(ConnectorField::secret).map(ConnectorField::key).toList();
-        if (!expectedScope.equals(text(declared, "app_scope"))
-            || keys.isEmpty() || new HashSet<>(keys).size() != keys.size() || !secretKeys.containsAll(keys)) {
-            throw new IllegalStateException();
+        if (keys.isEmpty() || new HashSet<>(keys).size() != keys.size() || !secretKeys.containsAll(keys)) {
+            throw new IllegalStateException("fields 는 겹치지 않는 비밀 칸 목록이어야 한다");
         }
-        String settings = https(requiredText(declared, "settings_url"));
-        String installSettings = text(declared, "install_settings_url");
-        return new ConnectorOAuthDeclaration(provider, scope, keys, settings, installSettings == null ? null : https(installSettings));
+        String settings = https(text(declared, "settings_url"));
+        JsonNode install = declared.get("install_settings_url");
+        String installSettings = install == null || install.isNull() ? null : https(text(declared, "install_settings_url"));
+        return new ConnectorOAuthDeclaration(provider, scope, keys, settings, installSettings);
     }
 
 
     private static String https(String value) {
-        URI uri = URI.create(value);
-        if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getRawUserInfo() != null) {
-            throw new IllegalArgumentException();
+        if (value != null) {
+            try {
+                URI uri = URI.create(value);
+                if ("https".equals(uri.getScheme()) && uri.getHost() != null && uri.getRawUserInfo() == null) {
+                    return value;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // URI 파싱 예외에는 주소 원문이 있으므로 고정된 까닭으로 바꾼다.
+            }
         }
-        return value;
+        throw new IllegalStateException("설정 주소는 올바른 HTTPS 주소여야 한다");
     }
 
 
