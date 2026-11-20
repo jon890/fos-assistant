@@ -135,6 +135,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기, 관리자의 공간별 용량. 아래 「실행 공간 파일」 |
+| `quality` | 배포 뒤 확인과 품질 평가의 평가 전용 사용자, 확인 한 번의 기록(`quality_run`), 기능별 규칙 판정([`docs/features/agent-quality.md`](../../docs/features/agent-quality.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 
@@ -267,7 +268,7 @@ domain과 infra는 admin을 import하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
-`crypto` 는 맨 아래다. 사용자별·그룹별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 기억은 주인(사용자나 그룹)을 받는 `OwnedTextCipher` 로 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)).
+`crypto` 는 맨 아래다. 사용자별·그룹별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 기억은 주인(사용자나 그룹)을 받는 `OwnedTextCipher` 로 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)). 서버 비밀값도 같은 까닭으로 `crypto.domain.ServerSecrets` 뒤에 두고, 값의 주인 기능이 부른다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)).
 
 `crypto.domain.entity`는 `UserDataKey`와 이후 추가하는 crypto 엔티티, 그 엔티티의 영속 ID를 둔다.
 암호화 정책과 port는 `crypto.domain`에 남긴다. `UserDataKey`의 단순 이름 또는
@@ -294,8 +295,9 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.application.port`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `people` 은 사용자 정리 때 위 패키지 표의 줄을 직접 지우지 않는다. `people.application.port`에 port(`UserPurgeParticipant`)를 두고 `connector`, `task` 가 구현한다. 아래 패키지의 표는 그 패키지의 정리 빈을 부른다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
-`workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. `admin` 을 뺀 어느 패키지도 `workspace` 를 import 하지 않는다.
-`admin` 은 `workspace` 위, 맨 위다. 관리자 전용 화면과 API 가 기능의 `application` 을 부르고, 어느 패키지도 `admin` 을 import 하지 않는다(`ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN`).
+`workspace` 는 `quality` 아래다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. `admin` 을 뺀 어느 패키지도 `workspace` 를 import 하지 않는다.
+`quality` 는 `workspace` 위다. 평가 전용 사용자를 준비하고 확인을 돌리려고 `people`, `user`, `agent`, `memory`, `chat`, `usage`, `task`, `notification`, `orchestration` 을 부른다. `admin` 을 뺀 어느 패키지도 `quality` 를 import 하지 않는다.
+`admin` 은 `quality` 위, 맨 위다. 관리자 전용 화면과 API 가 기능의 `application` 을 부르고, 어느 패키지도 `admin` 을 import 하지 않는다(`ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN`).
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 
 ### proactive
@@ -341,7 +343,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.action.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다. `task` 는 예약 작업 지우기 승인 카드를 띄우려고 `connector.action.application.ControlPlaneApprovals` 를 부르고, 승인한 뒤의 지우기는 `connector.action.application.port.ControlPlaneActionRunner` 를 `task` 가 구현한다. `mcp` 의 예약 작업 도구는 `mcp.application.port.TaskRequests` 를 `task` 가 구현한다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길

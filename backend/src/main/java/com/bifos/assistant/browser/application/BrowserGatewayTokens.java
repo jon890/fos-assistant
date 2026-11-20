@@ -2,6 +2,7 @@ package com.bifos.assistant.browser.application;
 
 import com.bifos.assistant.browser.application.dto.BrowserGrant;
 import com.bifos.assistant.browser.config.BrowserProperties;
+import com.bifos.assistant.crypto.domain.ServerSecrets;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Component;
 /**
  * 브라우저 중계의 접근 표식을 만들고 확인한다(ADR-20261008 / browser-gateway-token).
  *
- * <p>표식은 {@code gateway-secret} 로 번호를 HMAC-SHA256 한 값이고 표에 두지 않는다. 같은 바인딩은 늘 같은 표식을 받는다. 모양과
+ * <p>표식은 서버 비밀값 {@value #SECRET_NAME} 으로 번호를 HMAC-SHA256 한 값이고 표에 두지 않는다. 같은 바인딩은 늘 같은 표식을 받는다. 모양과
  * 서명할 글, 만료는 ADR-20261008 / browser-gateway-token 의 「결정」 이 갖고, 형식 검사와 비교는 이 클래스가 갖는다. 표식과 서명과
  * 비밀값은 로그와 예외 메시지에 싣지 않는다.
  */
@@ -37,40 +38,44 @@ public class BrowserGatewayTokens {
     private static final Pattern BINDING = Pattern.compile("^b([1-9][0-9]{0,18})\\.([0-9a-f]{64})$");
     private static final Pattern CALL = Pattern.compile("^u([1-9][0-9]{0,18})\\.([1-9][0-9]{0,11})\\.([0-9a-f]{64})$");
 
+    /** 서명 비밀을 두는 서버 비밀값의 이름이다(ADR-20261120 / server-secret). */
+    public static final String SECRET_NAME = "browser_gateway";
+
     private final LiveProperties<BrowserProperties> properties;
+    private final ServerSecrets secrets;
     private final Clock clock;
 
 
-    /** 중계가 켜져 있는가. 두 설정 가운데 하나라도 비면 꺼져 있다. */
+    /** 중계가 켜져 있는가. 중계 주소 설정과 저장소의 서명 비밀 가운데 하나라도 비면 꺼져 있다. */
     public boolean enabled() {
-        return properties.current().gatewayEnabled();
+        return active().isPresent();
     }
 
 
     /** 바인딩 표식을 실은 중계 주소다. 중계가 꺼졌으면 비어 있다. */
     public Optional<String> bindingAddress(long bindingId) {
         requirePositive(bindingId);
-        BrowserProperties current = properties.current();
-        if (!current.gatewayEnabled()) {
+        Optional<Active> current = active();
+        if (current.isEmpty()) {
             return Optional.empty();
         }
         String number = Long.toString(bindingId);
-        String signature = sign(current.gatewaySecret(), bindingText(number));
-        return Optional.of(current.gatewayBaseUrl() + "/b" + number + "." + signature);
+        String signature = sign(current.get().secret(), bindingText(number));
+        return Optional.of(current.get().baseUrl() + "/b" + number + "." + signature);
     }
 
 
     /** 지금부터 5분 동안 쓸 수 있는 호출 표식을 실은 중계 주소다. 중계가 꺼졌으면 비어 있다. */
     public Optional<String> callAddress(long userId) {
         requirePositive(userId);
-        BrowserProperties current = properties.current();
-        if (!current.gatewayEnabled()) {
+        Optional<Active> current = active();
+        if (current.isEmpty()) {
             return Optional.empty();
         }
         String number = Long.toString(userId);
         String expiry = Long.toString(clock.instant().plus(CALL_TTL).getEpochSecond());
-        String signature = sign(current.gatewaySecret(), callText(number, expiry));
-        return Optional.of(current.gatewayBaseUrl() + "/u" + number + "." + expiry + "." + signature);
+        String signature = sign(current.get().secret(), callText(number, expiry));
+        return Optional.of(current.get().baseUrl() + "/u" + number + "." + expiry + "." + signature);
     }
 
 
@@ -81,11 +86,11 @@ public class BrowserGatewayTokens {
      * <p>표식은 확인하지 않는다. {@link #verify(String)} 를 지난 표식만 넘긴다.
      */
     public Optional<String> relayBase(String token) {
-        BrowserProperties current = properties.current();
-        if (!current.gatewayEnabled()) {
+        Optional<Active> current = active();
+        if (current.isEmpty()) {
             return Optional.empty();
         }
-        String base = current.gatewayBaseUrl();
+        String base = current.get().baseUrl();
         String websocket = base.startsWith("https://")
             ? "wss://" + base.substring("https://".length())
             : "ws://" + base.substring("http://".length());
@@ -99,14 +104,15 @@ public class BrowserGatewayTokens {
      * <p>어느 까닭으로 거절했는지는 돌려주지 않는다. 중계가 꺼졌으면 비어 있다.
      */
     public Optional<BrowserGrant> verify(String token) {
-        BrowserProperties current = properties.current();
-        if (token == null || !current.gatewayEnabled()) {
+        Optional<Active> active = active();
+        if (token == null || active.isEmpty()) {
             return Optional.empty();
         }
+        String secret = active.get().secret();
         Matcher binding = BINDING.matcher(token);
         if (binding.matches()) {
             String number = binding.group(1);
-            return signatureMatches(current.gatewaySecret(), bindingText(number), binding.group(2))
+            return signatureMatches(secret, bindingText(number), binding.group(2))
                 ? parse(number).map(id -> new BrowserGrant(BrowserGrant.Kind.BINDING, id))
                 : Optional.empty();
         }
@@ -116,13 +122,30 @@ public class BrowserGatewayTokens {
         }
         String number = call.group(1);
         String expiry = call.group(2);
-        if (!signatureMatches(current.gatewaySecret(), callText(number, expiry), call.group(3))) {
+        if (!signatureMatches(secret, callText(number, expiry), call.group(3))) {
             return Optional.empty();
         }
         if (!Instant.ofEpochSecond(Long.parseLong(expiry)).isAfter(clock.instant())) {
             return Optional.empty();
         }
         return parse(number).map(id -> new BrowserGrant(BrowserGrant.Kind.CALL, id));
+    }
+
+
+    /**
+     * 중계 주소와 서명 비밀이 모두 있으면 둘을 낸다. 비밀은 설정이 아니라 서버 비밀값에서 매번 읽는다. 저장소가 메모리에 두므로 바꾼 값이
+     * 재기동 없이 다음 표식부터 쓰인다.
+     */
+    private Optional<Active> active() {
+        String baseUrl = properties.current().gatewayBaseUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return Optional.empty();
+        }
+        return secrets.read(SECRET_NAME).filter(secret -> !secret.isBlank()).map(secret -> new Active(baseUrl, secret));
+    }
+
+
+    private record Active(String baseUrl, String secret) {
     }
 
 

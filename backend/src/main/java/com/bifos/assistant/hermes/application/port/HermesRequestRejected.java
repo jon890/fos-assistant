@@ -14,11 +14,24 @@ import org.springframework.web.client.RestClientResponseException;
 public class HermesRequestRejected extends ApiException {
 
     private final int status;
+    private final boolean profileUnlisted;
 
 
     public HermesRequestRejected(ErrorCode code, String message, RestClientResponseException cause) {
+        this(code, message, cause, false);
+    }
+
+
+    /**
+     * 대시보드가 거절했고, 그 까닭이 실행 공간 정책에 없는 profile 인지를 함께 담는다.
+     *
+     * @param profileUnlisted plugin 이 본문에 {@code reason: unlisted} 를 넣었다(ADR-20261120 / no-local-shell)
+     */
+    public HermesRequestRejected(
+        ErrorCode code, String message, RestClientResponseException cause, boolean profileUnlisted) {
         super(code, message, cause);
         this.status = cause.getStatusCode().value();
+        this.profileUnlisted = profileUnlisted;
     }
 
 
@@ -26,11 +39,23 @@ public class HermesRequestRejected extends ApiException {
     public HermesRequestRejected(ErrorCode code, String message, int status, Throwable cause) {
         super(code, message, cause);
         this.status = status;
+        this.profileUnlisted = false;
     }
 
 
     /** 대시보드가 돌려준 상태 코드다. 보내기 전에 멈췄으면 같은 뜻으로 정한 상태 코드다. */
     public int status() {
         return status;
+    }
+
+
+    /**
+     * plugin 이 실행 공간 정책에 없는 profile 이라 거절했다.
+     *
+     * <p>정책이 없거나 틀린 거절과 구분한다. 참일 때만 그 에이전트의 실행 공간 도구를 꺼도 된다. 정책이 잠깐 틀린 거절을 정책
+     * 밖으로 오해하면 모든 에이전트의 셸을 끄게 된다(ADR-20261120 / no-local-shell).
+     */
+    public boolean profileUnlisted() {
+        return profileUnlisted;
     }
 }

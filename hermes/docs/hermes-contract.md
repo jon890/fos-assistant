@@ -1917,7 +1917,7 @@ MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.
 
-로컬 플러그인의 바인딩은 이 참조 대신 실행기 정의를 쓴다. 정의 모양은 [보관 파일 암호화 설계](../../docs/features/connector/design.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다. 2026-11-04 에 `v0.21.6` 의 `tools/mcp_tool_config.py` 를 읽어 기대는 점을 확인했다.
+로컬 플러그인의 바인딩은 이 참조 대신 실행기 정의를 쓴다. 정의 모양은 [보관 파일 암호화 설계](../plugins/dashboard-profile-api/README.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다. 2026-11-04 에 `v0.21.6` 의 `tools/mcp_tool_config.py` 를 읽어 기대는 점을 확인했다.
 
 - 자식 env 는 `PATH`, `HOME`, `USER`, `LANG`, `LC_ALL`, `TERM`, `SHELL`, `TMPDIR`, `XDG_*` 와 정의의 `env` 다(`_build_safe_env`). `HERMES_HOME` 은 오지 않는다. 그래서 실행기가 쓸 보관 파일 디렉터리와 key 파일 위치를 정의의 `env` 에 값으로 넣는다
 - command 가 절대 경로면 그대로 쓰고, 그 디렉터리를 자식 `PATH` 앞에 붙인다(`_resolve_stdio_command`). 실행기도 실제 command 에 같은 일을 한다
@@ -2020,9 +2020,9 @@ scheme, host, port 가운데 하나라도 다른 곳으로 가면 `Authorization
 ### profile 별 적용
 
 대시보드 plugin 은 유효한 `FOS_ASSISTANT_SANDBOX` 정책의 `profiles` 에 등록된 profile 만 docker 실행 공간으로 보낸다.
-미등록 profile 은 셸 도구 저장을 허용하고 local 로 둔다. 정책 자체가 없거나 잘못됐으면 저장을 거절한다.
-도구 저장 때 backend 가 바뀌므로 정책만 수정해서 이미 저장된 profile 의 실행 공간이 바뀌지는 않는다.
-정책에서 profile 을 빼면 다음 셸 저장에서 local 로 돌아간다.
+미등록 profile 의 셸 도구 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. 정책 자체가 없거나 잘못됐으면 `reason` 없는 409 다. 어느 경우도 local 로 켜지 않는다([ADR-20261120 / no-local-shell](../../docs/adr/ADR-20261120-no-local-shell.md)).
+도구 저장 때 backend 가 바뀌므로 정책만 수정해서 이미 저장된 profile 의 실행 공간이 바뀌지는 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장해 지금 정책을 반영한다.
+정책에서 profile 을 빼면 다음 셸 저장이 409 `unlisted` 이고, Control Plane 의 기동 작업이 그 에이전트의 실행 공간 도구를 끈다.
 정책 형식과 env, 망, 마운트 검증은 [`hermes/README.md`](../README.md)의 「셸 실행 공간」이 갖는다.
 
 token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
@@ -2304,9 +2304,10 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 | `modify` 의 인자 병합 | `pre_tool_call` 이 돌려준 `args` 를 원래 인자 뒤에 얕게 병합한다. 내장 도구와 MCP 도구를 나누지 않는다 | `hermes_cli/plugins.py` |
 | 결과 hook 이 받는 인자 | `transform_tool_result` 는 도구 인자를 `args` 로 받는다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
 | 바탕과 참고 사진 | 바탕 한 장 `image_url` 과 참고 목록 `reference_image_urls`(글 하나도 받는다)를 받는다. 값은 주소, data URL, 파일 경로다. 실행 공간이 있는 profile 은 Hermes 홈의 media cache(`cache/` 등) 안의 경로를 호스트에서 읽고 그 밖의 경로는 실행 공간 안에서 읽는다. 2026-11-20 에 v0.23.2 소스로 확인했다 | `tools/image_generation_tool.py` 의 `_handle_image_generate`, `_confine_source_images`, `tools/image_source.py` 의 `_MEDIA_CACHE_SUBDIRS` |
+| 비율 | `aspect_ratio` 는 `landscape`, `square`, `portrait` 셋이다. 빼면 `landscape` 로 만들고 셋 밖의 값도 `landscape` 로 바꾼다. Control Plane 의 그림 규칙이 비율을 늘 적게 하는 까닭이다. 2026-11-20 에 v0.23.2 소스로 확인했다 | `agent/image_gen_provider.py` 의 `VALID_ASPECT_RATIOS`, `DEFAULT_ASPECT_RATIO`, `resolve_aspect_ratio` |
 | 입력 장수 | openai-codex 는 바탕과 참고를 이어 앞의 16장(`_MAX_REFERENCE_IMAGES`)만 `images/edits` 로 보내고 넘는 것은 말없이 버린다. 입력 하나는 25MB 까지이고 PNG, JPEG, GIF, WebP 만 받는다 | `plugins/image_gen/openai-codex/__init__.py` 의 `_normalize_input_images`, `_MAX_INPUT_IMAGE_BYTES`, `_encode_input_image`, `plugins/image_gen/_common.py` 의 `collect_source_images` |
 
-Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자, 이미지 서비스를 읽는 설정 자리와 그 서비스 plugin, 바탕 사진의 두 인자와 호스트에서 읽는 media cache, 입력 장수를 새 버전의 소스에서 다시 본다.
+Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자, 이미지 서비스를 읽는 설정 자리와 그 서비스 plugin, 바탕 사진의 두 인자와 호스트에서 읽는 media cache, 비율 값과 기본값, 입력 장수를 새 버전의 소스에서 다시 본다.
 `fos-ctx` 는 실행 공간의 경로를 받지 않고 바탕 사진을 Control Plane 에서 받아 media cache 의 사본 경로로 바꾼다([ADR-20261120 / image-source](../../docs/adr/ADR-20261120-image-source.md)). 실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있기 때문이다.
 
 ### 네트워크

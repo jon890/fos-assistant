@@ -361,6 +361,10 @@ public enum ErrorCode {
     WORKSPACE_DELETE_TOO_MANY(HttpStatus.CONFLICT),
     /** 도우미가 실패했거나 제한 시간 안에 답하지 않았다. 일부가 지워졌을 수 있다. */
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
+    /** 서버에 웹 푸시 VAPID 키가 없어 기기를 등록받지 않는다(ADR-20261120 / web-push). */
+    PUSH_NOT_CONFIGURED(HttpStatus.CONFLICT),
+    /** KEK 가 설정되지 않아 서버 비밀값을 저장할 수 없다. 원문으로 두는 길은 없다(ADR-20261120 / server-secret). */
+    SECRET_STORE_UNAVAILABLE(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 

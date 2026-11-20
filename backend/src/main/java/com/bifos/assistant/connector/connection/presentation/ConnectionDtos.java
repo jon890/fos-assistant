@@ -217,7 +217,8 @@ public final class ConnectionDtos {
      * 에이전트 하나에서 본 연결 하나다. 상태는 enum 이름 그대로 내고, 붙어 있지 않으면 {@code status} 가 null 이다.
      *
      * @param toolCount 커넥터가 선언한 도구 수
-     * @param skills 붙이면 그 profile 에 설치되는 커넥터 스킬 이름
+     * @param skills 붙이면 그 profile 에 설치할 수 있는 스킬 이름. 에이전트용 스킬도 들어 있다
+     * @param skippedSkills 이 에이전트에 설치하지 못한 에이전트용 스킬과 까닭 낱말. 붙어 있지 않으면 빈 목록이다
      */
     public record AgentConnectionResponse(
         String connectorId,
@@ -227,7 +228,8 @@ public final class ConnectionDtos {
         String status,
         boolean restartRequired,
         int toolCount,
-        List<String> skills) {
+        List<String> skills,
+        List<SkippedSkillResponse> skippedSkills) {
         static AgentConnectionResponse from(AgentConnectionView value) {
             return new AgentConnectionResponse(
                 value.connectorId(),
@@ -237,8 +239,20 @@ public final class ConnectionDtos {
                 value.status() == null ? null : value.status().name(),
                 value.restartRequired(),
                 value.toolCount(),
-                value.skills());
+                value.skills(),
+                value.skippedSkills().stream()
+                    .map(skipped -> new SkippedSkillResponse(skipped.name(), skipped.reasons()))
+                    .toList());
         }
+    }
+
+    /**
+     * 설치하지 못한 에이전트용 스킬 하나다.
+     *
+     * @param reasons {@code terminal_off}, {@code sandbox_unregistered}, {@code sandbox_env_missing}, {@code name_taken}. 대시보드가
+     * 낱말을 더하면 그대로 낸다
+     */
+    public record SkippedSkillResponse(String name, List<String> reasons) {
     }
 
     /**

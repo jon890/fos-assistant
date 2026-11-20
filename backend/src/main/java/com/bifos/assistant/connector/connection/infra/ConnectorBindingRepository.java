@@ -36,6 +36,11 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
     boolean existsByAgentId(Long agentId);
 
 
+    /** 그 플러그인들의 바인딩 번호다. 브라우저 중계 서명 비밀을 바꾼 뒤 다시 설치할 대상이다. */
+    @Query("select b.id from ConnectorBinding b where b.connection.connectorId in :connectorIds order by b.id")
+    List<Long> findIdsByConnectorIdIn(@Param("connectorIds") Collection<String> connectorIds);
+
+
     /** 관리자 목록이 같은 그룹 사용자의 바인딩을 한 번에 읽는다. */
     List<ConnectorBinding> findByConnectionUserIdIn(Collection<Long> userIds);
 
@@ -48,9 +53,20 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
      */
     @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
         + " from ConnectorBinding b"
-        + " where b.applyDueAt <= :now and b.restartRequired = false"
+        + " where b.applyDueAt <= :now and b.restartRequired = false and b.cyclePhase is null"
         + " order by b.applyDueAt")
     List<DueBinding> findApplyDue(@Param("now") Instant now);
+
+
+    /**
+     * 껐다 켜기 단계이고 실패 표시가 없는 바인딩의 번호들이다(ADR-20261120 / connector-auto-apply). 생성자 식을 문자열로 두는
+     * 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
+        + " from ConnectorBinding b"
+        + " where b.cyclePhase is not null and b.applyFailedAt is null"
+        + " order by b.id")
+    List<DueBinding> findCycling();
 
 
     /**

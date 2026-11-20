@@ -13,14 +13,17 @@ import org.springframework.validation.annotation.Validated;
  * 센다. {@code ADMIN} 은 세지 않는다
  * @param purgeAfter 지운 뒤 행을 실제로 지우기까지 기다리는 기간. 0 보다 커야 한다. 지운 직후에도 늦게 끝난 실행과 지운
  * 대화의 정리가 그 에이전트의 행을 읽기 때문이다
+ * @param sandboxSweepOnStart 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하는가. 기본은 참이다. 검사는 끄고 그 메서드를 직접
+ * 부른다(ADR-20261120 / no-local-shell)
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.agents")
-public record AgentProperties(Integer maxPerUser, Duration purgeAfter) {
+public record AgentProperties(Integer maxPerUser, Duration purgeAfter, Boolean sandboxSweepOnStart) {
 
     public AgentProperties {
         maxPerUser = maxPerUser == null ? 5 : maxPerUser;
         purgeAfter = purgeAfter == null ? Duration.ofDays(7) : purgeAfter;
+        sandboxSweepOnStart = sandboxSweepOnStart == null ? Boolean.TRUE : sandboxSweepOnStart;
         if (purgeAfter.isZero() || purgeAfter.isNegative()) {
             throw new IllegalArgumentException("assistant.agents.purge-after must be positive");
         }

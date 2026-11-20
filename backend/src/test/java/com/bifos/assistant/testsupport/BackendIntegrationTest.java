@@ -25,6 +25,7 @@ import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.proactive.check.application.port.CheckNotificationPolicy;
@@ -123,7 +124,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         SkillService.class,
         SkillStore.class,
         TurnCancellation.class,
-        UserExecutionLimiter.class
+        UserExecutionLimiter.class,
+        VapidKeys.class
     })
 @ExtendWith(IntegrationTestIsolation.class)
 public @interface BackendIntegrationTest {

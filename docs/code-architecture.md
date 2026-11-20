@@ -77,10 +77,12 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
 | 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별·그룹별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 그룹 key 는 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)). 푼 key 는 Control Plane 메모리에만 있다 |
+| 브라우저 중계 서명 비밀 | 서버 비밀값 `server_secret` 의 `browser_gateway`. KEK 로 감싼 채로 두고 관리자 화면 「서버 비밀값」 에서 서버가 새로 만든다 |
 
 데이터베이스에는 어떤 비밀값도 원문으로 넣지 않는다.
+서버 비밀값은 `server_secret` 에 KEK 로 감싸 두고 관리자 화면에서 넣고 바꾼다. 옮길 값과 남길 값, 옮기는 순서는 [ADR-20261120 / server-secret](adr/ADR-20261120-server-secret.md) 과 [서버 비밀값 스펙](features/secret-store/spec.md) 이 갖는다.
 `agent` 는 profile 이름과 주소만 적는다.
-profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
+profile key 와 AI credential 은 아직 홈서버 파일과 Hermes 쪽에 있다. 옮기는 일은 서버 비밀값 스펙의 PR2, PR3 이 한다.
 
 ## 플러그인 비밀값을 두는 곳
 
@@ -97,7 +99,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 | 어디 | 무엇 | 언제 지워지는가 |
 | --- | --- | --- |
 | 보관 파일 | 연결마다 하나인 원본. 대시보드 plugin 이 Control Plane KEK 와 다른 key 로 암호화해 둔다([ADR-20261103 / connector-vault-key](../hermes/docs/adr/ADR-20261103-connector-vault-key.md)) | 연결을 해제할 때 |
-| 로컬 플러그인 MCP 프로세스의 env | 실행기가 띄울 때 보관 파일을 풀어 그 프로세스 env 에만 넣은 값. 서버 정의와 `.env` 에는 없다([보관 파일 암호화 설계](features/connector/design.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」) | 프로세스가 끝날 때 |
+| 로컬 플러그인 MCP 프로세스의 env | 실행기가 띄울 때 보관 파일을 풀어 그 프로세스 env 에만 넣은 값. 서버 정의와 `.env` 에는 없다([보관 파일 암호화 설계](../hermes/plugins/dashboard-profile-api/README.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」) | 프로세스가 끝날 때 |
 | 원격 플러그인을 붙인 에이전트 profile 의 `.env` | 붙일 때 보관 파일에서 복사한 값. 서버 정의의 헤더는 `${이름}` 참조만 갖고 그 profile 의 secret scope 에서 풀린다. Hermes 가 프로세스 없이 직접 붙어 실행기를 끼울 자리가 없어 예외로 둔다 | 그 에이전트에서 뗄 때. 연결 해제는 붙은 바인딩을 모두 떼므로 함께 지워진다 |
 | 옮기지 못한 옛 로컬 바인딩의 `.env` | 배포 때 보관 파일을 풀지 못해 옛 방식으로 남긴 사본. 기동 로그의 「남은 사본」 수로 드러난다 | 다시 연결하거나 뗄 때 |
 
