@@ -75,7 +75,7 @@ fos-agents 쪽 디렉터리와 manifest 칸 채우기는 이 저장소 밖이다
 
 ## PR2 의 경계
 
-PR2 는 이 설계를 다시 열지 않고 아래만 정한다. 정확한 칸과 마이그레이션은 PR2 계획이 정한다.
+PR2 는 이 설계를 다시 열지 않고 아래만 정했다. PR2(#823)는 머지됐고, 지금의 칸과 동작은 [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) 의 `skipped_skills` 와 [플러그인 연결](../connector.md) 의 「붙이기와 떼기」 가 갖는다.
 
 - Control Plane 의 설치 결과 읽기(`HttpHermesConnectorClient`)가 `skipped_skills` 를 읽고, 성공한 설치 응답만 바인딩 행에 저장한다. 새 테이블은 만들지 않고 `agent_connector_binding` 에 JSON 글 컬럼을 더한다.
 - 에이전트 연결 목록 응답의 바인딩마다 그 값을 내고, 웹의 `agent-connections-section.tsx` 가 spec REQ9 의 문구로 그린다.
