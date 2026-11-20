@@ -137,6 +137,8 @@ session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없�
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 `McpToolService.invalidContext()` 의 문구다.
+
+모델에게 가는 실패 글(도구 결과의 `isError` 참, JSON-RPC 인자 오류)은 「다음 방법: …」 이나 「사용자에게 바로 알린다.」 한 줄로 끝난다. 실패 결과 함수(`McpToolService.failure`, `jsonFailure`, `McpRpc.invalidParams`)가 `ToolFailureText` 만 받아 끝 줄 없는 글은 컴파일되지 않는다. JSON 실패는 같은 줄을 `next` 칸에 둔다. 기준은 [도구 실패 뒤 다른 방법 설계](tool-fallback/design.md) 의 「바꾸는 실패 글」 이다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
 까닭은 서버 로그에만 남는다. 압축 교체일 수 있는 경우(`DELEGATION_CONTEXT_UNAVAILABLE`), 등록이 없는 하위 에이전트(`SUBAGENT_SESSION_UNREGISTERED`), 중지된 origin(`ORIGIN_CANCELLED`)을 따로 남긴다.
 
@@ -258,5 +260,5 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 - 인자는 `path`(필수), `title`, `description` 뿐이다. 대화와 사용자는 인자로 받지 않고 서명한 `_fos_ctx` 의 origin 실행에서 정한다
 - `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다. `/workspace/` 가 아닌 경로에서 찾지 못하면 실패 글에 실행 공간에서 만든 파일은 `/workspace/` 경로로 다시 부르라는 안내를 덧붙인다. 실행 공간의 파일 도구가 결과물 폴더 경로에 쓴 파일은 Control Plane 에 보이지 않기 때문이다
 - 실행 공간은 Control Plane 이 읽기 전용으로 붙인 루트에서 링크를 따라가지 않고 읽는다. `mcp` 가 `workspace` 를 부르지 못해 `mcp.application.port.SandboxFiles` 를 `workspace` 가 구현한다
-- 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담는다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
+- 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담고 끝 줄로 끝난다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
 - 보관 자리가 차 있으면 10초까지 기다린다
