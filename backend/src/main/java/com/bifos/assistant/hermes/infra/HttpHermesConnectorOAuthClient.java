@@ -11,10 +11,10 @@ import com.bifos.assistant.hermes.config.HermesProperties;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -117,14 +117,15 @@ public class HttpHermesConnectorOAuthClient implements HermesConnectorOAuthClien
 
     private JsonNode post(String action, Map<String, Object> body) {
         try {
-            JsonNode response = client.post()
+            ResponseEntity<JsonNode> response = client.post()
                 .uri(baseUrl + "/api/connector-oauth/" + action)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + dashboardToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(JsonNode.class);
-            return response != null && response.isObject() ? response : null;
+                .toEntity(JsonNode.class);
+            JsonNode payload = response.getBody();
+            return response.getStatusCode().is2xxSuccessful() && payload != null && payload.isObject() ? payload : null;
         } catch (HttpClientErrorException.Conflict ex) {
             throw new ConnectorOAuthFlowConflict();
         } catch (RestClientException ex) {
@@ -167,12 +168,14 @@ public class HttpHermesConnectorOAuthClient implements HermesConnectorOAuthClien
 
 
     private static Outcome outcome(JsonNode body) {
-        String value = text(body, "outcome");
-        try {
-            return value == null ? Outcome.UNAVAILABLE : Outcome.valueOf(value.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            return Outcome.UNAVAILABLE;
-        }
+        return switch (text(body, "outcome")) {
+            case "ok" -> Outcome.OK;
+            case "grant_revoked" -> Outcome.GRANT_REVOKED;
+            case "app_rejected" -> Outcome.APP_REJECTED;
+            case "scope_denied" -> Outcome.SCOPE_DENIED;
+            case "missing" -> Outcome.MISSING;
+            case null, default -> Outcome.UNAVAILABLE;
+        };
     }
 
 

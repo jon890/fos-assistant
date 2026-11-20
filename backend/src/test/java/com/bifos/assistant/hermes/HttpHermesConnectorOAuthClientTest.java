@@ -129,6 +129,8 @@ class HttpHermesConnectorOAuthClientTest {
     void distinguishesTransportFailureFromProviderOutcome() {
         expect("refresh", APP_BODY).andRespond(withStatus(HttpStatus.BAD_GATEWAY)
             .contentType(MediaType.APPLICATION_JSON).body("{\"outcome\":\"grant_revoked\",\"detail\":\"client-secret-example\"}"));
+        expect("refresh", APP_BODY).andRespond(withStatus(HttpStatus.FOUND)
+            .contentType(MediaType.APPLICATION_JSON).body("{\"outcome\":\"grant_revoked\"}"));
         expect("refresh", APP_BODY).andRespond(withSuccess("{\"outcome\":\"unknown\"}", MediaType.APPLICATION_JSON));
         expect("refresh", APP_BODY)
             .andRespond(withSuccess("{\"outcome\":\"ok\",\"access_token\":\"test\",\"expires_at\":\"bad\"}", MediaType.APPLICATION_JSON));
@@ -136,7 +138,7 @@ class HttpHermesConnectorOAuthClientTest {
         expect("refresh", APP_BODY)
             .andRespond(withSuccess("{\"outcome\":\"ok\",\"access_token\":\"example\",\"expires_at\":null}", MediaType.APPLICATION_JSON));
 
-        for (int index = 0; index < 3; index++) {
+        for (int index = 0; index < 4; index++) {
             assertThat(client.refresh(VAULT, DEMO, APP)).isEqualTo(new Token(Outcome.UNAVAILABLE, null, null));
         }
         assertThat(client.refresh(VAULT, DEMO, APP)).isEqualTo(new Token(Outcome.APP_REJECTED, null, null));
