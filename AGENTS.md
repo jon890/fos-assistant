@@ -174,6 +174,7 @@ PR CI 는 느린 검사(브라우저 shard 와 E2E)를 기본으로 건너뛰고
 
 한 PR은 관심사 하나만 담는다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
 운영 코드의 변경 줄 상한과 계산은 `scripts/pr/pr-size.mjs` 가 갖는다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다. 스크립트가 경계 후보를 보이고, `check-local.sh --fast` 도 크기를 잰다.
+구현 중에는 Claude Code hook(`.claude/settings.json`)이 commit 마다 크기를 재서 상한의 80% 를 넘으면 에이전트에게 알린다. 그 안내를 받으면 남은 phase 를 이 PR 에 넣지 않고 계획서 deferred 와 PR 본문 「남은 범위」 로 미룬다. 판정과 안내 문구는 `scripts/pr/pr-size-hook.mjs` 가 갖는다.
 `규모:예외` 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 붙이지 않는다.
 
 Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는다.
