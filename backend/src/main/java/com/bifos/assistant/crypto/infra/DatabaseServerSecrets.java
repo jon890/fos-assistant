@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -118,12 +119,13 @@ public class DatabaseServerSecrets implements ServerSecrets {
 
 
     /**
-     * 활성 KEK 가 아닌 KEK 로 감싼 줄을 다시 감싼다. 기동 때 {@code DataKeyRewrapper} 가 트랜잭션 안에서 부른다. 바꾼 시각과 사람은
-     * 그대로 둔다.
+     * 활성 KEK 가 아닌 KEK 로 감싼 줄을 다시 감싼다. 기동 때 {@code DataKeyRewrapper} 가 부른다. 바꾼 시각과 사람은 그대로 둔다.
+     *
+     * @param eachInTransaction 줄 하나의 갱신을 자기 트랜잭션에서 돌리는 함수. 풀지 못한 줄과 갱신이 실패한 줄은 건너뛰고 수만 센다
      *
      * @return 다시 감싼 줄 수
      */
-    public int rewrapStale() {
+    public int rewrapStale(Consumer<Runnable> eachInTransaction) {
         if (!keks.available()) {
             return 0;
         }
@@ -137,7 +139,10 @@ public class DatabaseServerSecrets implements ServerSecrets {
             }
             try {
                 byte[] value = keks.unwrap(row.kekId(), row.sealedValue(), aad(row.name()));
-                rows.rewrap(row.name(), keks.activeKeyId(), keks.wrap(value, aad(row.name())));
+                String sealed = keks.wrap(value, aad(row.name()));
+                String kekId = keks.activeKeyId();
+                // 줄마다 따로 커밋한다. 한 줄의 DB 오류가 앞서 다시 감싼 줄까지 되돌리지 않게 한다.
+                eachInTransaction.accept(() -> rows.rewrap(row.name(), kekId, sealed));
                 rewrapped++;
             } catch (RuntimeException ex) {
                 // 한 줄이 풀리지 않아도 나머지 줄은 다시 감싼다. 이름과 예외 종류만 남긴다.

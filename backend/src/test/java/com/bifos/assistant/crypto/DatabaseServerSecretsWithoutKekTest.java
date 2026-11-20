@@ -30,6 +30,6 @@ class DatabaseServerSecretsWithoutKekTest {
         assertThatThrownBy(() -> secrets.write("browser_gateway", "value-without-kek-000", Map.of(), 1L))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SECRET_STORE_UNAVAILABLE));
         verify(rows, never()).save(any());
-        assertThat(secrets.rewrapStale()).isZero();
+        assertThat(secrets.rewrapStale(Runnable::run)).isZero();
     }
 }

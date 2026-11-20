@@ -81,7 +81,7 @@ test("값이 비어 있으면 확인 창 없이 만들고 플러그인 목록을
     /^\/api\/admin\/secrets\/browser-gateway\/regenerate$/,
   );
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  await expect(page.getByText(/플러그인 목록을 읽지 못해 바인딩을 다시 설치하지 못했어요/)).toBeVisible();
+  await expect(page.getByText(/바인딩 목록을 읽지 못해 바인딩을 다시 설치하지 못했어요/)).toBeVisible();
 });
 
 test("KEK 가 없으면 단추가 꺼지고 안내가 보인다", async ({ page }) => {

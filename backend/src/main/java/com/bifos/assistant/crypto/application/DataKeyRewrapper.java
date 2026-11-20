@@ -40,7 +40,7 @@ public class DataKeyRewrapper implements ApplicationRunner {
             log.error("데이터 key 를 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }
         try {
-            transactions.executeWithoutResult(status -> serverSecrets.rewrapStale());
+            serverSecrets.rewrapStale(work -> transactions.executeWithoutResult(status -> work.run()));
         } catch (RuntimeException e) {
             log.error("서버 비밀값을 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }

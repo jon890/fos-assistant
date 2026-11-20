@@ -46,13 +46,21 @@ public class ConnectorBrowserBindings {
             return OptionalInt.empty();
         }
         Set<String> ids = browsers.get().keySet();
-        return OptionalInt.of(ids.isEmpty() ? 0 : bindings.findIdsByConnectorIdIn(ids).size());
+        if (ids.isEmpty()) {
+            return OptionalInt.of(0);
+        }
+        try {
+            return OptionalInt.of(bindings.findIdsByConnectorIdIn(ids).size());
+        } catch (RuntimeException ex) {
+            log.warn("browser binding count: bindings unavailable exception={}", ex.getClass().getName());
+            return OptionalInt.empty();
+        }
     }
 
 
     /**
      * 모두 다시 설치한다. 한 바인딩의 시작 예외나 {@code CALL_FAILED} 는 그 바인딩의 실패로 세고 다음으로 간다. 플러그인 목록을 읽지
-     * 못하면 예외를 던지지 않고 그렇다고 돌려준다. 비밀은 이미 바뀌었기 때문이다.
+     * 못하거나 대상 바인딩을 읽지 못하면 예외를 던지지 않고 그렇다고 돌려준다. 비밀은 이미 바뀌었기 때문이다.
      */
     public BrowserBindingReinstall reinstallAll() {
         Optional<Map<String, ConnectorManifest>> found = browserManifests();
@@ -63,7 +71,14 @@ public class ConnectorBrowserBindings {
         if (browsers.isEmpty()) {
             return new BrowserBindingReinstall(0, 0, 0, false);
         }
-        List<Long> targets = attempts.start(() -> bindings.findIdsByConnectorIdIn(browsers.keySet()));
+        List<Long> targets;
+        try {
+            targets = attempts.start(() -> bindings.findIdsByConnectorIdIn(browsers.keySet()));
+        } catch (RuntimeException ex) {
+            // 비밀은 이미 바뀌었다. 대상을 읽지 못한 것을 결과로 알려 화면이 다시 만들기를 안내하게 한다.
+            log.warn("browser binding reinstall: bindings unavailable exception={}", ex.getClass().getName());
+            return new BrowserBindingReinstall(0, 0, 0, true);
+        }
         int restartPending = 0;
         int failed = 0;
         for (Long bindingId : targets) {

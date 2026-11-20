@@ -23,6 +23,6 @@ test("다시 설치 결과는 성공, 일부 실패, 목록 읽기 실패를 나
   ]);
   assert.match(
     reinstallSummary({ total: 0, restartPending: 0, failed: 0, catalogUnavailable: true })[0]!,
-    /플러그인 목록을 읽지 못해/,
+    /바인딩 목록을 읽지 못해/,
   );
 });

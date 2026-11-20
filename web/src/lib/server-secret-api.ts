@@ -55,7 +55,7 @@ export function regenerateConfirmText(bindingCount: number | null): string {
 export function reinstallSummary(result: BindingReinstall): string[] {
   if (result.catalogUnavailable)
     return [
-      "비밀은 바뀌었지만 플러그인 목록을 읽지 못해 바인딩을 다시 설치하지 못했어요. Hermes 가 돌아온 뒤 다시 만들어 주세요.",
+      "비밀은 바뀌었지만 플러그인이나 바인딩 목록을 읽지 못해 바인딩을 다시 설치하지 못했어요. Hermes 가 돌아온 뒤 다시 만들어 주세요.",
     ];
   if (result.total === 0) return ["새 비밀을 만들었어요."];
   const lines = [
