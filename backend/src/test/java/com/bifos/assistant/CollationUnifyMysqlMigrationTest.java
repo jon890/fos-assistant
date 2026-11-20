@@ -1,3 +1,4 @@
+// migration-test-prune: keep 정렬 규칙을 통일한 마이그레이션 뒤의 지금 스키마와 운영 MySQL 설정의 차이를 본다
 package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;

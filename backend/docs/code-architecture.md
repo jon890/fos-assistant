@@ -47,7 +47,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 두 base, 엔티티별 상속, 46개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
 `Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
 `JpaAuditingTest`가 H2 에서 확인한다. 칸의 정밀도는 `MysqlMigrationTest`가 실제 스키마로 대조한다.
-`JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
+`JpaAuditingMigrationTest`는 빈 DB 전체 적용에서 감사 칸이 NULL 을 허용하는지 확인한다.
 
 ## 패키지 배치 규칙
 

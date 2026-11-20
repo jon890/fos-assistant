@@ -1,11 +1,11 @@
-package com.bifos.assistant;
+package com.bifos.assistant.chat;
 
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import org.junit.jupiter.api.Tag;
 
-/** 실제 MySQL에서도 COMMENT 이외 DDL과 데이터를 바꾸지 않는지 확인한다. */
+/** 실제 MySQL의 UNIQUE와 복합 FK, cascade를 같은 데이터로 검증한다. */
 @Tag("mysql")
-class SchemaCommentsMysqlTest extends SchemaCommentsMigrationTest {
+class MediaObservationSchemaMysqlTest extends MediaObservationSchemaTest {
     @Override
     String[] createDatabase() {
         var database = MysqlTestDatabase.create();
