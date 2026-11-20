@@ -4,16 +4,22 @@ import com.bifos.assistant.hermes.application.dto.ConnectorEventWatch;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration.AppScope;
 import com.bifos.assistant.hermes.application.dto.ConnectorSnapshotDeclaration;
 import com.bifos.assistant.hermes.application.dto.ConnectorUnknownErrors;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
 /** 카탈로그 항목의 선언과 기본값을 읽는다. HTTP 호출과 실행 판정은 client가 맡는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
+@Slf4j
 final class ConnectorCatalogDecoder {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
     /** 읽을 수 없는 선언에 주는 판이다. 받는 쪽이 아는 판이 아니라 그 커넥터만 카탈로그에서 빠진다. */
@@ -58,7 +64,52 @@ final class ConnectorCatalogDecoder {
             ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()),
             ConnectorUnknownErrors.read(item.get("unknown_errors")),
             readable && schema(schema) == SCHEMA_DECLARING ? defaultToolPolicy(item) : null,
-            ConnectorEventWatch.read(item.get("event_watch")));
+            ConnectorEventWatch.read(item.get("event_watch")),
+            oauth(item, fields));
+    }
+
+
+    /** 대시보드가 검사한 선언을 읽고, 어긋난 OAuth 칸은 카탈로그의 나머지와 독립적으로 버린다. */
+    private static ConnectorOAuthDeclaration oauth(JsonNode item, List<ConnectorField> fields) {
+        JsonNode declared = item.get("oauth");
+        if (declared == null || declared.isNull()) {
+            return null;
+        }
+        try {
+            return readOAuth(declared, fields);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            log.warn("connector {} OAuth 선언의 모양이 맞지 않는다", text(item, "id"));
+            return null;
+        }
+    }
+
+
+    private static ConnectorOAuthDeclaration readOAuth(JsonNode declared, List<ConnectorField> fields) {
+        String provider = requiredText(declared, "provider");
+        AppScope scope = switch (provider) {
+            case "github" -> AppScope.PLUGIN;
+            case "google" -> AppScope.SHARED;
+            default -> throw new IllegalStateException();
+        };
+        String expectedScope = scope == AppScope.PLUGIN ? "plugin" : "shared";
+        List<String> keys = names(declared.get("fields"));
+        List<String> secretKeys = fields.stream().filter(ConnectorField::secret).map(ConnectorField::key).toList();
+        if (!expectedScope.equals(text(declared, "app_scope"))
+            || keys.isEmpty() || new HashSet<>(keys).size() != keys.size() || !secretKeys.containsAll(keys)) {
+            throw new IllegalStateException();
+        }
+        String settings = https(requiredText(declared, "settings_url"));
+        String installSettings = text(declared, "install_settings_url");
+        return new ConnectorOAuthDeclaration(provider, scope, keys, settings, installSettings == null ? null : https(installSettings));
+    }
+
+
+    private static String https(String value) {
+        URI uri = URI.create(value);
+        if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getRawUserInfo() != null) {
+            throw new IllegalArgumentException();
+        }
+        return value;
     }
 
 

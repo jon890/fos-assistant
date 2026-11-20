@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.connection.application.dto.AgentConnections
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPaymentContext;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
@@ -115,7 +116,8 @@ public final class ConnectionDtos {
         String linkKind,
         boolean standardPlugin,
         boolean singleBinding,
-        boolean ownerBrowser) {
+        boolean ownerBrowser,
+        ConnectorOAuthSummary oauth) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -133,7 +135,8 @@ public final class ConnectionDtos {
                 value.appearance().linkKind(),
                 value.standardPlugin(),
                 value.singleBinding(),
-                value.ownerBrowser());
+                value.ownerBrowser(),
+                value.oauth());
         }
     }
 

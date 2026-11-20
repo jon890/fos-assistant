@@ -27,6 +27,8 @@ import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration.AppScope;
 import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
@@ -116,6 +118,34 @@ class HttpHermesConnectorClientTest {
         assertThat(tools).extracting(ConnectorTool::argLabels)
             .containsExactly(Map.of("to", "받는 사람"), Map.of(), Map.of(), Map.of());
         assertThat(tools).extracting(ConnectorTool::risk).containsOnly("WRITE");
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("정상 OAuth 선언은 읽고 어긋난 선언만 비워 수동 입력 칸을 유지한다")
+    void readsOAuthAndKeepsManualFieldsForMalformedDeclarations() {
+        String oauth = """
+            "oauth":{"provider":"github","app_scope":"plugin","fields":["token"],
+            "settings_url":"https://accounts.example.test/settings","install_settings_url":"https://accounts.example.test/installations"}
+            """.strip();
+        String item = CATALOG.strip().substring(1, CATALOG.strip().length() - 1);
+        String withOAuth = item.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\"," + oauth);
+        String brokenFields = withOAuth.replace("\"fields\":[\"token\"]", "\"fields\":[\"scope\"]");
+        String brokenProvider = withOAuth.replace("\"github\"", "\"unknown\"");
+        String brokenUrl = withOAuth.replace("https://accounts.example.test/settings", "javascript:alert(1)");
+        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenUrl, item)) + "]";
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+
+        List<ConnectorManifest> catalog = client.readCatalog();
+        assertThat(catalog.getFirst().oauth()).isEqualTo(new ConnectorOAuthDeclaration(
+            "github", AppScope.PLUGIN, List.of("token"),
+            "https://accounts.example.test/settings", "https://accounts.example.test/installations"));
+        assertThat(catalog.subList(1, catalog.size())).allSatisfy(manifest -> {
+            assertThat(manifest.oauth()).isNull();
+            assertThat(manifest.fields()).extracting(ConnectorField::key).containsExactly("token", "scope");
+        });
         server.verify();
     }
 
