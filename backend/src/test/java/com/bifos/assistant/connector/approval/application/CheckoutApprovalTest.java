@@ -437,7 +437,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(fills.get()).isEqualTo(1);
         assertThat(action(answer).status()).isEqualTo(ActionStatus.FAILED);
         assertThat(action(answer).errorCode()).isEqualTo(ConnectorCheckoutOutcome.LIMIT);
-        assertThat(text).startsWith(ConnectorApprovalResume.ENDED);
+        assertThat(text).startsWith(ConnectorApprovalResume.ENDED_LEAD);
         assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
     }
 
@@ -453,7 +453,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
         clock.set(clock.instant().plus(ConnectorCheckoutOutcome.WAITING_LIFE));
 
-        assertThat(resumes.resume(user, conversation)).startsWith(ConnectorApprovalResume.ENDED);
+        assertThat(resumes.resume(user, conversation)).startsWith(ConnectorApprovalResume.ENDED_LEAD);
         assertThat(action(expired).status()).isEqualTo(ActionStatus.FAILED);
         assertThat(action(expired).errorCode()).isEqualTo(ConnectorCheckoutOutcome.RESUME_ENDED);
         assertThat(keptTabs.kept(user.id(), TAB, started)).isFalse();

@@ -4,7 +4,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 모든 실행의 공통 지시문에 넣는 「도구가 실패했을 때」 절이다(스펙 {@code docs/features/tool-fallback/spec.md} 의 REQ1, REQ2, REQ5).
+ * 모든 실행의 공통 지시문에 넣는 「도구가 실패했을 때」 절이다(스펙 {@code docs/features/tool-fallback/spec.md} 의 REQ1, REQ2, REQ5, REQ7).
  *
  * <p>도구 한 번이 실패했다고 바로 사용자에게 넘기지 않고 정한 횟수까지 다른 방법을 해 본 뒤에 묻게 한다. Control Plane 도구가 연달아 두 번
  * 실패하면 다른 서버의 도구로만 해 보게 하는 것은 Hermes 가 같은 MCP 서버의 연속 3번 실패에 그 서버를 60초 막기 때문이다
@@ -30,5 +30,6 @@ final class ToolFailureInstructions {
             보안이나 정책으로 막힌 주소와 도구는 다른 도구로 같은 대상을 다시 노리지 않는다. 막히지 않은 다른 대상으로 같은 일을 하는 것은 된다.
             다 해 보고도 못 했으면 답에 무엇을 해 봤는지 한 줄 적고 사용자에게 묻거나 부탁한다.
             다른 방법으로 해냈는데 결과가 처음 뜻과 달라졌으면(예: 기억을 고치지 못해 새로 남겼다) 답에 한 줄 알린다.
+            그림의 참고 사진을 받지 못했으면 설명만으로 비슷하게 그려 넣지 않는다. 먼저 그 사진을 쓰지 못한다는 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 알린다.
             """.stripTrailing();
 }

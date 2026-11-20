@@ -11,7 +11,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 모든 실행의 공통 지시문에 「도구가 실패했을 때」 절이 드는지 확인한다(스펙 tool-fallback REQ1, REQ2, REQ5). */
+/** 모든 실행의 공통 지시문에 「도구가 실패했을 때」 절이 드는지 확인한다(스펙 tool-fallback REQ1, REQ2, REQ5, REQ7). */
 @BackendIntegrationTest
 class ToolFailureInstructionsTest {
 
@@ -76,5 +76,15 @@ class ToolFailureInstructionsTest {
         assertThat(instructions(scope))
             .contains("다 해 보고도 못 했으면 답에 무엇을 해 봤는지 한 줄 적고 사용자에게 묻거나 부탁한다.")
             .contains("결과가 처음 뜻과 달라졌으면");
+    }
+
+
+    @ParameterizedTest
+    @EnumSource(InstructionScope.class)
+    @DisplayName("그림의 참고 사진을 받지 못하면 비슷하게 그려 넣지 않고 사진이나 링크를 보내 달라고 먼저 알린다")
+    void doesNotDrawLookalikeWithoutReferencePhoto(InstructionScope scope) {
+        assertThat(instructions(scope))
+            .contains("그림의 참고 사진을 받지 못했으면 설명만으로 비슷하게 그려 넣지 않는다.")
+            .contains("사용자가 사진을 올리거나 링크를 보내면 된다는 것을 알린다.");
     }
 }
