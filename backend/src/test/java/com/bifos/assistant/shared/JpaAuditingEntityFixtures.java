@@ -21,6 +21,7 @@ import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
+import com.bifos.assistant.crypto.domain.entity.ServerSecret;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
@@ -90,6 +91,7 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, UserBrowser.create(user.id(), unique, BUSINESS));
         add(entityManager, rows, AgentToken.issueFor(unique, "f".repeat(64), "검사"));
         add(entityManager, rows, UserDataKey.wrapped(user.id(), "audit", "wrapped"));
+        add(entityManager, rows, ServerSecret.named("audit-" + user.id()));
         add(entityManager, rows, HermesSessionBinding.of(unique, unique, execution, "root", "parent"));
         add(entityManager, rows, ExecutionContextSource.of(execution.id(), 0, "MEMORY", "memory:" + memory.id(), "FULL", "FRESH"));
         add(entityManager, rows, Notification.of(user.id(), NotificationKind.TASK_SUCCEEDED, "알림", "본문", null));

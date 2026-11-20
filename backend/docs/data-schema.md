@@ -19,7 +19,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「먼저 살펴보기 표」 | `proactive_check` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
-| 「암호화 key 표」 | `user_data_key` |
+| 「암호화 key 표」 | `user_data_key`, `server_secret` |
 
 ## 첨부 삭제 요청
 
@@ -82,6 +82,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `conversation` | `pending_messages` | 아직 |
+| `server_secret` | `sealed_value` | 함. 데이터 key 없이 KEK 로 바로 감싼다. 값이 비면 NULL 이다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)) |
 | `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
 | `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
@@ -108,6 +109,7 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+`server_secret` 은 사용자, 그룹, 에이전트 어디에도 속하지 않는 서버 비밀값이라 예외로 더했다(서버 비밀값 스펙 DECISION5, 사용자 2026-11-20).
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
 
 ## 마이그레이션 작성 규칙
@@ -1099,6 +1101,19 @@ action을 지우면 실행 내용도 지운다.
 
 **이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.** 사용자를 지우는 흐름이 생기면 이 줄을 지워 본문을 없앤다.
 본문 칸 쪽은 이 표에 외래 키를 두지 않는다. 이 줄을 지우는 길을 막지 않기 위해서다.
+
+### server_secret
+
+서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
+결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
+
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
+- `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
+- `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)
+- `meta_json` 은 비밀이 아닌 부가 값이다. 원문이나 앞부분을 넣지 않는다
+- `updated_by` 는 바꾼 사용자 번호이고 외래 키가 없다. 기동 때 옛 설정에서 가져온 값이면 NULL 이다
+- KEK 를 바꾸면 `DataKeyRewrapper` 가 `user_data_key` 와 함께 이 표의 옛 KEK 줄도 다시 감싼다
 
 ## 옛 문서 경로
 

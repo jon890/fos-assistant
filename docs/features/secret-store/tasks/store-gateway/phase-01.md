@@ -96,5 +96,9 @@ cd backend && ./gradlew archTest checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/test/resources/purge/fixture.sql` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/crypto/DatabaseServerSecretsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/crypto/SecretPrefixTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/crypto/DatabaseServerSecretsWithoutKekTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/architecture/JpaAuditingRules.java` | 수정 (새 엔티티의 감사 판정) |
+| `backend/src/test/java/com/bifos/assistant/shared/JpaAuditingEntityFixtures.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/shared/JpaAuditingTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/ServerSecretsTestSupport.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` | 수정 |
