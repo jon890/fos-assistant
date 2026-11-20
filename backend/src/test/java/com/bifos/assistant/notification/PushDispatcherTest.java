@@ -14,6 +14,8 @@ import com.bifos.assistant.notification.infra.PushDeviceRepository;
 import com.bifos.assistant.notification.infra.PushDevicesCodec;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.notification.domain.Notification;
+import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
@@ -82,10 +84,14 @@ class PushDispatcherTest {
     AppUserRepository users;
 
     @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
     PlatformTransactionManager transactionManager;
 
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<Long> createdUsers = new ArrayList<>();
+    private final List<Long> createdPeople = new ArrayList<>();
     private CurrentUser alice;
     private CurrentUser bob;
 
@@ -100,6 +106,7 @@ class PushDispatcherTest {
     @AfterEach
     void tearDown() {
         users.deleteAllById(createdUsers);
+        people.deleteAllById(createdPeople);
     }
 
 
@@ -249,6 +256,7 @@ class PushDispatcherTest {
     private CurrentUser user(String name) {
         String email = name + "-" + UUID.randomUUID() + "@example.com";
         AppUser saved = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER));
+        createdPeople.add(people.save(AllowedPerson.of(email, name, "push-" + UUID.randomUUID())).id());
         createdUsers.add(saved.id());
         return new CurrentUser(saved.id(), email, name, 1L, UserRole.MEMBER);
     }

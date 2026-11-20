@@ -26,8 +26,8 @@ public record PushDevices(List<PushDevice> devices) {
 
 
     /**
-     * 같은 주소의 기기가 있으면 번호를 두고 키와 이름, 시간대, 등록 시각을 바꾸고, 없으면 더한다. 더해서 {@code max} 를 넘으면 등록 시각이
-     * 가장 이른 기기를 뺀다.
+     * 같은 주소의 기기가 있으면 번호를 두고 키와 이름, 시간대, 등록 시각을 바꾸고, 없으면 더한다. 더해서 {@code max} 를 넘으면 그 기기를 뺀
+     * 나머지 가운데 등록 시각이 가장 이른 기기를 뺀다.
      */
     public PushDevices upsert(PushDevice device, int max) {
         List<PushDevice> next = new ArrayList<>(devices.size() + 1);
@@ -43,11 +43,15 @@ public record PushDevices(List<PushDevice> devices) {
         if (!replaced) {
             next.add(device);
         }
-        next.sort(NEWEST_FIRST);
-        while (next.size() > max) {
-            next.removeLast();
+        // 방금 등록한 기기는 늘 남긴다. 저장된 기기의 등록 시각이 시계 조정으로 지금보다 뒤여도 새 기기가 잘리지 않게 한다.
+        PushDevice kept = next.stream().filter(current -> current.endpointHash().equals(device.endpointHash())).findFirst().orElseThrow();
+        List<PushDevice> others = new ArrayList<>(next.stream().filter(current -> current != kept).sorted(NEWEST_FIRST).toList());
+        while (others.size() > max - 1) {
+            others.removeLast();
         }
-        return new PushDevices(next);
+        others.add(kept);
+        others.sort(NEWEST_FIRST);
+        return new PushDevices(others);
     }
 
 

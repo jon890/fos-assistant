@@ -11,6 +11,7 @@ import com.bifos.assistant.notification.infra.P256;
 import com.bifos.assistant.notification.infra.PushDevicesCodec;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
@@ -48,6 +49,7 @@ public class PushDeviceService {
     static final int AUTH_BYTES = 16;
 
     private final PushDeviceRepository repository;
+    private final UserAccessPolicy accessPolicy;
     private final PushRegistrationLock lock;
     private final VapidKeys keys;
     private final PushEndpointPolicy policy;
@@ -58,12 +60,14 @@ public class PushDeviceService {
 
     public PushDeviceService(
         PushDeviceRepository repository,
+        UserAccessPolicy accessPolicy,
         PushRegistrationLock lock,
         VapidKeys keys,
         PushProperties properties,
         Clock clock,
         PlatformTransactionManager transactionManager) {
         this.repository = repository;
+        this.accessPolicy = accessPolicy;
         this.lock = lock;
         this.keys = keys;
         this.policy = new PushEndpointPolicy(properties.allowedEndpointHosts());
@@ -110,6 +114,11 @@ public class PushDeviceService {
             }
             if (!locked.containsKey(user.id())) {
                 throw new ApiException(ErrorCode.UNAUTHENTICATED, "the requesting user no longer exists");
+            }
+            // 사용자 행을 잠근 뒤 허용 목록 행을 쓰기 잠금으로 읽는다(접근 끄기와 같은 잠금 순서). 끄기가 먼저 커밋됐으면 저장하지 않는다.
+            // 인증을 통과한 등록이 접근 끄기의 기기 비우기 뒤에 커밋되면 꺼진 사용자에게 기기가 다시 생기기 때문이다(스펙 REQ9).
+            if (!accessPolicy.allowedForUpdate(user.id())) {
+                throw new ApiException(ErrorCode.ACCESS_REVOKED, "access was revoked");
             }
             locked.forEach((owner, theirs) -> {
                 if (!owner.equals(user.id()) && theirs.containsHash(hash)) {

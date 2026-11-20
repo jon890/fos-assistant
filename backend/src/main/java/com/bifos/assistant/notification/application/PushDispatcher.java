@@ -94,6 +94,10 @@ public class PushDispatcher {
                 return;
             }
             byte[] payload = payload(event);
+            if (payload.length > WebPushEncryptor.MAX_PLAINTEXT) {
+                log.warn("push skipped, payload too large userId={} bytes={}", event.userId(), payload.length);
+                return;
+            }
             for (PushDevice device : targets) {
                 try {
                     deliverTo(event.userId(), device, payload);

@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.bifos.assistant.notification.application.PushDeviceService;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.notification.presentation.PushController;
+import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -50,16 +52,21 @@ class PushControllerTest {
     @Autowired
     AppUserRepository users;
 
+    @Autowired
+    AllowedPersonRepository people;
+
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
     private MockMvc mvc;
     private Long userId;
+    private Long personId;
 
 
     @BeforeEach
     void setUp() {
         String email = "push-" + UUID.randomUUID() + "@example.com";
         userId = users.save(AppUser.of(email, "푸시", 1L, UserRole.MEMBER)).id();
+        personId = people.save(AllowedPerson.of(email, "푸시", "push-" + UUID.randomUUID())).id();
         when(currentUser.require()).thenReturn(new CurrentUser(userId, email, "푸시", 1L, UserRole.MEMBER));
         mvc = MockMvcBuilders.standaloneSetup(new PushController(currentUser, devices))
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -70,6 +77,7 @@ class PushControllerTest {
     @AfterEach
     void tearDown() {
         users.deleteById(userId);
+        people.deleteById(personId);
     }
 
 

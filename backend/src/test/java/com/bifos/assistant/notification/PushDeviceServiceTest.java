@@ -23,7 +23,9 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -72,6 +74,7 @@ class PushDeviceServiceTest {
 
     private final List<Long> createdUsers = new ArrayList<>();
     private final List<Long> createdPeople = new ArrayList<>();
+    private final Map<String, Long> personIds = new HashMap<>();
     private CurrentUser alice;
     private CurrentUser bob;
 
@@ -194,12 +197,44 @@ class PushDeviceServiceTest {
     @Test
     @DisplayName("관리자가 접근을 끄면 그 사용자의 기기가 모두 지워진다")
     void accessRevokedClearsDevices() {
-        AllowedPerson person = people.save(AllowedPerson.of(alice.email(), "앨리스", "push-" + UUID.randomUUID()));
-        createdPeople.add(person.id());
+        AllowedPerson person = people.findById(personIds.get(alice.email())).orElseThrow();
         service.register(alice, registration(ENDPOINT, "PC"));
 
         personAccess.setEnabled(person.id(), false);
 
+        assertThat(service.list(alice)).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("등록이 잠금을 기다리는 동안 관리자가 접근을 끄면, 그 등록은 기기를 만들지 않는다")
+    void registrationAfterRevokeIsRejected() throws Exception {
+        AllowedPerson person = people.findById(personIds.get(alice.email())).orElseThrow();
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> holder = CompletableFuture.runAsync(() -> registrationLock.run(() -> {
+            held.countDown();
+            awaitQuietly(release);
+            return null;
+        }));
+        held.await(5, TimeUnit.SECONDS);
+        CompletableFuture<PushDevice> registering = CompletableFuture.supplyAsync(() -> service.register(alice, registration(ENDPOINT, "PC")));
+        CompletableFuture<?> revoking = CompletableFuture.runAsync(() -> personAccess.setEnabled(person.id(), false));
+        try {
+            for (int i = 0; i < 100 && people.findById(person.id()).orElseThrow().enabled(); i++) {
+                Thread.sleep(50);
+            }
+            assertThat(people.findById(person.id()).orElseThrow().enabled()).as("끄기가 커밋됐다").isFalse();
+        } finally {
+            release.countDown();
+        }
+        holder.get(5, TimeUnit.SECONDS);
+        revoking.get(10, TimeUnit.SECONDS);
+
+        assertThatThrownBy(() -> registering.get(10, TimeUnit.SECONDS))
+            .hasCauseInstanceOf(ApiException.class)
+            .cause()
+            .satisfies(ex -> assertThat(((ApiException)ex).code()).isEqualTo(ErrorCode.ACCESS_REVOKED));
         assertThat(service.list(alice)).isEmpty();
     }
 
@@ -262,6 +297,9 @@ class PushDeviceServiceTest {
     private CurrentUser user(String name) {
         String email = name + "-" + UUID.randomUUID() + "@example.com";
         AppUser saved = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER));
+        Long personId = people.save(AllowedPerson.of(email, name, "push-" + UUID.randomUUID())).id();
+        createdPeople.add(personId);
+        personIds.put(email, personId);
         createdUsers.add(saved.id());
         return new CurrentUser(saved.id(), email, name, 1L, UserRole.MEMBER);
     }

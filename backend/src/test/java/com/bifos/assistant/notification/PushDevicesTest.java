@@ -48,6 +48,20 @@ class PushDevicesTest {
 
 
     @Test
+    @DisplayName("저장된 기기의 등록 시각이 새 기기보다 뒤여도 방금 등록한 기기는 남는다")
+    void upsertKeepsNewDeviceUnderClockSkew() {
+        PushDevices devices = PushDevices.empty();
+        for (int i = 0; i < 3; i++) {
+            devices = devices.upsert(device("future" + i, "k", 3600 + i), 3);
+        }
+
+        PushDevices next = devices.upsert(device("now", "k", 0), 3);
+
+        assertThat(next.devices()).extracting(PushDevice::endpointHash).contains("now").hasSize(3);
+    }
+
+
+    @Test
     @DisplayName("JSON 으로 쓰고 읽으면 같은 목록이고, 비면 칸을 비운다")
     void codecRoundTrip() {
         PushDevices devices = PushDevices.empty().upsert(device("h1", "k1", 1), 10).upsert(device("h2", "k2", 2), 10);
