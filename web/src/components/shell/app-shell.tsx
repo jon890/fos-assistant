@@ -23,6 +23,8 @@ import {
 } from "./conversations-provider";
 import { shellRoleState } from "./role-state";
 import { ScreenTransition } from "./screen-transition";
+import { isSettingsArea } from "./settings-area";
+import { SettingsShell } from "./settings-shell";
 import {
   AppNameContext,
   ShellAccountContext,
@@ -104,12 +106,15 @@ export function useShellTitle(title: string | null): void {
 function ShellBody({
   children,
   signedIn,
+  hasSession,
 }: {
   children: React.ReactNode;
   signedIn: boolean;
+  hasSession: boolean;
 }) {
   const pathname = usePathname();
   const inAdminArea = isAdminArea(pathname);
+  const inSettingsArea = isSettingsArea(pathname, hasSession);
   const { startNew } = useConversations();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // 서버에서 그린 첫 그림과 hydration 동안은 펴 둔다. 저장한 값은 그 뒤에 읽는다.
@@ -144,8 +149,13 @@ function ShellBody({
       setDrawerOpen(true);
     }
   }, []);
-  // 관리자 영역에는 사이드바와 검색칸이 없어 단축키가 닿을 곳이 없다.
-  useShortcuts(signedIn && !inAdminArea, startNew, toggleSidebar, focusSearch);
+  // 관리자 틀과 설정 틀에는 사이드바와 검색칸이 없어 단축키가 닿을 곳이 없다.
+  useShortcuts(
+    signedIn && !inAdminArea && !inSettingsArea,
+    startNew,
+    toggleSidebar,
+    focusSearch,
+  );
 
   // 지난 그림의 경로와 폭이다. 바뀐 것을 그리는 중에 알아채 서랍을 닫는다.
   const [seen, setSeen] = useState({ pathname, wide });
@@ -178,6 +188,9 @@ function ShellBody({
 
   if (inAdminArea)
     return <AdminShell ready={wide !== null}>{children}</AdminShell>;
+
+  if (inSettingsArea)
+    return <SettingsShell ready={wide !== null}>{children}</SettingsShell>;
 
   return (
     <TitleContext.Provider value={setTitle}>
@@ -226,6 +239,7 @@ function ShellBody({
                 searchRef={drawerSearchRef}
                 onCollapse={() => updateCollapsed(true)}
                 showStatus={drawerOpen}
+                inDrawer
               />
             </aside>
           </SheetContent>
@@ -293,6 +307,7 @@ export function AppShell({
   role,
   displayName,
   appName,
+  hasSession,
   children,
 }: {
   /** 레이아웃이 읽은 역할이다. 읽지 못했으면 `null` 이다 */
@@ -300,10 +315,14 @@ export function AppShell({
   displayName?: string;
   /** 서버가 요청마다 환경에서 읽은 앱 이름이다 */
   appName: string;
+  /** 레이아웃이 읽은 로그인 세션이 있는지다. `/privacy` 의 틀을 정한다 */
+  hasSession: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const signedIn = pathname !== "/signin" && pathname !== "/privacy";
+  // `/privacy` 는 로그인 화면에서도 여는 공개 화면이라, 로그인했을 때만 설정 틀에서 보인다.
+  const signedIn =
+    pathname !== "/signin" && (pathname !== "/privacy" || hasSession);
   const inAdminArea = isAdminArea(pathname);
   /** 레이아웃이 역할을 읽지 못했을 때 브라우저에서 다시 읽은 결과다 */
   const [reread, setReread] = useState<ClientMe | null>(null);
@@ -336,6 +355,17 @@ export function AppShell({
     };
   }, [role, signedIn]);
 
+  // 로그아웃한 뒤 뒤로 가기로 돌아온 문서는 브라우저가 bfcache 에서 그대로 꺼낼 수 있다. 브라우저마다 달라
+  // 기대지 않고 다시 읽는다. 다시 읽은 page 가 세션을 확인해 로그인 화면으로 보낸다(docs/features/app-shell/design.md 의 「로그아웃」).
+  useEffect(() => {
+    if (!signedIn) return;
+    const reloadRestored = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", reloadRestored);
+    return () => window.removeEventListener("pageshow", reloadRestored);
+  }, [signedIn]);
+
   // 관리자 영역에서 돌아갈 곳이다. 저장소를 막은 브라우저에서는 적지 않고 넘어간다.
   useEffect(() => {
     if (!pathname.startsWith("/chat/")) return;
@@ -366,7 +396,9 @@ export function AppShell({
               {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
               <ConversationsProvider enabled={signedIn && !inAdminArea}>
                 <NotificationsProvider enabled={signedIn && !inAdminArea}>
-                  <ShellBody signedIn={signedIn}>{children}</ShellBody>
+                  <ShellBody signedIn={signedIn} hasSession={hasSession}>
+                    {children}
+                  </ShellBody>
                 </NotificationsProvider>
               </ConversationsProvider>
             </AppNameContext.Provider>
