@@ -100,18 +100,19 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 | `token_url` | 토큰 통로 주소. 연결 표식을 담는다 |
 | `nonce` | 대기 파일에만 있다. 이 흐름을 가리킨다 |
 
-교환 직후에는 대기 파일 `<보관 파일 id>.oauth.pending` 과 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pending` 에 쓴다. commit 이 둘을 한 번에 본 자리로 옮긴다. 대시보드가 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
+begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pending` 과, 토큰 없이 `nonce` 만 담은 대기 OAuth 파일 `<보관 파일 id>.oauth.pending` 을 만든다. 교환은 `nonce` 가 같을 때만 대기 OAuth 파일에 토큰을 채운다. commit 은 대기 보관 파일의 값을 지금 보관 파일 쓰기(`_write_vault`)로 본 자리에 써서 값이 같으면 파일을 바꾸지 않고, 대기 OAuth 파일만 rename 한다. 보관 파일을 rename 하면 값이 같아도 리비전(inode, 수정 시각, 크기)이 바뀌어 재시작 대기가 되기 때문이다. 대시보드가 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
 
-**보관 파일 id 마다 잠금을 둔다.** 갱신, commit, discard, 보관 파일 `PUT`·`DELETE`, 취소가 모두 그 잠금 안에서 읽고 고쳐 쓴다. 갱신은 서비스 HTTP 호출을 이 잠금 안에서 기다린다(바뀐 refresh token 을 잃지 않으려고). 전역 `PROFILE_WRITE_LOCK` 안에서는 서비스를 부르지 않는다.
+**보관 파일 id 마다 잠금을 두고, 잡는 순서는 보관 파일 잠금이 먼저, 전역 `PROFILE_WRITE_LOCK` 이 나중이다.** 갱신, begin, commit, discard, 취소, 보관 파일 `PUT`·`DELETE`, 바인딩 설치(그 바인딩의 보관 파일을 읽을 때)가 모두 보관 파일 잠금 안에서 읽고 고쳐 쓴다. 갱신과 취소는 보관 파일 잠금만 잡고 서비스를 부르며 전역 잠금은 잡지 않는다. 그래서 서비스 응답을 기다리는 동안 다른 profile 쓰기가 멈추지 않고, 같은 보관 파일을 쓰려는 요청만 전역 잠금 밖에서 기다린다. 바뀐 refresh token 을 잃지 않으려고 갱신은 서비스 호출부터 파일 쓰기까지 잠금을 놓지 않는다.
 
 ### 실행기와 직접 실행
 
 | 경로 | 바꿀 것 |
 | --- | --- |
 | 실행기 정의(`connector_launch.py`) | OAuth 를 선언한 플러그인이면 실행기 인자에 `@oauth=<token_env>` 를 더한다. 값은 넣지 않는다. 인자는 연결 방식과 상관없이 늘 같아 방식을 바꿔도 정의가 그대로다 |
-| 실행기(`connector_launcher.py`) | `@oauth` 가 있으면 OAuth 파일을 풀어 `token_url` 을 그 env 에 넣는다. 파일이 없으면(붙여 넣기 연결) 빈 값이다 |
+| 정의 해석(`connector_launch.py` 의 `_launcher_parts`, `_launcher_current`, `_launcher_inner`) | `@oauth=` 인자를 칸과 따로 읽는다. 낡은 정의 판정과 `${..}` env 만들기에서 칸으로 세지 않는다 |
+| 실행기(`connector_launcher.py` 의 `_parse_args`) | `@oauth` 가 있으면 OAuth 파일을 풀어 `token_url` 을 그 env 에 넣는다. 파일이 없으면(붙여 넣기 연결) 빈 값이다 |
 | 직접 실행(`connector_run.py` 의 `_binding_env`) | 승인한 쓰기와 금융 준비도 같은 OAuth 파일을 읽어 넣는다 |
-| 확인·선택지 호출(`call`, `list`) | 본문에 `oauth: "current"` 나 `oauth: "pending"` 을 받아 OAuth 파일이나 대기 파일의 `token_url` 을 넣는다 |
+| 확인·선택지 호출(`call`, `list`) | 본문 모양 검사에 `oauth` key 를 더한다. `oauth: "current"` 면 본 자리의 보관 파일과 OAuth 파일을, `oauth: "pending"` 이면 대기 보관 파일의 칸 값과 대기 OAuth 파일의 `token_url` 을 넣는다. 처음 연결은 본 자리 보관 파일이 없어도 된다 |
 
 ### 대시보드 plugin 경로(서비스 토큰)
 
@@ -123,7 +124,7 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 | `POST /api/connector-oauth/commit` | 보관 파일 id, `nonce` | 대기 파일 둘을 본 자리로 옮긴다. `nonce` 가 다르면 409 |
 | `POST /api/connector-oauth/discard` | 보관 파일 id, `nonce`, client ID·secret, access token | 대기 파일을 지운다. GitHub 은 그 access token 하나만 취소한다. Google 은 취소하지 않는다(아래 「취소 범위」) |
 | `POST /api/connector-oauth/refresh` | 보관 파일 id, client ID·secret | `outcome`, access token, 만료 시각. 바뀐 refresh token 은 답하기 전에 OAuth 파일에 쓴다 |
-| `POST /api/connector-oauth/revoke` | 보관 파일 id, client ID·secret, access token(있으면) | `outcome`. GitHub 은 access token 이 없으면 먼저 갱신해 받는다. OAuth 파일을 지운다. 보관 파일은 지금 해제 경로가 지운다 |
+| `POST /api/connector-oauth/revoke` | 보관 파일 id, client ID·secret, access token(있으면) | `outcome`. GitHub 은 access token 이 없으면 먼저 갱신해 받는다. 파일은 지우지 않는다. 지금 해제 경로의 보관 파일 `DELETE` 가 보관 파일과 OAuth 파일, 대기 파일 둘을 함께 지운다. 취소를 건너뛰거나 실패해도 refresh token 이 남지 않는다 |
 | `POST /api/connector-oauth/token-url` | 보관 파일 id, 새 통로 주소 | OAuth 파일의 `token_url` 만 바꾼다(서명 비밀 교체) |
 
 `outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable` 가운데 하나다. 서비스 응답 원문과 토큰은 로그에 쓰지 않는다. 카탈로그 응답은 플러그인마다 정규화한 `oauth` 와 제공자의 설정 화면 주소를 함께 낸다.
@@ -136,13 +137,13 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 | `POST /api/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
 | `GET /internal/connector-token/{표식}` | 토큰 통로. JWT 없이 받는다(`SecurityConfig` 에 `permitAll`, 브라우저 중계와 같은 자리). `{access_token, expires_at}` |
 
-**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 쓴 무작위 값은 만료까지 메모리 집합에 넣어 한 번만 받는다. 시작 때 받은 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분도 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제).
+**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 쓴 무작위 값은 만료까지 메모리 집합에 넣어 한 번만 받는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고 exchange·commit·discard 에 넘긴다.
 
 **토큰 통로 표식**은 두 가지다. 서명할 글은 `v1`, 종류, 번호, (대기면) `nonce` 다.
 
 | 표식 | 담는 곳 | 주는 토큰 |
 | --- | --- | --- |
-| `k<연결 번호>.<HMAC>` | OAuth 파일. 연결마다 고정 | 메모리의 현재 칸. 연결이 `READY` 가 아니면 409 |
+| `k<연결 번호>.<HMAC>` | OAuth 파일. 연결마다 고정 | 메모리의 현재 칸. 연결이 해제됐거나 `auth.reconnectRequired` 면 409. 확인 도구 실패로 `PENDING` 인 연결은 받는다(「연결 다시 확인」 이 이 표식으로 확인 도구를 부른다) |
 | `p<연결 번호>.<nonce>.<HMAC>` | 대기 OAuth 파일 | 메모리의 대기 칸. 연결 상태를 보지 않는다. 대기 칸이 없으면 404 |
 
 표식이 틀리면 401, 연결이 없거나 해제됐으면 404, 갱신이 `unavailable` 이면 503 이다.
@@ -217,7 +218,7 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 - **갱신 중 Control Plane 종료**: 대시보드는 바뀐 refresh token 을 OAuth 파일에 쓴 뒤 답한다. 답을 못 받아도 다음 갱신이 새 refresh token 으로 돈다
 - **OAuth 파일 쓰기 실패**: 갱신은 받은 refresh token 을 쓰지 못하면 `unavailable` 로 답하고 access token 을 주지 않는다. GitHub 은 옛 refresh token 이 이미 무효라 다음 갱신이 `grant_revoked` 가 된다. 이 경우를 로그로 구분한다
 - **해제**: 취소 → 지금 해제(바인딩 떼기, 보관 파일 지우기, 연결 `DISCONNECTED`). 취소 실패는 해제를 막지 않는다. 메모리 칸을 지운다
-- **배포 순서**: 대시보드 plugin 이 먼저다. 옛 plugin 은 카탈로그에 `oauth` 가 없어 Control Plane 이 단추를 내지 않는다. 옛 Control Plane 은 새 카탈로그의 `oauth` 값을 무시한다. 실행기 인자 `@oauth` 는 새 plugin 이 만든 정의에만 있다
+- **배포 순서**: 대시보드 plugin 이 먼저다. 옛 plugin 은 카탈로그에 `oauth` 가 없어 Control Plane 이 단추를 내지 않는다. 옛 Control Plane 은 새 카탈로그의 `oauth` 값을 무시한다. 실행기 인자 `@oauth` 는 새 plugin 이 만든 정의에만 있다. 이미 바인딩이 있는 플러그인에 `oauth` 선언을 더하면(PR2 의 Gmail, 저장소 밖 커리어) 붙여 넣기 바인딩의 정의도 인자가 늘어 한 번 재시작 대기가 된다. 연결 반영 자동화가 없으면 관리자가 반영 완료를 누른다
 - **서버 비밀값 PR1a 가 없으면** 이 기능을 시작하지 않는다(스펙 「선행 조건」)
 
 ## 검증 전략
@@ -227,8 +228,8 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 | REQ1 | 대시보드 plugin 의 manifest 검사 테스트(맞는 선언, 모르는 제공자, Google 빈 scope, `token_env` 겹침, 빈 `fields`) |
 | REQ2, REQ3 | Control Plane 카탈로그와 관리자 서버 비밀값 API 테스트, 웹 연결 화면 컴포넌트 테스트(`ready` 참·거짓, `ADMIN`·`MEMBER`, 단추 밖 칸) |
 | REQ4, REQ5, REQ11 | Control Plane 통합 테스트에서 가짜 대시보드로 시작·돌아오기·실패 경로를 돈다. 상태 값 위조, 만료, 다른 사용자, 재사용, `nonce` 어긋남. 대시보드의 begin·exchange·commit·discard 테스트. 웹 돌아오는 경로 테스트 |
-| REQ6 | Control Plane 토큰 통로 테스트(표식 위조, 현재·대기 칸, 만료 직전 갱신, 동시 요청 한 번 갱신). 대시보드 테스트(refresh token 교체 저장, 갱신 뒤 실행기 정의와 리비전이 그대로, 실행기와 `_binding_env` 가 `token_env` 를 넣음) |
-| REQ7 | `outcome` 별 상태와 알림 테스트(알림 한 번, 다시 연결 뒤 읽음, 앱 줄 바꾸면 관리자 알림 읽음) |
+| REQ6 | Control Plane 토큰 통로 테스트(표식 위조, 현재·대기 칸, 만료 직전 갱신, 동시 요청 한 번 갱신). 대시보드 테스트(refresh token 교체 저장, 갱신과 같은 값 commit 뒤 실행기 정의와 리비전이 그대로, 실행기와 `_binding_env` 가 `token_env` 를 넣음, `@oauth` 인자가 낡은 정의로 판정되지 않음, 해제가 OAuth 파일까지 지움, 갱신 중 다른 profile 쓰기가 막히지 않음) |
+| REQ7 | `outcome` 별 상태와 알림 테스트(알림 한 번, 다시 연결 뒤 읽음, 앱 줄 바꾸면 관리자 알림 읽음), `ADMIN_SECRETS` 알림을 눌러 서버 비밀값 화면으로 가는 웹 테스트 |
 | REQ8 | 해제 테스트(취소 성공, 실패해도 해제, Google 공유 건너뛰기, 응답의 주소) |
 | REQ9 | 방식 바꾸기 테스트(붙여 넣기 등록이 OAuth 파일을 지움, commit 이 보관 파일의 `oauth.fields` 에 든 칸을 없앰), 옛 `fields` 글 읽기 |
 | REQ10 | PR2. Gmail 플러그인 테스트(토큰 env 있음·없음) |
@@ -244,7 +245,7 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 | [`hermes/plugins/dashboard-profile-api/README.md`](../../../hermes/plugins/dashboard-profile-api/README.md) | `connector-oauth` 경로, OAuth 파일, `call`·`list` 본문의 `oauth` |
 | [`docs/features/connector.md`](../connector.md) | 등록 표에 단추 흐름, 해제에 취소 |
 | [`docs/code-architecture.md`](../../code-architecture.md) | 「플러그인 비밀값을 두는 곳」 에 OAuth 파일과 access token 의 자리 |
-| [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) | `connector_connection.fields` 의 `auth`, 알림의 `ADMIN_SECRETS` |
+| [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) | `connector_connection.fields` 의 `auth`, 알림의 `ADMIN_SECRETS`(목록 화면이라 공개 번호 없이 가리킨다. `NotificationTargetType.list()` 와 웹의 알림 이동이 함께 바뀐다) |
 | [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) | 「대체된 부분」 줄 |
 
 ## 결정
