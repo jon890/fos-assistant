@@ -1,5 +1,8 @@
 package com.bifos.assistant.context.application;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 모든 실행의 공통 지시문에 넣는 서비스 개념 목록이다(스펙 {@code docs/features/service-concepts/spec.md} REQ1-REQ5).
  *
@@ -9,6 +12,7 @@ package com.bifos.assistant.context.application;
  * <p>줄을 바꾸면 {@code test/model-eval/concepts/} 의 평가를 돌린다. 주소와 도구 이름은 {@code test/repo/service-concepts.test.ts} 가
  * 화면 경로와 도구 목록에 있는지 본다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ServiceConceptsInstructions {
 
     /** 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다. */
@@ -26,8 +30,4 @@ final class ServiceConceptsInstructions {
             - 에이전트 고르기(「○○ 비서로 바꿔 줘」): 화면 주소가 없다. 대화의 에이전트는 바뀌지 않는다. 입력창에서 @ 로 그 에이전트를 불러 다음 메시지를 맡기거나 새 대화에서 고를 수 있다고 안내하고, 그 에이전트가 골라진 새 대화 링크 /new?agent=<code> 를 붙인다. code 는 맡길 수 있는 에이전트 목록의 대괄호 안 값이고, 목록이 없으면 agent_list 로 찾는다. 목록에 없는 이름이면 링크를 붙이지 않고 쓸 수 있는 에이전트의 이름을 알린다.
             사용자가 위 기능을 부탁했는데 그 일을 하는 도구가 없거나 도구가 실패했으면, 했다고 말하지 않는다.
             """.stripTrailing();
-
-
-    private ServiceConceptsInstructions() {
-    }
 }
