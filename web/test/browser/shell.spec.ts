@@ -168,7 +168,7 @@ test("알림 단추는 사이드바 맨 위 앱 이름 옆에 있고 서랍 닫�
   await page.goto("/new");
   await openSidebar(page, testInfo);
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
-  const bell = sidebar.getByRole("link", { name: /^알림/ });
+  const bell = sidebar.getByRole("link", { name: /^알림(,|$)/ });
   await expect(bell).toBeVisible();
   const home = sidebar.getByRole("link", { name: "검사용 비서 홈", exact: true });
   const bellBox = (await bell.boundingBox())!;
@@ -184,7 +184,7 @@ test("알림 단추는 사이드바 맨 위 앱 이름 옆에 있고 서랍 닫�
     expect(overlaps, "알림 단추와 서랍 닫기 단추가 겹친다").toBe(false);
     // 휴대폰 위 막대의 알림 단추는 그대로다.
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("banner").getByRole("link", { name: /^알림/ })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("link", { name: /^알림(,|$)/ })).toBeVisible();
   }
 });
 
