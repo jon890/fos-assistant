@@ -126,3 +126,6 @@ UPDATE conversation SET title_key_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE proactive_check SET root_execution_id = 900000001 WHERE id = 900000001;
+
+INSERT INTO quality_run (id, public_id, group_id, kind, trigger_type, status, started_at, item_count, model_call_count, result_json, requested_by_user_id, created_at)
+VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'DEPLOY_CHECK', 'PIPELINE', 'RUNNING', '2020-01-01 00:00:00', 0, 0, '[]', NULL, '2020-01-01 00:00:00');

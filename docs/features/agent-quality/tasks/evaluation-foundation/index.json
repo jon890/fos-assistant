@@ -24,18 +24,50 @@
       "after": "PR2 가 머지된 뒤"
     }
   ],
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-11-20",
   "spec": "docs/features/agent-quality/spec.md",
   "design": "docs/features/agent-quality/design.md",
   "verification_plan": "verification-plan.md",
-  "requirements": ["REQ1", "REQ2"],
+  "requirements": [
+    "REQ1",
+    "REQ2"
+  ],
   "total_phases": 4,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
-    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ1", "REQ2"]},
-    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ2"]},
-    {"number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ1"]},
-    {"number": 4, "file": "phase-04.md", "execution_profile": "standard", "requirements": ["REQ2"]}
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ2"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ2"
+      ]
+    }
   ]
 }

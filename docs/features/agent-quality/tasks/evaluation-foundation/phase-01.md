@@ -29,7 +29,7 @@
 
 ## 작업 항목
 
-### 1. 마이그레이션 `backend/src/main/resources/db/migration/<RESERVED>.sql`
+### 1. 마이그레이션 `backend/src/main/resources/db/migration/V20261105074424__app_user_evaluation_quality_run.sql`
 
 - `ALTER TABLE app_user ADD COLUMN evaluation BOOLEAN NOT NULL DEFAULT FALSE COMMENT '평가 전용 사용자인가'`
 - `CREATE TABLE quality_run`: `id BIGINT AUTO_INCREMENT`, `public_id BINARY(16) NOT NULL UNIQUE`, `group_id BIGINT NOT NULL`, `kind VARCHAR(32) NOT NULL`, `trigger_type VARCHAR(32) NOT NULL`, `status VARCHAR(16) NOT NULL`, `started_at DATETIME(6) NOT NULL`, `finished_at DATETIME(6) NULL`, `item_count INT NOT NULL DEFAULT 0`, `model_call_count INT NOT NULL DEFAULT 0`, `elapsed_ms BIGINT NULL`, `result_json JSON NULL`, `requested_by_user_id BIGINT NULL`, `created_at DATETIME(6) NOT NULL`, 색인 `(group_id, kind, started_at)`, `requested_by_user_id` 외래 키 `ON DELETE SET NULL`. 칸마다 COMMENT.
@@ -61,7 +61,7 @@
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*QualityRunTest' --tests '*AppUserEvaluationTest' --tests '*PurgeClassificationTest' --tests '*SchemaCommentsMigrationTest' --tests '*TopLevelPackageOrderTest'
+cd backend && ./gradlew test --tests '*QualityRunTest' --tests '*AppUserEvaluationTest' --tests '*PurgeClassificationTest' --tests '*SchemaCommentsMigrationTest' --tests '*TopLevelPackageOrderTest' --tests '*JpaAuditing*'
 cd backend && ./gradlew archTest
 node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts test/repo/migration-collation.test.ts
 ```
@@ -72,7 +72,7 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts test/repo/mi
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/<RESERVED>.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V20261105074424__app_user_evaluation_quality_run.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/domain/QualityRun.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/domain/FeatureResult.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/domain/FeatureResultsConverter.java` | 신규 |
@@ -90,5 +90,8 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts test/repo/mi
 | `backend/src/test/resources/purge/fixture.sql` | 수정 |
 | `backend/docs/data-schema.md` | 수정 |
 | `backend/docs/code-architecture.md` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/architecture/JpaAuditingRules.java` | 수정 (quality_run 의 created_at 판정) |
+| `backend/docs/adr/ADR-20261016-jpa-auditing-base.md` | 수정 (판정 표에 quality_run) |
+| `backend/src/test/java/com/bifos/assistant/shared/JpaAuditingEntityFixtures.java` | 수정 (감사 왕복 검사에 QualityRun) |
 | `backend/src/test/java/com/bifos/assistant/quality/domain/QualityRunTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/user/infra/AppUserEvaluationTest.java` | 신규 |
