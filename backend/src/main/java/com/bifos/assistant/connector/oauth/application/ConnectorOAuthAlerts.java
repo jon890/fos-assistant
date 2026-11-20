@@ -70,9 +70,13 @@ public class ConnectorOAuthAlerts {
      * 연결의 revision 은 바꾸지 않는다. 연결 확인의 뒤 트랜잭션이 앞에서 읽은 revision 과 대조한다.
      */
     public void recovered(long connectionId) {
+        // 주인 번호는 트랜잭션 밖에서 읽는다. 안에서 읽으면 잠근 뒤의 다시 읽기가 잠그기 전에 읽은 엔티티를 돌려준다.
+        Long userId = connections.findById(connectionId).map(ConnectorConnection::userId).orElse(null);
+        if (userId == null) {
+            return;
+        }
         transactions.executeWithoutResult(status -> {
-            Long userId = connections.findById(connectionId).map(ConnectorConnection::userId).orElse(null);
-            if (userId == null || users.findByIdForUpdate(userId).isEmpty()) {
+            if (users.findByIdForUpdate(userId).isEmpty()) {
                 return;
             }
             ConnectorConnection connection = connections.findById(connectionId).orElse(null);
