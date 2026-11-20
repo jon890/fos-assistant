@@ -45,6 +45,21 @@ class ConversationLinksTest {
 
 
     @Test
+    @DisplayName("그림에 저장한 꼴의 링크(punycode 호스트, 퍼센트 인코딩)는 사용자가 보낸 한글 주소와 같은 주소로 본다")
+    void matchesStoredFormOfSentLink() {
+        userSays("이 양말 https://쇼핑.example/상품/1 신은 아이 그려 줘");
+        userSays("이것도 xn--hp4bo76a.example/b");
+
+        URI stored = find("https://쇼핑.example/상품/1").orElseThrow();
+        assertThat(stored).isEqualTo(URI.create("https://xn--hp4bo76a.example/%EC%83%81%ED%92%88/1"));
+        assertThat(find(stored.toString())).as("이어지는 장면에서 저장한 꼴을 다시 적는다(스펙 generated-image REQ25)").contains(stored);
+        assertThat(find("https://쇼핑.example/b")).as("사용자가 punycode 로 보낸 호스트도 같다").isPresent();
+        assertThat(find("https://xn--hp4bo76a.example/상품/2")).isEmpty();
+        assertThat(find("https://xn--hp4bo76a.other/%EC%83%81%ED%92%88/1")).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("더 긴 주소의 앞부분, 바꾼 주소, 남의 메시지와 답에만 있는 주소는 대화에 없는 주소다")
     void rejectsLinksNotSentByRequester() {
         userSays("https://shop.example.com/goods/12345?utm=x 이거");

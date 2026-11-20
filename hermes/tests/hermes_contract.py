@@ -527,6 +527,52 @@ HERMES_BUILTIN_TOOLS = frozenset({
     "vision_analyze", "web_extract", "web_search", "write_file", "x_search",
     "xai_video_edit", "xai_video_extend",
 })
+# 내장 도구가 든 toolset 마다의 도구다. `toolsets.py` 의 `TOOLSETS` 에서 여러 toolset 을 묶은 플랫폼 묶음(`hermes-*`,
+# `coding` 등)과 도구가 없는 것을 뺐다. 합치면 `HERMES_BUILTIN_TOOLS` 와 같다. 작업 과정의 도구 이름 검사
+# (`test/repo/tool-label-coverage.test.ts`)가 에이전트에 켤 수 있는 toolset 의 도구를 이 표로 고른다.
+# Hermes 를 올려 도구가 다른 toolset 으로 옮겨지면 `test_tool_guard_contract.py` 가 실패한다.
+HERMES_TOOLSETS = {
+    "web": ("web_search", "web_extract"),
+    "search": ("web_search",),
+    "x_search": ("x_search",),
+    "vision": ("vision_analyze",),
+    "video": ("video_analyze",),
+    "image_gen": ("image_generate",),
+    "video_gen": ("video_generate", "xai_video_edit", "xai_video_extend"),
+    "computer_use": ("computer_use",),
+    "terminal": ("terminal", "process_manage"),
+    "skills": ("skills_list", "skill_view", "skill_manage"),
+    "browser": ("browser_exec", "browser_cdp", "browser_dialog", "browser_vault"),
+    "cronjob": ("cronjob_manage",),
+    "file": ("read_file", "write_file", "patch", "search_files"),
+    "tts": ("text_to_speech",),
+    "todo": ("todo_list",),
+    "memory": ("memory",),
+    "session_search": ("session_search",),
+    "connections": ("manage_connections",),
+    "project": ("desktop_project",),
+    "desktop_ui": (
+        "read_terminal", "close_terminal", "desktop_preview", "drive_preview", "annotate_preview",
+        "read_window_below", "focus_pane", "react_to_message", "gui_tour", "show_tip", "set_theme",
+    ),
+    "onboarding": ("setup_beat",),
+    "catalog": ("manage_catalog",),
+    "clarify": ("clarify",),
+    "code_execution": ("execute_code",),
+    "delegation": ("delegate_task",),
+    "kanban": (
+        "kanban_show", "kanban_list", "kanban_complete", "kanban_block", "kanban_request_review",
+        "kanban_request_changes", "kanban_heartbeat", "kanban_comment", "kanban_create", "kanban_link",
+        "kanban_unblock", "kanban_attach", "kanban_attach_url", "kanban_attachments",
+    ),
+    "discord": ("discord",),
+    "discord_admin": ("discord_admin",),
+    "feishu_doc": ("feishu_doc_read",),
+    "feishu_drive": (
+        "feishu_drive_list_comments", "feishu_drive_list_comment_replies",
+        "feishu_drive_reply_comment", "feishu_drive_add_comment",
+    ),
+}
 # 안전 목록의 내장 도구가 든 기본 toolset 이다. 읽기 경계 toolset 밖으로 옮겨지면 안전한지 다시 본다.
 TOOL_GUARD_SAFE_TOOLSETS = {
     "web_search": "web", "web_extract": "web", "vision_analyze": "vision",
@@ -598,3 +644,17 @@ IMAGE_SOURCE_HOST_READ = ("tools/image_source.py", "_MEDIA_CACHE_SUBDIRS")
 # 이미지 서비스(openai-codex)가 받는 입력 장수와, 넘는 것을 버리는 자리다. plugin 의 `MAX_SOURCES` 가 같은 값이다.
 IMAGE_SOURCE_LIMIT = ("plugins/image_gen/openai-codex/__init__.py", "_MAX_REFERENCE_IMAGES", 16,
                       "collect_source_images(image_url, reference_image_urls, limit=_MAX_REFERENCE_IMAGES)")
+# `image_generate` 의 비율 값과, 비율을 빼면 쓰는 기본값이다(fos-assistant 스펙 generated-image REQ26).
+# Control Plane 의 `ArtifactService.IMAGE_RULES` 가 이 값으로 비율을 늘 적게 한다. 기본값이 가로라 빼면 한 사람의 정사각이 지켜지지 않는다.
+IMAGE_ASPECT_RATIOS = ("agent/image_gen_provider.py",
+                       'VALID_ASPECT_RATIOS: tuple[str, ...] = ("landscape", "square", "portrait")',
+                       'DEFAULT_ASPECT_RATIO = "landscape"')
+# 비율이 모델에게 보이고 이미지 서비스까지 가는 자리다. 하나라도 바뀌면 그림 규칙이 적은 비율이 그림에 닿지 않을 수 있다.
+IMAGE_ASPECT_RATIO_PATH = (
+    ("tools/image_generation_tool.py", '"enum": list(VALID_ASPECT_RATIOS)'),
+    ("tools/image_generation_tool.py", 'aspect_ratio = args.get("aspect_ratio", DEFAULT_ASPECT_RATIO)'),
+    ("tools/image_generation_tool.py", "_dispatch_to_plugin_provider(prompt, aspect_ratio,"),
+    ("tools/image_generation_tool.py", 'kwargs: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}'),
+    ("plugins/image_gen/openai-codex/__init__.py", "aspect = resolve_aspect_ratio(aspect_ratio)"),
+    ("plugins/image_gen/openai-codex/__init__.py", "size = size_for(aspect)"),
+)

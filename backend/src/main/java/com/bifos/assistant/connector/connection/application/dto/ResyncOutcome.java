@@ -13,6 +13,8 @@ public enum ResyncOutcome {
     RESTART_PENDING,
     /** 반영 예정 시각 전이거나, 다시 보낸 설치가 {@code reload_pending} 이다. */
     APPLY_SCHEDULED,
+    /** 껐다 켜기 단계라 설치를 보내지 않았거나, 설치가 그 서버를 끈 채 두었거나 껐다 켜기를 요구했다(ADR-20261120 / connector-auto-apply). */
+    CYCLE_PENDING,
     /** 카탈로그에서 빠진 커넥터다. */
     CATALOG_MISSING,
     /** 다시 읽은 설치가 꺼져 있거나 {@code configured} 가 거짓이거나 방식이 다르다. */

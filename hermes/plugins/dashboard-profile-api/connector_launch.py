@@ -1,6 +1,6 @@
 """로컬(stdio) 플러그인 서버를 실행기로 띄우는 서버 정의를 만들고 알아본다.
 
-정의의 모양과 까닭은 `docs/features/connector/design.md` 의 「실행기 정의(DECISION12)」 가 갖는다. 칸 값은 정의와 profile `.env` 에 두지 않고,
+정의의 모양과 까닭은 `hermes/plugins/dashboard-profile-api/README.md` 의 「실행기 정의(DECISION12)」 가 갖는다. 칸 값은 정의와 profile `.env` 에 두지 않고,
 실행기(`connector_launcher.py`)가 띄울 때 보관 파일에서 풀어 자식 env 에만 넣는다.
 경로 값은 모두 설치할 때 대시보드 프로세스에서 읽는다. 코드에 경로 상수나 기본값을 두지 않는다.
 """

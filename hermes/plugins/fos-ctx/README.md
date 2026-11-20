@@ -267,11 +267,13 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 422 `IMAGE_SOURCE_LINK_NO_IMAGE` | 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다 |
 | 422 `IMAGE_SOURCE_LINK_TOO_LARGE` | 사진이 너무 크다 |
 | 502 `IMAGE_SOURCE_LINK_FAILED` | 링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다 |
-| 410 `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지났다 |
+| 410 `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지났다. 만든 그림(`generated:`)이면 다음 장면에서 그 그림을 빼고 인물 줄만으로 다시 부르라고 덧붙인다 |
 | 404 | 이 경로가 없는 옛 Control Plane 이다. 막는다. 경로를 받던 동작으로 돌아가지 않는다. Control Plane 은 이 경로에서 404 를 내지 않는다 |
 | 그 밖의 답, 제한 시간 | 받지 못했다고 막는다 |
 | 제한 시간 | 한 호출의 모든 가리킴을 합쳐 `FETCH_BUDGET`(15초) |
 | 맥락이 없다 | `tool_call_id` 나 session 이 빈 호출(코드 실행 안의 호출)은 막는다 |
+
+링크(`link:`)를 쓰지 못한 까닭에는 「다음 장면이고 앞 그림은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 다시 부른다」 를 덧붙인다(스펙 generated-image DECISION52).
 
 ### 승인 관문으로 가는 동작을 막는다
 

@@ -53,9 +53,20 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
      */
     @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
         + " from ConnectorBinding b"
-        + " where b.applyDueAt <= :now and b.restartRequired = false"
+        + " where b.applyDueAt <= :now and b.restartRequired = false and b.cyclePhase is null"
         + " order by b.applyDueAt")
     List<DueBinding> findApplyDue(@Param("now") Instant now);
+
+
+    /**
+     * 껐다 켜기 단계이고 실패 표시가 없는 바인딩의 번호들이다(ADR-20261120 / connector-auto-apply). 생성자 식을 문자열로 두는
+     * 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
+        + " from ConnectorBinding b"
+        + " where b.cyclePhase is not null and b.applyFailedAt is null"
+        + " order by b.id")
+    List<DueBinding> findCycling();
 
 
     /**
