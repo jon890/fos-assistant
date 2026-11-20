@@ -1,3 +1,4 @@
+// migration-test-prune: keep 지금 스키마의 유일 제약과 NULL 허용, 색인을 본다. 버전은 옛 줄을 넣는 시점일 뿐이다
 package com.bifos.assistant.chat;
 
 import java.util.HashMap;
