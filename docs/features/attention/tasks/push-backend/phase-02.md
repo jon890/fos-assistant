@@ -48,11 +48,11 @@ record: `Long notificationId`, `Long userId`, `NotificationKind kind`, `String t
 
 `WebPushClient` 는 `PushResponse send(String endpoint, String authorization, byte[] body)` 하나를 둔 인터페이스이고 `HttpWebPushClient` 가 운영 구현이다. `PushResponse` 는 같은 패키지의 record 다. 운영 구현은 → 상태 코드와 `Retry-After`(초, 없으면 null). 머리 `Content-Encoding: aes128gcm`, `Content-Type: application/octet-stream`, `TTL: 86400`, `Urgency: normal`. 연결 실패는 상태 0 으로 돌려준다.
 
-### 5. `notification/application/PushDispatcher.java` 와 `PushDeviceService.removeIfPresent`
+### 5. `notification/application/PushDispatcher.java` 와 `PushDeviceService.removeIfUnchanged`
 
 - `onCreated(NotificationCreated)`: `@TransactionalEventListener(phase = AFTER_COMMIT)`. 키가 꺼졌으면 바로 끝낸다. 아니면 `BackgroundTasks.start("push-" + publicId, ...)` 로 `deliver` 를 띄운다. 이 메서드 안에서 예외가 나가지 않게 한다
-- `deliver`: 기기 목록을 잠그지 않고 읽고, 기기마다 정책 재검사와 겹침 검사를 한 뒤 글 `{"title","body","url":"/n/<publicId>","tag":"<publicId>"}` 를 암호화해 보낸다. 응답 처리는 설계 「보내기」 표대로: 2xx 끝, 404·410 은 `removeIfPresent(userId, deviceId)`, 429·5xx·0 은 `retryDelays` 만큼 다시(429 와 503 의 `Retry-After` 는 `retryAfterMax` 안에서 따른다), 그 밖은 경고 로그
-- `PushDeviceService.removeIfPresent(Long userId, UUID deviceId)`: 잠금 안 트랜잭션에서 그 번호가 있으면 뺀다. 같은 주소로 다시 등록해도 번호는 유지되므로, 다시 등록된 기기는 2xx 를 받는 다음 보내기부터 정상이다
+- `deliver`: 기기 목록을 잠그지 않고 읽고, 기기마다 정책 재검사와 겹침 검사를 한 뒤 글 `{"title","body","url":"/n/<publicId>","tag":"<publicId>"}` 를 암호화해 보낸다. 응답 처리는 설계 「보내기」 표대로: 2xx 끝, 404·410 은 `removeIfUnchanged(userId, device)`, 429·5xx·0 은 `retryDelays` 만큼 다시(429 와 503 의 `Retry-After` 는 `retryAfterMax` 안에서 따른다), 그 밖은 경고 로그
+- `PushDeviceService.removeIfUnchanged(Long userId, PushDevice sent)`: 잠금 안 트랜잭션에서 보낼 때 읽은 기기와 번호와 `registeredAt` 이 같을 때만 뺀다. 그 사이 다시 등록한 기기는 지우지 않는다(rule-68)
 
 ### 6. 문서
 
@@ -88,7 +88,7 @@ scripts/dev/check-local.sh --fast
 | `backend/src/main/java/com/bifos/assistant/notification/infra/VapidSigner.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/infra/WebPushClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/PushDispatcher.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/notification/application/PushDeviceService.java` | 수정 (`removeIfPresent`) |
+| `backend/src/main/java/com/bifos/assistant/notification/application/PushDeviceService.java` | 수정 (`removeIfUnchanged`) |
 | `backend/src/test/java/com/bifos/assistant/notification/WebPushEncryptorTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/VapidSignerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/PushDispatcherTest.java` | 신규 |

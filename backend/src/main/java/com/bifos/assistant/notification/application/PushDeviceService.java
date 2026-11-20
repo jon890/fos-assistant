@@ -140,6 +140,18 @@ public class PushDeviceService {
     }
 
 
+    /**
+     * 푸시 서비스가 구독이 없다고 답한 기기를 뺀다. 보낼 때 읽은 기기와 번호와 등록 시각이 같을 때만 뺀다. 그 사이 같은 주소로 다시
+     * 등록했거나 다른 사용자에게 옮겨졌거나 이미 빠졌으면 아무것도 하지 않는다(rule-68).
+     */
+    public void removeIfUnchanged(Long userId, PushDevice sent) {
+        mutate(userId, devices -> devices.devices().stream()
+            .anyMatch(device -> device.id().equals(sent.id()) && device.registeredAt().equals(sent.registeredAt()))
+                ? devices.removeById(sent.id())
+                : devices);
+    }
+
+
     /** 그 사용자의 기기를 모두 지운다. 관리자가 접근을 끄면 부른다. */
     public void clearAll(Long userId) {
         mutate(userId, devices -> PushDevices.empty());
