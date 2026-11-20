@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 /**
  * 단추 연결을 시작하고, 서비스 화면에서 돌아온 요청으로 연결을 만든다(스펙 REQ4, REQ5, REQ11).
@@ -145,10 +146,10 @@ public class ConnectorOAuthFlows {
         if (app == null) {
             return ConnectorOAuthCompletion.of(Outcome.UNAVAILABLE, connectorId);
         }
-        if (hasText(error) || (!hasText(code) && !hasText(setupAction))) {
+        if (StringUtils.hasText(error) || (!StringUtils.hasText(code) && !StringUtils.hasText(setupAction))) {
             return discarded(Outcome.DENIED, flow, connectorId, app, null);
         }
-        if (!hasText(code)) {
+        if (!StringUtils.hasText(code)) {
             try {
                 Flow again = new Flow(flow.connectionId(), flow.nonce(), flow.fields(), flow.redirectUri(), true, flow.expiresAt());
                 return new ConnectorOAuthCompletion(Outcome.REAUTHORIZE, connectorId, authorizeUrl(user.id(), connectorId, app, again), null);
@@ -258,11 +259,6 @@ public class ConnectorOAuthFlows {
 
     private static ApiException notConfigured() {
         return new ApiException(ErrorCode.CONNECTOR_OAUTH_NOT_CONFIGURED, "the OAuth app of this connector is not configured");
-    }
-
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
 

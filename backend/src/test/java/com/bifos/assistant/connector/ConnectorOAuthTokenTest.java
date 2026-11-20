@@ -19,7 +19,6 @@ import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.oauth.application.ConnectorOAuthApps;
-import com.bifos.assistant.connector.oauth.application.ConnectorOAuthRefresher;
 import com.bifos.assistant.connector.oauth.application.ConnectorOAuthSigner;
 import com.bifos.assistant.connector.oauth.application.ConnectorOAuthTokens;
 import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthToken;
@@ -75,9 +74,6 @@ class ConnectorOAuthTokenTest {
 
     @Autowired
     ConnectorOAuthTokens tokens;
-
-    @Autowired
-    ConnectorOAuthRefresher refresher;
 
     @Autowired
     ConnectorOAuthSigner signer;
@@ -323,7 +319,7 @@ class ConnectorOAuthTokenTest {
         tokens.refresh(expiring.id(), null);
         tokens.refresh(fresh.id(), null);
 
-        refresher.refreshDue();
+        tokens.refreshDue();
 
         verify(oauth, times(1)).refresh(eq(empty.vault()), eq(CONNECTOR), any());
         verify(oauth, times(2)).refresh(eq(expiring.vault()), eq(CONNECTOR), any());

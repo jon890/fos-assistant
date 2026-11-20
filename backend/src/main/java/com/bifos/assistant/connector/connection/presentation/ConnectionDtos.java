@@ -182,13 +182,7 @@ public final class ConnectionDtos {
         }
     }
 
-    /**
-     * 연결 방식이다. 화면이 「단추로 연결함」 과 「직접 입력함」 을 나눠 보인다.
-     *
-     * @param method {@code oauth} 나 {@code manual}
-     * @param provider 단추 연결의 제공자 이름. 붙여 넣은 연결이면 null
-     * @param reconnectRequired 서비스가 갱신을 거절해 다시 연결해야 하는가
-     */
+    /** 연결 방식이다. {@code method} 는 {@code oauth} 나 {@code manual} 이고 {@code provider} 는 단추 연결에만 있다. */
     public record AuthView(String method, String provider, boolean reconnectRequired) {
     }
 

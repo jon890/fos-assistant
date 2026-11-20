@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,6 +38,9 @@ public class ConnectorOAuthTokens {
     private final ConnectorOAuthApps apps;
     private final ConnectorOAuthAlerts alerts;
     private final Clock clock;
+
+    /** 이 시간 안에 만료되는 토큰을 예약 갱신이 새로 받는다. 주기(10분)보다 길어 한 주기를 놓쳐도 만료 전에 다시 본다. */
+    static final Duration AHEAD = Duration.ofMinutes(15);
 
     private final Map<Long, ConnectorOAuthToken> current = new ConcurrentHashMap<>();
     private final Map<String, ConnectorOAuthToken> pending = new ConcurrentHashMap<>();
@@ -103,6 +107,27 @@ public class ConnectorOAuthTokens {
                 log.warn("connector OAuth refresh did not succeed connection={} outcome={}", connectionId, outcome);
             }
             return new ConnectorOAuthRefresh(outcome, outcome == Outcome.OK ? current.get(connectionId) : null);
+        }
+    }
+
+
+    /**
+     * 도구를 부르지 않는 연결도 만료 전에 갱신한다(스펙 DECISION17). 10분마다 돌고 검사에서는 {@code -} 로 끄고 직접 부른다.
+     *
+     * <p>{@code READY} 인 단추 연결 가운데 현재 칸이 없거나 곧 만료되는 것이 대상이다. 재기동 뒤 첫 주기는 메모리가 비어 모두 갱신한다.
+     * 한 연결의 실패는 경고로 남기고 다음 연결로 간다.
+     */
+    @Scheduled(cron = "${assistant.connector.oauth.refresh-cron}")
+    public void refreshDue() {
+        for (ConnectorConnection connection : connections.findByStatus(ConnectionStatus.READY)) {
+            try {
+                if (connection.fields().auth().usesOAuth()) {
+                    refresh(connection.id(), AHEAD);
+                }
+            } catch (RuntimeException ex) {
+                log.warn("connector OAuth scheduled refresh failed connection={} exception={}",
+                    connection.id(), ex.getClass().getSimpleName());
+            }
         }
     }
 
