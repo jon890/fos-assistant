@@ -199,7 +199,7 @@ public class EventWatchPoller {
                     if (watches.update(target.bindingId(), current -> current.reachable()
                         .checked(now, EventWatchResult.WOKE, fresh.size())
                         .consumed(queriedAt, nowSeen, true, today)).isEmpty()) {
-                        throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "event watch is no longer enabled");
+                        throw new ApiException(ErrorCode.EVENT_WATCH_DISABLED, "event watch is no longer enabled");
                     }
                 });
         } catch (ApiException ex) {

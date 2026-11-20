@@ -95,6 +95,27 @@ class EventWatchPollerTest extends EventWatchTestSupport {
         assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
         assertThat(count("SELECT COUNT(*) FROM agent_execution WHERE user_id = ?")).isZero();
         assertThat(stub().received()).isEmpty();
+        assertThat(count("SELECT COUNT(*) FROM conversation WHERE user_id = ?")).isZero();
+    }
+
+
+    @Test
+    @DisplayName("사건 감지를 꺼 실행 예약을 취소해도 기존 점검 대화는 지우지 않는다")
+    void disableDuringListingPreservesExistingConversation() throws InterruptedException {
+        listing("m1");
+        ProactiveCheck previous = wakeOnce();
+        when(feed.listEvents(anyString(), anyString(), any())).thenAnswer(invocation -> {
+            watches.disable(user.id(), agent.id(), CONNECTOR);
+            return ConnectorEventListing.success(List.of(new ConnectorEventListing.Item("m2", null, List.of("INBOX"))), false);
+        });
+
+        poller.checkAll();
+        awaitIdle();
+
+        assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isEqualTo(1);
+        assertThat(stub().received()).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM conversation WHERE id = ?", Long.class, previous.conversationId()))
+            .isEqualTo(1);
     }
 
 
