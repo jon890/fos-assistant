@@ -38,6 +38,14 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
     Optional<FollowUp> findByUserIdAndTitleKeyAndOpenMarker(Long userId, String titleKey, Integer openMarker);
 
 
+    /**
+     * 같은 제목의 열린 줄을 쓰기 잠금으로 읽는다. 받아들이기 전에 부른다. 잠그지 않고 읽은 줄을 저장하면 그 사이 화면에서 커밋한
+     * 기한 변경이나 거절을 옛 값으로 덮는다(rule-68).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<FollowUp> findForUpdateByUserIdAndTitleKeyAndOpenMarker(Long userId, String titleKey, Integer openMarker);
+
+
     /** 그 대화에서 {@code closedAfter} 뒤에 그 상태로 끝난 같은 제목의 줄이 있는가. 거절한 제안을 다시 받지 않으려고 본다. */
     boolean existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
         Long conversationId, String titleKey, FollowUpStatus status, Instant closedAfter);

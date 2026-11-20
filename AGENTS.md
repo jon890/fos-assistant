@@ -36,7 +36,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | 그 트리의 맨 위 실행 | **루트 실행**, 줄여서 **루트** | 뿌리 |
 | 사용자가 해야 하거나 끝나기를 기다리는 일 한 줄 | **할 일**, 코드는 `follow_up` | 추적 목표, 챙길 일 |
 | #161 의 Living View | **지금 화면**, 주소는 `/now` | Living View |
-| `notification` 표의 줄. 알림 단추와 알림 화면에 보이는 것 | **알림** | 알림 줄 |
+| `notification` 표의 줄. 「지금 볼 것」 의 「알림」 탭과 「지금 볼 것」 의 점에 보이는 것 | **알림** | 알림 줄 |
 | 대화 안에 끼우는 안내 줄(`SYSTEM` 메시지) | **알림 줄** | |
 | 에이전트에게 쥐어 주는 도구 묶음. 플러그인 root 의 `assistant.json` 이 assistant 쪽 정보를 선언한다 | **플러그인**, 코드는 `connector` | 커넥터, 커넥터 에이전트 |
 | 사용자가 플러그인 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection`. 그 화면(`/connections`)과 메뉴는 「외부 서비스 연결」 | 화면 이름으로 「연결」 |
@@ -181,7 +181,7 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-Draft CI 가 통과하고 최신 main 을 merge 한 뒤 검증을 받고, 통과해야 Ready 로 올린다. 별도 리뷰 에이전트는 띄우지 않는다.
+Draft CI 가 통과하면 검증을 받고, 통과해야 Ready 로 올린다. main 은 충돌이 났거나 머지 큐·코디네이터가 요청할 때만 합친다. 머지 직전 최신화는 큐가 한다. 별도 리뷰 에이전트는 띄우지 않는다.
 독립 verify(대화를 모르는 하위 에이전트)는 기능 루프를 쓴 PR(확인받은 스펙이 있는 PR)과 위험 라벨이 하나라도 붙은 PR 만 받는다. 위험 라벨은 `scripts/pr/pr-risk-labels.sh` 가 달고 머지 규칙은 바꾸지 않는다. 근거와 버린 대안은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 의 4절이 갖는다(사용자 결정 2026-11-02, 2026-11-03). 그 밖의 PR 은 구현한 세션이 verify 절차(인수 조건 대조, 검사 재실행, diff 읽기)를 스스로 하고 PR 본문에 「같은 세션 검증」 이라고 적는다.
 인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
 Ready 뒤에는 GitHub 의 Claude 리뷰(`claude-review`)가 한 번 더 본다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
@@ -190,8 +190,8 @@ verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전�
 등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
-머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
-CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/repo/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
+머지 직전에 필수 검사가 통과해야 한다. 최신 main 을 포함한 head 의 통과가 기본이고, 아래 조건이면 직전 CI 결과를 쓴다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
+CI 뒤 main 에 들어온 커밋이 이 PR 과 같은 파일을 고치지 않았고, 빌드와 의존성 파일, `test/repo/`, CI 판정 파일을 건드리지 않았고, 마이그레이션 같은 한 묶음의 파일을 PR 과 main 이 둘 다 바꾸지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
 필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `--match-head-commit` 으로 머지하고, 이력을 한 줄로 합치지 않는다.
 머지한 뒤에는 위 「작업 단위」 의 정리를 한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.

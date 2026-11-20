@@ -148,7 +148,7 @@ public class Memory extends CreatedAtEntity {
 
     /**
      * 이 항목을 대신한 새 항목의 번호다(ADR-20261102 / table-reduce-r2). 비어 있지 않으면 어디에도 실리지 않는다. 엔티티는 이 칸을 읽기만 하고
-     * 쓰지 않는다. 칸을 비우는 일은 저장소의 전용 쿼리가 한다.
+     * 쓰지 않는다. 칸을 채우고 비우는 일은 저장소의 전용 쿼리({@code supersede}, {@code clearSupersededBy})가 한다.
      */
     @Column(name = "superseded_by_memory_id", insertable = false, updatable = false)
     private Long supersededByMemoryId;

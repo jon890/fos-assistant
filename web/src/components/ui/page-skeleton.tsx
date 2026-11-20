@@ -15,6 +15,8 @@ type Props = {
   description?: PageSkeletonDescription;
   /** 목록 위에 입력 폼이 먼저 오는 화면이면 그 폼이다. */
   form?: PageSkeletonForm;
+  /** 제목 아래에 탭 줄이 있는 화면이다(`/now`). 탭 줄 높이와 그 아래 간격을 잡아 둔다. */
+  tabs?: boolean;
 };
 
 /**
@@ -199,6 +201,7 @@ export function PageSkeleton({
   title = false,
   description,
   form,
+  tabs = false,
 }: Props) {
   if (shape === "chat") return <ChatSkeleton width={width} />;
 
@@ -208,7 +211,15 @@ export function PageSkeleton({
       aria-busy="true"
       className={`mx-auto w-full ${WIDTH_CLASS[width]}`}
     >
-      {title ? <TitleBlock description={description} /> : null}
+      {title && tabs ? (
+        <>
+          {/* `/now` page 의 h1(mb-4), 탭 줄(TabsList 의 p-1 과 min-h-9), 탭 아래 간격(gap-4)과 같다. */}
+          <Skeleton className="mb-4 h-7 w-48" />
+          <Skeleton className="mb-4 h-11 w-48 rounded-lg" />
+        </>
+      ) : title ? (
+        <TitleBlock description={description} />
+      ) : null}
       {form ? <FormBlock form={form} /> : null}
       {shape === "cards" ? <CardsBody tall={form === "agent"} /> : null}
       {shape === "list" ? <ListBody /> : null}
