@@ -252,7 +252,7 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 인자 검사는 `McpFileSpaceCalls`, 경로 판정과 결과 문구는 `McpFileSpaceTools` 가 갖는다.
 
 - 인자는 `path`(필수), `title`, `description` 뿐이다. 대화와 사용자는 인자로 받지 않고 서명한 `_fos_ctx` 의 origin 실행에서 정한다
-- `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다
+- `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다. `/workspace/` 가 아닌 경로에서 찾지 못하면 실패 글에 실행 공간에서 만든 파일은 `/workspace/` 경로로 다시 부르라는 안내를 덧붙인다. 실행 공간의 파일 도구가 결과물 폴더 경로에 쓴 파일은 Control Plane 에 보이지 않기 때문이다
 - 실행 공간은 Control Plane 이 읽기 전용으로 붙인 루트에서 링크를 따라가지 않고 읽는다. `mcp` 가 `workspace` 를 부르지 못해 `mcp.application.port.SandboxFiles` 를 `workspace` 가 구현한다
 - 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담는다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
 - 보관 자리가 차 있으면 10초까지 기다린다
