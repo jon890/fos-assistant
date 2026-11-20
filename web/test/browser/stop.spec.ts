@@ -247,16 +247,25 @@ test("닫히는 중인 풀이가 남아 있어도 Esc 로 답을 중지한다", 
   await expect(
     page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
   ).toBeEnabled();
-  // 닫히는 움직임을 늘려 풀이가 닫힌 채 남아 있는 동안 Esc 를 누른다.
-  await page.addStyleTag({
-    content: '[data-slot="tooltip-content"]{animation-duration:5s !important}',
-  });
+  // 보내기 단추에서 남은 풀이가 사라진 뒤 대상 풀이를 연다.
+  await page.mouse.move(600, 300);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.getByRole("button", { name: "사이드바 접기" }).hover();
-  await expect(page.getByRole("tooltip")).toHaveText("사이드바 접기");
+  const tooltip = page.getByRole("tooltip", {
+    name: "사이드바 접기",
+    exact: true,
+  });
+  await expect(tooltip).toBeVisible();
+  const content = page.locator('[data-slot="tooltip-content"]').filter({
+    hasText: "사이드바 접기",
+  });
+  // 이 풀이의 닫히는 움직임만 늘려 닫힌 채 남아 있는 동안 Esc 를 누른다.
+  await content.evaluate((element: HTMLElement) => {
+    element.style.animationDuration = "5s";
+  });
   await page.mouse.move(600, 300, { steps: 10 });
-  await expect(
-    page.locator('[data-slot="tooltip-content"][data-state="closed"]'),
-  ).toBeVisible();
+  await expect(content).toHaveAttribute("data-state", "closed");
+  await expect(content).toBeVisible();
   await page.getByRole("textbox", { name: "메시지" }).focus();
   await page.keyboard.press("Escape");
   await expect(
