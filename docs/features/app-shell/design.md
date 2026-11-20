@@ -12,7 +12,7 @@
 | REQ4 | `app/settings/page.tsx` 를 새로 둔다. 새 부품 `SettingsShell` 이 묶음 목록을 그리고, 화면 틀(`AppShell`)이 경로로 설정 영역인지 정해 그 틀을 쓴다. 화면마다의 주소와 page 는 그대로다 |
 | REQ5 | `SettingsShell` 은 사이드바와 대화 목록을 그리지 않고 머리에 「대화로」 를 둔다. 돌아갈 곳은 관리자 틀과 같은 `sessionStorage` 값을 읽는 함수로 정한다 |
 | REQ6 | Route Handler `POST /signout` 이 Auth.js 의 `signOut({ redirect: false })` 로 이 브라우저의 세션 쿠키만 지운다. 끝나면 브라우저가 `/signin` 으로 문서째 다시 연다. bfcache 로 돌아온 문서는 화면 틀이 다시 읽는다. Google provider 의 인증 요청에 `prompt=select_account` 를 붙인다 |
-| REQ7 | `NotificationBell` 을 사이드바 맨 위 앱 이름 바로 오른쪽(왼쪽 묶음)으로 옮긴다. 서랍에서는 그 줄 오른쪽 끝이 서랍 닫기 단추 자리라 비워 둔다. 휴대폰 위 막대의 단추는 그대로 둔다 |
+| REQ7 | `NotificationBell` 을 사이드바 맨 위 앱 이름 바로 오른쪽(왼쪽 묶음)으로 옮긴다. 서랍에서는 그 줄 오른쪽 끝이 서랍 닫기 단추 자리라 비워 둔다. 휴대폰 위 막대의 단추는 그대로 둔다. PR4 가 알림 단추를 지웠고 그 뒤의 모양은 REQ17 이 갖는다 |
 | REQ8 | `Composer` 의 테두리 상자(`composer-shell`)를 세로 두 줄로 바꾼다. 위 줄은 글 칸, 아래 줄(`composer-actions`)은 왼쪽에 「＋」 와 `ModelTierPicker`, 오른쪽(`ml-auto`)에 중지와 보내기다. 상자 아래에 있던 모델 단계 줄을 없앤다. 「＋」 는 지금 사진 첨부 단추의 동작과 접근성 이름(「사진 첨부」)을 그대로 쓰고 아이콘만 `Plus` 다 |
 | REQ9 | `AgentPicker`(카드 묶음)를 지우고 새 부품 `AgentSwitcher` 가 이름표 단추와 목록을 그린다. 새 대화 화면에서 `StartAgentSwitcher` 가 같은 단추를 넓은 화면의 머리 줄과 휴대폰 위 막대 가운데(portal) 두 자리에 둔다. 대화가 만들어졌으면(`agentLocked`) 목록 대신 안내 popover 를 연다 |
 | REQ10 | 메시지가 있는 대화와 대화방은 지금 머리 줄을 `ConversationHeader` 로 옮겨 그대로 그린다. 단추가 아니므로 목록이 열리지 않는다. 위 막대 가운데는 화면이 자리를 차지하지 않으므로 지금처럼 `/` 로 가는 제목 링크다 |
@@ -228,7 +228,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 
 | ID | 경계 | 확인 |
 | --- | --- | --- |
-| REQ1, REQ2, REQ7 | 브라우저 테스트(넓은 화면, 360px, 낮은 높이 640×320) | 사이드바 줄의 차례와 없는 줄, 대화가 많을 때와 낮은 높이에서 이름 줄이 보이는지, 서랍의 같은 줄, 앱 이름 옆 알림 단추가 서랍 닫기 단추와 겹치지 않는지 |
+| REQ1, REQ2, REQ7 | 브라우저 테스트(넓은 화면, 360px, 낮은 높이 640×320) | 사이드바 줄의 차례와 없는 줄, 대화가 많을 때와 낮은 높이에서 이름 줄이 보이는지, 서랍의 같은 줄. PR4 가 알림 단추를 지워 겹침 확인은 없어졌고, 단추가 없는지는 REQ17 줄이 본다 |
 | REQ3 | 브라우저 테스트 | `ADMIN` 과 `MEMBER` 역할의 메뉴 줄, 360px 에서 손가락으로 밝기 값을 바꾸고 새로 고친 뒤 남는지, 역할 읽기 실패 때 메뉴와 로그아웃, 키보드로 열고 `Esc` 로 닫기 |
 | REQ4, REQ5 | 노드 테스트(`settings-area.ts` 의 경로 판정과 골라진 줄)와 브라우저 테스트 | `/settings` 의 두 폭, 저장한 `/connections` 주소, `/executions/{id}` 가 설정 틀 밖에서 열리는지, 로그인한 `/privacy`, 「대화로」 가 보던 대화로 돌아가는지 |
 | REQ6 | 브라우저 테스트, 노드 테스트 | 로그아웃 뒤 `/signin`, 뒤로 가기와 `/chat/{id}` 가 로그인 화면으로 가는지, `persisted` 인 `pageshow` 에 세션이 없을 때만 다시 읽는지, `/signout` 이 500 이거나 끊겼을 때 안내. 계정 고르기 값은 `test/node/auth-signin.test.ts` 의 방식(provider 를 가짜로 바꿔 끼움)으로 provider 설정을 본다 |
