@@ -267,7 +267,7 @@ domain과 infra는 admin을 import하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
-`crypto` 는 맨 아래다. 사용자별·그룹별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 기억은 주인(사용자나 그룹)을 받는 `OwnedTextCipher` 로 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)).
+`crypto` 는 맨 아래다. 사용자별·그룹별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 기억은 주인(사용자나 그룹)을 받는 `OwnedTextCipher` 로 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)). 서버 비밀값도 같은 까닭으로 `crypto.domain.ServerSecrets` 뒤에 두고, 값의 주인 기능이 부른다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)).
 
 `crypto.domain.entity`는 `UserDataKey`와 이후 추가하는 crypto 엔티티, 그 엔티티의 영속 ID를 둔다.
 암호화 정책과 port는 `crypto.domain`에 남긴다. `UserDataKey`의 단순 이름 또는

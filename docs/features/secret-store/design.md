@@ -7,7 +7,7 @@
 | ID | 해결 방법 |
 | --- | --- |
 | REQ1 | `admin.secret.presentation` 의 관리자 API 와 `web/src/app/admin/secrets/` 화면. 권한은 기존 관리자 영역의 `requireAdmin` 을 쓴다(ADR-063) |
-| REQ2 | `crypto.application.ServerSecretService` 가 이름별 상태(`EMPTY`, `SET`), 앞부분, 마지막으로 바꾼 사용자 번호, 시각, 공개 값(VAPID 공개 키와 연락처)만 담은 dto 를 낸다. 앞부분 기준(16자 이상일 때 앞 4자)은 `ConnectorValues` 의 상수를 `crypto.domain` 으로 옮겨 두 곳이 함께 쓴다 |
+| REQ2 | 저장할 수 있는지(KEK 유무)는 `crypto.application.ServerSecretService` 가, 값마다의 상태(입력됨 여부, 앞부분, 마지막으로 바꾼 사용자 번호, 시각, 공개 값)는 그 값의 주인 기능의 application(PR1a 는 `GatewaySecretService.status()`)이 원문 없는 dto 로 낸다. 앞부분 기준(16자 이상일 때 앞 4자)은 `ConnectorValues` 의 상수를 `crypto.domain` 으로 옮겨 두 곳이 함께 쓴다 |
 | REQ3 | 원문 읽기는 `crypto.domain.ServerSecrets` 인터페이스에만 있다. `admin` 은 규칙상 기능의 `application` 과 dto 만 부를 수 있어(`ADMIN_USES_ONLY_FEATURE_APPLICATION`) 원문에 닿지 못한다 |
 | REQ4 | `crypto.infra.DatabaseServerSecrets` 가 값을 `KeyEncryptionKeys.wrap` 으로 감싸 `server_secret.sealed_value` 에 쓴다. AAD 는 `server_secret:<이름>` 이다. KEK 가 없으면 `SECRET_STORE_UNAVAILABLE`(409)로 거절하고 줄을 만들지 않는다 |
 | REQ5 | 쓰기 트랜잭션이 커밋되면 새 값을 캐시에 바로 넣는다. 읽기가 캐시를 채울 때는 이름별 세대 번호가 읽기 전과 같을 때만 넣는다. 사용처는 매번 `ServerSecrets` 를 부른다(서버 한 대 전제) |
@@ -17,8 +17,8 @@
 | REQ9 | 값의 주인 기능이 가져온다. `browser.application.GatewaySecretImporter` 가 `BrowserProperties` 의 옛 값을 가져온다. 가져오기는 `SmartInitializingSingleton` 으로 웹 서버가 요청을 받기 전에 돈다. 이름의 줄이 있으면(값이 비어 있어도) 건너뛴다 |
 | REQ10 | `HermesProfileKeyStore` 가 파일 대신 `ServerSecrets` 의 `profile_key:<profile>` 를 읽고 쓴다. 공개 메서드 모양은 그대로다. `write` 는 값이 NULL 인 줄을 비어 있음으로 보고 쓴다. 지운 profile 이름으로 다시 만들 수 있다 |
 | REQ11 | `hermes.infra` 의 profile key 가져오기가 옛 key 디렉터리의 파일을 이름마다 한 번 가져온다. REQ9 와 같은 기동 단계다 |
-| REQ12 | `agent.application.ProviderKeyService` 가 공급자마다 `provider_key:<공급자>:<번호>` 줄을 둔다. 별칭과 순서는 그 줄의 `meta` JSON 에 둔다 |
-| REQ13 | `ProviderKeyService` 가 대시보드 포트(`HermesDashboardClient`)에 더한 `putCredentialPool` 로 그 공급자의 우리 줄 전체와 방식, 버전 번호를 보낸다. 공급자마다 JVM 잠금 하나 안에서 「최신 커밋 값 읽기와 보내기」 를 한다. 실패는 공급자 줄(`provider:<공급자>`)의 `meta.syncError` 에 남고 성공하면 지운다. 기동 뒤 모든 공급자를 한 번 보낸다 |
+| REQ12 | `agent.application.ProviderKeyService` 가 공급자마다 `provider_key:<공급자>:<번호>` 줄을 둔다. 별칭과 순서는 그 줄의 `meta_json` 에 둔다 |
+| REQ13 | `ProviderKeyService` 가 대시보드 포트(`HermesDashboardClient`)에 더한 `putCredentialPool` 로 그 공급자의 우리 줄 전체와 방식, 버전 번호를 보낸다. 공급자마다 JVM 잠금 하나 안에서 「최신 커밋 값 읽기와 보내기」 를 한다. 실패는 공급자 줄(`provider:<공급자>`)의 `meta_json` 안 `syncError` 에 남고 성공하면 지운다. 기동 뒤 모든 공급자를 한 번 보낸다 |
 | REQ14 | plugin 이 Hermes 루트 목록에서 `source` 가 `manual:fos-assistant:<번호>` 인 줄만 고치고 그 밖의 줄(구독 로그인)보다 뒤 우선순위로 둔다. 쓰기는 Hermes 의 인증 저장 함수와 그 잠금을 거친다. 번호와 key 지문이 같은 줄은 Hermes 의 상태(막힘, `last_status_at`, `request_count`)를 그대로 둔다. 방식은 `credential_pool_strategies.<공급자>` 에 `fill_first` 나 `round_robin` 으로 쓴다. 어느 `config.yaml` 이 profile 실행에 읽히는지는 PR3 의 계약 테스트가 정한다 |
 | REQ15 | plugin 의 새 `GET /api/credential-pool/<공급자>` 가 우리 줄마다 상태, 오류 코드, 풀리는 시각, 사용 횟수(`request_count`), 마지막 상태 시각(`last_status_at`)을 원문 없이 낸다. 화면을 열 때 부르고 실패하면 상태 칸만 비운다 |
 | REQ16 | plugin 의 새 `POST /api/credential-pool/<공급자>/<번호>/reset` 이 Hermes 의 `reset_status` 를 부른다 |
@@ -51,7 +51,7 @@
 | `name` | 기본 키. `vapid`, `browser_gateway`, `profile_key:<profile>`, `provider:<공급자>`, `provider_key:<공급자>:<번호>`, `import:<단계>` |
 | `kek_id`, `sealed_value` | 감싼 값. 값이 비었으면 둘 다 NULL 이다. 줄이 있고 값이 NULL 이면 「비어 있음, 가져오기 끝남」 이다 |
 | `prefix` | 화면에 보일 앞부분. 짧은 값은 NULL |
-| `meta` | 비밀이 아닌 JSON. VAPID 공개 키와 연락처, 별칭과 순서, 공급자 방식과 버전 번호, 반영 실패 |
+| `meta_json` | 비밀이 아닌 JSON. VAPID 공개 키와 연락처, 별칭과 순서, 공급자 방식과 버전 번호, 반영 실패 |
 | `updated_by`, `updated_at` | 마지막으로 바꾼 사용자 번호(기동 가져오기는 NULL)와 시각 |
 
 `backend/docs/data-schema.md` 에 표를 더하고 「테이블을 늘리지 않는다」 예외 줄에 스펙 DECISION5 를 적는다.
@@ -73,9 +73,11 @@
 
 ## 실패와 일관성
 
+- **쓰기의 트랜잭션**: `@Transactional` 은 application 에만 둔다(구조 규칙). 그래서 `DatabaseServerSecrets` 는 부른 쪽 트랜잭션에 참여하고, 값을 바꾸는 application 메서드(`GatewaySecretService` 등)가 트랜잭션을 연다. 줄이 없을 때 두 관리자가 같은 이름을 동시에 처음 만들면 한쪽이 기본 키 충돌로 실패한다. 관리자가 사실상 한 명이라 잠금 조회를 두지 않는다(스펙 DECISION14).
+- **다시 감싸기**: KEK 교체 때 값 칸만 바꾸는 갱신 쿼리를 써서 `updated_at` 과 바꾼 사람이 그대로다. 풀리지 않는 줄은 건너뛰고 수만 경고한다.
 - **쓰기와 캐시**: 커밋 뒤 새 값을 캐시에 넣고 세대 번호를 올린다. 커밋 전에 옛 줄을 읽은 스레드는 세대가 바뀌어 캐시에 넣지 못한다. 롤백되면 캐시와 세대가 그대로다.
 - **VAPID 바꾸기**: 줄과 기기 비우기가 전역 등록 잠금 안의 한 트랜잭션이다. 잠금을 놓은 뒤의 등록은 공개 키 확인으로 옛 키 구독을 거절한다. 해제 알림은 커밋 뒤 따로 만들고, 실패해도 키는 바뀐 채 경고만 남긴다.
-- **중계 비밀 바꾸기**: 값이 커밋되면 옛 표식은 바로 무효다. 그 뒤 브라우저 플러그인 바인딩을 하나씩 다시 설치한다. 서버 정의의 `.env` 가 바뀌어 plugin 이 재시작 필요를 답하므로 바인딩은 재시작 대기가 되고, 관리자가 기존 「반영 완료」(Hermes 재시작)를 해야 새 표식으로 돈다. 그 사이 그 플러그인 호출은 실패한다(스펙 DECISION20). 연결 반영 자동화(connector-auto-apply)가 들어오면 그 기능이 재시작 대기를 푼다. 이 설계는 기존 재시작 대기 상태만 쓰므로 두 기능 사이에 따로 맞출 계약이 없다. 하나가 실패해도 다음으로 가고, 실패한 바인딩은 기존 바인딩 화면에 실패로 보인다.
+- **중계 비밀 바꾸기**: 값이 커밋되면 옛 표식은 바로 무효다. 그 뒤 브라우저 플러그인 바인딩을 하나씩 다시 설치한다. 서버 정의의 `.env` 가 바뀌어 plugin 이 재시작 필요를 답하므로 바인딩은 재시작 대기가 되고, 관리자가 기존 「반영 완료」(Hermes 재시작)를 해야 새 표식으로 돈다. 그 사이 그 플러그인 호출은 실패한다(스펙 DECISION20). 연결 반영 자동화(connector-auto-apply)가 들어오면 그 기능이 재시작 대기를 푼다. 이 설계는 기존 재시작 대기 상태만 쓰므로 두 기능 사이에 따로 맞출 계약이 없다. 하나가 실패해도 다음으로 간다. 대시보드 호출이 실패한 바인딩은 기존 바인딩 화면에 실패(`PENDING`)로 보인다. 시작 단계에서 막힌 바인딩(에이전트가 바쁨, 지워짐, 주인 접근 해제)은 상태를 남기지 않고 실패 수에만 든다. 화면은 실패 수를 보이고 다시 만들기를 안내한다.
 - **provider key 동기화**: Control Plane 이 원본이다. 공급자마다 JVM 잠금 안에서 최신 값을 읽어 보내므로 늦게 도착한 옛 목록이 새 목록을 덮지 않는다. plugin 도 버전 번호로 한 번 더 막는다. 같은 줄은 Hermes 상태를 지키므로 기동 때 다시 보내도 막힘 기억이 지워지지 않는다.
 - **Hermes 인증 파일**: 구독 로그인 갱신도 같은 파일에 쓰므로 plugin 은 파일을 직접 고쳐 쓰지 않고 Hermes 의 인증 저장 함수와 잠금을 거친다.
 - **가져오기**: 웹 서버가 요청을 받기 전에 돈다. 이름마다 줄이 있으면 건너뛰므로 여러 번 기동해도 한 번이다. 한 값이 실패하면 경고만 남기고 기동을 멈추지 않는다. 그 값을 쓰는 기능은 꺼진 채로 뜬다.
@@ -105,7 +107,7 @@
 | --- | --- | --- | --- | --- |
 | DECISION1 | 값을 감싸는 층 | 값 자체를 KEK 로 바로 감싼다. 서버용 데이터 key 층을 두지 않는다 | 작성자 | 값이 짧고 수가 적다. [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 이 이 방식을 기각한 까닭(사용자 한 명만 지울 수 없음, KEK 교체 때 모든 본문을 다시 씀)은 서버 비밀값에 해당하지 않는다 |
 | DECISION2 | 저장 자리 | `crypto.domain` 인터페이스와 `crypto.infra` 구현. 하위 기능을 만들지 않는다 | 작성자 | 하위 기능은 정해진 큰 기능만 둔다(`backend/docs/code-architecture.md` 「패키지 배치 규칙」). infra 사용처가 부를 수 있는 층이 domain 이다 |
-| DECISION3 | 한 테이블에 모든 종류 | 이름 접두로 종류를 나누고 비밀 아닌 값은 `meta` JSON 에 둔다 | 작성자 | 테이블을 하나만 더한다(스펙 DECISION5). 종류마다 칸을 두면 대부분 비어 있다 |
+| DECISION3 | 한 테이블에 모든 종류 | 이름 접두로 종류를 나누고 비밀 아닌 값은 `meta_json` 에 둔다 | 작성자 | 테이블을 하나만 더한다(스펙 DECISION5). 종류마다 칸을 두면 대부분 비어 있다 |
 | DECISION4 | 지운 값과 가져오기 표지 | 줄을 지우지 않고 값만 NULL 로 둔다. 쓰기는 NULL 줄을 비어 있음으로 본다 | 작성자 | 스펙 DECISION16 의 「다시 가져오지 않음」 을 칸 하나 없이 지킨다 |
 | DECISION5 | 캐시 | 커밋 뒤 새 값을 넣고, 읽기는 세대 번호가 같을 때만 넣는다. 만료 시간은 두지 않는다 | 작성자 | 서버 한 대 전제. 커밋 앞 읽기가 옛 값을 남기는 경쟁을 막는다 |
 | DECISION6 | provider key 를 Hermes 에 넘기는 모양 | 공급자 단위 `PUT` 에 버전 번호. 우리 줄은 `source` 로 구분하고 같은 줄은 Hermes 상태를 지킨다 | 작성자 | 구독 로그인 줄을 건드리지 않고, 다시 보내기와 기동 때 맞추기가 같은 호출이다 |

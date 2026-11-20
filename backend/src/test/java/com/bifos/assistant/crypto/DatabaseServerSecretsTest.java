@@ -71,9 +71,7 @@ class DatabaseServerSecretsTest {
         secrets.write("probe_a", VALUE, Map.of(), 1L);
         ServerSecret source = rows.findById("probe_a").orElseThrow();
         secrets.write("probe_b", "other-value-0000000000", Map.of(), 1L);
-        ServerSecret target = rows.findById("probe_b").orElseThrow();
-        target.rewrap(source.kekId(), source.sealedValue());
-        rows.save(target);
+        transactions.executeWithoutResult(status -> rows.rewrap("probe_b", source.kekId(), source.sealedValue()));
         secrets.invalidateAll();
 
         assertThat(secrets.read("probe_b")).isEmpty();
@@ -82,10 +80,11 @@ class DatabaseServerSecretsTest {
 
     @Test
     @DisplayName("지우면 줄은 남고 값은 비며 같은 이름에 다시 쓸 수 있다")
-    void clearKeepsRowAndAllowsRewrite() {
+    void clearKeepsRowAndAllowsRewrite(CapturedOutput output) {
         secrets.write("probe_clear", VALUE, Map.of(), 1L);
 
         secrets.clear("probe_clear", 2L);
+        assertThat(output.getAll()).contains("server secret cleared name=probe_clear by=2").doesNotContain(VALUE);
 
         assertThat(secrets.exists("probe_clear")).isTrue();
         assertThat(secrets.read("probe_clear")).isEmpty();
@@ -135,21 +134,26 @@ class DatabaseServerSecretsTest {
 
 
     @Test
-    @DisplayName("옛 KEK 로 감싼 줄은 기동 작업이 활성 KEK 로 다시 감싼다")
+    @DisplayName("옛 KEK 로 감싼 줄은 기동 작업이 활성 KEK 로 다시 감싸고 바꾼 시각과 사람은 그대로이며 풀리지 않는 줄은 건너뛴다")
     void rewrapsRowsWrappedWithOldKek() {
         FileKeyEncryptionKeys oldKeks = new FileKeyEncryptionKeys(
             new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10, null, 0));
-        secrets.write("probe_rewrap", "placeholder-value-44444", Map.of(), 1L);
-        ServerSecret row = rows.findById("probe_rewrap").orElseThrow();
-        row.rewrap(
-            "test-kek-0",
-            oldKeks.wrap(VALUE.getBytes(StandardCharsets.UTF_8), "server_secret:probe_rewrap".getBytes(StandardCharsets.UTF_8)));
-        rows.save(row);
+        secrets.write("probe_rewrap", "placeholder-value-44444", Map.of(), 9L);
+        String oldSealed = oldKeks.wrap(VALUE.getBytes(StandardCharsets.UTF_8), "server_secret:probe_rewrap".getBytes(StandardCharsets.UTF_8));
+        transactions.executeWithoutResult(status -> rows.rewrap("probe_rewrap", "test-kek-0", oldSealed));
+        // 풀리지 않는 줄이 하나 있어도 나머지는 다시 감싼다.
+        secrets.write("probe_broken", "broken-value-555555555", Map.of(), 9L);
+        transactions.executeWithoutResult(status -> rows.rewrap("probe_broken", "test-kek-0", oldSealed));
+        var before = rows.findById("probe_rewrap").orElseThrow().updatedAt();
 
         rewrapper.run(null);
 
-        assertThat(rows.findById("probe_rewrap")).get().extracting(ServerSecret::kekId).isEqualTo("test-kek-1");
+        ServerSecret row = rows.findById("probe_rewrap").orElseThrow();
+        assertThat(row.kekId()).isEqualTo("test-kek-1");
+        assertThat(row.updatedBy()).isEqualTo(9L);
+        assertThat(row.updatedAt()).isEqualTo(before);
         assertThat(secrets.read("probe_rewrap")).isEqualTo(Optional.of(VALUE));
+        assertThat(rows.findById("probe_broken").orElseThrow().kekId()).isEqualTo("test-kek-0");
     }
 
 

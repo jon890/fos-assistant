@@ -118,7 +118,8 @@ public class DatabaseServerSecrets implements ServerSecrets {
 
 
     /**
-     * 활성 KEK 가 아닌 KEK 로 감싼 줄을 다시 감싼다. 기동 때 {@code DataKeyRewrapper} 가 부른다.
+     * 활성 KEK 가 아닌 KEK 로 감싼 줄을 다시 감싼다. 기동 때 {@code DataKeyRewrapper} 가 트랜잭션 안에서 부른다. 바꾼 시각과 사람은
+     * 그대로 둔다.
      *
      * @return 다시 감싼 줄 수
      */
@@ -128,21 +129,30 @@ public class DatabaseServerSecrets implements ServerSecrets {
         }
         int rewrapped = 0;
         int missing = 0;
+        int failed = 0;
         for (ServerSecret row : rows.findByKekIdNotAndKekIdIsNotNull(keks.activeKeyId())) {
             if (!keks.has(row.kekId())) {
                 missing++;
                 continue;
             }
-            byte[] value = keks.unwrap(row.kekId(), row.sealedValue(), aad(row.name()));
-            row.rewrap(keks.activeKeyId(), keks.wrap(value, aad(row.name())));
-            rows.save(row);
-            rewrapped++;
+            try {
+                byte[] value = keks.unwrap(row.kekId(), row.sealedValue(), aad(row.name()));
+                rows.rewrap(row.name(), keks.activeKeyId(), keks.wrap(value, aad(row.name())));
+                rewrapped++;
+            } catch (RuntimeException ex) {
+                // 한 줄이 풀리지 않아도 나머지 줄은 다시 감싼다. 이름과 예외 종류만 남긴다.
+                log.warn("server secret cannot be rewrapped name={} exception={}", row.name(), ex.getClass().getName());
+                failed++;
+            }
         }
         if (rewrapped > 0) {
             log.info("서버 비밀값을 활성 KEK 로 다시 감쌌다 rewrapped={}", rewrapped);
         }
         if (missing > 0) {
             log.warn("KEK 파일에 없는 옛 KEK 로 감싼 서버 비밀값이 있다. 그 값은 읽지 못한다 count={}", missing);
+        }
+        if (failed > 0) {
+            log.warn("다시 감싸지 못한 서버 비밀값이 있다 count={}", failed);
         }
         invalidateAll();
         return rewrapped;

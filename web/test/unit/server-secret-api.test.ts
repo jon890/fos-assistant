@@ -19,7 +19,7 @@ test("다시 설치 결과는 성공, 일부 실패, 목록 읽기 실패를 나
   ]);
   assert.deepEqual(reinstallSummary({ total: 3, restartPending: 2, failed: 1, catalogUnavailable: false }), [
     "2개를 다시 설치했어요. 반영 완료 전까지 브라우저 플러그인은 동작하지 않습니다.",
-    "1개는 다시 설치하지 못했어요. 바인딩 화면에서 확인해 주세요.",
+    "1개는 다시 설치하지 못했어요. 바인딩 화면에서 확인하고, 그대로면 비밀을 다시 만들어 주세요.",
   ]);
   assert.match(
     reinstallSummary({ total: 0, restartPending: 0, failed: 0, catalogUnavailable: true })[0]!,

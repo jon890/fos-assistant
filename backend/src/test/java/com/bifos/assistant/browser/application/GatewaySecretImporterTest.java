@@ -1,6 +1,11 @@
 package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.crypto.domain.ServerSecrets;
@@ -53,11 +58,27 @@ class GatewaySecretImporterTest {
     }
 
 
+    @Test
+    @DisplayName("KEK 가 없으면 옛 값을 가져오지 않고 줄을 만들지 않는다")
+    void skipsWithoutKek() {
+        ServerSecrets withoutKek = mock(ServerSecrets.class);
+        when(withoutKek.available()).thenReturn(false);
+
+        assertThat(new GatewaySecretImporter(withoutKek, live(LEGACY)).importLegacy()).isFalse();
+        verify(withoutKek, never()).write(any(), any(), any(), any());
+    }
+
+
     private GatewaySecretImporter importer(String legacy) {
+        return new GatewaySecretImporter(secrets, live(legacy));
+    }
+
+
+    private static LiveProperties<BrowserProperties> live(String legacy) {
         BrowserProperties properties = new BrowserProperties(
             false, null, null, null, null, null, null, null, 1024, null, null, null, 2,
             Duration.ofMinutes(10), Duration.ofSeconds(30), Duration.ofMinutes(30), Duration.ofMinutes(30),
             null, legacy);
-        return new GatewaySecretImporter(secrets, LiveProperties.fixed(BrowserProperties.class, properties));
+        return LiveProperties.fixed(BrowserProperties.class, properties);
     }
 }

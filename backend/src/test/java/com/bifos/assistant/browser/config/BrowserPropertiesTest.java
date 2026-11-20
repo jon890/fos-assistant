@@ -31,22 +31,14 @@ class BrowserPropertiesTest {
 
 
     @Test
-    @DisplayName("중계 두 값이 모두 있으면 중계가 켜진다")
-    void enablesGatewayWithBothValues() {
-        assertThat(properties(BASE, SECRET).gatewayEnabled()).isTrue();
-        assertThat(properties("http://cp.example.test:8080/internal/browser-gateway", SECRET)
-            .gatewayEnabled())
-                .isTrue();
-    }
-
-
-    @Test
-    @DisplayName("중계 두 값이 비거나 하나만 있으면 기동하되 중계는 꺼진다")
-    void keepsGatewayOffWhenEitherValueIsBlank() {
-        assertThat(properties(null, null).gatewayEnabled()).isFalse();
-        assertThat(properties("", " ").gatewayEnabled()).isFalse();
-        assertThat(properties(BASE, null).gatewayEnabled()).isFalse();
-        assertThat(properties(null, SECRET).gatewayEnabled()).isFalse();
+    @DisplayName("중계 두 값이 비거나 하나만 있어도 기동한다. 켜짐은 저장소의 서명 비밀이 정한다")
+    void startsWhenEitherGatewayValueIsBlank() {
+        assertThat(properties(BASE, SECRET).gatewayBaseUrl()).isEqualTo(BASE);
+        assertThat(properties("http://cp.example.test:8080/internal/browser-gateway", SECRET).gatewaySecret()).isEqualTo(SECRET);
+        assertThat(properties(null, null).gatewaySecret()).isNull();
+        assertThat(properties("", " ").gatewayBaseUrl()).isEmpty();
+        assertThat(properties(BASE, null).gatewaySecret()).isNull();
+        assertThat(properties(null, SECRET).gatewayBaseUrl()).isNull();
     }
 
 

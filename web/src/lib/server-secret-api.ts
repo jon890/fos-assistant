@@ -63,7 +63,7 @@ export function reinstallSummary(result: BindingReinstall): string[] {
   ];
   if (result.failed > 0)
     lines.push(
-      `${result.failed}개는 다시 설치하지 못했어요. 바인딩 화면에서 확인해 주세요.`,
+      `${result.failed}개는 다시 설치하지 못했어요. 바인딩 화면에서 확인하고, 그대로면 비밀을 다시 만들어 주세요.`,
     );
   return lines;
 }

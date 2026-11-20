@@ -31,7 +31,8 @@ import org.springframework.validation.annotation.Validated;
  * 보다 짧으면 {@code idleTimeout} 으로 끌어올린다
  * @param gatewayBaseUrl Hermes 가 중계에 닿는 주소. {@code http} 나 {@code https} 이고 끝이 {@code /internal/browser-gateway} 다.
  * 비어 있으면 중계가 꺼진다
- * @param gatewaySecret 중계의 접근 표식을 서명하는 비밀값. 32자 이상이다. 비어 있으면 중계가 꺼진다
+ * @param gatewaySecret 옛 서명 비밀. 32자 이상이다. 서버 비밀값 {@code browser_gateway} 가 없을 때 기동하며 한 번 가져오는 데만
+ * 쓴다(ADR-20261120 / server-secret). 중계의 켜짐은 저장소의 값이 정한다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.browser")
@@ -118,12 +119,6 @@ public record BrowserProperties(
                 throw new IllegalStateException(PREFIX + "cpu must be positive: " + cpu);
             }
         }
-    }
-
-
-    /** 중계의 두 값이 모두 있을 때만 중계가 켜진다. */
-    public boolean gatewayEnabled() {
-        return hasText(gatewayBaseUrl) && hasText(gatewaySecret);
     }
 
 

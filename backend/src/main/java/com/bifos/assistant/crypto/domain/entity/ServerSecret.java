@@ -76,13 +76,6 @@ public class ServerSecret extends AuditedEntity implements Persistable<String> {
     }
 
 
-    /** 다른 KEK 로 다시 감싼다. 바꾼 사람과 앞부분은 그대로다 */
-    public void rewrap(String kekId, String sealedValue) {
-        this.kekId = kekId;
-        this.sealedValue = sealedValue;
-    }
-
-
     public boolean set() {
         return sealedValue != null;
     }

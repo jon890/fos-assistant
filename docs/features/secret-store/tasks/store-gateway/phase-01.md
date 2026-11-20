@@ -41,11 +41,11 @@
 
 ### 3. `crypto/domain/entity/ServerSecret.java`, `crypto/infra/ServerSecretRepository.java`
 
-엔티티는 `AuditedEntity` 를 잇고 `sealed(kekId, sealed, prefix, meta, by)`, `cleared(by)`, `rewrap(kekId, sealed)` 를 연다. 저장소는 `findByNameStartingWith`, `findByKekIdNotAndKekIdIsNotNull`, 이름으로 쓰기 잠금 조회(`@Lock(PESSIMISTIC_WRITE)`).
+엔티티는 `AuditedEntity` 를 잇고 `sealed(kekId, sealed, prefix, meta, by)`, `cleared(by)`, `rewrap(kekId, sealed)` 를 연다. 저장소는 `findByNameStartingWith`, `findByKekIdNotAndKekIdIsNotNull`, KEK 교체용 값 칸 갱신 쿼리 `rewrap(name, kekId, sealedValue)`(엔티티 저장을 거치지 않아 `updated_at` 이 그대로다). 잠금 조회는 두지 않는다(관리자가 사실상 한 명, 스펙 DECISION14).
 
 ### 4. `crypto/infra/DatabaseServerSecrets.java`
 
-`ServerSecrets` 구현. AAD 는 `("server_secret:" + name)` 의 UTF-8 바이트. `write` 와 `clear` 는 `@Transactional`(기본 전파 `REQUIRED`)이라 부른 쪽 트랜잭션이 있으면 참여하고 없으면 자기 트랜잭션을 연다. 둘 다 `TransactionSynchronizationManager` 의 커밋 뒤 콜백에서 캐시에 새 값(또는 비어 있음)을 넣고 세대를 올린다. info 로그는 `server secret written name={} by={}` 꼴로 이름과 사용자 번호만. `read` 는 캐시 → 없으면 세대를 읽어 두고 줄을 풀어 세대가 같을 때만 캐시에 넣는다. 풀지 못하면(KEK 없음, 태그 불일치) 이름과 예외 클래스 이름만 경고하고 `Optional.empty()`. `int rewrapStale()` 로 옛 KEK 줄을 다시 감싸고 KEK 가 없는 옛 줄 수를 경고한다. `void invalidateAll()` 은 캐시를 비우고 세대를 올린다(KEK 교체 뒤와 테스트 정리에 쓴다).
+`ServerSecrets` 구현. AAD 는 `("server_secret:" + name)` 의 UTF-8 바이트. `@Transactional` 은 application 에만 둘 수 있어(구조 규칙) `write` 와 `clear` 는 부른 쪽 트랜잭션에 참여한다. 값을 바꾸는 application 메서드가 트랜잭션을 연다. 둘 다 `TransactionSynchronizationManager` 의 커밋 뒤 콜백에서 캐시에 새 값(또는 비어 있음)을 넣고 세대를 올린다. info 로그는 `server secret written name={} by={}` 꼴로 이름과 사용자 번호만. `read` 는 캐시 → 없으면 세대를 읽어 두고 줄을 풀어 세대가 같을 때만 캐시에 넣는다. 풀지 못하면(KEK 없음, 태그 불일치) 이름과 예외 클래스 이름만 경고하고 `Optional.empty()`. `int rewrapStale()` 로 옛 KEK 줄을 다시 감싸고 KEK 가 없는 옛 줄 수를 경고한다. `void invalidateAll()` 은 캐시를 비우고 세대를 올린다(KEK 교체 뒤와 테스트 정리에 쓴다).
 
 ### 5. `crypto/application/DataKeyRewrapper.java`
 

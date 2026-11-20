@@ -4,6 +4,7 @@ import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.DatabaseServerSecrets;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class DataKeyRewrapper implements ApplicationRunner {
     private final KeyEncryptionKeys keks;
     private final DataKeyWriter writer;
     private final DatabaseServerSecrets serverSecrets;
+    private final TransactionTemplate transactions;
 
 
     @Override
@@ -38,7 +40,7 @@ public class DataKeyRewrapper implements ApplicationRunner {
             log.error("데이터 key 를 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }
         try {
-            serverSecrets.rewrapStale();
+            transactions.executeWithoutResult(status -> serverSecrets.rewrapStale());
         } catch (RuntimeException e) {
             log.error("서버 비밀값을 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }
