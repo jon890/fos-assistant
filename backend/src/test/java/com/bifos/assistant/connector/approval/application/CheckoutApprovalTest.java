@@ -295,7 +295,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(fills.get()).isEqualTo(1);
         var again = prepare(UUID.randomUUID().toString());
         assertThat(again.actionId()).isNull();
-        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE);
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE.text());
         assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
     }
 

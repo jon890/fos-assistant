@@ -59,7 +59,7 @@ phase 01 이 `shared/util/ToolFailureText` 를 만들었다. `alternative(failur
   - 「사진을 직접 올려 달라고 한다」 처럼 사용자에게 넘기라고만 하는 글이 `NEXT_PREFIX` 없이 끝나는 것이 없음을 위 두 조건이 함께 보장한다
 - `ConnectorPolicyEndpointTest` 와 `ToolGuardControllerTest` 의 막힘 사례마다 응답 `message` 의 마지막 줄이 `NEXT_PREFIX` 로 시작하거나 `ASK_USER` 와 같은지 본다. `[승인 대기]` 사례는 글이 그대로인지 본다. 이름이 `_MESSAGE` 로 끝나지 않는 글도 이 사례가 잡는다
 - `test/e2e/scenarios/connector-binding.ts` 의 고정 글(`BINDING_CHECK`, `BINDING_PENDING`, `BINDING_RESTART`, `NO_CONTEXT`)을 새 판정 글로 맞춘다. PR CI 는 E2E 를 기본으로 건너뛰므로 PR 에 `검사:전체` 라벨을 붙여 PR 에서 돌린다(라벨은 PR 을 연 쪽이 붙인다)
-- 기존 테스트의 기대 글을 맞춘다. 상수를 직접 비교하던 곳은 `.text()` 를 붙인다. 대상은 `grep -rlE "_MESSAGE|확인하지 못해 막았다|연결이 준비되지 않아" backend/src/test/java/com/bifos/assistant/connector backend/src/test/java/com/bifos/assistant/orchestration backend/src/test/java/com/bifos/assistant/mcp` 로 찾는다. `ConnectorPolicyEndpointTest`, `ToolGuardControllerTest`, `FinancialPrepareReplyTest`, `FinancialOrderOpeningTest`, `CheckoutApprovalTest`, `AttendedOnlyPrepareTest`, `ConnectorActionServiceTest`, `ConnectorBindingDriftTest`, `PurchaseLimitControllerTest` 가 든다
+- 기존 테스트의 기대 글을 맞춘다. 상수를 직접 비교하던 곳은 `.text()` 를 붙인다. 대상은 `grep -rlE "_MESSAGE|확인하지 못해 막았다|연결이 준비되지 않아" backend/src/test/java/com/bifos/assistant/connector backend/src/test/java/com/bifos/assistant/orchestration backend/src/test/java/com/bifos/assistant/mcp` 로 찾는다. `ConnectorPolicyEndpointTest`, `ToolGuardControllerTest`, `FinancialPrepareReplyTest`, `FinancialOrderOpeningTest`, `CheckoutApprovalTest`, `AttendedOnlyPrepareTest`, `ConnectorActionServiceTest`, `ConnectorBindingDriftTest`, `PurchaseLimitControllerTest` 를 살핀다(부분 문자열만 보는 곳은 그대로 통과한다). E2E 시나리오에 같은 글을 `===` 로 비교하는 곳이 있으면 phase 01 의 글까지 함께 맞춘다
 
 ## 검증
 
@@ -85,8 +85,10 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*ToolFail
 | `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialPrepareReplyTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialOrderOpeningTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/approval/application/CheckoutApprovalTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/approval/application/AttendedOnlyPrepareTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingDriftTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/PurchaseLimitControllerTest.java` | 수정 |
 | `test/e2e/scenarios/connector-binding.ts` | 수정 |
+| `test/e2e/scenarios/connector-policy.ts` | 수정 (phase 01 글 포함) |
+| `test/e2e/scenarios/mcp-principal.ts` | 수정 (phase 01 글 포함) |
+| `test/e2e/scenarios/memory-remember-mcp.ts` | 수정 (phase 01 글 포함) |
+| `test/e2e/scenarios/memory.ts` | 수정 (phase 01 글 포함) |
+| `test/e2e/scenarios/native-delegation-mcp.ts` | 수정 (phase 01 글 포함) |
+| `test/e2e/scenarios/proactive-check.ts` | 수정 (phase 01 글 포함) |
