@@ -28,6 +28,8 @@ import org.junit.jupiter.api.Test;
 class LinkImageFetcherTest {
     private static final byte[] PNG = {(byte)0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1, 2, 3};
     private static final byte[] JPEG = {(byte)0xff, (byte)0xd8, (byte)0xff, (byte)0xe0, 1, 2};
+    /** AVIF 머리(ftyp avif)다. 받는 네 형식이 아니라 머리 바이트로 판정해도 받지 않는다. */
+    private static final byte[] AVIF = {0, 0, 0, 0x1c, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f'};
     private static final String PUBLIC = "93.184.216.34";
 
     private final Map<String, String[]> dns = new HashMap<>();
@@ -240,7 +242,7 @@ class LinkImageFetcherTest {
     void rejectsNonImagesAndLargeImages() {
         html("https://shop.example.com/none", "<title>상품</title>");
         image("https://img.example.com/a.svg", "image/svg+xml", "<svg/>".getBytes(StandardCharsets.UTF_8));
-        image("https://img.example.com/a.avif", "image/avif", PNG);
+        image("https://img.example.com/a.avif", "image/avif", AVIF);
         image("https://img.example.com/fake.png", "image/png", JPEG);
         html("https://shop.example.com/avif", "<meta property=\"og:image\" content=\"https://img.example.com/a.avif\">");
         html("https://shop.example.com/page2", "<meta property=\"og:image\" content=\"https://shop.example.com/none\">");
@@ -259,6 +261,56 @@ class LinkImageFetcherTest {
         assertRejected(fetcher, "https://img.example.com/fake.png", Reason.NO_IMAGE);
         assertRejected(fetcher, "https://img.example.com/big.png", Reason.TOO_LARGE);
         assertRejected(fetcher, "https://img.example.com/liar.png", Reason.TOO_LARGE);
+    }
+
+
+    @Test
+    @DisplayName("응답 종류를 사진이 아닌 이름으로 적은 사진은 머리 바이트로 형식을 정해 받는다. 첫 주소와 대표 사진 주소 모두")
+    void sniffsImageWithWrongContentType() {
+        image("https://img.example.com/form.jpg", "multipart/form-data", JPEG);
+        image("https://img.example.com/octet.jpg", "application/octet-stream", JPEG);
+        pages.put("img.example.com/untyped.png", response(200, Map.of(), PNG));
+        html("https://shop.example.com/form", "<meta property=\"og:image\" content=\"https://img.example.com/form.jpg\">");
+        html("https://shop.example.com/octet", "<meta property=\"og:image\" content=\"https://img.example.com/octet.jpg\">");
+        LinkImageFetcher fetcher = fetcher(List.of(), List.of());
+
+        for (String link : List.of(
+            "https://img.example.com/form.jpg",
+            "https://img.example.com/octet.jpg",
+            "https://shop.example.com/form",
+            "https://shop.example.com/octet")) {
+            LinkImage image = fetcher.fetch(URI.create(link));
+            assertThat(image.contentType()).as(link).isEqualTo("image/jpeg");
+            assertThat(image.bytes()).as(link).isEqualTo(JPEG);
+        }
+        LinkImage untyped = fetcher.fetch(URI.create("https://img.example.com/untyped.png"));
+        assertThat(untyped.contentType()).isEqualTo("image/png");
+    }
+
+
+    @Test
+    @DisplayName("응답 종류가 사진이 아니고 머리 바이트도 받는 사진 형식이 아니면 NO_IMAGE 다. 첫 주소와 대표 사진 주소 모두")
+    void rejectsUntypedNonImageBytes() {
+        byte[] page = "<!doctype html><html><body>상품</body></html>".getBytes(StandardCharsets.UTF_8);
+        image("https://img.example.com/html.bin", "application/octet-stream", page);
+        pages.put("img.example.com/untyped", response(200, Map.of(), page));
+        image("https://img.example.com/form.svg", "multipart/form-data", "<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes(StandardCharsets.UTF_8));
+        image("https://img.example.com/form.avif", "multipart/form-data", AVIF);
+        html("https://shop.example.com/html", "<meta property=\"og:image\" content=\"https://img.example.com/html.bin\">");
+        html("https://shop.example.com/untyped", "<meta property=\"og:image\" content=\"https://img.example.com/untyped\">");
+        html("https://shop.example.com/svg", "<meta property=\"og:image\" content=\"https://img.example.com/form.svg\">");
+        LinkImageFetcher fetcher = fetcher(List.of(), List.of());
+
+        for (String link : List.of(
+            "https://img.example.com/html.bin",
+            "https://img.example.com/untyped",
+            "https://img.example.com/form.svg",
+            "https://img.example.com/form.avif",
+            "https://shop.example.com/html",
+            "https://shop.example.com/untyped",
+            "https://shop.example.com/svg")) {
+            assertRejected(fetcher, link, Reason.NO_IMAGE);
+        }
     }
 
 

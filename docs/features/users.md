@@ -12,6 +12,7 @@ covers: `backend/src/main/java/com/bifos/assistant/user/`, `backend/src/main/jav
 - 관리자가 사용자를 끄면 그 사용자의 다음 요청부터 막히고, 다시 켜면 다음 요청부터 통과한다.
 - 관리자의 사용자 목록은 마지막 로그인과 마지막 대화 시각을 보인다. 값이 없으면 「기록 없음」 이다.
 - 사람을 더하는 화면과 API 는 `ADMIN` 만 연다. `MEMBER` 역할 사용자는 둘 다 보지 못한다.
+- 배포 뒤 확인에 쓰는 평가 전용 사용자는 로그인하지 않고, 관리자 사용자 목록에 「평가용」 으로 보인다. 만들고 숨기는 방법은 [`agent-quality.md`](agent-quality.md) 가 갖는다.
 
 profile 을 사람마다 나누는 근거는 [ADR-002](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md), Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는 [ADR-018](../../backend/docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 에 있다.
 
@@ -183,7 +184,7 @@ profile 을 만드는 경로가 에이전트 만들기와 같아 MCP 등록과 �
 | 설정이 빈 목록이다 | Hermes 를 부르지 않는다 |
 | 기본 도구가 이미 다 켜져 있다 | 쓰지 않는다 |
 | profile 이 실행 공간 정책에 없다 | plugin 이 409 `sandbox_unavailable` 로 거절하면 셸·파일·사진 도구를 빼고 다시 쓴다. 경고 로그를 남긴다. `image_gen` 은 기다리는 목록에 남아 관리자에게 알림이 가고, 운영이 정책에 등록하면 Control Plane 이 5분 안에 스스로 켠다. 나머지 셸·파일 도구는 관리자가 에이전트 도구 화면에서 켠다 |
-| 정책에 없는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. 그 쓰기가 셸을 local 로 확정하기 때문이다. 경고 로그를 남긴다 |
+| 정책에 없는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. plugin 이 정책 밖 셸 저장을 거절한다. 경고 로그를 남긴다. 그 셸은 Control Plane 의 기동 작업이 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
 | Hermes 가 답하지 않거나 다른 오류로 거절한다 | 경고 로그만 남긴다. 로그인은 그대로 끝난다 |
 | 옛 plugin 이 `require_sandbox` 를 몰라 400 으로 거절한다 | 같다. 아무 도구도 켜지 않는다. plugin 을 먼저 배포한다 |
 

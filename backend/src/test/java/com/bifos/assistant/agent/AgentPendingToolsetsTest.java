@@ -151,6 +151,22 @@ class AgentPendingToolsetsTest {
 
 
     @Test
+    @DisplayName("평가 전용 사용자의 기본 비서는 실행 공간이 없어도 관리자에게 알리지 않는다")
+    void evaluationOwnerIsNotNoticed() {
+        jdbc.update("UPDATE app_user SET evaluation = TRUE WHERE id = ?", owner.id());
+        when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenReturn(List.of("web"));
+        doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "no sandbox"))
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
+
+        pending.attemptAll();
+
+        assertThat(waiting()).containsExactly("image_gen");
+        assertThat(notices()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("이미지 서비스 설정을 쓰지 못한 실패가 이어지면 관리자에게 알리고 계속 기다린다")
     void noticesAdminWhenWriteKeepsFailing() {
         when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenReturn(List.of("web"));

@@ -31,6 +31,8 @@ final class HermesCallFailure {
 
     /** 셸과 파일 도구를 켜는 설정 쓰기가 실행 공간이 없어 거절됐을 때 쓰는 메시지다. */
     private static final String SANDBOX_UNAVAILABLE_MESSAGE = "the isolated shell workspace is not configured";
+    /** 정책에 없는 profile 이라 거절했을 때 plugin 이 넣는 {@code reason} 값이다(ADR-20261120 / no-local-shell). */
+    private static final String SANDBOX_UNLISTED_REASON = "unlisted";
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -59,23 +61,28 @@ final class HermesCallFailure {
      *
      * <p>409 이고 응답 본문 JSON 의 {@code code} 칸이 {@link #SANDBOX_UNAVAILABLE_CODE} 일 때만 값이 있다. 본문을
      * 글자로 찾지 않는다. {@code detail} 같은 다른 칸에 같은 낱말이 들어 있어도 다른 거절로 본다. 돌려주는 예외는
-     * 거절이라는 사실을 지키고 오류 코드만 {@link ErrorCode#AGENT_SANDBOX_UNAVAILABLE} 로 바꾼다.
+     * 거절이라는 사실을 지키고 오류 코드만 {@link ErrorCode#AGENT_SANDBOX_UNAVAILABLE} 로 바꾼다. 본문의 {@code reason} 이
+     * {@code unlisted} 면 정책 밖 표시를 켠다.
      */
     static Optional<HermesRequestRejected> sandboxRejection(RestClientException cause) {
         if (!(cause instanceof RestClientResponseException response)
             || response.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
             return Optional.empty();
         }
+        boolean unlisted;
         try {
-            JsonNode code = JSON.readTree(response.getResponseBodyAsString()).get("code");
+            JsonNode body = JSON.readTree(response.getResponseBodyAsString());
+            JsonNode code = body == null ? null : body.get("code");
             if (code == null || !code.isTextual() || !SANDBOX_UNAVAILABLE_CODE.equals(code.asText())) {
                 return Optional.empty();
             }
+            JsonNode reason = body.get("reason");
+            unlisted = reason != null && reason.isTextual() && SANDBOX_UNLISTED_REASON.equals(reason.asText());
         } catch (JacksonException ex) {
             return Optional.empty();
         }
-        return Optional.of(
-            new HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, SANDBOX_UNAVAILABLE_MESSAGE, response));
+        return Optional.of(new HermesRequestRejected(
+            ErrorCode.AGENT_SANDBOX_UNAVAILABLE, SANDBOX_UNAVAILABLE_MESSAGE, response, unlisted));
     }
 
 

@@ -30,7 +30,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
-| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. 셸 계열 도구를 켤 때 신뢰한 정책에 등록된 profile 만 `sandbox_owner` 로 docker 실행 공간 설정을 쓴다. 미등록 profile 은 local 이다. 정책이 없거나 잘못됐으면 409 다(ADR-086) |
+| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. 셸 계열 도구를 켤 때 신뢰한 정책에 등록된 profile 만 `sandbox_owner` 로 docker 실행 공간 설정을 쓴다. 미등록 profile 은 409 `sandbox_unavailable`, `reason: unlisted` 다. 정책이 없거나 잘못됐으면 `reason` 없는 409 다(ADR-086, ADR-20261120 / no-local-shell) |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 | `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |

@@ -317,7 +317,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             optionalBoolean(body, "plugin_updated", false),
             optionalBoolean(body, "reload_pending", false),
             optionalBoolean(body, "cycle_available", false),
-            optionalBoolean(body, "cycle_off", false));
+            optionalBoolean(body, "cycle_off", false),
+            ConnectorSkippedSkillsDecoder.read(body.get("skipped_skills"), connectorId));
     }
 
 

@@ -32,6 +32,9 @@ import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
+import com.bifos.assistant.quality.domain.QualityRun;
+import com.bifos.assistant.quality.domain.type.QualityRunKind;
+import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
@@ -95,6 +98,7 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, HermesSessionBinding.of(unique, unique, execution, "root", "parent"));
         add(entityManager, rows, ExecutionContextSource.of(execution.id(), 0, "MEMORY", "memory:" + memory.id(), "FULL", "FRESH"));
         add(entityManager, rows, Notification.of(user.id(), NotificationKind.TASK_SUCCEEDED, "알림", "본문", null));
+        add(entityManager, rows, QualityRun.start(user.groupId(), QualityRunKind.DEPLOY_CHECK, QualityRunTrigger.PIPELINE, user.id(), BUSINESS));
         add(entityManager, rows, ChatArtifact.of(conversation.id(), 1L, unique, 1L));
         add(entityManager, rows, ChatAttachment.of(conversation.id(), user.id(), "audit.txt", "text/plain", 1, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ResultDelivery.opened(conversation.id(), "{\"version\":1,\"items\":[]}", null, BUSINESS));
