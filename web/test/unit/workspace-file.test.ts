@@ -53,18 +53,18 @@ test("파일 주소는 조각마다 인코딩하고 내려받기는 download=1 �
   assert.equal(fileUrl("a.txt"), "/api/workspace/files/a.txt");
 });
 
-test("경로 줄은 「파일 공간」 부터 연 디렉터리까지다", () => {
+test("경로 줄은 「작업 폴더」 부터 연 디렉터리까지다", () => {
   assert.deepEqual(crumbs("a/b"), [
-    { name: "파일 공간", path: "" },
+    { name: "작업 폴더", path: "" },
     { name: "a", path: "a" },
     { name: "b", path: "a/b" },
   ]);
-  assert.deepEqual(crumbs(""), [{ name: "파일 공간", path: "" }]);
+  assert.deepEqual(crumbs(""), [{ name: "작업 폴더", path: "" }]);
 });
 
 test("경로 줄은 빈 조각을 건너뛴다", () => {
   assert.deepEqual(crumbs("a//b/"), [
-    { name: "파일 공간", path: "" },
+    { name: "작업 폴더", path: "" },
     { name: "a", path: "a" },
     { name: "b", path: "a/b" },
   ]);
@@ -81,9 +81,9 @@ test("어느 조각에든 %, ;, \\ 가 있으면 주소로 쓸 수 없다", () =
 test("경로를 잇고 화면 주소를 만든다", () => {
   assert.equal(joinPath("", "a.txt"), "a.txt");
   assert.equal(joinPath("a", "b.txt"), "a/b.txt");
-  assert.equal(explorerHref(""), "/files");
-  assert.equal(explorerHref("a b"), "/files?path=a+b");
-  assert.equal(explorerHref("a", "a/c.txt"), "/files?path=a&file=a%2Fc.txt");
+  assert.equal(explorerHref(""), "/files/workspace");
+  assert.equal(explorerHref("a b"), "/files/workspace?path=a+b");
+  assert.equal(explorerHref("a", "a/c.txt"), "/files/workspace?path=a&file=a%2Fc.txt");
 });
 
 test("따옴표 안의 쉼표와 줄바꿈을 지킨다", () => {

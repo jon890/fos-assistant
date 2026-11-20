@@ -26,7 +26,6 @@ import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
-import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
@@ -63,9 +62,6 @@ class GeneratedImageTurnTest {
 
     @Autowired
     ArtifactVaultService vault;
-
-    @Autowired
-    ArtifactAutoVaultSetting setting;
 
     @Autowired
     ArtifactCleaner cleaner;
@@ -112,7 +108,6 @@ class GeneratedImageTurnTest {
             CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id()));
         conversation = conversations.save(Conversation.startedBy(owner.id(), "그림", agent.id(), NOW));
         folders.add(conversation.id());
-        setting.change(owner.id(), true);
     }
 
 
@@ -189,19 +184,9 @@ class GeneratedImageTurnTest {
 
 
     @Test
-    @DisplayName("자동 보관을 끈 사용자와 중지한 답의 그림은 보관하지 않고 직접 보관하면 보관본이 생긴다")
-    void skipsAutoVaultWhenOffOrStopped() {
-        setting.change(owner.id(), false);
-        save("call_1", "끈 그림", png(4));
-        ChatMessage answer = answer("만들었어요");
-        artifactService.recordTurn(conversation.id(), answer.id(), NOW);
-        autoVault.afterCompletedTurn(conversation.id(), answer.id());
-
-        assertThat(bound(answer)).singleElement().extracting(ChatArtifact::autoVaultState).isNull();
-        assertThat(vault.list(owner.id())).isEmpty();
-
+    @DisplayName("중지한 답의 그림은 보관하지 않고 직접 보관하면 보관본이 생긴다")
+    void skipsAutoVaultWhenStopped() {
         // 중지한 답은 ChatTurnLifecycle 이 자동 보관을 부르지 않는다. 묶기만 한다.
-        setting.change(owner.id(), true);
         save("call_2", "중지한 그림", png(5));
         ChatMessage stopped = answer("중지됨");
         artifactService.recordTurn(conversation.id(), stopped.id(), NOW.plusSeconds(60));
