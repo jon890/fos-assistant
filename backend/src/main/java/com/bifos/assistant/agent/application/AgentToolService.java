@@ -20,11 +20,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 에이전트 toolset의 조회, 권한 판정, Hermes 설정 반영을 맡는다. */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AgentToolService {
 
@@ -60,6 +62,23 @@ public class AgentToolService {
         if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())
             .contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
             throw new ApiException(ErrorCode.AGENT_TOOLS_NOT_APPLIED, "original inspection tool was not applied");
+        }
+    }
+
+
+    /**
+     * 이 에이전트의 셸·파일 도구가 실행 공간에서 도는가(ADR-091). 실행 입력의 파일 공간 규칙을 고르는 데 쓴다.
+     *
+     * <p>Hermes 에서 켜진 도구를 읽지 못하면 실행 공간이 없다고 본다. 이 값 때문에 turn 을 실패시키지 않는다.
+     */
+    public boolean runsInSandbox(Agent agent) {
+        try {
+            return AgentToolPolicy.hasSandboxToolset(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()));
+        } catch (RuntimeException ex) {
+            log.warn(
+                "could not read toolsets for the sandbox rule agentId={} exceptionClass={}", agent.id(),
+                ex.getClass().getSimpleName());
+            return false;
         }
     }
 
