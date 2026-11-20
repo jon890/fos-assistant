@@ -18,6 +18,7 @@ TOOL = "attachment_inspect"
 MAX_BYTES = 10 * 1024 * 1024
 TIMEOUT = 30
 FAILURE = ask_user("원본 사진을 받지 못해 판독하지 못했다. 재업로드를 요구하지 말고 실패를 알린다.")
+INVALID_ARGS = alternative("인자 형식이 올바르지 않다", "attachment_id 와 region 을 도구 설명의 형식에 맞게 고쳐 다시 부른다")
 REGION_REQUIRED = alternative("전체 원본의 안전 한도를 넘었다.",
                               "표시 치수 안의 작은 영역을 지정한다. 위치를 모르면 overview=true로 전체 개요를 먼저 보고 원본 영역을 고른다. "
                               "사진별 3회 안에서 다시 조회하고 실패하면 판독하지 못했다고 알린다")
@@ -97,8 +98,10 @@ def authorize(args, session_id, tool_call_id, isolated=False):
 
 def handle(args, **_):
     deadline = time.monotonic() + TIMEOUT
-    if not valid_args(args) or not isinstance(args.get("_fos_ctx"), dict) \
-            or not isinstance(args.get("_fos_inspect"), dict):
+    if not valid_args(args):
+        # 인자만 고치면 되는 호출이다. 판독하지 못했다고 끝내지 않는다(fos-assistant 스펙 tool-fallback REQ3).
+        return failure(INVALID_ARGS, "invalid_args")
+    if not isinstance(args.get("_fos_ctx"), dict) or not isinstance(args.get("_fos_inspect"), dict):
         return failure()
     if args.get("overview") is False:
         args = {key: value for key, value in args.items() if key != "overview"}

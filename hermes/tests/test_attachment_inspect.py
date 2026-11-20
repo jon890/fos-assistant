@@ -76,7 +76,7 @@ class AttachmentInspectTest(unittest.TestCase):
         invalid = {**args, "unknown": True}
         self.assertFalse(self.inspect.valid_args(invalid))
         with patch.object(self.inspect, "supervise") as supervise:
-            self.assertEqual(self.inspect.handle(invalid), self.inspect.failure())
+            self.assertEqual(self.inspect.handle(invalid), self.inspect.failure(self.inspect.INVALID_ARGS, "invalid_args"))
             supervise.assert_not_called()
 
     def test_top_level_compression_and_subagent_chains_are_distinct(self):

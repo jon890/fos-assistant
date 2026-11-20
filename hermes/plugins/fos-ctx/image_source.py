@@ -50,23 +50,30 @@ MAX_ECHO_CHARS = 80
 EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
 # 문제 줄마다 끝 줄(`next_step.py`)이 붙는다. 글 전체는 마지막 문제의 끝 줄로 끝난다.
+# 참고 사진을 쓰지 못하면 설명만으로 비슷하게 그려 넣지 않고 먼저 알린다(fos-assistant 스펙 tool-fallback REQ7).
+NO_DRAW = "설명만으로 비슷하게 그려 넣지 말고, "
+ASK_PHOTO = "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"
 NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
-                            "파일 경로와 맨 주소는 쓰지 않는다", "attachment:, generated:, link: 가리킴으로 고쳐 다시 부른다")
-TOO_MANY = alternative("한 번에 쓸 수 있는 사진은 %d장까지다" % MAX_SOURCES, "사진을 %d장 이하로 줄여 다시 부른다" % MAX_SOURCES)
+                            "파일 경로와 맨 주소는 쓰지 않는다",
+                            "사용자가 이 대화에 보낸 주소면 link: 로 고쳐 다시 부른다. 비서가 찾은 주소처럼 넘길 수 없으면 " + NO_DRAW
+                            + "그 사진을 넘길 수 없다는 것과 " + ASK_PHOTO)
+# 어느 사진을 뺄지는 사용자가 정한다(fos-assistant 스펙 generated-image DECISION25, DECISION32).
+TOO_MANY = ask_user("한 번에 쓸 수 있는 사진은 %d장까지다. 어느 사진을 뺄지 사용자에게 묻는다" % MAX_SOURCES)
 UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다",
-                      "이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다")
+                      "이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다. 없으면 " + NO_DRAW
+                      + "그 사진을 쓸 수 없다는 것과 " + ASK_PHOTO)
 GONE = ask_user("지웠거나 보관 기간이 지나 쓸 수 없다")
 # 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
 GONE_GENERATED = alternative("지웠거나 보관 기간이 지나 쓸 수 없다",
                              "같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
                              "앞 그림을 참고하지 못했다고 답에 적는다. 그런 장면이 아니면 사용자에게 바로 알린다")
 LINK_REASONS = {
-    "IMAGE_SOURCE_LINK_BLOCKED": ask_user("열 수 없는 주소다"),
-    "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", "다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다"),
-    "IMAGE_SOURCE_LINK_TOO_LARGE": alternative("사진이 너무 크다", "다른 방법이 없으니 해 본 것을 알리고 더 작은 사진을 올려 달라고 묻는다"),
-    "IMAGE_SOURCE_LINK_FAILED": alternative("링크를 열지 못했다. 쇼핑몰이 막았을 수 있다", "다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다"),
+    "IMAGE_SOURCE_LINK_BLOCKED": ask_user("열 수 없는 주소다. 설명만으로 비슷하게 그려 넣지 않는다"),
+    "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", NO_DRAW + "그 사진을 받지 못한 것과 " + ASK_PHOTO),
+    "IMAGE_SOURCE_LINK_TOO_LARGE": alternative("사진이 너무 크다", NO_DRAW + "더 작은 사진을 올려 달라고 먼저 알린다"),
+    "IMAGE_SOURCE_LINK_FAILED": alternative("링크를 열지 못했다. 쇼핑몰이 막았을 수 있다", NO_DRAW + "그 사진을 받지 못한 것과 " + ASK_PHOTO),
 }
-FAILED = alternative("사진을 받지 못했다", "다른 방법이 없으니 잠시 뒤 다시 해 달라고 알린다")
+FAILED = alternative("사진을 받지 못했다", NO_DRAW + "잠시 뒤 다시 해 달라고 알린다")
 # 링크를 쓰지 못했을 때 그 줄의 끝 줄 앞에 넣는다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
 LINK_NEXT_SCENE = ("같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
                    "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다. 그런 장면이 아니면 아래 줄을 따른다")

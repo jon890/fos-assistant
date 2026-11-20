@@ -204,13 +204,13 @@ class LinkTest(ImageSourceFixture):
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
                      "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 같은 인물의 다음 장면을",
-                     "  다음 방법: 다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다",
+                     "  다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
             self.assertIn(line, decision["message"])
         # 줄마다 끝 줄이 붙고 글 전체는 마지막 문제의 끝 줄로 끝난다(tool-fallback 스펙 REQ3)
-        self.assertTrue(decision["message"].endswith("  다음 방법: 이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다"))
+        self.assertTrue(decision["message"].endswith("사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"))
 
     def test_attachment_received_but_link_failed_blocks_and_forgets(self):
         """첨부는 받았어도 링크 하나를 못 받으면 막고, 받은 첨부 사본을 지우며 링크를 기억하지 않는다."""

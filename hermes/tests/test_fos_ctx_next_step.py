@@ -12,7 +12,7 @@ import test_fos_ctx as base
 # 모듈마다 모델에게 돌려주는 실패 글 상수다. 성공 글과 글을 잇는 틀(HEAD)은 넣지 않는다.
 FAILURE_CONSTANTS = {
     "image_source": ("NOT_REFERENCE", "TOO_MANY", "UNKNOWN", "GONE", "GONE_GENERATED", "FAILED", "OLD_SERVER", "NO_CONTEXT"),
-    "attachment_inspect": ("FAILURE", "REGION_REQUIRED"),
+    "attachment_inspect": ("FAILURE", "INVALID_ARGS", "REGION_REQUIRED"),
     "generated_image": ("FAILED_MESSAGE",),
     "approval_guard": ("DANGEROUS_COMMAND_MESSAGE", "APPROVAL_WRITE_MESSAGE", "COMPUTER_USE_MESSAGE"),
     "connector_policy": ("POLICY_BLOCK_MESSAGE", "CONTEXT_BLOCK_MESSAGE", "UNKNOWN_SERVER_MESSAGE",
@@ -51,10 +51,24 @@ class FailureTextTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(text.rstrip().endswith("올려 달라고 한다"), text)
 
-    def test_link_without_image_asks_after_saying_what_was_tried(self):
-        """링크에서 사진을 찾지 못하면 해 본 것을 알리고 묻는 다음 방법을 준다."""
+    def test_link_without_image_asks_for_a_photo_or_link(self):
+        """링크에서 사진을 찾지 못하면 같은 링크를 다시 부르지 않고 사진이나 링크를 보내 달라고 먼저 알리게 한다."""
         text = self.module("image_source").LINK_REASONS["IMAGE_SOURCE_LINK_NO_IMAGE"]
-        self.assertTrue(text.endswith("다음 방법: 다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다"))
+        self.assertTrue(text.endswith("다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 "
+                                      "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"))
+
+    def test_reference_photo_failures_do_not_draw_a_lookalike(self):
+        """참고 사진을 쓰지 못한 글은 비슷하게 그려 넣지 말고 사진이나 링크를 보내 달라고 먼저 알리게 한다(스펙 REQ7)."""
+        image_source = self.module("image_source")
+        texts = [image_source.NOT_REFERENCE, image_source.UNKNOWN, image_source.FAILED,
+                 *(image_source.LINK_REASONS[code] for code in
+                   ("IMAGE_SOURCE_LINK_NO_IMAGE", "IMAGE_SOURCE_LINK_FAILED", "IMAGE_SOURCE_LINK_TOO_LARGE", "IMAGE_SOURCE_LINK_BLOCKED"))]
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertIn("비슷하게 그려 넣지", text)
+        for text in (image_source.NOT_REFERENCE, image_source.UNKNOWN, image_source.LINK_REASONS["IMAGE_SOURCE_LINK_NO_IMAGE"]):
+            with self.subTest(text=text):
+                self.assertIn("사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다", text)
 
     def test_blank_next_step_is_rejected(self):
         """다음 방법이 빈 실패 글은 만들 수 없다."""

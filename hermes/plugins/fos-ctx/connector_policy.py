@@ -33,7 +33,8 @@ POLICY_BLOCK_MESSAGE = alternative("fos-ctx: 이 도구 호출의 사용 정책�
 CONTEXT_BLOCK_MESSAGE = ask_user("fos-ctx: 이 도구 호출의 실행 맥락이 없어 막았다.")
 UNKNOWN_SERVER_MESSAGE = ask_user("fos-ctx: 이 연결에 등록되지 않은 도구라 막았다. 다시 부르지 않는다.")
 ARGS_TOO_LARGE_MESSAGE = alternative("fos-ctx: 인자가 너무 커서 실행하지 않았다.", "인자를 나눠서 다시 부른다")
-CODE_EXECUTION_MESSAGE = alternative("fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다.", "코드 실행 밖에서 그 도구를 직접 부른다")
+# 코드 실행으로 플러그인을 부르는 것은 정책으로 막힌 것이라 바로 알린다(fos-assistant 스펙 tool-fallback REQ2).
+CODE_EXECUTION_MESSAGE = ask_user("fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다.")
 # Control Plane 이 판정 응답에 싣는 결제 넘기기 맥락을 넣는 인자 이름이다. 모델이 정하지 못하게 늘 덮어쓴다.
 PAYMENT_ARG = "_fos_payment"
 PAYMENT_CONTEXT_KEYS = {"v", "handed_off_at_ms", "final_amount_krw", "expected_total_krw", "url"}
