@@ -831,10 +831,16 @@ class ConnectorAgentSkillTest(ConnectorGateCase):
 
     def test_invalid_agent_skills_leave_the_connector_out(self):
         """경로, 키, 요구 env, 이름 겹침, 앞머리, 파일 수 가운데 하나라도 틀리면 카탈로그에서 뺀다."""
-        outside = self.base / "outside-skills"
-        outside.mkdir()
+        def outside_the_plugin():
+            # 사례마다 임시 폴더가 새로 생기므로, plugin 밖 디렉터리도 그 안에서 만든다. 없는 경로와 구분하려는 것이다.
+            skill = self.base / "outside-skills" / "report"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: demo-report\n---\n본문\n", encoding="utf-8")
+            self.declare({"path": "../outside-skills"})
 
         def linked():
+            outside = self.base / "outside-skills"
+            outside.mkdir()
             (self.connector_root / "agent-link").symlink_to(outside)
             self.declare({"path": "./agent-link"})
 
@@ -860,7 +866,7 @@ class ConnectorAgentSkillTest(ConnectorGateCase):
 
         cases = (
             ("not an object", lambda: self.declare("./agent-skills")),
-            ("path outside the plugin", lambda: self.declare({"path": "../outside-skills"})),
+            ("path outside the plugin", outside_the_plugin),
             ("missing directory", lambda: self.declare({"path": "./no-such-dir"})),
             ("linked directory", linked),
             ("unknown key", with_skill({"path": "./agent-skills", "extra": True})),
