@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { mermaidRenderId } from "@/lib/dev-docs/mermaid";
+import { mermaidRenderId } from "@/lib/mermaid";
 
 type MermaidApi = (typeof import("mermaid"))["default"];
 
