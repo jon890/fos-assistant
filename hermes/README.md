@@ -98,9 +98,9 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 플러그인 설치에도 같은 검사를 적용한다.
 API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽기 전용으로 붙여 막는다. 실제 생성 시점의 검증은 Docker socket proxy가 맡는다.
 
-정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
+유효한 정책이 profile 에 적용되면 plugin 은 아래 `terminal:` 전체를 쓴다.
 정책이 적용되지 않는 named profile 의 셸 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. `terminal:` 은 바꾸지 않는다. local 로 켜지 않는다([ADR-20261120 / no-local-shell](../docs/adr/ADR-20261120-no-local-shell.md)).
-이미 docker 였다가 정책에서 빠진 profile 도 같다. Control Plane 은 기동할 때 이 `reason` 을 보고 그 에이전트의 실행 공간 도구를 끈다.
+이미 docker 를 쓰던 profile 에 정책이 더 이상 적용되지 않을 때도 같다. Control Plane 은 기동 점검 표시가 남은 에이전트에서만 이 `reason` 을 보고 실행 공간 도구를 끈다.
 정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 `reason` 없는 409 로 거절한다.
 요청 본문의 `require_sandbox` 는 옛 Control Plane 호환으로 받고 도구 저장의 판정은 바꾸지 않는다.
 
