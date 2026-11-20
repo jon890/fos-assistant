@@ -37,27 +37,26 @@ final class LinkPageParts {
 
     /** 페이지 글에서 대표 사진 주소의 글을 찾는다. 엔티티는 푼다. 없으면 빈 값이다. */
     static Optional<String> previewImage(String html) {
-        String lower = html.toLowerCase(Locale.ROOT);
         String found = null;
         int rank = PREVIEW_NAMES.size();
         int from = 0;
         // 여기까지는 '>' 가 없다고 이미 본 자리다. 닫히지 않은 태그가 이어져도 같은 구간을 다시 훑지 않아 전체가 선형이다.
         int noCloseUntil = 0;
         while (true) {
-            int start = lower.indexOf("<meta", from);
+            int start = indexOfMeta(html, from);
             if (start < 0) {
                 break;
             }
             int afterName = start + "<meta".length();
             from = afterName;
-            if (afterName < lower.length() && !isTagBoundary(lower.charAt(afterName))) {
+            if (afterName < html.length() && !isTagBoundary(html.charAt(afterName))) {
                 continue;
             }
             // '>' 는 태그 길이 상한 안에서만 찾는다. 페이지 끝까지 찾으면 닫히지 않은 태그마다 끝까지 훑어 다시 제곱이 된다.
             int limit = start + MAX_TAG_CHARS;
-            int end = indexWithin(lower, '>', Math.max(afterName, noCloseUntil), limit);
+            int end = indexWithin(html, '>', Math.max(afterName, noCloseUntil), limit);
             if (end < 0) {
-                noCloseUntil = Math.max(noCloseUntil, Math.min(lower.length(), limit));
+                noCloseUntil = Math.max(noCloseUntil, Math.min(html.length(), limit));
                 continue;
             }
             from = end + 1;
@@ -69,6 +68,20 @@ final class LinkPageParts {
             }
         }
         return Optional.ofNullable(found).map(LinkPageParts::decodeEntities).map(String::trim);
+    }
+
+
+    /**
+     * 원문에서 {@code <meta} 를 대소문자 없이 찾는다. 소문자 사본을 만들지 않는다. {@code İ}(U+0130)처럼 소문자로 바꾸면 길이가 달라지는 글자가
+     * 앞에 있으면 사본의 위치로 원문을 잘라 태그가 어긋나기 때문이다.
+     */
+    private static int indexOfMeta(String html, int from) {
+        for (int i = from; i + "<meta".length() <= html.length(); i++) {
+            if (html.charAt(i) == '<' && html.regionMatches(true, i, "<meta", 0, "<meta".length())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
 

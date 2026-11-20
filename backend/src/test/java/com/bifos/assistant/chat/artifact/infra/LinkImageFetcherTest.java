@@ -263,6 +263,18 @@ class LinkImageFetcherTest {
 
 
     @Test
+    @DisplayName("소문자로 바꾸면 길이가 달라지는 글자(U+0130)가 앞에 있어도 대표 사진 meta 를 원문 그대로 읽는다")
+    void readsPreviewAfterLengthChangingCharacters() {
+        image("https://img.example.com/a.png", "image/png", PNG);
+        html("https://shop.example.com/turkish",
+            "<title>" + "\u0130".repeat(40) + "</title><META property=\"og:image\" content=\"https://img.example.com/a.png\">");
+        LinkImageFetcher fetcher = fetcher(List.of(), List.of());
+
+        assertThat(fetcher.fetch(URI.create("https://shop.example.com/turkish")).bytes()).isEqualTo(PNG);
+    }
+
+
+    @Test
     @DisplayName("페이지는 앞 상한까지만 읽고 그 뒤의 meta 는 찾지 않는다")
     void readsOnlyPagePrefix() {
         image("https://img.example.com/a.png", "image/png", PNG);
