@@ -7,6 +7,7 @@ import com.bifos.assistant.usage.tree.application.dto.RecentFailures;
 import com.bifos.assistant.usage.tree.application.dto.RootExecutionPage;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.FailedRootExecutionRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RootExecutionQuery {
 
     private final AgentExecutionRepository executions;
+    private final FailedRootExecutionRepository failedRoots;
     private final ConversationPublicIds conversations;
 
 
@@ -66,8 +68,8 @@ public class RootExecutionQuery {
         if (userIds.isEmpty()) {
             return new RecentFailures(0, List.of());
         }
-        long total = executions.countFailedRootsSince(userIds, since);
-        List<FailedRoot> recent = executions.findFailedRootsSince(userIds, since, PageRequest.of(0, limit)).stream()
+        long total = failedRoots.countFailedRootsSince(userIds, since);
+        List<FailedRoot> recent = failedRoots.findFailedRootsSince(userIds, since, PageRequest.of(0, limit)).stream()
             .map(row -> new FailedRoot(row.id(), row.userId(), row.agentName(), row.startedAt(), row.errorCode()))
             .toList();
         return new RecentFailures(total, recent);

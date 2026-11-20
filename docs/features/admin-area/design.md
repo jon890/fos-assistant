@@ -34,7 +34,7 @@
 | `GET /api/v1/admin/overview/failures` | `requireAdmin` | `{since, total, recent: [{id, userName, agentName, startedAt, errorCode, mine}]}` |
 | `GET /api/v1/admin/overview/monthly` | `requireAdmin` | `{month, currency, totalExecutions, subscriptionExecutions, actualCostMicros, incomplete}`. `incomplete` 는 `unpricedExecutions`, 금액을 확인하지 못한 도우미(`pendingSubagents + unconfirmedSubagents + unpricedSubagents`), `observationIncompleteExecutions` 가운데 하나라도 0보다 크면 참이다(스펙 DECISION11) |
 
-**실패 질의.** `AgentExecutionRepository` 에 둘을 더한다. 둘 다 같은 조건이다.
+**실패 질의.** `usage.execution.infra` 에 `FailedRootExecutionRepository` 를 새로 두고 둘을 더한다. `AgentExecutionRepository` 는 파일 길이 상한(500줄)에 닿아 있다. 둘 다 같은 조건이다.
 
 - 조건: `e.userId in :userIds`, `e.rootExecutionId is null`, `e.startedAt >= :since`, `e.status <> RUNNING`, 그리고 `e.status = FAILED` 이거나 `e.errorCode is not null`
 - 수: `count(e)`

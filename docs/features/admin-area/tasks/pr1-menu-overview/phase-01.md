@@ -36,7 +36,7 @@
 ### 2. `usage` 의 실패 질의와 요약
 
 - `backend/src/main/java/com/bifos/assistant/usage/execution/domain/FailedExecutionRow.java`(record): `Long id, Long userId, String agentName, Instant startedAt, String errorCode`.
-- `AgentExecutionRepository` 에 둘을 더한다. 조건은 같다: `e.userId in :userIds and e.rootExecutionId is null and e.startedAt >= :since and e.status <> RUNNING and (e.status = FAILED or e.errorCode is not null)`.
+- `backend/src/main/java/com/bifos/assistant/usage/execution/infra/FailedRootExecutionRepository.java`(`Repository<AgentExecution, Long>`)를 새로 두고 둘을 더한다. `AgentExecutionRepository` 는 파일 길이 상한(500줄)에 닿아 있어 더하지 않는다. 조건은 같다: `e.userId in :userIds and e.rootExecutionId is null and e.startedAt >= :since and e.status <> RUNNING and (e.status = FAILED or e.errorCode is not null)`.
   - `long countFailedRootsSince(Collection<Long> userIds, Instant since)`
   - `List<FailedExecutionRow> findFailedRootsSince(Collection<Long> userIds, Instant since, Pageable pageable)`: `select new ...FailedExecutionRow(e.id, e.userId, a.name, e.startedAt, e.errorCode) from AgentExecution e left join Agent a on a.id = e.agentId where ... order by e.startedAt desc, e.id desc`. 조인의 선례는 같은 파일의 `sumByAgentBetween` 이다.
 - `backend/src/main/java/com/bifos/assistant/usage/tree/application/dto/FailedRoot.java`(record, 칸은 위와 같다)와 `RecentFailures.java`(record `long total, List<FailedRoot> recent`).
@@ -91,7 +91,8 @@ node --test test/repo/doc-links.test.ts test/repo/doc-code-references.test.ts
 | `backend/src/main/java/com/bifos/assistant/user/infra/AppUserRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/user/application/UserDisplayNameService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/domain/FailedExecutionRow.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정(주석) |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/FailedRootExecutionRepository.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/tree/application/dto/FailedRoot.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/tree/application/dto/RecentFailures.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/tree/application/RootExecutionQuery.java` | 수정 |

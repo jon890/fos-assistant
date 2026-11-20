@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -34,6 +35,7 @@ class AdminOverviewServiceTest {
         Clock.fixed(Instant.parse("2026-11-20T03:00:00Z"), ZoneOffset.UTC));
 
 
+    @DisplayName("요약 탭이 따로 알리는 세 경우 가운데 하나라도 있으면 금액이 적을 수 있다고 표시한다")
     @ParameterizedTest(name = "[{index}] 가격 없음 {0}, 대기 {1}, 확인 못 함 {2}, 도우미 가격 없음 {3}, 관측 미확인 {4} → {5}")
     @CsvSource({
         "0, 0, 0, 0, 0, false",
