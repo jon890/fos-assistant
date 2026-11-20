@@ -6,6 +6,7 @@ import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentConnectionsSection } from "./agent-connections-section";
@@ -29,6 +30,7 @@ import {
 import { fetchPersona } from "@/lib/agent-api";
 import type { AgentConnectionsList } from "@/lib/agent-connection";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
+import { PAGE_HEADS } from "@/lib/page-head";
 import type { SkillListView } from "@/lib/skill";
 
 /** 서버가 읽어 온 값이거나, 읽지 못했을 때 화면에 보일 안내다. */
@@ -54,8 +56,10 @@ type Props = {
   /** 이 에이전트가 요청자의 기본 비서이면 참이다. 「공개와 삭제」 절이 지우기 단추를 감춘다. */
   primary?: boolean;
   adminError: string | null;
-  /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
+  /** 에이전트를 지운 뒤 돌아갈 목록 주소다. 일반 화면의 뒤로 가기도 여기로 간다. */
   listHref: string;
+  /** 관리자 영역에서 그리면 참이다. 관리자 영역은 화면 머리 틀을 쓰지 않고 지금 폭으로 감싼다. */
+  admin: boolean;
   /** 이 에이전트와 새 대화를 여는 주소다. 요청자가 대화할 수 있는 에이전트일 때만 있다. */
   chatHref?: string | null;
   /** 「소개」 절의 처음 값이다. 목록에서 찾지 못하면 없고 절을 그리지 않는다. */
@@ -101,6 +105,7 @@ export function AgentDetailBody({
   primary = false,
   adminError,
   listHref,
+  admin,
   chatHref = null,
   introduction,
 }: Props) {
@@ -126,33 +131,19 @@ export function AgentDetailBody({
     setPersona(await readPersona(code));
   }
 
-  return (
+  // 절 부품은 폭을 갖지 않는다. 폭과 제목은 아래에서 영역에 맞게 감싼다.
+  const sections = (
     <>
-      {chatHref ? (
-        <div className="mx-auto mb-2 flex w-full max-w-2xl justify-end">
-          <Button asChild variant="outline" size="sm">
-            <Link href={chatHref}>
-              <MessageSquare aria-hidden="true" />
-              대화하기
-            </Link>
-          </Button>
-        </div>
-      ) : null}
       {persona === null ? (
-        <div className="mx-auto w-full max-w-2xl">
-          <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-          <Notice variant="info">
-            이 에이전트의 성격은 주인만 볼 수 있어요.
-          </Notice>
-        </div>
+        <Notice variant="info">
+          이 에이전트의 성격은 주인만 볼 수 있어요.
+        </Notice>
       ) : (
         <>
           {adminError ? (
-            <div className="mx-auto mb-8 w-full max-w-2xl">
-              <Notice variant="error" role="alert">
-                관리 정보를 불러오지 못했어요. {adminError}
-              </Notice>
-            </div>
+            <Notice variant="error" role="alert" className="mb-8">
+              관리 정보를 불러오지 못했어요. {adminError}
+            </Notice>
           ) : null}
           {persona.ok ? (
             <PersonaEditor
@@ -161,12 +152,9 @@ export function AgentDetailBody({
               initialPersona={persona.data}
             />
           ) : (
-            <div className="mx-auto w-full max-w-2xl">
-              <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <Notice variant="error" role="alert">
-                {persona.message}
-              </Notice>
-            </div>
+            <Notice variant="error" role="alert">
+              {persona.message}
+            </Notice>
           )}
         </>
       )}
@@ -190,7 +178,7 @@ export function AgentDetailBody({
       ) : (
         <section
           aria-label="이 에이전트가 쓰는 연결"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+          className="mt-8 rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
           <Notice variant="error" role="alert" className="mt-3">
@@ -210,7 +198,7 @@ export function AgentDetailBody({
       ) : (
         <section
           aria-label="도구"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+          className="mt-8 rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">도구</h2>
           <Notice variant="error" role="alert" className="mt-3">
@@ -223,7 +211,7 @@ export function AgentDetailBody({
       ) : (
         <section
           aria-label="스킬"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+          className="mt-8 rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">스킬</h2>
           <Notice variant="error" role="alert" className="mt-3">
@@ -239,7 +227,7 @@ export function AgentDetailBody({
       ) : (
         <section
           aria-label="먼저 살펴보기"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+          className="mt-8 rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">먼저 살펴보기</h2>
           <Notice variant="error" role="alert" className="mt-3">
@@ -264,5 +252,35 @@ export function AgentDetailBody({
         />
       ) : null}
     </>
+  );
+
+  if (admin)
+    return (
+      <div className="mx-auto w-full max-w-2xl">
+        <h1
+          className={`text-xl font-semibold ${persona?.ok ? "mb-2" : "mb-4"}`}
+        >
+          {name}
+        </h1>
+        {sections}
+      </div>
+    );
+  return (
+    <PageFrame
+      title={name}
+      back={{ href: listHref, label: PAGE_HEADS.agents.title }}
+      action={
+        chatHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={chatHref}>
+              <MessageSquare aria-hidden="true" />
+              대화하기
+            </Link>
+          </Button>
+        ) : null
+      }
+    >
+      {sections}
+    </PageFrame>
   );
 }

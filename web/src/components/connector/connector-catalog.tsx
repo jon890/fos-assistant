@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { STANDARD_PLUGIN_NOTICE } from "@/components/connector/connector-tools";
 import { LoginLink } from "@/components/connector/browser-login";
@@ -16,6 +16,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 import {
   ConnectorIcon,
   ConnectorDetailsFold,
@@ -192,19 +195,30 @@ export function ConnectorCatalog({
   const [connectors, setConnectors] = useState<ConnectorSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     void readConnectors().then((result) => {
-      if (result.ok) setConnectors(result.data);
-      else setError(result.message);
+      if (result.ok) {
+        setConnectors(result.data);
+        setError(null);
+      } else setError(result.message);
     });
   }, []);
 
+  useEffect(load, [load]);
+
   return (
-    <div className="mx-auto w-full max-w-6xl">
-      <h1 className="text-xl font-semibold">외부 서비스 연결</h1>
-      <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.
-      </p>
+    <PageFrame
+      {...PAGE_HEADS.connections}
+      action={
+        // 사이트 로그인이 필요한 연결은 내 브라우저를 쓴다. 설정 목록까지 돌아가지 않고 여기서 간다.
+        <Link
+          href="/browser"
+          className="text-sm text-foreground underline underline-offset-4 hover:text-foreground-soft"
+        >
+          내 브라우저
+        </Link>
+      }
+    >
       {preferredAgent !== null ? (
         <Notice variant="info" className="mb-4">
           보던 에이전트에서 쓸 서비스를 골라 연결해 주세요. 연결이 끝나면 그
@@ -212,11 +226,12 @@ export function ConnectorCatalog({
         </Notice>
       ) : null}
       {error ? (
-        <Notice variant="error" role="alert">
-          서비스 목록을 읽지 못했어요. {error}
-        </Notice>
+        <LoadFailure
+          message={`서비스 목록을 읽지 못했어요. ${error}`}
+          onRetry={load}
+        />
       ) : connectors === null ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <ListSkeleton />
       ) : connectors.length === 0 ? (
         <EmptyState
           title="연결할 수 있는 서비스가 없어요"
@@ -259,6 +274,6 @@ export function ConnectorCatalog({
             ))}
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

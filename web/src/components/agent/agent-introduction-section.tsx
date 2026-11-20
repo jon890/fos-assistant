@@ -111,7 +111,7 @@ export function AgentIntroductionSection({
   return (
     <section
       aria-label="소개"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <h2 className="font-semibold">소개</h2>
       <p className="mt-1 text-sm text-muted-foreground">

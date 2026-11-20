@@ -17,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 import {
   CONNECTOR_ID_PATTERN,
   checkConnection,
@@ -39,17 +42,21 @@ type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
  */
 type Chooser = "auto" | "open" | "closed";
 
+/** 상세 화면의 뒤로 가기다. 목록 화면으로 돌아간다 */
+const BACK = { href: "/connections", label: PAGE_HEADS.connections.title };
+
 function NotFound() {
   return (
-    <div className="mx-auto w-full max-w-2xl" data-testid="connector-not-found">
-      <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
-      <Link
-        href="/connections"
-        className="text-sm text-foreground underline underline-offset-4"
-      >
-        서비스 연결로 돌아가기
-      </Link>
-    </div>
+    <PageFrame title="찾을 수 없는 서비스예요" back={BACK}>
+      <div data-testid="connector-not-found">
+        <Link
+          href="/connections"
+          className="text-sm text-foreground underline underline-offset-4"
+        >
+          서비스 연결로 돌아가기
+        </Link>
+      </div>
+    </PageFrame>
   );
 }
 
@@ -81,20 +88,19 @@ export function ConnectorConnectionPanel({
 
   if (!validId || loaded.kind === "notFound") return <NotFound />;
   if (loaded.kind === "loading")
-    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
+    return (
+      <PageFrame title="" titlePending back={BACK}>
+        <ListSkeleton />
+      </PageFrame>
+    );
   if (loaded.kind === "failed") {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-3">
-        <Notice variant="error" role="alert">
-          연결 상태를 읽지 못했어요. {loaded.message}
-        </Notice>
-        <Button
-          variant="outline"
-          onClick={() => void fetchLoaded(id).then(setLoaded)}
-        >
-          상태 다시 읽기
-        </Button>
-      </div>
+      <PageFrame title={PAGE_HEADS.connections.title} back={BACK}>
+        <LoadFailure
+          message={`연결 상태를 읽지 못했어요. ${loaded.message}`}
+          onRetry={() => void fetchLoaded(id).then(setLoaded)}
+        />
+      </PageFrame>
     );
   }
 
@@ -271,7 +277,7 @@ export function ConnectorConnectionPanel({
   });
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <PageFrame title={title} back={BACK}>
       {chooserShown ? (
         <ConnectorOnboarding
           connectorId={id}
@@ -429,6 +435,6 @@ export function ConnectorConnectionPanel({
           <ErrorNotice error={error} loginUrl={loginUrl} />
         </CardContent>
       </Card>
-    </div>
+    </PageFrame>
   );
 }

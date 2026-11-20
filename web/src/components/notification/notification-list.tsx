@@ -6,7 +6,7 @@ import { describeFailure } from "@/components/error-message";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -193,21 +193,17 @@ export function NotificationList() {
           모두 읽음
         </Button>
       </div>
-      {error ? (
+      {/* 목록을 하나도 읽지 못했으면 다시 읽기를 준다. 목록이 있는 채의 실패(다음 쪽, 읽음 표시)는 목록 위에 알린다. */}
+      {error && items.length > 0 ? (
         <Notice variant="error" className="mb-4">
           {error}
         </Notice>
       ) : null}
       {loading ? (
-        <div
-          className="flex flex-col gap-2"
-          data-testid="notification-skeleton"
-        >
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-        </div>
-      ) : items.length === 0 && !error ? (
+        <ListSkeleton data-testid="notification-skeleton" />
+      ) : error && items.length === 0 ? (
+        <LoadFailure message={error} onRetry={loadFirstPage} />
+      ) : items.length === 0 ? (
         <EmptyState
           title="아직 알림이 없어요."
           description="승인이 필요한 요청이 생기면 여기에 알려 드려요."

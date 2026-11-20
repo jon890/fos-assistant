@@ -170,7 +170,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
   return (
     <section
       aria-label="스킬"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>

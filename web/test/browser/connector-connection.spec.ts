@@ -348,9 +348,10 @@ test("모르는 id 는 찾을 수 없는 화면을 보인다", async ({ page }) 
     route.fulfill({ status: 404, json: notFound }),
   );
   await page.goto("/connections/missing-id");
-  await expect(page.getByTestId("connector-not-found")).toContainText(
-    "찾을 수 없는 서비스예요",
-  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: "찾을 수 없는 서비스예요" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("connector-not-found")).toBeVisible();
   await expect(page.getByText("raw upstream")).toHaveCount(0);
 });
 
@@ -363,11 +364,12 @@ test("형식이 틀린 id 는 서버를 부르지 않고 찾을 수 없는 화�
     return route.fulfill({ status: 404, json: notFound });
   });
   await page.goto("/connections/Bad_Id");
-  await expect(page.getByTestId("connector-not-found")).toContainText(
-    "찾을 수 없는 서비스예요",
-  );
   await expect(
-    page.getByRole("button", { name: "상태 다시 읽기" }),
+    page.getByRole("heading", { level: 1, name: "찾을 수 없는 서비스예요" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("connector-not-found")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "다시 읽기" }),
   ).toHaveCount(0);
   expect(called).toEqual([]);
 });
@@ -394,7 +396,7 @@ test("카탈로그를 읽지 못하면 쓸 수 없다고 하지 않고 다시 �
   await expect(page.getByText("지금은 쓸 수 없어요")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "연결 해제" })).toHaveCount(0);
   catalogOk = true;
-  await page.getByRole("button", { name: "상태 다시 읽기" }).click();
+  await page.getByRole("button", { name: "다시 읽기" }).click();
   await expect(page.getByLabel("토큰", { exact: true })).toBeVisible();
 });
 
