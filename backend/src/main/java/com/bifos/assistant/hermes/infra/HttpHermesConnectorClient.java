@@ -12,7 +12,6 @@ import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -26,7 +25,6 @@ import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -44,7 +42,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final String VAULT = "vault";
     private static final String CONNECTOR = "connector";
     private static final String TOOL = "tool";
-    private static final String OWNER_BROWSER = "owner_browser";
     private static final String VAULT_PATH = "/api/connector-vault";
     private static final int HTTP_CONFLICT = 409;
     private static final int HTTP_UNAUTHORIZED = 401;
@@ -95,13 +92,13 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
     @Override
     public CallResult call(String connectorId, String tool, Map<String, String> values, String ownerBrowser) {
-        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, "values", values), ownerBrowser));
+        return postCall(connectorId, HermesConnectorBodies.withOwnerBrowser(Map.of(TOOL, tool, "values", values), ownerBrowser));
     }
 
 
     @Override
     public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
-        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
+        return postCall(connectorId, HermesConnectorBodies.withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
     }
 
 
@@ -126,17 +123,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     @Override
     public ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
         return HttpHermesConnectorToolList.post(client, baseUrl, token, connectorId, Map.of(VAULT, vault));
-    }
-
-
-    /** 중계 주소가 null 이면 키를 싣지 않는다. 사용자 브라우저를 쓰지 않는 커넥터의 요청 본문은 그대로다. */
-    private static Map<String, Object> withOwnerBrowser(Map<String, Object> request, String ownerBrowser) {
-        if (ownerBrowser == null) {
-            return request;
-        }
-        Map<String, Object> body = new LinkedHashMap<>(request);
-        body.put(OWNER_BROWSER, ownerBrowser);
-        return body;
     }
 
 
@@ -188,7 +174,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
      */
     @Override
     public CallResult execute(String profile, String connectorId, String hermesTool, String argsJson) {
-        JsonNode args = arguments(argsJson);
+        JsonNode args = HermesConnectorBodies.arguments(argsJson);
         if (args == null) {
             // 보내지 않았으므로 실행되지 않은 것이 분명하다.
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
@@ -224,17 +210,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
 
-    /** 승인 줄에 저장한 인자 글을 JSON object 로 읽는다. object 로 읽을 수 없으면 null 이다. */
-    private static JsonNode arguments(String argsJson) {
-        try {
-            JsonNode args = MAPPER.readTree(argsJson);
-            return args != null && args.isObject() ? args : null;
-        } catch (JacksonException ex) {
-            return null;
-        }
-    }
-
-
     @Override
     public InstallResult bindConnector(
         String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
@@ -259,7 +234,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             log.warn("커넥터 주인의 첨부 디렉터리를 만들지 못해 확인을 대시보드에 맡긴다 profile={} connector={}", profile, connectorId);
         }
         return refusable(
-            withOwnerBrowser(
+            HermesConnectorBodies.withOwnerBrowser(
                 Map.of(
                     PROFILE,
                     profile,
