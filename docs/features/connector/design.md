@@ -162,15 +162,18 @@
 ```
 
 - `restartWaiting` 은 실패 표시가 없는 재시작 대기 바인딩 수다. 껐다 켜기 단계와 실패한 바인딩은 세지 않는다. 실패한 바인딩은 재시작으로 풀리지 않아 세면 운영 작업이 재시작을 되풀이한다.
-- `runningExecutions` 는 위 「바쁜가」 의 전체 수다.
+- `restartWaiting` 은 재시작 감지와 같이 `restart_required_since` 가 빈 옛 줄도 뺀다. `oldestWaitingSince` 는 그 가운데 가장 이른 `restart_required_since` 다.
+- `runningExecutions` 는 turn 자리, 원격 종료 확인 자리, `RUNNING` 줄 전부의 합이다. 대화 turn 의 루트 줄이 turn 자리와 겹쳐 실제보다 많이 세지만, 재기동 뒤 turn 자리 없이 남은 루트 줄을 놓치지 않는다. 많이 세면 재시작이 늦어질 뿐이다.
+- 토큰은 환경 변수 `CONNECTOR_OPS_TOKEN`(설정 `assistant.connector.ops.token`)으로 받는다. 비어 있으면 조회는 늘 401 이다.
 - 재시작 여부, 6시간 상한, 재시작 뒤 확인은 운영 정기 작업이 정한다. 요청 본문은 PR3 이 써서 `fos-home-infra` 에 넘긴다. 이 저장소에는 두지 않는다.
 
 ### Control Plane: 알림과 연결 응답(PR3)
 
-- 실패 알림은 실패 표시를 적은 결과 트랜잭션이 커밋된 뒤 그룹 관리자마다 보내고 `admin_notified_at` 을 적는다. 24시간 알림도 같은 칸을 쓰므로 한 대기에 두 번 가지 않는다.
+- 실패 알림과 24시간 알림은 예약 작업의 알림 단계 하나가 보낸다. 실패 표시를 적는 곳이 여럿이라 결과 트랜잭션마다 보내지 않고, 30초 주기에 실패 표시나 24시간 지난 `waiting_since` 를 보고 바인딩마다 잠근 뒤 그룹 관리자마다 한 건을 보내며 같은 트랜잭션에서 `admin_notified_at` 을 적는다. 한 대기에 두 번 가지 않는다.
+- `waiting_since` 는 결과 적용 뒤 자동 대기가 남았거나 실패 표시를 적을 때 비어 있으면 적는다. PR3 전부터 `PENDING` 이던 줄은 DML 마이그레이션이 `restart_required_since`, `cycle_at`, `updated_at` 차례로 채운다.
 - 정의 어긋남 점검의 `notifyAdmins` 는 재시작 대기와 껐다 켜기를 세지 않는다. PR1 에서 껐다 켜기를 빼고, PR3 에서 실패 알림으로 바꾼다.
 - 알림 본문은 「연결 반영 확인」 에서 「다시 확인」 을 누르라고 쓴다.
-- 연결 응답(`AgentConnectionView`, 관리자 목록 `AdminConnection`)에 `applyFailed`(boolean)를 더한다. 관리자 목록에는 `waitingSince` 도 더한다. 기존 칸은 바꾸지 않는다.
+- 연결 응답(`AgentConnectionView`, 연결 화면의 붙인 에이전트, 관리자 목록 `AdminConnection`)에 `applyFailed`(boolean)를 더한다. 관리자 목록에는 `waitingSince` 와 「다시 확인」 단추를 보일지인 `recheckable` 도 더한다. 24시간 기준이 알림과 같은 설정을 쓰도록 서버가 정한다. 대기 시각이 없는 `PENDING` 줄도 자동 경로가 맡지 않으므로 다시 확인할 수 있다. 기존 칸은 바꾸지 않는다.
 - 기동 시각을 읽지 못하는 상태는 메모리의 한 값으로 들고, 바뀔 때만 로그를 남긴다(REQ4).
 
 ### 웹(PR3)
@@ -179,7 +182,8 @@
 | --- | --- |
 | `boundReadiness`, `connectionStatusLabel` | `applyFailed` 면 「반영하지 못했어요. 관리자에게 알렸어요.」, `restartRequired` 면 「자동으로 반영하고 있어요. 대화가 없는 틈에 반영돼서 조금 걸릴 수 있어요.」(상태 글은 「자동 반영 중」), 그 밖의 `PENDING` 은 「몇 분 안에 자동으로 반영돼요.」 |
 | `isAwaitingApply` 와 다시 읽기 상한 | 실패한 바인딩은 다시 읽지 않는다. 상한을 껐다 켜기의 10분 대기와 두 번의 `apply-delay` 를 덮도록 15분 이상으로 늘린다 |
-| `ConnectorAdminPanel` | 상태 글을 「자동 반영 중」 과 「반영 실패」 로 나눈다. 「다시 확인」 단추는 `applyFailed` 이거나 `waitingSince` 에서 24시간이 지난 줄에만 보인다. 설명에 「자동 반영이 실패했을 때만 누르세요」 |
+| `ConnectorAdminPanel` | 상태 글을 「자동 반영 중」 과 「반영 실패」 로 나눈다. 「다시 확인」 단추는 `recheckable` 줄에만 보인다. 설명에 「자동 반영이 실패했을 때만 누르세요」 |
+| 연결 상태 배지 | 실패한 바인딩은 「반영 실패」, 재시작 대기를 포함해 반영 중인 바인딩은 「붙이는 중」 이다. 쓰이지 않던 `connectionStatusLabel` 의 재시작 대기 글은 지운다 |
 
 ## 실패와 일관성
 
