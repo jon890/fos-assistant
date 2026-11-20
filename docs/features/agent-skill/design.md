@@ -48,13 +48,13 @@ fos-agents 쪽 디렉터리와 manifest 칸 채우기는 이 저장소 밖이다
 | `terminal_off` | `platform_toolsets.api_server` 에 `terminal` 이 없다 | 요구 env 있는 에이전트용 스킬 |
 | `sandbox_unregistered` | `terminal.backend` 가 `docker` 가 아니다 | 같음 |
 | `sandbox_env_missing` | `terminal.docker_env` 의 키에 요구 이름 가운데 하나라도 없다 | 같음 |
-| `name_taken` | 이 플러그인이 설치하지 않은 같은 이름이 profile `skills/` 나 `skills.external_dirs` 의 디렉터리에 있다 | 모든 에이전트용 스킬 |
+| `name_taken` | 이 플러그인이 설치하지 않은 같은 이름이 profile `skills/` 에 있거나, 소유와 상관없이 `skills.external_dirs` 의 디렉터리에 있다 | 모든 에이전트용 스킬 |
 
 - 까닭은 위 순서로 해당하는 것을 모두 낸다. 빠진 이름은 이름 순이다.
 - 플러그인 스킬은 판정하지 않는다. 지금처럼 늘 설치하고, 겹치면 바인딩이 409 다(spec REQ6).
 - 처음 붙일 때(소유 기록 없음) `name_taken` 이 하나라도 있으면 지금처럼 409 로 거절한다. Control Plane 이 먼저 `SKILL_NAME_TAKEN` 으로 막으므로 대시보드의 거절은 그 사이 경합만 받는다.
 
-**설치 응답.** `PUT /api/connectors` 의 붙이기 응답에 `skipped_skills: [{name, reasons}]` 를 더한다. 「바뀐 것 없음」 으로 일찍 돌아가는 경로에도 판정한 목록을 넣는다. 떼기만 빈 목록이다. Control Plane 은 이 칸을 모르면 무시한다.
+**설치 응답.** `PUT /api/connectors` 의 붙이기 응답에 `skipped_skills: [{name, reasons}]` 를 더한다. 「바뀐 것 없음」 으로 일찍 돌아가는 붙이기 경로에도 판정한 목록을 넣는다. 떼기 응답에는 칸을 넣지 않는다(없는 칸은 빈 목록으로 읽는다). Control Plane 은 이 칸을 모르면 무시한다.
 
 **소유 기록.** 모양을 바꾸지 않는다. `skills` 에 실제로 설치한 이름만 적는다. 새 키를 더하면 이전 이미지로 되돌렸을 때 옛 plugin 의 기록 검사(`connector_state.py` 의 `_connector_state` 허용 키)가 그 profile 의 바인딩 쓰기를 모두 거절하기 때문이다.
 
