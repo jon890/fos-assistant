@@ -6,7 +6,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { rehypeHeadingIds } from "@/lib/dev-docs/headings";
 import { resolveDocLink } from "@/lib/dev-docs/links";
-import { MermaidBlock } from "./mermaid-block";
+import { MermaidBlock } from "@/components/ui/mermaid-block";
 
 type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 

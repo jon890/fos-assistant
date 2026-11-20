@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
@@ -76,6 +77,17 @@ public class GeneratedImageService {
      */
     public GeneratedImageSaved save(
         Long conversationId, Long ownerUserId, String callKey, String title, String prompt, byte[] image) {
+        return save(conversationId, ownerUserId, callKey, title, prompt, List.of(), image);
+    }
+
+
+    /**
+     * 참고한 링크와 함께 그림을 저장한다(ADR-20261120 / link-image-source). 링크는 지시문과 따로 봉하고 key 번호를 자기 칸에 둔다.
+     *
+     * @param sourceLinks 그림을 만들 때 참고한 링크 주소. 쓴 순서다. 없으면 빈 목록이다
+     */
+    public GeneratedImageSaved save(
+        Long conversationId, Long ownerUserId, String callKey, String title, String prompt, List<String> sourceLinks, byte[] image) {
         String extension = extensionOf(image);
         ReentrantLock lock = locks[Math.floorMod(conversationId.hashCode(), LOCK_COUNT)];
         lock.lock();
@@ -88,8 +100,12 @@ public class GeneratedImageService {
             String path = FOLDER + name + "." + extension;
             long byteSize = store.write(conversationId, path, image);
             try {
-                SealedText sealed = seal(ownerUserId, callKey, prompt == null ? "" : prompt);
-                artifacts.save(ChatArtifact.generatedImage(conversationId, path, byteSize, sealed.content(), sealed.keyId(), callKey));
+                SealedText sealed = seal(ownerUserId, aad(ownerUserId, callKey), prompt == null ? "" : prompt);
+                SealedText links = sourceLinks.isEmpty()
+                    ? new SealedText(null, null)
+                    : seal(ownerUserId, linksAad(ownerUserId, callKey), String.join("\n", sourceLinks));
+                artifacts.save(ChatArtifact.generatedImage(
+                    conversationId, path, byteSize, sealed.content(), sealed.keyId(), links.content(), links.keyId(), callKey));
             } catch (RuntimeException ex) {
                 removeQuietly(conversationId, path);
                 throw ex;
@@ -122,7 +138,8 @@ public class GeneratedImageService {
         }
         Map<Long, GeneratedImageDetail> details = new HashMap<>();
         for (ChatArtifact image : images) {
-            details.put(image.id(), new GeneratedImageDetail(promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path())));
+            details.put(image.id(), new GeneratedImageDetail(
+                promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()), sourceLinksOf(image, ownerUserId)));
         }
         return details;
     }
@@ -186,15 +203,17 @@ public class GeneratedImageService {
 
 
     /**
-     * 그 대화에서 만든 그림 가운데 파일이 남은 것의 제목이다. 새것부터 {@code limit} 개까지다(스펙 generated-image REQ17).
+     * 그 대화에서 만든 그림 가운데 파일이 남은 것의 제목과 참고한 링크다. 새것부터 {@code limit} 개까지다(스펙 generated-image REQ17, REQ25).
      *
-     * <p>실행 입력에 넣어, 모델이 Hermes 기록을 압축한 뒤에도 고칠 그림을 제목으로 가리킬 수 있게 한다.
+     * <p>실행 입력에 넣어, 모델이 Hermes 기록을 압축한 뒤에도 고칠 그림을 제목으로 가리키고 이어지는 장면에서 같은 링크를 다시 넣게 한다.
+     *
+     * @param ownerUserId 대화 주인. 링크의 key 주인이다
      */
-    public List<String> liveTitles(Long conversationId, int limit) {
+    public List<GeneratedImageMention> liveMentions(Long conversationId, Long ownerUserId, int limit) {
         return artifacts.findGeneratedImages(conversationId).stream()
             .filter(it -> !it.isDeleted())
-            .map(it -> GeneratedImageTitle.ofPath(it.path()))
             .limit(limit)
+            .map(it -> new GeneratedImageMention(GeneratedImageTitle.ofPath(it.path()), sourceLinksOf(it, ownerUserId)))
             .toList();
     }
 
@@ -212,14 +231,35 @@ public class GeneratedImageService {
     }
 
 
-    private SealedText seal(Long ownerUserId, String callKey, String prompt) {
-        return cipher.seal(ownerUserId, aad(ownerUserId, callKey), prompt).orElseGet(() -> new SealedText(prompt, null));
+    /** 참고한 링크를 푼다. 없거나 풀지 못하면 빈 목록이다. */
+    public List<String> sourceLinksOf(ChatArtifact artifact, Long ownerUserId) {
+        String stored = artifact.generationSourceLinks();
+        if (stored == null) {
+            return List.of();
+        }
+        Optional<String> opened = artifact.generationSourceLinksKeyId() == null
+            ? Optional.of(stored)
+            : cipher.open(
+                artifact.generationSourceLinksKeyId(), ownerUserId, linksAad(ownerUserId, artifact.generationCallKey()), stored);
+        return opened.map(text -> text.lines().filter(line -> !line.isBlank()).toList()).orElse(List.of());
+    }
+
+
+    /** 암호화가 꺼져 있으면 평문이다. key 를 풀지 못하면 {@code seal} 이 던지고 평문으로 내려 저장하지 않는다. */
+    private SealedText seal(Long ownerUserId, String aad, String plain) {
+        return cipher.seal(ownerUserId, aad, plain).orElseGet(() -> new SealedText(plain, null));
     }
 
 
     /** 행 번호는 넣을 때 정해지므로 암호문의 자리를 사용자와 호출 값으로 묶는다. 호출 값은 표 전체에서 유일하다. */
     private static String aad(Long ownerUserId, String callKey) {
         return "chat_artifact_prompt:user:" + ownerUserId + ":call:" + callKey;
+    }
+
+
+    /** 참고한 링크의 암호문 자리다. 지시문과 다른 칸이라 끝을 달리한다. */
+    private static String linksAad(Long ownerUserId, String callKey) {
+        return aad(ownerUserId, callKey) + ":links";
     }
 
 

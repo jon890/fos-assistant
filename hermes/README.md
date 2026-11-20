@@ -59,7 +59,7 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
 | `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
 | `read_only_mounts` | 아니오 | 모든 실행 공간에 붙일 `<원본 절대 경로>:<컨테이너 절대 경로>` 목록. 읽기 전용으로만 붙는다 |
-| `profiles` | 예 | 격리할 named profile 이름을 키로 둔 객체. 아래 표의 설정을 값으로 받는다. 빈 객체면 모두 local 로 둔다. `default` 는 등록할 수 없다 |
+| `profiles` | 예 | 격리할 named profile 이름을 키로 둔 객체. 아래 표의 설정을 값으로 받는다. 빈 객체면 모든 profile 의 실행 공간 도구 저장을 거절한다. `default` 는 등록할 수 없다 |
 
 `profiles[profile]` 은 다음 세 칸만 받는다.
 
@@ -98,10 +98,10 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽기 전용으로 붙여 막는다. 실제 생성 시점의 검증은 Docker socket proxy가 맡는다.
 
 정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
-등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.
-요청 본문의 `require_sandbox` 가 참이면 local 로 두지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 이 값을 보낸다.
-이미 docker 였다가 정책에서 빠지면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.
-정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 거절한다.
+등록되지 않은 profile 의 셸 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. `terminal:` 은 바꾸지 않는다. local 로 켜지 않는다([ADR-20261120 / no-local-shell](../docs/adr/ADR-20261120-no-local-shell.md)).
+이미 docker 였다가 정책에서 빠진 profile 도 같다. Control Plane 은 기동할 때 이 `reason` 을 보고 그 에이전트의 실행 공간 도구를 끈다.
+정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 `reason` 없는 409 로 거절한다.
+요청 본문의 `require_sandbox` 는 옛 Control Plane 호환으로 받고 도구 저장의 판정은 바꾸지 않는다.
 
 ```yaml
 terminal:
@@ -139,7 +139,7 @@ terminal:
 `fos-sandbox-profile` label 은 proxy 검사와 유휴 정리, 복구에서 정책의 profile 을 식별한다. API 요청으로 label 을 지정하지 못한다.
 
 docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_mode: approve` 도 쓴다. `approvals` 의 다른 키는 그대로 둔다.
-`backend: local` 을 쓸 때는 `approvals.unattended_mode` 를 지운다. 남은 `approvals` 가 비면 블록째 지운다.
+도구 저장은 `backend: local` 을 쓰지 않는다. 정책에서 빠진 profile 은 셸 계열이 꺼진 뒤에도 이전 docker `terminal:` 과 이 값이 남지만, 셸 계열과 `execute_code` 가 꺼져 쓰이지 않는다.
 그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령, 승인 파일 쓰기와 `computer_use` 는 fos-ctx 가 먼저 막는다. 플러그인 승인은 Control Plane 의 승인 경로를 쓴다.
 판정 경로는 [실행 공간](docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
 

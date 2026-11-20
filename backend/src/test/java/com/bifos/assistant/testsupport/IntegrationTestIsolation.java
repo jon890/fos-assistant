@@ -75,7 +75,9 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
     public void beforeEach(ExtensionContext context) {
         ApplicationContext applicationContext = SpringExtension.getApplicationContext(context);
         reset(applicationContext);
-        apply(applicationContext, overridesOf(context.getRequiredTestClass()));
+        List<String> overrides = overridesOf(context.getRequiredTestClass());
+        apply(applicationContext, overrides);
+        ServerSecretsTestSupport.seed(applicationContext, overrides);
     }
 
 
@@ -163,9 +165,12 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> overridables(context).forEach(OverridableLiveProperties::reset));
         attempt(failures, () -> context.getBean(StubHermesRunsClient.class).reset());
         attempt(failures, () -> context.getBean(RecordingContentDraftJobStarter.class).reset());
+        attempt(failures, () -> context.getBean(RecordingWebPushClient.class).reset());
         attempt(failures, () -> context.getBean(TestClock.class).reset());
         // H2는 지운 사용자와 데이터 key의 번호를 다시 쓸 수 있다. 앞 검사의 key 캐시가 새 사용자에게 남지 않게 비운다.
         attempt(failures, () -> context.getBean(DataKeyService.class).forgetCachedKeys());
+        // 서버 비밀값 줄과 그 캐시는 검사마다 비운다. 중계 서명 비밀은 검사 시작 때 설정에서 다시 넣는다.
+        attempt(failures, () -> ServerSecretsTestSupport.reset(context));
         // 시계를 되돌리고 대화 번호를 재사용해도 앞 검사의 소유자와 경고 시각을 가져가지 않는다.
         attempt(failures, () -> {
             var contents = context.getBean(ChatMessageContents.class);
@@ -179,6 +184,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(FailingAccessRevoker.class).reset());
         attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
         attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
+        attempt(failures, () -> context.getBean(FakeLinkImageWeb.class).reset());
         attempt(failures, () -> context.getBean(EchoCdpRelayConnector.class).reset());
         attempt(
             failures,

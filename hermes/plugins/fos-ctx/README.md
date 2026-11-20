@@ -233,8 +233,8 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | --- | --- |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `generated-image` 로 바꾼 것(`/internal/hermes/generated-image`). http(s) 가 아니거나 없으면 올리지 못한 결과로 바꾼다 |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
-| 본문 | `multipart/form-data`. 조각 `meta` 는 JSON `{"v": 1, "root_session_id", "session_id", "tool_call_id", "title", "prompt", "sig"}`, 조각 `image` 는 그림 바이트 그대로다. 그림을 JSON 의 base64 로 보내지 않는다 |
-| 서명할 글 | `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256, 지시문의 SHA-256 을 `\n` 하나로 이은 UTF-8. 해시는 소문자 16진수이고 제목이 없으면 빈 글의 해시다. key 는 `_fos_ctx` 와 같다 |
+| 본문 | `multipart/form-data`. 조각 `meta` 는 JSON `{"v": 1, "root_session_id", "session_id", "tool_call_id", "title", "prompt", "sig"}` 이고, 그 호출이 링크 사진을 받았으면 `"source_links"`(받은 주소 목록, 쓴 순서)가 더 붙는다(1.15.0 부터). 조각 `image` 는 그림 바이트 그대로다. 그림을 JSON 의 base64 로 보내지 않는다 |
+| 서명할 글 | `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256, 지시문의 SHA-256 을 `\n` 하나로 이은 UTF-8. `source_links` 가 있으면 주소를 `\n` 으로 이은 글의 SHA-256 을 여덟째 줄로 더한다. 없으면 일곱 줄 그대로다. 해시는 소문자 16진수이고 제목이 없으면 빈 글의 해시다. key 는 `_fos_ctx` 와 같다 |
 | 보내지 않는 것 | `tool_call_id` 나 session 이 빈 호출, `MAX_BYTES`(20MiB)를 넘는 그림. 올리지 못한 결과로 바꾼다 |
 | 답 | 200 의 `{"title"}` 이면 그 제목으로 성공 결과를 만든다 |
 | 404 | 이 경로가 없는 옛 Control Plane 이다. 결과를 바꾸지 않는다(rule-66). Control Plane 은 이 경로에서 404 를 내지 않는다 |
@@ -242,16 +242,18 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 제한 시간 | `UPLOAD_TIMEOUT`(15초). 한 번만 부른다. Hermes 의 callback 제한(기본 30초)보다 짧다 |
 
 확인 값: 위 「도구 판정」 의 key, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 그림 바이트 `image-bytes`, 제목 `수채화 고양이`, 지시문 `창가에 앉은 고양이` 의 서명은 `d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee` 다. backend 의 `GeneratedImageEndpointTest` 도 같은 값을 쓴다.
+같은 값에 `source_links` `["https://shop.example.com/goods/1", "https://img.example.com/p.png"]` 를 더한 서명은 `83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d` 다.
 
 ### 그림을 고칠 사진을 받는다
 
 `image_generate` 의 바탕(`image_url`)과 참고(`reference_image_urls`)를 Control Plane 에서 받아 넘긴다. 1.14.0 부터다(fos-assistant [ADR-20261120 / image-source](../../../docs/adr/ADR-20261120-image-source.md)).
 실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있어, 모델이 적은 경로를 그대로 두면 다른 대화의 사진을 쓸 수 있다.
 
-- `pre_tool_call` 은 도구 판정을 통과한 `image_generate` 호출에서 두 인자의 값이 모두 `attachment:<첨부 번호>` 나 `generated:<제목>` 인지 본다. 하나라도 아니거나 합쳐 `MAX_SOURCES`(16)장을 넘으면 묻지 않고 막는다
+- `pre_tool_call` 은 도구 판정을 통과한 `image_generate` 호출에서 두 인자의 값이 모두 `attachment:<첨부 번호>`, `generated:<제목>`, `link:<사용자가 보낸 주소>`(1.15.0 부터, fos-assistant [ADR-20261120 / link-image-source](../../../docs/adr/ADR-20261120-link-image-source.md)) 가운데 하나인지 본다. 하나라도 아니거나 합쳐 `MAX_SOURCES`(16)장을 넘으면 묻지 않고 막는다
 - 가리킴을 하나씩 받아 Hermes 홈의 `cache/fos-image-sources/` 에 무작위 이름으로 쓰고, 두 인자를 그 경로로 바꾼 `modify` 를 돌려준다. 제목 줄 떼기와 한 `modify` 로 묶는다. 같은 가리킴은 한 번만 받는다
 - 하나라도 받지 못하면 받은 사본을 지우고, 가리킴마다 까닭을 한 줄씩 적은 글로 막는다. 글은 「그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다.」 로 끝난다
-- `transform_tool_result` 는 그 호출의 사본을 먼저 지운다. 결과 hook 이 돌지 못한 사본은 다음 받기 때 1시간이 지난 것부터 지운다
+- 링크 가리킴을 받으면 응답 머리 `X-Image-Source-Link` 의 받은 주소를 사본과 같은 호출 키로 기억한다. 머리가 없으면 받지 못한 것으로 본다
+- `transform_tool_result` 는 기억한 링크를 먼저 읽어 그림 올리기의 `source_links` 로 넘기고, 그 호출의 사본과 링크를 지운다. 결과 hook 이 돌지 못한 사본은 다음 받기 때 1시간이 지난 것부터 지운다
 - 두 인자가 모두 비면 묻지 않는다. 가리킴 없는 그림 만들기는 이전과 같다
 
 | 칸 | 값 |
@@ -259,13 +261,19 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `image-source` 로 바꾼 것(`/internal/hermes/image-source`) |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
 | 본문 | JSON `{"_fos_ctx": <도구 이름 image_generate 로 서명한 맥락>, "source": "<가리킴>"}`. 맥락은 MCP 호출의 `_fos_ctx` 와 같다 |
-| 200 | 본문이 원본 바이트이고 `Content-Type` 이 PNG, JPEG, GIF, WebP 가운데 하나다. 20MiB 를 넘으면 받지 못한 것으로 본다 |
-| 422 `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진이나 이 대화에서 만든 그림이 아니다 |
-| 410 `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지났다 |
+| 200 | 본문이 원본 바이트이고 `Content-Type` 이 PNG, JPEG, GIF, WebP 가운데 하나다. 20MiB 를 넘으면 받지 못한 것으로 본다. 링크 가리킴이면 `X-Image-Source-Link` 에 Control Plane 이 정해진 꼴로 바꾼 받은 주소가 있다 |
+| 422 `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다 |
+| 422 `IMAGE_SOURCE_LINK_BLOCKED` | 열 수 없는 주소다(https 아님, 내부망이나 금지 목록, 넘기기 초과) |
+| 422 `IMAGE_SOURCE_LINK_NO_IMAGE` | 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다 |
+| 422 `IMAGE_SOURCE_LINK_TOO_LARGE` | 사진이 너무 크다 |
+| 502 `IMAGE_SOURCE_LINK_FAILED` | 링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다 |
+| 410 `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지났다. 만든 그림(`generated:`)이면 다음 장면에서 그 그림을 빼고 인물 줄만으로 다시 부르라고 덧붙인다 |
 | 404 | 이 경로가 없는 옛 Control Plane 이다. 막는다. 경로를 받던 동작으로 돌아가지 않는다. Control Plane 은 이 경로에서 404 를 내지 않는다 |
 | 그 밖의 답, 제한 시간 | 받지 못했다고 막는다 |
 | 제한 시간 | 한 호출의 모든 가리킴을 합쳐 `FETCH_BUDGET`(15초) |
 | 맥락이 없다 | `tool_call_id` 나 session 이 빈 호출(코드 실행 안의 호출)은 막는다 |
+
+링크(`link:`)를 쓰지 못한 까닭에는 「다음 장면이고 앞 그림은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 다시 부른다」 를 덧붙인다(스펙 generated-image DECISION52).
 
 ### 승인 관문으로 가는 동작을 막는다
 

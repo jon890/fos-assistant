@@ -48,6 +48,9 @@ assistant:
     purge-cron: "40 * * * * *"
     # 기본 비서에 켜지 못한 기본 도구(「그림 만들기」)를 다시 켜 보는 시각(ADR-20261119 / image-gen-defaults)
     pending-toolsets-cron: "20 */5 * * * *"
+    # 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 실행 공간 정책 밖이면 그 도구를 끈다(ADR-20261120 / no-local-shell).
+    # 끝내지 못한 에이전트는 pending-toolsets-cron 주기에 다시 본다
+    sandbox-sweep-on-start: true
   people:
     # 첫 로그인에 만든 기본 에이전트에 켜는 도구다. 셸 계열은 실행 공간 정책에 등록된 profile 에서만 켜고,
     # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets).
@@ -260,6 +263,21 @@ assistant:
       connect-timeout: 5s
       read-timeout: 10s
       total-timeout: 30s
+    link-image:
+      # 사용자가 대화에 보낸 링크의 사진을 그림의 바탕이나 참고로 받을 때의 제한(ADR-20261120 / link-image-source).
+      # 허용 주소 목록은 없다. 링크 하나의 전체 시간은 fos-ctx 의 한 호출 예산(15초) 안이어야 한다
+      connect-timeout: 3s
+      read-timeout: 5s
+      total-timeout: 10s
+      max-redirects: 5
+      max-page-bytes: 2097152
+      max-image-bytes: 20971520
+      max-header-bytes: 65536
+      # 홈서버 자신에게 되돌아오는 호스트 이름과 IP 대역. 값은 운영 설정에서 넣는다.
+      # 둘 다 비면 모든 링크를 막는다(닫힌 쪽). 개발과 테스트만 allow-without-blocklist 를 켠다
+      blocked-hosts: []
+      blocked-cidrs: []
+      allow-without-blocklist: false
   artifact-vault:
     # 자동 보관을 기다리는 결과물을 다시 훑는 간격. 재시작 뒤와 일시 장애 뒤에 이어서 보관한다
     auto-retry-delay: 60s
@@ -280,6 +298,12 @@ assistant:
     cleanup-cron: "0 30 4 * * *"
     # 사건이 없는 동안 알림 SSE 에 주석 줄을 보내는 간격. 앞단 프록시가 연결을 끊지 않게 한다
     stream-heartbeat: 20s
+  push:
+    # 웹 푸시 VAPID 키와 연락처(ADR-20261120 / web-push). 셋을 함께 채우거나 함께 비운다. 비우면 푸시가 꺼진 채 기동한다
+    vapid-public-key: ${ASSISTANT_PUSH_VAPID_PUBLIC_KEY:}
+    # 비밀 키 base64url 한 줄을 담은 파일의 경로. 비밀 키 값을 환경 변수나 데이터베이스에 두지 않는다
+    vapid-private-key-file: ${ASSISTANT_PUSH_VAPID_PRIVATE_KEY_FILE:}
+    subject: ${ASSISTANT_PUSH_SUBJECT:}
   task:
     # 발화기와 시작 단계가 도는 때(초 포함 6필드). 검사에서는 - 로 끈다
     dispatch-cron: "*/30 * * * * *"
@@ -356,8 +380,10 @@ assistant:
     sweep-interval: 1m
     # 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
     screen-timeout: 30m
-    # 커넥터가 브라우저에 닿는 중계의 주소와 접근 표식의 서명 비밀. 둘 중 하나라도 비면 중계만 꺼진다
+    # 커넥터가 브라우저에 닿는 중계의 주소. 비거나 서명 비밀이 없으면 중계만 꺼진다
     gateway-base-url: ${ASSISTANT_BROWSER_GATEWAY_BASE_URL:}
+    # 옛 서명 비밀. 서버 비밀값(browser_gateway)이 없을 때 기동하며 한 번 가져오는 데만 쓴다.
+    # 값은 관리자 화면의 서버 비밀값이 갖는다(ADR-20261120 / server-secret)
     gateway-secret: ${ASSISTANT_BROWSER_GATEWAY_SECRET:}
   sandbox-workspace:
     # 실행 공간 루트를 Control Plane 에서 본 경로. 읽기 전용으로 붙인다. 비면 파일 공간의 모든 경로가 503 이고 상태 조회는 available false 다

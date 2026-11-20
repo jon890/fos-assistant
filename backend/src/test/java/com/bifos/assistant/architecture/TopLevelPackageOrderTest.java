@@ -67,15 +67,15 @@ class TopLevelPackageOrderTest {
     void allowsTopPackageToUseEveryOtherPackage() {
         List<String> others = TopLevelPackageOrder.ORDER.subList(0, TopLevelPackageOrder.ORDER.size() - 1);
 
-        assertThat(others).hasSize(22);
+        assertThat(others).hasSize(23);
         assertThat(TopLevelPackageOrder.violations("admin", others)).isEmpty();
     }
 
 
     @Test
-    @DisplayName("층 순서는 겹치는 이름 없이 스물셋이다")
-    void orderHasTwentyThreeDistinctPackages() {
-        assertThat(TopLevelPackageOrder.ORDER).hasSize(23);
-        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(23);
+    @DisplayName("층 순서는 겹치는 이름 없이 스물넷이다")
+    void orderHasTwentyFourDistinctPackages() {
+        assertThat(TopLevelPackageOrder.ORDER).hasSize(24);
+        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(24);
     }
 }

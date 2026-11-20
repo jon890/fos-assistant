@@ -1,6 +1,8 @@
 package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.browser.domain.CdpProbe;
+import com.bifos.assistant.chat.artifact.config.LinkImageProperties;
+import com.bifos.assistant.chat.artifact.infra.LinkImageFetcher;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
@@ -51,6 +53,14 @@ public class IntegrationTestDoubles {
     @Primary
     StubHermesRunsClient stubHermesRunsClient() {
         return new StubHermesRunsClient();
+    }
+
+
+    /** 웹 푸시 요청을 네트워크 없이 모은다. 검사가 정하지 않으면 201 을 돌려준다. */
+    @Bean
+    @Primary
+    RecordingWebPushClient recordingWebPushClient() {
+        return new RecordingWebPushClient();
     }
 
 
@@ -130,6 +140,21 @@ public class IntegrationTestDoubles {
     @Bean
     AttentionTestCandidates.ReadCountingCandidates readCountingAttentionCandidates() {
         return new AttentionTestCandidates.ReadCountingCandidates();
+    }
+
+
+    /** 링크 사진 받기의 바깥 웹이다. 테스트마다 비운다. */
+    @Bean
+    FakeLinkImageWeb fakeLinkImageWeb() {
+        return new FakeLinkImageWeb();
+    }
+
+
+    /** 바깥 DNS 와 네트워크 대신 {@link FakeLinkImageWeb} 으로 받는다. 주소 검사와 내부망 판정은 운영 코드 그대로다. */
+    @Bean
+    @Primary
+    LinkImageFetcher fakeLinkImageFetcher(LinkImageProperties properties, FakeLinkImageWeb web) {
+        return new LinkImageFetcher(properties, web::resolve, web);
     }
 
 

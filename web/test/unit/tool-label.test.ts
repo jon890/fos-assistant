@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isReadableDetail, toolLabel } from "../../src/lib/tool-label.ts";
+import { connectorLabel, isReadableDetail, toolLabel } from "../../src/lib/tool-label.ts";
 
 test("terminal 은 도는 중에 「작업하고 있어요」, 끝나면 「작업을 했어요」 다", () => {
   assert.equal(toolLabel("terminal", true), "작업하고 있어요");
@@ -147,4 +147,28 @@ test("주문 상한 변경 도구는 바꿨다고 말하지 않고 변경을 요
     toolLabel("mcp__fos_assistant__order_limit_change", false),
     /바꿨어요/,
   );
+});
+
+test("플러그인 도구는 도는 중이든 끝났든 「서비스 이름 · 도구 제목」 이다", () => {
+  const gmail = { service: "Gmail", title: "메일 읽기" };
+  assert.equal(toolLabel("mcp__gmail__get_message", true, gmail), "Gmail · 메일 읽기");
+  assert.equal(toolLabel("mcp__gmail__get_message", false, gmail), "Gmail · 메일 읽기");
+});
+
+test("제목을 선언하지 않은 플러그인 도구는 서비스 이름만 보인다", () => {
+  assert.equal(connectorLabel({ service: "Gmail", title: null }), "Gmail");
+  assert.equal(toolLabel("mcp__gmail__x", false, { service: "Gmail", title: null }), "Gmail");
+});
+
+test("그림 만들기 도구는 도는 중과 끝난 뒤 그림을 만드는 말로 보인다", () => {
+  assert.equal(toolLabel("image_generate", true), "그림을 만들고 있어요");
+  assert.equal(toolLabel("image_generate", false), "그림을 만들었어요");
+});
+
+test("예약 작업 지우기는 지웠다고 말하지 않고 승인을 요청했다고 보인다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__task_delete", false),
+    "예약 작업 삭제 승인을 요청했어요",
+  );
+  assert.doesNotMatch(toolLabel("mcp__fos_assistant__task_delete", false), /지웠어요/);
 });

@@ -79,11 +79,25 @@ public class AppUser extends AuditedEntity {
     @Column(name = "purchase_limit_daily_krw", nullable = false, insertable = false, updatable = false)
     private Long purchaseLimitDailyKrw;
 
+    // 웹 푸시 기기 목록 JSON 이다(ADR-20261120 / web-push). 주문 상한과 같은 까닭으로 넣기와 고치기에서 빼고 getter 를 두지 않는다.
+    // 읽기와 쓰기는 PushDeviceRepository 의 전용 쿼리로만 한다. 검사의 create-drop 스키마가 같은 칸을 갖도록 매핑한다.
+    @Column(name = "push_devices", columnDefinition = "TEXT", insertable = false, updatable = false)
+    private String pushDevices;
+
     // 옛 「결과물 자동 보관」 설정이다(#530). 스위치를 없애 더 읽거나 쓰지 않는다(스펙 workspace REQ16).
     // 칸은 마이그레이션에 남아 있어 검사의 create-drop 스키마가 같은 칸을 갖도록 매핑만 둔다. 넣기와 고치기에서 뺀다.
     @ColumnDefault("true")
     @Column(name = "artifact_auto_vault", insertable = false, updatable = false)
     private Boolean artifactAutoVault;
+
+    /**
+     * 평가 전용 사용자인가(docs/features/agent-quality/design.md 의 「평가 전용 사용자」). 참이면 로그인하지 않고 일반 화면과 집계에서
+     * 빠진다. 먼저 읽어 둔 사용자를 저장해도 덮지 않도록 넣기와 고치기에서 빼고 {@code AppUserRepository.markEvaluation} 으로만 바꾼다.
+     */
+    @Getter
+    @ColumnDefault("false")
+    @Column(name = "evaluation", nullable = false, insertable = false, updatable = false)
+    private boolean evaluation;
 
 
     protected AppUser() {}

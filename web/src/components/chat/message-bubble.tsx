@@ -302,6 +302,7 @@ export function MessageBubble({
             summary={turn.activity}
             executionId={turn.executionId}
             cancelled={turn.status === "CANCELLED"}
+            failed={turn.status === "FAILED"}
             sourceReads={turn.sourceReads}
             memoryUses={memoryUses}
             conversationId={conversationId}

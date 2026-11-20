@@ -30,6 +30,7 @@ import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ProbeResult;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient.SkippedSkill;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.application.dto.CallResult;
@@ -170,6 +171,7 @@ class AgentConnectionControllerTest {
             .andExpect(jsonPath("$.status").value("PENDING"))
             .andExpect(jsonPath("$.restartRequired").value(true))
             .andExpect(jsonPath("$.toolCount").value(2))
+            .andExpect(jsonPath("$.skippedSkills").isEmpty())
             .andExpect(jsonPath("$.vault").doesNotExist())
             .andReturn()
             .getResponse()
@@ -190,6 +192,41 @@ class AgentConnectionControllerTest {
         mvc.perform(get(path))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.connections[0].bound").value(false));
+    }
+
+
+    @Test
+    @DisplayName("설치가 빠진 스킬을 답하면 붙이기 응답과 연결 목록의 그 바인딩에 이름과 까닭이 있고 떼면 사라진다")
+    void listsSkippedSkillsOfBinding() throws Exception {
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false, false, false, false, List.of(
+                new SkippedSkill("demo-runner", List.of("terminal_off", "sandbox_env_missing")),
+                new SkippedSkill("demo-report", List.of("name_taken")))));
+        CurrentUser owner = user(UserRole.MEMBER);
+        connect(owner);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        signIn(owner);
+        String path = "/api/v1/agents/" + agent.code() + "/connections";
+
+        mvc.perform(get(path))
+            .andExpect(jsonPath("$.connections[0].skippedSkills").isEmpty());
+        mvc.perform(put(path + "/" + DEMO))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.skippedSkills[0].name").value("demo-runner"))
+            .andExpect(jsonPath("$.skippedSkills[0].reasons[1]").value("sandbox_env_missing"));
+        mvc.perform(get(path))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connections[0].skippedSkills.length()").value(2))
+            .andExpect(jsonPath("$.connections[0].skippedSkills[0].name").value("demo-runner"))
+            .andExpect(jsonPath("$.connections[0].skippedSkills[0].reasons[0]").value("terminal_off"))
+            .andExpect(jsonPath("$.connections[0].skippedSkills[0].reasons[1]").value("sandbox_env_missing"))
+            .andExpect(jsonPath("$.connections[0].skippedSkills[1].name").value("demo-report"))
+            .andExpect(jsonPath("$.connections[0].skippedSkills[1].reasons[0]").value("name_taken"));
+
+        mvc.perform(delete(path + "/" + DEMO)).andExpect(status().isNoContent());
+        mvc.perform(get(path))
+            .andExpect(jsonPath("$.connections[0].bound").value(false))
+            .andExpect(jsonPath("$.connections[0].skippedSkills").isEmpty());
     }
 
 

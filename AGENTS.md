@@ -54,7 +54,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - **이 저장소는 공개 저장소다. 홈서버의 운영 정보를 적지 않는다.** 아래 「공개 저장소」 를 본다.
 - Hermes core 를 고치지 않는다. profile, API server, plugin hook 만 쓴다.
   고쳐야 할 것 같으면 ADR-001 의 검토 순서를 따른다.
-- 비밀값을 데이터베이스에 넣지 않는다. profile key 는 홈서버 파일에 둔다.
+- 비밀값을 데이터베이스에 원문으로 넣지 않는다. 서버 비밀값은 KEK 로 감싸 `server_secret` 에 두고, KEK 는 홈서버 파일에 둔다([ADR-20261120 / server-secret](docs/adr/ADR-20261120-server-secret.md)). 값마다 지금 두는 곳은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「비밀값을 두는 곳」 이 갖는다.
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
   제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
@@ -174,6 +174,7 @@ PR CI 는 느린 검사(브라우저 shard 와 E2E)를 기본으로 건너뛰고
 
 한 PR은 관심사 하나만 담는다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
 운영 코드의 변경 줄 상한과 계산은 `scripts/pr/pr-size.mjs` 가 갖는다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다. 스크립트가 경계 후보를 보이고, `check-local.sh --fast` 도 크기를 잰다.
+구현 중에는 Claude Code hook(`.claude/settings.json`)이 commit 마다 크기를 재서 상한의 80% 이상이면 에이전트에게 알린다. 그 안내를 받으면 남은 phase 를 이 PR 에 넣지 않고 계획서 deferred 와 PR 본문 「남은 범위」 로 미룬다. 판정과 안내 문구는 `scripts/pr/pr-size-hook.mjs` 가 갖는다.
 `규모:예외` 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 붙이지 않는다.
 
 Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는다.

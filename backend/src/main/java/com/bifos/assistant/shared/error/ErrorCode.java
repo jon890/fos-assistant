@@ -180,6 +180,17 @@ public enum ErrorCode {
     /** 그림을 고칠 바탕으로 가리킨 사진이나 그림이 있었지만 지웠거나 보관 기간이 지나 파일이 없다. */
     IMAGE_SOURCE_GONE(HttpStatus.GONE),
     /**
+     * 사용자가 보낸 링크가 https 가 아니거나, 이름이 풀리지 않거나, 내부망이나 금지 목록의 주소이거나, 넘기기가 너무 많다
+     * (ADR-20261120 / link-image-source). 풀리지 않는 이름과 막힌 주소를 가르지 않는다. 가르면 서버 쪽 DNS 의 내부 이름을 알아낼 수 있다.
+     */
+    IMAGE_SOURCE_LINK_BLOCKED(HttpStatus.UNPROCESSABLE_ENTITY),
+    /** 링크가 받는 사진 형식이 아니고 페이지에 대표 사진도 없거나, 대표 사진이 받는 형식이 아니다. */
+    IMAGE_SOURCE_LINK_NO_IMAGE(HttpStatus.UNPROCESSABLE_ENTITY),
+    /** 링크의 사진이 받기 상한을 넘는다. */
+    IMAGE_SOURCE_LINK_TOO_LARGE(HttpStatus.UNPROCESSABLE_ENTITY),
+    /** 링크를 열지 못했다. 연결 실패, 200 이 아닌 답, 제한 시간, 동시 받기 초과다. 쇼핑몰이 자동 요청을 막았을 수 있다. */
+    IMAGE_SOURCE_LINK_FAILED(HttpStatus.BAD_GATEWAY),
+    /**
      * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 origin 실행을 하나로 정하지 못했다.
      *
      * <p>서명 없음, 서명 틀림, origin 없음, origin 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야
@@ -350,6 +361,10 @@ public enum ErrorCode {
     WORKSPACE_DELETE_TOO_MANY(HttpStatus.CONFLICT),
     /** 도우미가 실패했거나 제한 시간 안에 답하지 않았다. 일부가 지워졌을 수 있다. */
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
+    /** 서버에 웹 푸시 VAPID 키가 없어 기기를 등록받지 않는다(ADR-20261120 / web-push). */
+    PUSH_NOT_CONFIGURED(HttpStatus.CONFLICT),
+    /** KEK 가 설정되지 않아 서버 비밀값을 저장할 수 없다. 원문으로 두는 길은 없다(ADR-20261120 / server-secret). */
+    SECRET_STORE_UNAVAILABLE(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 

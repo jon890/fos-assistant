@@ -96,7 +96,7 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
 
   const menu = await openAdminMenu(page, testInfo);
   await expect(menu.locator("section > p")).toHaveText(["살펴보기", "비서 설정", "사용자와 자원"]);
-  await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간"]);
+  await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간", "서버 비밀값"]);
   await expect(menu.getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
 });

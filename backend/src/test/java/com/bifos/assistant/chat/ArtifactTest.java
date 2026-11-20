@@ -97,17 +97,35 @@ class ArtifactTest {
         + "artifact_write 에서는 HTML 과 CSS 는 content, HTML 이 부를 인터넷의 사진은 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
         + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
         + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
-        + "아래 여섯 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
+        + "아래 열두 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
         + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
         + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
-        + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
+        + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 한국어로 자세히 쓴다.\n"
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
+        + "- 사람이 나오는 그림을 새로 그릴 때는 지시문에 「인물 N명」 처럼 인물 수를 숫자로 적고,"
+        + " 사람마다 「- 인물1: 생김새(나이대, 머리, 체격), 옷, 신발」 처럼 한 줄씩 적는다.\n"
+        + "- 같은 인물이 나오는 다음 장면을 그릴 때는 사용자가 「이어서」 라고 하지 않아도 앞 그림을 reference_image_urls 에 generated:<그림 제목> 으로 넣는다."
+        + " 바탕(image_url)에 넣지 않고 구도는 새로 잡는다. 앞 지시문의 인물 줄을 글자 그대로 다시 적고,"
+        + " 아래 「이 대화에서 만든 그림」 에서 앞 그림 제목 뒤에 참고 링크가 있으면 그 링크도 link: 로 함께 넣는다."
+        + " 그 링크만 쓸 수 없다는 결과를 받으면 링크를 빼고 앞 그림만 참고로 다시 그리고, 링크 사진을 쓰지 못했다고 답에 적는다."
+        + " 앞 그림이 「이 대화에서 만든 그림」 에 없거나 앞 그림을 쓸 수 없다는 결과를 받으면 참고 없이 인물 줄만으로 그리고, 앞 그림을 참고하지 못했다고 답에 적는다.\n"
+        + "- aspect_ratio 는 늘 적는다. 사용자가 비율이나 구도를 말했거나 쓰임새로 분명하면 그것을 따른다"
+        + "(프로필 사진은 얼굴 위주로 square, 블로그 대표 사진은 landscape)."
+        + " 그렇지 않으면 사람이나 동물 여럿, 풍경, 물건 여럿은 landscape, 한 사람이나 동물 하나, 물건 하나는 square 다."
+        + " 얼굴 위주로 정한 때가 아니면 사람은 머리부터 발까지 들어오고 얼굴이 잘 보이게 지시문에 적는다.\n"
         + "- 이 대화에 보낸 사진이나 이 대화에서 만든 그림을 바탕으로 고칠 때는 바탕 한 장을 image_url 에, 참고할 것을 reference_image_urls 에 넣는다."
-        + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적고 파일 경로나 인터넷 주소는 쓰지 않는다.\n"
+        + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적는다.\n"
+        + "- 사용자가 이 대화에 보낸 링크(상품 페이지나 사진 주소)의 사진을 바탕이나 참고로 쓸 때는 link:<사용자가 보낸 주소 그대로> 로 적는다."
+        + " 검색이나 페이지에서 찾은 주소는 쓰지 않는다.\n"
+        + "- 바탕과 참고에는 attachment:, generated:, link: 가리킴만 쓰고 파일 경로나 맨 주소는 쓰지 않는다.\n"
         + "- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다."
         + " 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다.\n"
-        + "- 그림을 만들지 못했거나 쓸 수 없는 사진이라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진과 그 까닭)과 다시 부탁하는 방법을 답한다.\n"
+        + "- 올린 사진이나 만든 그림을 바탕(image_url)으로 고칠 때는 인물 수와 사람별 줄을 적지 않고, 바탕에 없는 사람을 더할 때만 그 사람의 줄을 적는다."
+        + " aspect_ratio 는 바탕 사진의 비율에 가까운 것을 고른다.\n"
+        + "- 그림을 만들지 못했거나 쓸 수 없는 사진이나 링크라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진이나 링크와 그 까닭)과 다시 부탁하는 방법을 답한다."
+        + " 다만 다음 장면에서 앞 그림(generated:)이나 다시 넣은 링크만 쓸 수 없으면 위 다음 장면 줄대로 그것을 빼고 다시 그린다."
+        + " 링크를 쓸 수 없으면 사진을 직접 올리는 방법도 알린다.\n"
         + "[파일 공간]\n"
         + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
         + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
@@ -281,9 +299,47 @@ class ArtifactTest {
             "generated/지난 그림.png");
 
         assertThat(artifactService.agentPreamble(conversation, false))
-            .contains("만든 그림은 generated:<그림 제목> 으로 적고")
+            .contains("만든 그림은 generated:<그림 제목> 으로 적는다")
             .contains("이 대화에서 만든 그림: 「새 신발」, 「수채화 고양이」\n")
             .doesNotContain("지난 그림");
+    }
+
+
+    @Test
+    @DisplayName("그림 제목 줄에는 그림이 참고한 링크가 제목 뒤에 붙고, 2,048자를 넘는 링크, 풀지 못한 링크, 파일이 지워진 그림의 링크는 빠진다")
+    void preambleListsSourceLinksOfLiveGeneratedImages() {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        String edgeLink = "https://shop.example.com/" + "b".repeat(2048 - "https://shop.example.com/".length());
+        String longLink = edgeLink + "c";
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "지난 장면", "지시문",
+            List.of("https://gone.example.com/1"), png(41));
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "공원의 가족", "지시문",
+            List.of("https://shop.example.com/goods/1", "https://img.example.com/%EC%96%91%EB%A7%90.png", longLink), png(42));
+        generatedImages.save(conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "다음 장면", "지시문", List.of(), png(43));
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "경계 링크", "지시문", List.of(edgeLink), png(44));
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "풀 수 없는 링크", "지시문",
+            List.of("https://locked.example.com/1"), png(45));
+        jdbc.update(
+            "UPDATE chat_artifact SET generation_source_links_key_id = ? WHERE conversation_id = ? AND path = ?",
+            Long.MAX_VALUE,
+            conversation.id(),
+            "generated/풀 수 없는 링크.png");
+        jdbc.update(
+            "UPDATE chat_artifact SET deleted_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND path = ?",
+            conversation.id(),
+            "generated/지난 장면.png");
+
+        assertThat(artifactService.agentPreamble(conversation, false))
+            .as("이어지는 장면에서 앞 그림의 링크를 다시 넣을 수 있게 알린다(스펙 generated-image REQ25)")
+            .contains("이 대화에서 만든 그림: 「풀 수 없는 링크」, 「경계 링크」(참고 링크: " + edgeLink + "), 「다음 장면」, "
+                + "「공원의 가족」(참고 링크: https://shop.example.com/goods/1, https://img.example.com/%EC%96%91%EB%A7%90.png)\n")
+            .as("2,048자는 적고 2,049자는 뺀다").doesNotContain(longLink)
+            .as("풀지 못한 링크는 빼고 제목만 적는다").doesNotContain("locked.example.com")
+            .doesNotContain("gone.example.com");
     }
 
 

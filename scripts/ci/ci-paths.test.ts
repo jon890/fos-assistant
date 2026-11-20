@@ -411,10 +411,10 @@ test("브라우저 필수 검사는 shard 를 돌린 경우에만 폭별 실제 
   const body = workflowJobs().get("browser-required") ?? assert.fail("browser-required job 이 없다");
   assert.match(body, /matrix:\n {8}project: \[mobile, desktop\]/);
   assert.match(body, /if: needs.changes.outputs.browser == 'true'\n {8}env:/);
-  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 3/);
+  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 5/);
   const work = workflowJobs().get("browser")!;
-  assert.match(work, /shard: \[1, 2, 3\]/);
-  assert.equal(work.match(/--shard=\$\{\{ matrix.shard \}\}\/3/g)?.length, 2);
+  assert.match(work, /shard: \[1, 2, 3, 4, 5\]/);
+  assert.equal(work.match(/--shard=\$\{\{ matrix.shard \}\}\/5/g)?.length, 2);
 });
 
 test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 단계 결과로 판정한다", () => {

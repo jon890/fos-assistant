@@ -34,7 +34,9 @@ memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속�
 memory_revision|USER|memory_id|DELETE|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
 notification|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대상은 공개 식별자이며 NotificationCleaner가 기간이 지난 행을 지운다.
 proactive_check|AGENT|id|DELETE|GAP|DELETE|user_id와 agent_id와 conversation_id FK가 있다. 알려진 공백: 대화 purge 뒤 report_json이 남는다.
+quality_run|GLOBAL|id|KEEP|KEEP|KEEP|그룹의 확인 기록이다. 지우지 않는다. requested_by_user_id 는 FK ON DELETE SET NULL 로 사용자를 지우면 비워지고, fixture 는 그 칸을 비워 둔다.
 result_delivery|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태, 시도 횟수, 항목의 출처와 결과 식별자, 마지막 시도의 상태와 실행 참조만 보존한다.
+server_secret|GLOBAL|name|KEEP|KEEP|KEEP|서버 비밀값이다. 사용자에 속하지 않고 KEK 로 감싼 값을 둔다(ADR-20261120 / server-secret).
 subagent_usage_job|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|DELETE|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
 task_run|USER|id|DELETE|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.crypto.domain.entity.ServerSecret;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.shared.domain.AuditedEntity;
@@ -118,6 +119,8 @@ class JpaAuditingTest {
                 agent.changeApiBaseUrl("http://changed.test");
             } else if (row instanceof AllowedPerson person) {
                 person.disable();
+            } else if (row instanceof ServerSecret secret) {
+                secret.clear(1L);
             } else if (row instanceof Task task) {
                 task.changeCheckEnabled(false);
                 task.moveNext(LATER.plusSeconds(10));
@@ -125,7 +128,7 @@ class JpaAuditingTest {
         }
         entityManager.flush();
         List<AuditedEntity> changed = fixture.rows().stream().filter(AuditedEntity.class::isInstance).map(AuditedEntity.class::cast).toList();
-        assertThat(changed).hasSize(4).allSatisfy(row -> {
+        assertThat(changed).hasSize(5).allSatisfy(row -> {
             assertThat(row.createdAt()).isEqualTo(micros(CREATED));
             assertThat(row.updatedAt()).isEqualTo(micros(LATER));
         });

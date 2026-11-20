@@ -5,11 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 허용 목록이 누구를 들여보내고 누구를 막는지 확인한다. */
 @BackendIntegrationTest
@@ -21,10 +27,21 @@ class SignInPolicyTest {
     @Autowired
     AllowedPersonRepository people;
 
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    TransactionTemplate transactions;
+
 
     @BeforeEach
     void setUp() {
         people.deleteAll();
+        agents.deleteAll();
+        users.deleteAll();
     }
 
 
@@ -86,5 +103,20 @@ class SignInPolicyTest {
     @DisplayName("빈 주소는 거절한다")
     void rejectsBlankAddress() {
         assertThat(policy.admit("")).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("평가 전용 사용자 주소는 로그인 판정과 완료 기록에서 막지만 꺼진 주소로 보지 않는다")
+    void evaluationAddressCannotSignInButIsNotRevoked() {
+        String email = "evaluation@quality.invalid";
+        people.save(AllowedPerson.of(email, "평가 사용자", "eval-check"));
+        AppUser saved = users.save(AppUser.of(email, "평가 사용자", 1L, UserRole.MEMBER));
+        transactions.executeWithoutResult(status -> users.markEvaluation(saved.id(), Instant.now()));
+
+        assertThat(policy.admit(email)).isEmpty();
+        assertThat(policy.recordCompletion(email)).isFalse();
+        // 예약 작업 발화가 이 판정으로 주인을 확인하므로 평가 사용자를 막지 않는다.
+        assertThat(policy.revoked(email)).isFalse();
     }
 }
