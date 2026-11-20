@@ -546,7 +546,7 @@ subagent goal의 본문 보호 확대는 이 작업의 범위 밖이다.
 `content_draft_image` 는 그 대화에서 만든 그림의 제목을 받아 사진 첨부 사본을 같은 대화에 만들고 `{assetId, fileName, photoDir, title}` 을 돌려준다. 원고와 초안은 그 사본을 보통 사진처럼 가리킨다.
 사본 행은 `source_artifact_id` 에 그림 행 번호가 있고 `message_id` 가 비어 있다. 위 「권한·원본·관찰 검사」 의 「보낸 첨부」 조건은 「보낸 첨부이거나 원고용 사본」 으로 읽는다. 나머지 조건은 같다.
 사본은 사진 순번, preview 의 빠진 사진, 보내지 않은 사진 수에 들지 않는다. snapshot 입력의 `ordinal` 은 보낸 사진 뒤에 첨부 번호 순서로 잇는다.
-같은 그림의 쓸 수 있는 사본이 있으면 다시 만들지 않는다. 그림 파일이 보관 기간 정리로 지워졌으면 `IMAGE_SOURCE_GONE`, 그 제목이 없으면 `IMAGE_SOURCE_UNKNOWN` 이고 두 결과 모두 고정 안내 `message` 를 함께 준다.
+같은 그림의 쓸 수 있는 사본이 있으면 다시 만들지 않는다. 그림 파일이 지워졌으면 사본이 있어도 거절하고, 이미 넣은 원고는 사본 번호로 남는다. 그림 파일이 보관 기간 정리로 지워졌으면 `IMAGE_SOURCE_GONE`, 그 제목이 없으면 `IMAGE_SOURCE_UNKNOWN` 이고 두 결과 모두 고정 안내 `message` 를 함께 준다.
 사전·사후 guard 와 오류 변환은 원고 도구와 같다. 설계와 근거는 [비서가 만든 이미지 설계](generated-image/design.md) 의 「PR4: 만든 그림을 블로그 원고에 넣기」 와 [ADR-20261120 / generated-image-draft](../adr/ADR-20261120-generated-image-draft.md) 가 갖는다.
 
 ### 첫 MCP 생성의 재시도 식별

@@ -10,8 +10,8 @@ list_media_observations와 record_media_observation은 같은 Control Plane MCP 
 입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)이 갖는다.
 fos-ctx REQUIRED_TOOLS에 두 도구를 추가해 서명을 만들지 못하면 막는다.
 원고 content_draft_write와 content_draft_read는 record_media_observation 뒤에, 만든 그림을 원고에 넣는 content_draft_image와 content_draft_preview, content_draft_save는 그 뒤에 등록되어 있다.
-앞의 두 도구의 저장·재시도·오류 계약은 [원고 저장 계약](content-draft.md#mcp와-배치)이, 뒤의 두 도구는 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결)이 갖는다.
-fos-ctx REQUIRED_TOOLS에도 네 원고 도구가 들어가며 살펴보기에서는 모두 차단한다.
+write와 read의 저장·재시도·오류 계약은 [원고 저장 계약](content-draft.md#mcp와-배치)이, content_draft_image는 [만든 그림을 원고에 넣기](content-draft.md#만든-그림을-원고에-넣기)가, preview와 save는 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결)이 갖는다.
+fos-ctx REQUIRED_TOOLS에도 원고 도구가 모두 들어가며 살펴보기에서는 모두 차단한다.
 새 정의는 memory_remember 앞에 넣고 작업 기준의 기존 도구 전체와 상대 등록 순서를 보존한다.
 memory_search가 합쳐진 기준에서는 그 정의·서명·살펴보기 허용과 이름·schema 기반 검사를 유지한다.
 도구 개수나 마지막 도구를 과거 값으로 고정하지 않는다.

@@ -105,9 +105,11 @@ class ContentDraftImagesTest extends ContentDraftFixture {
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.IMAGE_SOURCE_GONE));
         assertThat(attachments.count()).as("사본을 만들지 않는다").isEqualTo(copies);
         assertThat(drafts.read(owner, conversation.id(), saved.draft().draftId(), null).draft().revision()).isEqualTo(1);
-        assertThat(images.attach(owner, conversation.id(), "넣은 그림").assetId())
-            .as("그림 파일이 지워져도 이미 만든 사본을 돌려준다")
-            .isEqualTo(kept.assetId());
+        assertThatThrownBy(() -> images.attach(owner, conversation.id(), "넣은 그림"))
+            .as("사본이 있어도 지워진 그림은 새로 넣지 못한다")
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.IMAGE_SOURCE_GONE));
+        var revised = drafts.revise(owner, conversation.id(), saved.draft().draftId(), 1, draftWith(kept.assetId()));
+        assertThat(revised.draft().revision()).as("이미 넣은 원고는 사본 번호로 고쳐 저장한다").isEqualTo(2);
     }
 
 

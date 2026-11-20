@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 그 대화에서 만든 그림을 블로그 원고에 넣을 수 있게 사진 첨부 사본으로 꺼낸다(ADR-20261120 / generated-image-draft).
  *
- * <p>같은 그림의 쓸 수 있는 사본이 있으면 그것을 돌려준다. 그림 파일이 지워진 뒤에도 이미 만든 사본은 남는다(스펙
- * generated-image REQ19). 찾기부터 사본 쓰기까지 사용자와 대화 잠금 안에서 해 같은 그림을 동시에 넣어도 사본이 하나다.
+ * <p>같은 그림의 쓸 수 있는 사본이 있으면 그것을 돌려준다. 그림 파일이 지워졌으면 사본이 있어도 거절하고, 이미 넣은 원고는
+ * 사본으로 남는다(스펙 generated-image REQ19). 찾기부터 사본 쓰기까지 사용자와 대화 잠금 안에서 해 같은 그림을 동시에 넣어도 사본이 하나다.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,17 +38,17 @@ public class ContentDraftImages {
 
     /**
      * @throws ApiException {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 은 그 제목의 그림이 없을 때, {@link ErrorCode#IMAGE_SOURCE_GONE} 은
-     * 그림 파일이 보관 기간 정리로 지워졌고 쓸 수 있는 사본도 없을 때다
+     * 그림 파일이 보관 기간 정리로 지워졌을 때다
      */
     public ContentDraftImageView attach(CurrentUser user, Long conversationId, String title) {
         requireWritable(user, conversationId);
         return mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
             requireWritable(user, conversationId);
             Long artifactId = images.idByTitle(conversationId, title);
-            ChatAttachment copy = copies.findUsable(user.id(), conversationId, artifactId).orElseGet(() -> {
-                GeneratedImageSource source = images.readByTitle(conversationId, title);
-                return copies.create(user.id(), conversationId, artifactId, title, source.contentType(), source.bytes());
-            });
+            // 그림 파일이 지워졌으면 사본이 있어도 새로 넣지 못한다(스펙 REQ19). 이미 넣은 원고는 사본 번호를 그대로 쓴다.
+            GeneratedImageSource source = images.readByTitle(conversationId, title);
+            ChatAttachment copy = copies.findUsable(user.id(), conversationId, artifactId)
+                .orElseGet(() -> copies.create(user.id(), conversationId, artifactId, title, source.contentType(), source.bytes()));
             return new ContentDraftImageView(copy.id().toString(), copy.storedName(),
                 copies.agentDirectory(user.id(), conversationId), title);
         });
