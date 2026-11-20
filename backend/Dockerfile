@@ -11,12 +11,19 @@ COPY src ./src
 RUN gradle clean assemble --no-daemon
 
 # Stage 2: runtime
-FROM eclipse-temurin:21-jre-alpine
+# glibc 이미지다. 파일 읽기와 결과물 저장이 SecureDirectoryStream(openat+O_NOFOLLOW)으로 링크 바꿔치기 경쟁을
+# 막으려면 glibc 가 있어야 한다(musl 은 SecureDirectoryStream 을 주지 않는다). #359.
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-RUN apk add --no-cache curl \
- && addgroup -S assistant && adduser -S assistant -G assistant
+# uid 100, gid 101 은 앞선 Alpine 이미지(addgroup/adduser -S)가 주던 값이다. 운영 저장소가 이 id 로 마운트를
+# 소유해 번호를 그대로 고정한다. curl 은 HEALTHCHECK 가 쓴다.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd -r -g 101 assistant \
+ && useradd -r -u 100 -g 101 -M -s /usr/sbin/nologin assistant
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 

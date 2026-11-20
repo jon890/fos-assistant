@@ -94,9 +94,10 @@ public class ContentDraftReferences {
     }
 
 
+    /** 보낸 사진이나 만든 그림의 원고용 사본만 쓴다(ADR-20261120 / generated-image-draft). 사본은 메시지에 묶이지 않는다. */
     private boolean usable(ContentDraft draft, ChatAttachment row) {
         return draft.conversationId().equals(row.conversationId()) && draft.ownerUserId().equals(row.uploadedByUserId())
-            && row.messageId() != null && row.deletionRequestedAt() == null && row.deletedAt() == null
+            && (row.messageId() != null || row.isDraftImageCopy()) && row.deletionRequestedAt() == null && row.deletedAt() == null
             && row.expiresAt().isAfter(clock.instant());
     }
 

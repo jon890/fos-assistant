@@ -9,9 +9,9 @@ covers: `backend/src/main/java/com/bifos/assistant/mcp/`, `hermes/plugins/fos-ct
 list_media_observations와 record_media_observation은 같은 Control Plane MCP 서버에 등록되어 있다.
 입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)이 갖는다.
 fos-ctx REQUIRED_TOOLS에 두 도구를 추가해 서명을 만들지 못하면 막는다.
-원고 content_draft_write와 content_draft_read는 record_media_observation 뒤에, content_draft_preview와 content_draft_save는 그 뒤에 등록되어 있다.
-앞의 두 도구의 저장·재시도·오류 계약은 [원고 저장 계약](content-draft.md#mcp와-배치)이, 뒤의 두 도구는 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결)이 갖는다.
-fos-ctx REQUIRED_TOOLS에도 네 원고 도구가 들어가며 살펴보기에서는 모두 차단한다.
+원고 content_draft_write와 content_draft_read는 record_media_observation 뒤에, 만든 그림을 원고에 넣는 content_draft_image와 content_draft_preview, content_draft_save는 그 뒤에 등록되어 있다.
+write와 read의 저장·재시도·오류 계약은 [원고 저장 계약](content-draft.md#mcp와-배치)이, content_draft_image는 [만든 그림을 원고에 넣기](content-draft.md#만든-그림을-원고에-넣기)가, preview와 save는 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결)이 갖는다.
+fos-ctx REQUIRED_TOOLS에도 원고 도구가 모두 들어가며 살펴보기에서는 모두 차단한다.
 새 정의는 memory_remember 앞에 넣고 작업 기준의 기존 도구 전체와 상대 등록 순서를 보존한다.
 memory_search가 합쳐진 기준에서는 그 정의·서명·살펴보기 허용과 이름·schema 기반 검사를 유지한다.
 도구 개수나 마지막 도구를 과거 값으로 고정하지 않는다.
@@ -114,7 +114,7 @@ session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`, `approval_resume`, `file_space_put`가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_image`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`, `approval_resume`, `file_space_put`가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
@@ -187,6 +187,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |
 | `content_draft_write`, `content_draft_read` | [원고 저장 계약](content-draft.md#mcp와-배치) |
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
+| `content_draft_image` | [만든 그림을 원고에 넣기](content-draft.md#만든-그림을-원고에-넣기) |
 | `memory_remember` | [`docs/features/memory.md`](memory.md) 의 「에이전트가 기억을 남기는 길」 |
 | `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
 | `file_space_put` | 아래 「파일 공간에 넣는 도구」 |
@@ -252,7 +253,7 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 인자 검사는 `McpFileSpaceCalls`, 경로 판정과 결과 문구는 `McpFileSpaceTools` 가 갖는다.
 
 - 인자는 `path`(필수), `title`, `description` 뿐이다. 대화와 사용자는 인자로 받지 않고 서명한 `_fos_ctx` 의 origin 실행에서 정한다
-- `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다
+- `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다. `/workspace/` 가 아닌 경로에서 찾지 못하면 실패 글에 실행 공간에서 만든 파일은 `/workspace/` 경로로 다시 부르라는 안내를 덧붙인다. 실행 공간의 파일 도구가 결과물 폴더 경로에 쓴 파일은 Control Plane 에 보이지 않기 때문이다
 - 실행 공간은 Control Plane 이 읽기 전용으로 붙인 루트에서 링크를 따라가지 않고 읽는다. `mcp` 가 `workspace` 를 부르지 못해 `mcp.application.port.SandboxFiles` 를 `workspace` 가 구현한다
 - 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담는다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
 - 보관 자리가 차 있으면 10초까지 기다린다

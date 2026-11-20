@@ -163,7 +163,7 @@ class ChatRegenerateTest {
             .isEqualTo(history.get(1).id());
         // 다시 생성도 같은 결과물 폴더 단락을 붙인 같은 질문을 보낸다.
         String expected = artifactService.agentPreamble(
-            conversations.findById(conversationId).orElseThrow()) + "원래 질문";
+            conversations.findById(conversationId).orElseThrow(), false) + "원래 질문";
         assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())
             .contains("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.\n\n오늘은 ");

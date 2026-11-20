@@ -443,6 +443,7 @@ AAD 에 줄 번호와 대화, 대화 주인이 들어가 암호문을 다른 줄
 사용자가 대화를 지우면 정리 작업이 첨부 파일과 행을 함께 지운다. 지운 대화는 다시 열 수 없어 자리를 남길 까닭이 없다.
 읽기는 현재 대화 주인과 업로더, `deletion_requested_at`, `deleted_at`과 `expires_at`을 함께 확인한다.
 삭제 요청이나 만료가 있으면 파일 정리가 아직 끝나지 않았어도 원본과 관찰 본문을 제공하지 않는다.
+`source_artifact_id` 가 있으면 만든 그림을 블로그 원고에 넣으려고 만든 사본이고 그 값은 그림 행(`chat_artifact.id`)이다. 사본은 `message_id` 가 비어 있지만 보내지 않은 사진으로 세지 않고 메시지에 묶지 않는다. 그림 행이 대화 정리로 함께 지워져 FK 는 두지 않는다. 칸은 `V20261105074421__chat_attachment_source_artifact.sql` 이 갖고 까닭은 [ADR-20261120 / generated-image-draft](../../docs/adr/ADR-20261120-generated-image-draft.md) 가 갖는다.
 
 ### media_observation
 

@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import type { AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AGENT_CARD_HEIGHT, AgentPicker } from "./agent-picker";
+import { useShellTitleSlot } from "@/components/shell/title-slot";
+import { AgentSwitcher, AgentSwitcherSkeleton } from "./agent-switcher";
 import { AttentionLine } from "./attention-line";
 
 /*
@@ -22,24 +24,19 @@ type HeaderProps = {
   loading: boolean;
   agentsError: boolean;
   onRetryAgents(): void;
-  selectedCode: string;
-  onSelect(code: string): void;
-  /** 사진을 먼저 올려 빈 대화가 생겼다. 그 대화의 에이전트는 이미 정해졌다 */
-  locked: boolean;
 };
 
-/** 입력창 위에 그리는 인사와 에이전트 카드다 */
+/**
+ * 입력창 위에 그리는 인사다. 에이전트는 화면 위쪽 이름표로 고르므로 여기에는 카드가 없다
+ * (docs/features/app-shell/spec.md 의 REQ9). 목록을 읽지 못했거나 비었을 때의 안내만 남는다.
+ */
 export function StartScreenHeader({
   displayName,
   agents,
   loading,
   agentsError,
   onRetryAgents,
-  selectedCode,
-  onSelect,
-  locked,
 }: HeaderProps) {
-  const only = agents.length === 1 ? agents[0] : undefined;
   return (
     <div className="mx-auto mt-auto w-full max-w-3xl pb-2">
       <h1 className="mb-2 text-center text-2xl font-semibold">
@@ -48,15 +45,7 @@ export function StartScreenHeader({
           : "무엇을 도와드릴까요?"}
       </h1>
       <AttentionLine />
-      {loading ? (
-        // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
-        <div role="status" className="flex gap-2 overflow-hidden pb-1">
-          <span className="sr-only">에이전트를 읽는 중</span>
-          <Skeleton className={`${AGENT_CARD_HEIGHT} w-48 shrink-0`} />
-          <Skeleton className={`${AGENT_CARD_HEIGHT} w-48 shrink-0`} />
-          <Skeleton className={`${AGENT_CARD_HEIGHT} w-48 shrink-0`} />
-        </div>
-      ) : agentsError ? (
+      {loading ? null : agentsError ? (
         <div role="alert">
           <EmptyState
             title="에이전트 목록을 읽지 못했어요"
@@ -75,18 +64,62 @@ export function StartScreenHeader({
             <Link href="/agents?new=1">에이전트 만들기</Link>
           </Button>
         </div>
-      ) : only ? (
-        <p className="text-center text-sm font-medium">{only.name}</p>
-      ) : (
-        <AgentPicker
-          agents={agents}
-          selectedCode={selectedCode}
-          onSelect={onSelect}
-          disabled={locked}
-        />
-      )}
+      ) : null}
     </div>
   );
+}
+
+type SwitcherProps = {
+  agents: AgentView[];
+  loading: boolean;
+  agentsError: boolean;
+  selectedCode: string;
+  onSelect(code: string): void;
+  locked: boolean;
+};
+
+/**
+ * 새 대화 화면의 이름표 단추를 두 자리에 둔다. 넓은 화면은 대화 영역 맨 위 머리 줄, 휴대폰은 위 막대 가운데다
+ * (docs/features/app-shell/spec.md 의 REQ9). 폭은 CSS 로만 나눈다. 머리 줄은 좁은 폭에서 숨고 위 막대는 넓은
+ * 폭에서 숨으므로 한 번에 하나만 보인다.
+ */
+export function StartAgentSwitcher({
+  agents,
+  loading,
+  agentsError,
+  selectedCode,
+  onSelect,
+  locked,
+}: SwitcherProps) {
+  // 이름표가 없으면 위 막대 가운데 자리를 차지하지 않는다. 그 자리의 홈 링크가 그대로 남는다.
+  if (agentsError || (!loading && agents.length === 0)) return null;
+  const switcher = loading ? (
+    <AgentSwitcherSkeleton />
+  ) : (
+    <AgentSwitcher
+      agents={agents}
+      selectedCode={selectedCode}
+      onSelect={onSelect}
+      locked={locked}
+    />
+  );
+  return (
+    <>
+      <div
+        data-testid="start-agent-header"
+        className="hidden min-w-0 items-center md:flex"
+      >
+        {switcher}
+      </div>
+      <TitleSlotPortal>{switcher}</TitleSlotPortal>
+    </>
+  );
+}
+
+/** 휴대폰 위 막대 가운데 자리를 차지하고 그 안에 그린다. 그릴 것이 있을 때만 이 부품을 둔다 */
+function TitleSlotPortal({ children }: { children: React.ReactNode }) {
+  const titleSlot = useShellTitleSlot();
+  return titleSlot ? createPortal(children, titleSlot) : null;
 }
 
 type PromptsProps = {

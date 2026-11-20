@@ -20,8 +20,8 @@
 
 ## 의도 메모
 
-- HTML 파서 의존성을 더하지 않는다(설계 DECISION17). meta 태그만 정규식이나 작은 손 해석기로 찾는다.
-- 링크 받기는 스티커 받기와 실행기와 상한을 나눠 갖는다(설계 DECISION16). `ArtifactSourceFetcher.MAX_BYTES`(5MiB)를 쓰지 않는다.
+- HTML 파서 의존성을 더하지 않는다(설계 DECISION20). meta 태그만 정규식이나 작은 손 해석기로 찾는다.
+- 링크 받기는 스티커 받기와 실행기와 상한을 나눠 갖는다(설계 DECISION19). `ArtifactSourceFetcher.MAX_BYTES`(5MiB)를 쓰지 않는다.
 - 이름이 풀리지 않는 것과 내부망으로 풀리는 것을 같은 까닭(`BLOCKED`)으로 낸다. 서버 쪽 DNS 의 내부 이름을 알아내지 못하게 한다.
 - 로그에는 호스트와 까닭만 남긴다. 경로와 쿼리는 남기지 않는다.
 
@@ -47,7 +47,7 @@
 
 공개 메서드 `LinkImage fetch(URI link)`. 생성자는 `ArtifactSourceFetcher` 와 같은 꼴로 둘이다. `@Autowired` 운영 생성자 `(LinkImageProperties)` 와 테스트용 `(LinkImageProperties, ArtifactSourceDnsResolver, ArtifactSourceTransport)`. `LinkImage` 는 `record LinkImage(String contentType, byte[] bytes)` 로 같은 패키지나 `chat/artifact/infra` 에 둔다.
 
-- 주소 검사를 두 벌로 만들지 않는다(설계 DECISION16). `ArtifactSourceFetcher.validate` 의 허용 목록 앞부분(https, 443, 사용자 정보, 조각, 호스트 형식, 제어 문자)을 package-private static 메서드로 빼서 두 객체가 같이 부르고, `ArtifactSourceFetcher` 는 그 뒤에 허용 목록만 더 본다. 링크 받기에서는 그 거절(`ArtifactSourceRejectedException`)을 `BLOCKED` 로 바꾼다
+- 주소 검사를 두 벌로 만들지 않는다(설계 DECISION19). `ArtifactSourceFetcher.validate` 의 허용 목록 앞부분(https, 443, 사용자 정보, 조각, 호스트 형식, 제어 문자)을 package-private static 메서드로 빼서 두 객체가 같이 부르고, `ArtifactSourceFetcher` 는 그 뒤에 허용 목록만 더 본다. 링크 받기에서는 그 거절(`ArtifactSourceRejectedException`)을 `BLOCKED` 로 바꾼다
 - 주소마다: 위 주소 검사 → `blockedHosts` 검사 → 이름 풀기, 모든 주소가 `isPublic` 이고 `blockedCidrs` 밖 → 그중 하나에 고정 연결. `isPublic` 은 `ArtifactSourceFetcher` 의 static 메서드를 그대로 부른다.
 - 301, 302, 303, 307, 308 이면 `Location` 을 현재 주소 기준으로 풀어 다시 한다. `maxRedirects` 를 넘으면 `BLOCKED`. `Location` 이 없거나 주소로 풀리지 않으면 `FAILED`. 넘기기 횟수는 페이지 주소와 대표 사진 주소를 합쳐 링크 하나에 5번이다.
 - 요청 머리: `Accept: image/png, image/jpeg, image/webp, image/gif, text/html;q=0.9`, 일반 브라우저 꼴 `User-Agent`(개인 정보 없는 고정 글), `Accept-Encoding: identity`. 쿠키와 인증 머리는 보내지 않는다.

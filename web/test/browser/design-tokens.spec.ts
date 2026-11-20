@@ -1,6 +1,7 @@
 import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 import { contrast, parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
+import { pickAgent } from "./helpers.ts";
 
 /** `globals.css` 가 두 밝기 모드에서 모두 값을 가져야 하는 색 토큰이다. 이름은 ADR-023 과 ADR-051 의 표를 따른다. */
 const TOKENS = [
@@ -369,7 +370,7 @@ function expectBorderToken(colors: Awaited<ReturnType<typeof readBorder>>, name:
 
 test("두 밝기 모드에서 사이드바와 작업 과정 패널의 테두리는 border 색이다", async ({ page }, testInfo) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   await page.getByRole("textbox", { name: "메시지" }).fill("테두리 색 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
@@ -413,7 +414,7 @@ test("실행 기록의 성공 배지는 글자가 success 색이고 바탕이 su
     data: { text: "성공 배지 색 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
 
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   const badge = records.locator('[data-slot="badge"]').filter({ hasText: /^성공$/ }).first();

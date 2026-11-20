@@ -224,10 +224,27 @@ class FileSpaceTurnTest {
     @Test
     @DisplayName("실행 입력에 파일 공간 단락과 실패 규칙이 들어 있다")
     void preambleHasFileSpaceRules() {
-        String preamble = artifactService.agentPreamble(conversation);
+        String preamble = artifactService.agentPreamble(conversation, false);
 
         assertThat(preamble)
-            .contains("[파일 공간]", "file_space_put 도구가 있을 때만", "넣었다고 답하지 않고 까닭을 알린다", "already");
+            .contains("[파일 공간]", "file_space_put 도구가 있을 때만", "넣었다고 답하지 않고 까닭을 알린다", "already")
+            .doesNotContain("/workspace/");
+    }
+
+
+    @Test
+    @DisplayName("실행 공간 에이전트의 실행 입력은 넣을 파일을 /workspace/ 에 만들고 그 경로로 넣으라고 한다")
+    void sandboxPreambleSendsFilesThroughWorkspace() {
+        String preamble = artifactService.agentPreamble(conversation, true);
+
+        assertThat(preamble)
+            .contains(
+                "아래 다섯 줄은 file_space_put 도구가 있을 때만 따른다.",
+                "- 넣을 파일은 /workspace/ 아래에 만들고 file_space_put 의 path 에 그 /workspace/ 경로를 그대로 쓴다."
+                    + " 위 결과물 폴더 경로에 만든 파일은 찾지 못한다.\n",
+                "파일 도구는 실행 공간에서 돌아 위 폴더에 쓴 파일이 이 서비스에 보이지 않는다.",
+                "넣었다고 답하지 않고 까닭을 알린다")
+            .doesNotContain("위 폴더에 결과물 파일을 직접 쓴다", "아래 네 줄은");
     }
 
 

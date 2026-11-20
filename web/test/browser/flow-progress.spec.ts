@@ -1,4 +1,5 @@
 import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
+import { pickAgent } from "./helpers.ts";
 import { LONG_ACTIVITY_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import type { Locator } from "../../node_modules/@playwright/test/index.js";
 
@@ -28,7 +29,7 @@ test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인
   page,
 }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(
@@ -96,7 +97,7 @@ test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인
 
 test("사건 없는 자식은 저장된 줄에서 빼고 머리는 수 없이 한 줄로 보인다", async ({ page }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("사건 없는 자식 검사");
@@ -125,7 +126,7 @@ test("사건 없는 자식은 저장된 줄에서 빼고 머리는 수 없이 �
 
 test("병렬 도우미가 거꾸로 끝나도 저장된 줄의 시간이 맞고 모델과 토큰은 보이지 않는다", async ({ page }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("병렬 하위 에이전트 검사");
@@ -159,7 +160,7 @@ test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 �
   page,
 }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   await page.getByRole("textbox", { name: "메시지" }).fill("그냥 대화");
   await page.getByRole("button", { name: "보내기" }).click();
 
@@ -208,7 +209,7 @@ for (const { durationMs, duration } of [
     await route.fulfill({ response, json: turns });
   });
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   // 이 입력의 도우미는 모델 이름과 토큰 수를 싣고 끝난다. 그 값이 대화에 나오지 않는지 본다.
   await page.getByRole("textbox", { name: "메시지" }).fill("하위 에이전트 칸 검사");
   await page.getByRole("button", { name: "보내기" }).click();
@@ -257,7 +258,7 @@ test("진행 중 블록은 답이 없을 때도 답이 흘러나올 때도 비�
   let released = false;
   try {
     await page.goto("/new");
-    await page.getByRole("radio", { name: "브라우저 비서" }).click();
+    await pickAgent(page, "브라우저 비서");
     await page.getByRole("textbox", { name: "메시지" }).fill(pendingInput);
     await page.getByRole("button", { name: "보내기" }).click();
     await hermes.waitForHeldRun();
@@ -282,7 +283,7 @@ test("진행 중 블록은 답이 없을 때도 답이 흘러나올 때도 비�
   // 답이 흘러나오는 중이다. 이 입력은 첫 조각을 보낸 뒤 도구 줄을 남기고 기다린다.
   try {
     await page.goto("/new");
-    await page.getByRole("radio", { name: "브라우저 비서" }).click();
+    await pickAgent(page, "브라우저 비서");
     await page.getByRole("textbox", { name: "메시지" }).fill(LONG_ACTIVITY_PROBE);
     await page.getByRole("button", { name: "보내기" }).click();
     const answer = page.getByTestId("assistant-message").last();
@@ -321,7 +322,7 @@ test("기다림 점이 있던 자리에 답이 들어와 얼굴과 첫 줄이 �
   let released = false;
   try {
     await page.goto("/new");
-    await page.getByRole("radio", { name: "브라우저 비서" }).click();
+    await pickAgent(page, "브라우저 비서");
     await page.getByRole("textbox", { name: "메시지" }).fill("짧은 답");
     await page.getByRole("button", { name: "보내기" }).click();
     await hermes.waitForHeldRun();

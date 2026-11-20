@@ -112,6 +112,10 @@ description: 네이버 블로그의 임시저장 글을 읽고 고치며, 대화
 ```
 
 사진은 사용자가 보낸 순서대로 놓는다. 사용자가 바꾸라고 할 때만 바꾼다.
+
+**이 대화에서 만든 그림도 사진처럼 넣을 수 있다.** 사용자가 그림을 글에 넣어 달라고 하면 `content_draft_image` 에 그림 제목을 글자 그대로 준다.
+받은 `fileName` 으로 `[사진 <N>: <fileName>]` 줄을 쓰고 `N` 은 다른 사진 번호와 겹치지 않게 붙인다. 사진을 올리지 않은 대화면 받은 `photoDir` 을 `photo_dir` 에 쓴다.
+`IMAGE_SOURCE_GONE` 이나 `IMAGE_SOURCE_UNKNOWN` 을 받으면 초안을 바꾸지 않고 받은 안내대로 사용자에게 알린다.
 **같은 사진은 글에 한 번만 넣는다.** `CONTENT_DRAFT_DUPLICATE_PHOTO` 를 받으면 중복된 블록을 지우고 다시 저장한다.
 `photo_notes` 에 사진 번호마다 무엇을 보고 썼는지 적으면 미리보기에만 보이고 네이버에는 들어가지 않는다.
 
@@ -124,7 +128,7 @@ description: 네이버 블로그의 임시저장 글을 읽고 고치며, 대화
 1. `content_draft_write` 로 확인받은 원고를 남긴다. 위 「초안」 의 칸은 `draft` 로 이렇게 옮긴다
    - `title`, `category`, `tags` 는 같은 이름의 칸에 그대로 넣는다
    - 본문은 순서대로 `blocks` 로 나눈다. 글은 `{"type":"paragraph","text":...}`, 사진은 `{"type":"image","assetId":...,"caption":...}`, 스티커는 `{"type":"sticker","code":...}`, 지도는 `{"type":"map","name":...,"address":...}` 이다
-   - 사진의 `assetId` 는 대화에 첨부된 사진의 ID 다. 파일 이름을 넣지 않는다. `photo_dir` 은 넣지 않는다
+   - 사진의 `assetId` 는 대화에 첨부된 사진의 ID 다. 만든 그림은 `content_draft_image` 가 준 `assetId` 다. 파일 이름을 넣지 않는다. `photo_dir` 은 넣지 않는다
    - 처음 저장할 때는 `requestId` 를 하나 정해 넣고, 고칠 때는 `draftId` 와 `expectedRevision` 을 넣는다
 2. `content_draft_preview` 를 `draftId` 와 `revision` 으로 부른다. `bindingId` 는 생략한다. 결과의 포함한 사진과 빠진 사진을 사용자에게 알린다
 3. `content_draft_save` 를 `snapshotId` 로 부른다. 사용자에게 승인 카드가 간다

@@ -198,7 +198,7 @@ test("설정의 「내 데이터」 묶음에서 파일 공간을 열고 에이�
   const group = page
     .getByRole("navigation", { name: "설정 메뉴" })
     .getByRole("group", { name: "내 데이터" });
-  await expect(group.getByRole("link")).toHaveText([/^파일 공간/, /^사용량/]);
+  await expect(group.getByRole("link")).toHaveText([/^파일 공간/]);
   await group.getByRole("link", { name: "파일 공간" }).click();
 
   await expect(page).toHaveURL(/\/files$/);

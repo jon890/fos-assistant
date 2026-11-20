@@ -153,10 +153,7 @@ public class GeneratedImageService {
      * 기간 정리로 파일을 지웠을 때다
      */
     public GeneratedImageSource readByTitle(Long conversationId, String title) {
-        ChatArtifact image = artifacts.findGeneratedImages(conversationId).stream()
-            .filter(it -> GeneratedImageTitle.ofPath(it.path()).equals(title))
-            .findFirst()
-            .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "no generated image has this title"));
+        ChatArtifact image = findByTitle(conversationId, title);
         Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(conversationId, image.path());
         if (file.isEmpty() || !Files.isRegularFile(file.get())) {
             throw gone();
@@ -175,6 +172,32 @@ public class GeneratedImageService {
             }
             throw ex;
         }
+    }
+
+
+    /**
+     * 그 대화에서 파일이 남은 그림 행의 번호를 제목으로 찾는다. 바이트는 읽지 않는다(ADR-20261120 / generated-image-draft).
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     *
+     * @throws ApiException {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 은 그 제목의 그림이 없을 때, {@link ErrorCode#IMAGE_SOURCE_GONE} 은
+     * 보관 기간 정리로 파일을 지웠을 때다
+     */
+    public Long liveIdByTitle(Long conversationId, String title) {
+        ChatArtifact image = findByTitle(conversationId, title);
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(conversationId, image.path());
+        if (file.isEmpty() || !Files.isRegularFile(file.get())) {
+            throw gone();
+        }
+        return image.id();
+    }
+
+
+    private ChatArtifact findByTitle(Long conversationId, String title) {
+        return artifacts.findGeneratedImages(conversationId).stream()
+            .filter(it -> GeneratedImageTitle.ofPath(it.path()).equals(title))
+            .findFirst()
+            .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "no generated image has this title"));
     }
 
 

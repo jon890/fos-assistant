@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 /**
  * 링크 사진 받기가 쓰는 작은 해석들이다. 페이지의 대표 사진 meta 찾기, 주소 풀기, 사진 머리 바이트 확인을 한다.
  *
- * <p>HTML 파서 의존성을 더하지 않는다(설계 generated-image DECISION17). 대표 사진은 meta 태그 하나라 태그만 훑는다.
+ * <p>HTML 파서 의존성을 더하지 않는다(설계 generated-image DECISION20). 대표 사진은 meta 태그 하나라 태그만 훑는다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class LinkPageParts {
