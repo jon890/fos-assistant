@@ -81,6 +81,24 @@ class EventWatchPollerTest extends EventWatchTestSupport {
 
 
     @Test
+    @DisplayName("사건 조회 중 감지를 끄면 이미 가져온 새 항목으로 실행을 열지 않는다")
+    void disableDuringListingPreventsEventRun() throws InterruptedException {
+        when(feed.listEvents(anyString(), anyString(), any())).thenAnswer(invocation -> {
+            watches.disable(user.id(), agent.id(), CONNECTOR);
+            return ConnectorEventListing.success(List.of(new ConnectorEventListing.Item("m1", null, List.of("INBOX"))), false);
+        });
+
+        poller.checkAll();
+        awaitIdle();
+
+        assertThat(state()).isNull();
+        assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM agent_execution WHERE user_id = ?")).isZero();
+        assertThat(stub().received()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("같은 항목을 다시 받아도 다시 깨우지 않고, 저장된 상태만으로 다시 확인해도 같으며, 겹침 안에 늦게 온 항목은 깨운다 (REQ2)")
     void sameItemsNeverWakeTwiceAndLateItemsDo() throws InterruptedException {
         listing("m1");

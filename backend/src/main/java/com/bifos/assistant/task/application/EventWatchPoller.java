@@ -194,9 +194,14 @@ public class EventWatchPoller {
             fresh.stream().limit(properties.maxItemsPerRun()).toList());
         try {
             proactiveChecks.startEvent(owner, target.agentCode(), batch,
-                check -> watches.update(target.bindingId(), current -> current.reachable()
-                    .checked(now, EventWatchResult.WOKE, fresh.size())
-                    .consumed(queriedAt, nowSeen, true, today)));
+                check -> {
+                    // 조회 중 감지를 껐거나 바인딩을 뗐으면 살펴보기 저장도 취소해 모델을 부르지 않는다.
+                    if (watches.update(target.bindingId(), current -> current.reachable()
+                        .checked(now, EventWatchResult.WOKE, fresh.size())
+                        .consumed(queriedAt, nowSeen, true, today)).isEmpty()) {
+                        throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "event watch is no longer enabled");
+                    }
+                });
         } catch (ApiException ex) {
             boolean busy = ex.code() == ErrorCode.USER_BUSY || ex.code() == ErrorCode.CONVERSATION_BUSY;
             update(target.bindingId(), current -> current.reachable()
