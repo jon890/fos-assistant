@@ -1,0 +1,41 @@
+{
+  "name": "hermes-oauth",
+  "description": "플러그인 OAuth 연결의 Hermes 쪽: 제공자 표, OAuth 파일, 대시보드 경로, 실행기의 토큰 통로 env",
+  "pr_scope": "대시보드 plugin 이 OAuth 선언을 읽고 교환·갱신·취소와 OAuth 파일을 다루며 실행기가 토큰 통로 주소를 플러그인 프로세스에 넣게 한다.",
+  "deferred": [
+    {
+      "what": "Control Plane 의 OAuth 흐름: 서버 비밀값의 OAuth 앱 줄, 상태 값, 시작·돌아오기·확인·해제 갈래, 토큰 통로, 갱신 주기, 끊김과 알림(REQ2-REQ9, REQ11)",
+      "why": "PR1 전체가 운영 코드 줄 수 상한을 넘어 Hermes 쪽을 먼저 머지한다. 서버 비밀값 PR1a 가 머지되어야 시작한다",
+      "after": "이 계획(hermes-oauth)과 서버 비밀값 PR1a 머지"
+    },
+    {
+      "what": "웹의 연결 단추, 돌아오는 경로, 서버 비밀값 화면의 OAuth 앱 줄, ADMIN_SECRETS 알림 이동(REQ3, REQ4, REQ5 의 화면)",
+      "why": "Control Plane API 가 있어야 화면이 동작한다. 줄 수 상한 때문에 나눈다. Control Plane PR 과 합칠지는 코디네이터가 정한다",
+      "after": "Control Plane OAuth 흐름 PR 머지"
+    },
+    {
+      "what": "Gmail 플러그인의 Google OAuth 전환(REQ10)",
+      "why": "스펙 PR 나눔의 PR2 다",
+      "after": "PR1 전체 머지"
+    },
+    {
+      "what": "저장소 밖 커리어 플러그인의 GitHub OAuth 선언과 토큰 통로 사용",
+      "why": "다른 저장소의 PR 이다",
+      "after": "PR1 전체 머지"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/connector-oauth/spec.md",
+  "design": "docs/features/connector-oauth/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ1", "REQ6"],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ1"]},
+    {"number": 2, "file": "phase-02.md", "execution_profile": "deep", "requirements": ["REQ6"]},
+    {"number": 3, "file": "phase-03.md", "execution_profile": "deep", "requirements": ["REQ6"]},
+    {"number": 4, "file": "phase-04.md", "execution_profile": "deep", "requirements": ["REQ6"]}
+  ]
+}
