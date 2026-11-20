@@ -23,7 +23,8 @@ from .common import (
     logger,
 )
 
-from .connector_launch import _binding_env
+from .connector_launch import _binding_env, _oauth_token_url
+from .connector_oauth_store import _read_pending_values
 
 from .connector_manifest import (
     _connector_manifest,
@@ -98,6 +99,8 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `listing` 이면 `tool` 이 없다. `vault` 는 그 플러그인의 보관 파일이어야 한다.
     보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 플러그인의 옛 연결도 확인된다.
     `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 플러그인만 쓴다.
+    `oauth` 는 선택이고 `vault` 와만 받는다. `current` 면 본 자리 보관 파일과 OAuth 파일의 통로 주소를, `pending` 이면 대기 보관 파일의
+    칸 값과 대기 OAuth 파일의 통로 주소를 넣는다. `pending` 은 본 자리 보관 파일이 없어도 된다(docs/features/connector-oauth/design.md).
     """
     from starlette.responses import JSONResponse
     global _connector_calls
@@ -110,19 +113,30 @@ async def _connector_call_request(request, connector_id: str, listing=False):
         return _rejected("없는 connector 다", 404)
     body = await _json_object(request)
     shapes = ({"values"}, {"vault"}) if listing else ({"tool", "values"}, {"tool", "vault"})
-    if (body is None or set(body) - {"owner_browser"} not in shapes
+    if (body is None or set(body) - {"owner_browser", "oauth"} not in shapes
             or ("values" in body and not isinstance(body["values"], dict))
             or ("vault" in body and (not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])))):
         return _rejected("tool 과, values 나 vault 가운데 하나만 필요하다")
+    oauth_mode = body.get("oauth")
+    if "oauth" in body and ("vault" not in body or oauth_mode not in ("current", "pending")
+                            or manifest.get("oauth") is None):
+        return _rejected("oauth 는 단추로 연결하는 플러그인의 vault 와 함께 current 나 pending 으로만 받는다")
     if listing and manifest["schema"] != TOOL_LIST_SCHEMA:
         return _rejected("도구 목록은 assistant.json 이 없는 표준 플러그인에서만 받는다")
     # 도구 목록은 도구를 부르지 않는다. 로그에 남길 이름만 둔다.
     tool = "tools/list" if listing else body["tool"]
     if not listing and (not isinstance(tool, str) or tool not in manifest["call_tools"]):
         return _rejected("이 플러그인이 선택지나 확인에 쓰는 도구가 아니다")
+    token_url = ""
     if "vault" in body:
         try:
-            stored = await asyncio.to_thread(_read_vault, body["vault"])
+            if oauth_mode == "pending":
+                stored = await asyncio.to_thread(_read_pending_values, body["vault"])
+            else:
+                stored = await asyncio.to_thread(_read_vault, body["vault"])
+            if oauth_mode is not None:
+                token_url = await asyncio.to_thread(_oauth_token_url, body["vault"], connector_id,
+                                                    oauth_mode == "pending")
         except Exception as error:
             logger.warning("dashboard-profile-api: 플러그인 %s 의 보관 파일을 읽지 못했다: %s",
                            connector_id, type(error).__name__)
@@ -145,6 +159,9 @@ async def _connector_call_request(request, connector_id: str, listing=False):
         env[field["env"]] = value
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    if manifest.get("oauth_env") is not None:
+        # `oauth` 를 주지 않은 호출은 붙여 넣은 칸 값을 쓴다. 통로 주소는 빈 값이다.
+        env[manifest["oauth_env"]] = token_url
     if manifest["owner_attachments_env"] is not None:
         # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 플러그인이 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
         env[manifest["owner_attachments_env"]] = ""

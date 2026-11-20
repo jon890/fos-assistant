@@ -100,7 +100,7 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 | `token_url` | 토큰 통로 주소. 연결 표식을 담는다 |
 | `nonce` | 대기 파일에만 있다. 이 흐름을 가리킨다 |
 
-begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pending` 과, 토큰 없이 `nonce` 만 담은 대기 OAuth 파일 `<보관 파일 id>.oauth.pending` 을 만든다. 교환은 `nonce` 가 같을 때만 대기 OAuth 파일에 토큰을 채운다. commit 은 대기 보관 파일의 값을 지금 보관 파일 쓰기(`_write_vault`)로 본 자리에 써서 값이 같으면 파일을 바꾸지 않고, 대기 OAuth 파일만 rename 한다. 보관 파일을 rename 하면 값이 같아도 리비전(inode, 수정 시각, 크기)이 바뀌어 재시작 대기가 되기 때문이다. 대시보드가 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
+begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pending` 과, 토큰 없이 `nonce` 만 담은 대기 OAuth 파일 `<보관 파일 id>.oauth.pending` 을 만든다. 교환은 `nonce` 가 같을 때만 대기 OAuth 파일에 토큰을 채운다. commit 은 대기 보관 파일의 값을 지금 보관 파일 쓰기(`_write_vault`)로 본 자리에 써서 값이 같으면 파일을 바꾸지 않고, 대기 OAuth 파일의 내용을 본 연결 통로 주소로 바꿔 본 자리 OAuth 파일로 쓴다. 보관 파일을 rename 하면 값이 같아도 리비전(inode, 수정 시각, 크기)이 바뀌어 재시작 대기가 되기 때문이다. 대시보드가 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
 
 **보관 파일 id 마다 잠금을 두고, 잡는 순서는 보관 파일 잠금이 먼저, 전역 `PROFILE_WRITE_LOCK` 이 나중이다.** 갱신, begin, commit, discard, 취소, 보관 파일 `PUT`·`DELETE` 가 모두 보관 파일 잠금 안에서 읽고 고쳐 쓴다. 본 보관 파일을 쓰는 commit 과 `PUT`·`DELETE` 는 보관 파일 잠금 다음 전역 잠금을 잡는다. 바인딩 설치는 지금처럼 전역 잠금만 잡고 보관 파일 잠금을 잡지 않는다. 그래서 설치가 보관 파일과 리비전을 읽는 동안 본 보관 파일이 바뀌지 않고, 잡는 순서가 거꾸로 되는 일이 없다. 갱신과 취소는 보관 파일 잠금만 잡고 서비스를 부르며 전역 잠금은 잡지 않는다. 그래서 서비스 응답을 기다리는 동안 다른 profile 쓰기가 멈추지 않고, 같은 보관 파일을 쓰려는 요청만 전역 잠금 밖에서 기다린다. 바뀐 refresh token 을 잃지 않으려고 갱신은 서비스 호출부터 파일 쓰기까지 잠금을 놓지 않는다.
 
@@ -121,7 +121,7 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | `POST /api/connector-oauth/authorize-url` | 플러그인 id, `mode`(`install`·`authorize`), client ID, App 이름, 돌아오는 주소, 상태 값, PKCE challenge | 로그인 주소. GitHub `install` 은 App 설치 화면, `authorize` 는 일반 허락 화면. Google 은 동의 화면(`access_type=offline`, `prompt=consent`) |
 | `POST /api/connector-oauth/begin` | 보관 파일 id, 단추 밖 칸 값 | 대기 보관 파일을 쓰고 `nonce` 를 답한다 |
 | `POST /api/connector-oauth/exchange` | 보관 파일 id, `nonce`, client ID·secret, 코드, PKCE verifier(있을 때), 돌아오는 주소, 통로 주소 | `outcome`. 성공하면 대기 OAuth 파일을 쓰고 access token 과 만료 시각을 답한다. Google 은 받은 scope 가 요청과 다르면 `scope_denied` |
-| `POST /api/connector-oauth/commit` | 보관 파일 id, `nonce` | 대기 파일 둘을 본 자리로 옮긴다. `nonce` 가 다르면 409 |
+| `POST /api/connector-oauth/commit` | 보관 파일 id, `nonce`, 본 연결 통로 주소 | 대기 파일 둘을 본 자리로 옮긴다. 대기 파일의 통로 주소는 대기 표식이라 본 자리 OAuth 파일에는 받은 본 연결 주소를 쓴다. `nonce` 가 다르면 409 |
 | `POST /api/connector-oauth/discard` | 보관 파일 id, `nonce`, client ID·secret, access token | 대기 파일을 지운다. GitHub 은 그 access token 하나만 취소한다. Google 은 취소하지 않는다(아래 「취소 범위」) |
 | `POST /api/connector-oauth/refresh` | 보관 파일 id, client ID·secret | `outcome`, access token, 만료 시각. 바뀐 refresh token 은 답하기 전에 OAuth 파일에 쓴다 |
 | `POST /api/connector-oauth/revoke` | 보관 파일 id, client ID·secret, access token(있으면) | `outcome`. GitHub 은 access token 이 없으면 먼저 갱신해 받는다. 파일은 지우지 않는다. 지금 해제 경로의 보관 파일 `DELETE` 가 보관 파일과 OAuth 파일, 대기 파일 둘을 함께 지운다. 취소를 건너뛰거나 실패해도 refresh token 이 남지 않는다 |
@@ -174,7 +174,7 @@ sequenceDiagram
   D->>S: 토큰 교환
   D-->>C: ok, access token(대기 칸에 둔다)
   C->>D: 확인 도구 호출(oauth: pending)
-  C->>D: commit(nonce)
+  C->>D: commit(nonce, 본 연결 통로 주소)
   C-->>W: 연결됨
 ```
 

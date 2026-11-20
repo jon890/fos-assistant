@@ -152,14 +152,20 @@ def _fill_pending(vault: str, nonce: str, data: dict) -> None:
     _write_oauth(vault, connector, {**pending, **data, "nonce": nonce}, pending=True)
 
 
-def _commit(vault: str, nonce: str) -> None:
-    """대기 파일 둘을 본 자리로 옮긴다. 보관 파일은 `_write_vault` 로 다시 써 값이 같으면 파일과 리비전이 그대로다."""
+def _commit(vault: str, nonce: str, token_url: str | None = None) -> None:
+    """대기 파일 둘을 본 자리로 옮긴다. 보관 파일은 `_write_vault` 로 다시 써 값이 같으면 파일과 리비전이 그대로다.
+
+    `token_url` 을 주면 본 자리 OAuth 파일의 통로 주소를 그것으로 둔다. 대기 파일의 주소는 대기 표식(`p...`)이라
+    본 연결 표식(`k...`)으로 바꿔야 한다(docs/features/connector-oauth/design.md 의 「Control Plane API」).
+    """
     pending = _pending_with(vault, nonce)
     values = _read_pending_values(vault)
     if not pending["refresh_token"] or values is None or values["connector"] != pending["connector"]:
         raise NonceMismatch()
     connector = pending.pop("connector")
     pending.pop("nonce")
+    if token_url is not None:
+        pending["token_url"] = token_url
     _write_vault(vault, connector, values["values"])
     _write_oauth(vault, connector, pending)
     _discard_files(vault)
@@ -175,6 +181,11 @@ def _discard(vault: str, nonce: str) -> None:
 def _discard_files(vault: str) -> None:
     for suffix in (OAUTH_PENDING_SUFFIX, VAULT_PENDING_SUFFIX):
         _side_path(vault, suffix).unlink(missing_ok=True)
+
+
+def _has_oauth(vault: str) -> bool:
+    """본 자리 OAuth 파일이 있는가."""
+    return _side_path(vault, OAUTH_SUFFIX).exists()
 
 
 def _delete_oauth(vault: str) -> bool:

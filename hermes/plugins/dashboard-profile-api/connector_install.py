@@ -76,6 +76,7 @@ from .connector_vault import (
 from .profiles import (
     _check_skills_list,
 )
+from .connector_oauth_store import _has_oauth
 
 from .connector_output import (
     _sandbox_connector_output_directory,
@@ -238,7 +239,12 @@ async def _connector_request(request):
             revision = await asyncio.to_thread(_vault_revision, body["bind"]["vault"])
             # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 플러그인의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
             fields = {field["key"] for field in manifest["fields"]}
-            values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields})
+            # 단추로 연결한 연결(OAuth 파일이 있음)은 단추 칸이 비어도 받는다. 보관 파일 잠금은 잡지 않는다. 본 보관 파일을
+            # 쓰는 쪽이 보관 파일 잠금 다음 이 전역 잠금을 잡으므로 읽는 동안 파일이 바뀌지 않는다(docs/features/connector-oauth/design.md).
+            oauth = (manifest.get("oauth") is not None
+                     and await asyncio.to_thread(_has_oauth, body["bind"]["vault"]))
+            values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields},
+                                   oauth=oauth)
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             owner_output = None

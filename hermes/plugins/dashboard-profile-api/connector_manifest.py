@@ -366,6 +366,10 @@ def _server_matches(manifest: dict, server: dict) -> bool:
         elif name in manifest["operator_env"]:
             if value not in (reference, expected["env"][name]):
                 return False
+        elif name == manifest.get("oauth_env"):
+            # 통로 주소 env 는 실행기 정의가 빈 값으로 둔다. 옛 정의와 펼친 정의는 참조도 된다(docs/features/connector-oauth/design.md).
+            if value not in ("", reference):
+                return False
         elif value != reference and not (value == "" and name in manifest["optional_env"]):
             return False
     return True

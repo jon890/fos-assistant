@@ -16,7 +16,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 뿐. 운영자 env 이름은 쓰지 않고 성공으로 답한다 | 200. 운영자 env 이름은 `{profile, key, restart_required: false}` | 400 다른 key, 카탈로그 플러그인의 `fields[].env`(칸 값은 보관 파일에만 둔다), `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 플러그인 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
-| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 플러그인이면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 플러그인의 보관 파일이 없다 |
+| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 단추 연결을 선언한 플러그인은 `vault` 와 함께 `oauth` 를 받는다. `current` 면 보관 파일과 OAuth 파일의 통로 주소를, `pending` 이면 대기 보관 파일 값과 대기 OAuth 파일의 통로 주소를 `token_env` 로 넣는다. `pending` 은 본 자리 보관 파일이 없어도 된다. `oauth` 가 없으면 통로 주소는 빈 값이다. 사용자 브라우저를 쓰는 플러그인이면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 플러그인의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}`. 도구를 찾아 부른 응답에는 부르기 직전 `tools/list` 의 `read_only`(그 도구의 `readOnlyHint` 가 참인가)를 더한다 | 504 실행됐는지 모른다 |
 | `POST /api/connectors/<id>/events` | 사건 감지를 선언한 플러그인의 조회 도구를 그 profile 의 값으로 불러 새 항목을 낸다 | `{profile, since}`. `since` 는 0 이상의 정수 초다 | `{ok: true, items: [{id, received_at, labels}], truncated}` 또는 `{ok: false, error: <공통 어휘>}` | 404 사건 감지를 선언하지 않았거나 설치하지 않은 플러그인 |
 | `POST /api/connectors/<id>/prepare` | Control Plane 이 금융 준비를 위해 그 플러그인의 준비 도구(`execution_guard.prepare_tool`)를 한 번 부른다. 주문을 보내지 않는다 | `{profile, hermes_tool, args}` | `{ok: true, result: {v, executionArgs, summary}}` 또는 `{ok: false, error: <공통 어휘>, stage, code}`. `stage` 는 멈춘 검사의 고정 단계 코드, `code` 는 플러그인이 선언한 오류 코드나 SDK 입력 거절 코드이고 없으면 `-` 다. 인자, 계좌, 원격 응답은 싣지 않는다. Control Plane 은 두 칸을 로그에만 남긴다 | 409 금융 보호 맥락을 확인하지 못했다. 504 시간 제한을 넘겼다 |
@@ -28,7 +28,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connector-oauth/authorize-url` | 단추 연결의 제공자 로그인 주소를 만든다 | `{connector, mode, client_id, redirect_uri, state}` 와 선택 키 `app_slug`, `code_challenge`. GitHub `install` 은 `app_slug` 로 App 설치 화면 주소에 `state` 만 붙인다. `authorize` 는 PKCE challenge(`S256`)를 붙이고, Google 은 선언 scope, `access_type=offline`, `prompt=consent`, `include_granted_scopes=false` 를 더한다 | `{url}` | 400 형식, 제공자와 맞지 않는 `mode`. 404 `oauth` 를 선언하지 않은 플러그인 |
 | `POST /api/connector-oauth/begin` | 단추 흐름을 시작한다 | `{vault, connector, values}`. `values` 는 단추 밖 칸 값이다 | `{nonce}`. 앞 흐름의 대기 파일은 덮는다 | 400 칸 값. 409 다른 플러그인의 보관 파일 |
 | `POST /api/connector-oauth/exchange` | 받은 코드를 토큰으로 바꾼다 | `{vault, connector, nonce, client_id, client_secret, code, redirect_uri, token_url}` 와 선택 키 `code_verifier` | `{outcome}`. `ok` 면 `access_token`, `expires_at`(epoch 초나 null)을 더하고 대기 OAuth 파일에 refresh token 과 `token_url` 을 쓴다. refresh token 이 없는 응답은 `app_rejected`, Google 이 선언 scope 를 다 주지 않으면 `scope_denied` 이고 파일을 쓰지 않는다 | 409 `nonce` 가 다르다 |
-| `POST /api/connector-oauth/commit` | 대기 파일 둘을 본 자리로 옮긴다 | `{vault, nonce}` | `{ok: true}` | 409 `nonce` 가 다르거나 교환 전이다 |
+| `POST /api/connector-oauth/commit` | 대기 파일 둘을 본 자리로 옮긴다 | `{vault, nonce}` 와 선택 키 `token_url`. 주면 본 자리 OAuth 파일의 통로 주소를 그것(본 연결 표식 주소)으로 둔다 | `{ok: true}` | 409 `nonce` 가 다르거나 교환 전이다 |
 | `POST /api/connector-oauth/discard` | 실패한 흐름을 접는다 | `{vault, connector, nonce, client_id, client_secret}` 와 선택 키 `access_token`. GitHub 은 그 access token 하나를 취소하고 Google 은 취소하지 않는다 | `{ok: true}` | 409 다른 흐름의 대기 파일 |
 | `POST /api/connector-oauth/refresh` | access token 을 새로 받는다 | `{vault, connector, client_id, client_secret}` | `{outcome}`. `ok` 면 `access_token`, `expires_at`. 바뀐 refresh token 은 답하기 전에 OAuth 파일에 쓰고, 쓰지 못하면 `unavailable` 이다. OAuth 파일이 없으면 `missing` | |
 | `POST /api/connector-oauth/revoke` | 해제 때 제공자의 허락을 취소한다 | `{vault, connector, client_id, client_secret}` 와 선택 키 `access_token`. GitHub 은 access token 이 없으면 먼저 갱신해 받아 허락(grant) 전체를 취소하고, Google 은 refresh token 을 취소한다 | `{outcome}`. 파일은 지우지 않는다. 보관 파일 `DELETE` 가 지운다 | |
@@ -515,10 +515,11 @@ stdio 플러그인의 바인딩 설치는 서버 정의를 아래 모양으로 �
 
 ```yaml
 command: <대시보드 프로세스의 python>
-args: ["-I", <plugin 의 connector_launcher.py>, <보관 파일 id>, <플러그인 id>, "<칸 key>=<env 이름>", ..., "--", <실제 command>, <실제 args>...]
+args: ["-I", <plugin 의 connector_launcher.py>, <보관 파일 id>, <플러그인 id>, "<칸 key>=<env 이름>", ..., ["@oauth=<token_env>"], "--", <실제 command>, <실제 args>...]
 env:
   <운영자 env>: <운영 목록의 값>
   <주인 env>: <그 바인딩의 값이나 빈 값>
+  <oauth.token_env>: ""
   FOS_ASSISTANT_CONNECTOR_VAULT_DIR: <보관 파일 디렉터리>
   FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE: <대시보드 프로세스의 같은 이름의 값. 없으면 빈 값>
   FOS_ASSISTANT_CONNECTOR_VAULT_REVISION: <보관 파일의 판>
@@ -526,6 +527,7 @@ enabled: true
 ```
 
 - 칸 env 는 정의에도 `.env` 에도 없다. 실행기가 띄울 때 채운다.
+- **단추 연결을 선언한 플러그인은 연결 방식과 상관없이 `@oauth=<token_env>` 인자를 둔다**([ADR-20261120 / connector-oauth](../../../docs/adr/ADR-20261120-connector-oauth.md)). 실행기가 OAuth 파일의 토큰 통로 주소를 그 env 에 넣고, 파일이 없으면(붙여 넣기 연결) 빈 값이다. 정의 env 의 그 이름은 빈 값이라 profile `.env` 를 거치지 않는다. 방식을 바꿔도 정의가 같고, refresh token 이 바뀌어도 리비전이 그대로라 재시작 대기가 생기지 않는다. 직접 실행과 금융 준비(`_binding_env`)도 같은 주소를 넣는다.
 - 경로 값은 모두 설치할 때 대시보드 프로세스에서 읽는다(`sys.executable`, 이 plugin 의 디렉터리, `_vault_dir()`, 운영 env). 코드에 경로 상수나 기본값을 두지 않으므로 공개 저장소에는 이름만 있다.
 - **보관 파일 디렉터리를 정의로 넘긴다.** Hermes 는 자식 env 를 `PATH`, `HOME` 같은 몇 이름과 정의의 `env` 로만 만든다(`_build_safe_env`, [`hermes-contract.md`](../../docs/hermes-contract.md) 의 「MCP 프로세스의 환경 값」). `HERMES_HOME` 이 오지 않아 실행기가 Hermes 루트를 스스로 구하지 못한다.
 - **활성 key id 는 넘기지 않는다.** 실행기는 읽기만 하고, 읽기는 활성 id 와 상관없이 key 파일의 key 로 푼다(위 DECISION7). 넘기면 key 를 회전할 때마다 모든 정의가 낡는다.

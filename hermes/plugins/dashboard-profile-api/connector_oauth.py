@@ -47,7 +47,7 @@ BODIES = {
     "begin": ({"vault", "connector", "values"}, set()),
     "exchange": ({"vault", "connector", "nonce", "client_id", "client_secret", "code", "redirect_uri", "token_url"},
                  {"code_verifier"}),
-    "commit": ({"vault", "nonce"}, set()),
+    "commit": ({"vault", "nonce"}, {"token_url"}),
     "discard": ({"vault", "connector", "nonce", "client_id", "client_secret"}, {"access_token"}),
     "refresh": ({"vault", "connector", "client_id", "client_secret"}, set()),
     "revoke": ({"vault", "connector", "client_id", "client_secret"}, {"access_token"}),
@@ -69,7 +69,7 @@ def _body_problem(action: str, body) -> str | None:
     for key, value in body.items():
         if key == "values":
             continue
-        if key in ("access_token", "code_verifier", "code_challenge", "app_slug") and value in (None, ""):
+        if key in ("access_token", "code_verifier", "code_challenge", "app_slug", "token_url") and value in (None, ""):
             continue
         if not _text(value):
             return "%s 가 올바르지 않다" % key
@@ -306,7 +306,7 @@ async def _connector_oauth_request(request, action: str, write_lock: asyncio.Loc
         if action == "commit":
             # 본 보관 파일을 쓰므로 보관 파일 잠금 다음 전역 잠금을 잡는다. 서비스를 부르지 않아 짧다.
             async with vault_lock(vault), write_lock:
-                await asyncio.to_thread(_commit, vault, body["nonce"])
+                await asyncio.to_thread(_commit, vault, body["nonce"], body.get("token_url"))
             _log("commit", vault, "ok")
             return JSONResponse({"ok": True}, status_code=200)
         async with vault_lock(vault):
