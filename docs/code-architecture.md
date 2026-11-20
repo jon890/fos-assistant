@@ -77,10 +77,12 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
 | 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별·그룹별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 그룹 key 는 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)). 푼 key 는 Control Plane 메모리에만 있다 |
+| 브라우저 중계 서명 비밀 | 서버 비밀값 `server_secret` 의 `browser_gateway`. KEK 로 감싼 채로 두고 관리자 화면 「서버 비밀값」 에서 서버가 새로 만든다 |
 
 데이터베이스에는 어떤 비밀값도 원문으로 넣지 않는다.
+서버 비밀값은 `server_secret` 에 KEK 로 감싸 두고 관리자 화면에서 넣고 바꾼다. 옮길 값과 남길 값, 옮기는 순서는 [ADR-20261120 / server-secret](adr/ADR-20261120-server-secret.md) 과 [서버 비밀값 스펙](features/secret-store/spec.md) 이 갖는다.
 `agent` 는 profile 이름과 주소만 적는다.
-profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
+profile key 와 AI credential 은 아직 홈서버 파일과 Hermes 쪽에 있다. 옮기는 일은 서버 비밀값 스펙의 PR2, PR3 이 한다.
 
 ## 플러그인 비밀값을 두는 곳
 
