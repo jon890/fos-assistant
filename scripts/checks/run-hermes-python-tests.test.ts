@@ -12,6 +12,13 @@ test("없는 모듈은 실행 전에 실패한다", () => {
   assert.equal(result.status, 1);
   assert.equal(result.stderr.trim(), "없는 모듈이다: missing-module.py");
 });
+test("기존 argparse의 붙여 쓴 동시 실행 수와 옵션 구분자를 받는다", () => {
+  for (const options of [["--jobs=2"], ["-j2"], ["--jobs", "2"], ["--"]]) {
+    const result = spawnSync(process.execPath, [runner, ...options, "missing-module.py"], { encoding: "utf8" });
+    assert.equal(result.status, 1, `${options.join(" ")}: ${result.stderr}`);
+    assert.equal(result.stderr.trim(), "없는 모듈이다: missing-module.py");
+  }
+});
 test("선택 모듈을 각각 실행하고 실패 코드와 출력을 보존한다", () => {
   const directory = mkdtempSync(join(tmpdir(), "hermes-runner-"));
   const log = join(directory, "calls.jsonl");

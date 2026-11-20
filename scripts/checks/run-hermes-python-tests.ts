@@ -13,17 +13,22 @@ let jobs = Math.min(4, cpus().length || 1);
 const selected: string[] = [];
 for (let index = 2; index < process.argv.length; index++) {
   const arg = process.argv[index];
+  if (arg === "--") {
+    selected.push(...process.argv.slice(index + 1).map(name => basename(name)));
+    break;
+  }
   if (arg === "--help" || arg === "-h") {
     console.log("사용법: node scripts/checks/run-hermes-python-tests.ts [-j 동시수] [모듈 파일 이름...]\n모듈별 별도 Python 프로세스로 실행한다. 기본 동시 수는 CPU 수와 4 중 작은 값이다. 모듈당 제한은 300초다.");
     process.exit(0);
   }
-  if (arg === "-j" || arg === "--jobs") {
-    const value = process.argv[++index];
-    if (!value || !/^-?\d+$/.test(value)) {
+  const attached = arg.startsWith("--jobs=") ? arg.slice(7) : arg.startsWith("-j") && arg !== "-j" ? arg.slice(2) : undefined;
+  if (arg === "-j" || arg === "--jobs" || attached !== undefined) {
+    const value = attached ?? process.argv[++index];
+    if (!value || !/^[+-]?\d+$/.test(value.trim())) {
       console.error("동시 수는 정수여야 한다");
       process.exit(2);
     }
-    jobs = Math.max(1, Number(value));
+    jobs = Math.max(1, Number(value.trim()));
   } else if (arg.startsWith("-")) {
     console.error(`알 수 없는 옵션: ${arg}`);
     process.exit(2);
