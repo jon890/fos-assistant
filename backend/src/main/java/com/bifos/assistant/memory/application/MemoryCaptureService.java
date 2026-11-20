@@ -100,11 +100,10 @@ public class MemoryCaptureService {
         MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
         String body = request.content();
         String summary = request.summary() == null ? "" : request.summary();
-        Memory created = direct
-            ? Memory.remembered(
-                user.id(), request.title(), body, summary, placement, request.executionId(), dedupKey, clock.instant())
-            : Memory.proposed(
-                user.id(), request.title(), body, summary, placement, request.executionId(), dedupKey, clock.instant());
+        Memory created = (direct
+            ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
+            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant()))
+                .fillSummary(summary, null);
         // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
         created.allowArchive(request.archivable());
         Memory saved;

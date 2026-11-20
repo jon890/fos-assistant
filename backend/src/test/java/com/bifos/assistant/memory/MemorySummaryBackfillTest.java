@@ -85,7 +85,7 @@ class MemorySummaryBackfillTest {
         assertThat(reread(atLimit).summary()).isEqualTo("나".repeat(200));
         for (Memory other : List.of(longFact, archived, always, superseded, group, document, proposal)) {
             Memory read = reread(other);
-            assertThat(read.summaryPending()).as(other.title()).isFalse();
+            assertThat(read.storedSummary()).as(other.title()).isNotNull();
             assertThat(read.summary()).as(other.title()).isEmpty();
         }
         assertThat(jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, shortFact.id()))

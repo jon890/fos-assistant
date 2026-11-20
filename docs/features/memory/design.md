@@ -49,7 +49,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 
 `MemoryText(title, content)` 에 `summary` 를 더한다. 풀지 못하면 지금처럼 셋 다 없다. `StoredMemoryText`, `SealedMemoryText` 도 `summary` 를 갖는다.
 `MemoryTexts.seal` 은 요약을 `memory:<번호>:summary:<범위>:<주인>` AAD 로 암호화하고 `open` 은 저장된 요약이 `NULL` 이면 빈 글로 낸다.
-`Memory.summary()` 는 푼 요약이고 없으면 빈 글이다. `Memory.hasSummary()` 는 빈 글이 아닌가다.
+`Memory.summary()` 는 푼 요약이고 없으면 빈 글이다. 넣기 전 항목과 이관 전 줄에는 `Memory.fillSummary` 로 요약을 적는다.
 요약을 적는 엔티티 메서드는 `USER` 범위의 `MEMORY` 가 아니면 빈 글 밖의 값을 거절한다(`IllegalArgumentException`). 그룹 기억과 문서에 요약이 생기지 않는 불변식이고, 그 요청을 받는 화면 경로는 PR2 가 `VALIDATION_FAILED` 로 바꿔 낸다.
 
 요약을 다루는 기존 경로를 모두 바꾼다.

@@ -496,15 +496,15 @@ class MemoryEncryptionTest {
         assertThat(reread(withSummary).summary()).isEqualTo(SUMMARY);
         assertThat(jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, pending)).isNull();
         assertThat(reread(pending).readable()).isTrue();
-        assertThat(reread(pending).summaryPending()).isTrue();
+        assertThat(reread(pending).storedSummary()).isNull();
     }
 
 
     /** 요약을 가진 개인 기억을 넣는다. 암호문은 넣은 뒤 같은 트랜잭션에서 적으므로 트랜잭션 안에서 넣는다. */
     private Memory insertWithSummary() {
         return new TransactionTemplate(transactionManager).execute(status -> texts.insert(Memory.remembered(
-            ADMIN.id(), TITLE, FIRST, SUMMARY, MemoryPlacement.core(MemoryRetrieval.SEARCH), null, null,
-            Instant.parse("2026-11-20T00:00:00Z"))));
+            ADMIN.id(), TITLE, FIRST, MemoryPlacement.core(MemoryRetrieval.SEARCH), null, null,
+            Instant.parse("2026-11-20T00:00:00Z")).fillSummary(SUMMARY, null)));
     }
 
 

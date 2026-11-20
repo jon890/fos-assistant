@@ -77,7 +77,7 @@ class MemoryRevisionWriter {
     private void saveRevision(Memory memory, MemoryChangeType changeType, CurrentUser user) {
         MemoryRevision revision = MemoryRevision.of(memory, changeType, user.id(), null, clock.instant());
         if (memory.dataKeyId() == null && memory.readable()) {
-            texts.seal(revision.stored(), memory.title(), memory.content(), memory.summaryPending() ? null : memory.summary())
+            texts.seal(revision.stored(), memory.title(), memory.content(), memory.storedSummary() == null ? null : memory.summary())
                 .ifPresent(revision::seal);
         }
         revisions.save(revision);

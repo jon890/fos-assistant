@@ -90,7 +90,7 @@ public class MemorySummaryBackfill implements ApplicationRunner {
     /** @return 적었으면 참, 풀지 못해 건너뛰었으면 거짓, 이미 적혔거나 없으면 null */
     private Boolean fillOne(Long id) {
         Memory row = memories.findByIdForUpdate(id).orElse(null);
-        if (row == null || !row.summaryPending()) {
+        if (row == null || row.storedSummary() != null) {
             return null;
         }
         if (!row.readable()) {

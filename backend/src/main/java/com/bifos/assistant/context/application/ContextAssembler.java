@@ -300,7 +300,7 @@ public class ContextAssembler implements OmittedMemories {
         return memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.readable()
-            && memory.hasSummary();
+            && !memory.summary().isEmpty();
     }
 
 
