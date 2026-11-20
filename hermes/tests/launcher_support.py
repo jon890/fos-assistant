@@ -1,4 +1,4 @@
-"""실행기 정의의 바인딩을 직접 만들어 대시보드 직접 실행 경로를 검사하는 준비다(docs/features/connector/design.md 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」).
+"""실행기 정의의 바인딩을 직접 만들어 대시보드 직접 실행 경로를 검사하는 준비다(hermes/plugins/dashboard-profile-api/README.md 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」).
 
 `ConnectorGateCase` 를 쓰는 검사는 소유 기록을 손으로 쓴다. 이 도우미는 그 항목을 실행기 정의로 바꾸고,
 값을 보관 파일에만 둔다. profile `.env` 에는 칸 값이 없다.

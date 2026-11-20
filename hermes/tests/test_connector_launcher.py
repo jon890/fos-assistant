@@ -1,4 +1,4 @@
-"""로컬 플러그인 서버를 실행기로 띄우는 바인딩을 검사한다(docs/features/connector/spec.md 의 REQ6, REQ8).
+"""로컬 플러그인 서버를 실행기로 띄우는 바인딩을 검사한다(hermes/plugins/dashboard-profile-api/README.md 의 「보관 파일 암호화와 실행기 설계」).
 
 실행기는 실제 자식 프로세스로 띄운다. Hermes 처럼 몇 기본 env 에 서버 정의의 `env` 만 얹어 넘기고,
 실제 서버 대신 받은 env 를 파일로 내는 셸 스크립트를 둔다.

@@ -35,6 +35,11 @@ class SafeListTest(unittest.TestCase):
         self.assertNotIn("skill_manage", plugin.SAFE_TOOLS)
         self.assertTrue(set(contract.TOOL_GUARD_SAFE_TOOLSETS) <= contract.HERMES_BUILTIN_TOOLS)
 
+    def test_toolset_table_covers_builtin_tools(self):
+        """toolset 별 표를 합치면 내장 도구 목록과 같다."""
+        tools = {tool for names in contract.HERMES_TOOLSETS.values() for tool in names}
+        self.assertEqual(tools, contract.HERMES_BUILTIN_TOOLS)
+
 
 class HermesToolSourceTest(unittest.TestCase):
     """`HERMES_SOURCE` 의 Hermes 소스에서 도구 목록과 코드 실행 안의 호출 지점을 대조한다."""
@@ -57,6 +62,14 @@ class HermesToolSourceTest(unittest.TestCase):
         expected = contract.HERMES_BUILTIN_TOOLS
         self.assertEqual(sorted(names - expected), [], "계약에 없는 새 도구")
         self.assertEqual(sorted(expected - names), [], "Hermes 에서 빠진 도구")
+
+    def test_toolset_table_matches(self):
+        """toolset 별 표가 Hermes 의 `TOOLSETS` 와 같다. 도구가 다른 toolset 으로 옮겨지면 작업 과정의 도구 이름 검사를 다시 본다."""
+        toolsets = self.toolsets["TOOLSETS"]
+        for name, tools in contract.HERMES_TOOLSETS.items():
+            with self.subTest(toolset=name):
+                self.assertIn(name, toolsets)
+                self.assertEqual(sorted(toolsets[name]["tools"]), sorted(tools))
 
     def test_safe_tools_stay_in_read_toolsets(self):
         """안전 목록의 도구는 지금의 읽기 경계 toolset 에 든다. 도구 묶음이 바뀌면 안전한지 다시 본다."""
