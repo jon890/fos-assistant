@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp.application;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class McpToolCatalog {
 
 
     public List<Map<String, Object>> tools() {
-        return List.of(
+        return List.<Map<String, Object>>of(
             Map.of(
                 "name",
                 "memory_read",
@@ -182,7 +183,21 @@ public class McpToolCatalog {
                             "default", 10),
                         "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
-                    List.of("query"))));
+                    List.of("query"))))
+            .stream().map(McpToolCatalog::allowRuntimeContext).toList();
     }
 
+
+    private static Map<String, Object> allowRuntimeContext(Map<String, Object> tool) {
+        if (!(tool.get("inputSchema") instanceof Map<?, ?> schema)
+            || !Boolean.FALSE.equals(schema.get("additionalProperties"))) {
+            return tool;
+        }
+        // fos-ctx가 붙이는 서명 인자를 Hermes가 도구 호출 전에 거절하지 않게 한다.
+        var inputSchema = new LinkedHashMap<>(schema);
+        inputSchema.remove("additionalProperties");
+        var definition = new LinkedHashMap<>(tool);
+        definition.put("inputSchema", inputSchema);
+        return definition;
+    }
 }

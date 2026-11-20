@@ -191,7 +191,7 @@ class McpMemoryToolTest {
             .findFirst().orElseThrow();
         JsonNode schema = search.path("inputSchema");
         assertThat(schema.path("type").asString()).isEqualTo("object");
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.has("additionalProperties")).isFalse();
         assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("query");
         JsonNode fields = schema.path("properties");
         assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "cursor");

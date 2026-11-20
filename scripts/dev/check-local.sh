@@ -14,6 +14,7 @@
 # 사용법: scripts/dev/check-local.sh [--fast | --skip-browser] [브라우저 spec ...]
 # --fast 는 Draft PR 을 열기 전에 쓴다. 몇 분 안에 끝나는 단계만 돈다.
 #   공개 정보, PR 크기, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, 루트 test/ 와 scripts/ 의 단위 테스트, 품질(컴파일과 구조 규칙, 포맷) 검사다.
+#   추적하지 않는 Markdown 파일이 있으면 경고하고 계속한다. 일부 문서 검사는 추적 파일만 보므로 stage 한 뒤 다시 확인한다.
 #   공개 정보 검사는 push 하면 되돌릴 수 없으므로 빼지 않고 맨 앞에 둔다.
 #   이 검사는 추적 파일의 지금 내용만 본다. 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
 #   SQL·Java 마이그레이션이나 purge fixture 가 바뀌면 PurgeClassificationTest 만 추가로 돌린다.
@@ -83,6 +84,17 @@ step() {
   fi
 }
 
+warn_untracked_docs() {
+  local file warned=false
+  while IFS= read -r -d '' file; do
+    if [ "${warned}" = false ]; then
+      echo "알림: 추적하지 않는 Markdown 파일이 있다. 일부 문서 검사에서 빠질 수 있으므로 stage 한 뒤 다시 검사한다(계속 진행)."
+      warned=true
+    fi
+    printf '  %s\n' "${file}"
+  done < <(git -C "${ROOT}" ls-files -z --others --exclude-standard -- '*.md')
+}
+
 check_pr_size() {
   if [ "$(git -C "${ROOT}" branch --show-current)" = main ] ||
      ! git -C "${ROOT}" merge-base origin/main HEAD >/dev/null 2>&1; then
@@ -143,6 +155,7 @@ PY
 
 echo "임시 로그(성공 시 삭제, 실패 시 보존): ${LOG_DIR}"
 if [ "${fast}" = true ]; then
+  warn_untracked_docs
   step public-safe     "${ROOT}/scripts/checks/check-public-safe.sh"
   step pr-size         check_pr_size
   step file-length     node "${ROOT}/scripts/checks/check-file-length.mjs"

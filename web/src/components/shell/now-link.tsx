@@ -44,7 +44,7 @@ export function NowLink({ onNavigate }: { onNavigate(href: string): void }) {
       aria-label={nowLinkLabel(nowCount)}
       aria-current={current ? "page" : undefined}
       onClick={() => onNavigate("/now")}
-      className={`mb-4 flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
+      className={`mb-1 flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
         current
           ? "bg-accent font-medium text-foreground"
           : "text-muted-foreground"

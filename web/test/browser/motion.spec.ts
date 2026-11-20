@@ -415,12 +415,12 @@ test("줄인 움직임에서 「새 메시지」 단추는 바로 내려간다",
     .toBeLessThanOrEqual(1);
 });
 
-/** 사이드바의 「사용량」 을 눌러 화면을 옮기고 그 화면의 제목이 보일 때까지 기다린다. */
-async function goToUsage(page: Page, testInfo: TestInfo) {
+/** 사이드바의 「예약 작업」 을 눌러 화면을 옮기고 그 화면의 제목이 보일 때까지 기다린다. 같은 틀 안의 이동이다. */
+async function goToTasks(page: Page, testInfo: TestInfo) {
   await openSidebar(page, testInfo);
-  await page.getByRole("link", { name: "사용량", exact: true }).click();
-  await expect(page).toHaveURL(/\/usage$/);
-  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toBeVisible();
+  await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "예약 작업", exact: true }).click();
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.getByRole("heading", { name: "예약 작업", exact: true, level: 1 })).toBeVisible();
 }
 
 test("화면을 옮기면 본문만 바뀌고 화면 틀은 같은 DOM 노드로 남는다", async ({ page }, testInfo) => {
@@ -432,7 +432,7 @@ test("화면을 옮기면 본문만 바뀌고 화면 틀은 같은 DOM 노드로
   await expect(shell).toBeVisible();
   await shell.evaluate((node) => node.setAttribute("data-probe", "shell"));
 
-  await goToUsage(page, testInfo);
+  await goToTasks(page, testInfo);
   await expect(shell, "옮긴 뒤에도 화면 틀이 다시 만들어지지 않는다").toHaveAttribute("data-probe", "shell");
   expect(await page.locator('[data-probe="shell"]').count(), "표시를 붙인 화면 틀의 수").toBe(1);
 });
@@ -453,7 +453,7 @@ test("첫 메시지를 보내 주소가 바뀌어도 대화가 다시 만들어�
 test("줄인 움직임에서 화면을 옮겨도 본문 제목이 보인다", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/new");
-  await goToUsage(page, testInfo);
+  await goToTasks(page, testInfo);
   // 본문 제목이 보이는 것은 goToUsage 가 단언한다.
   const wrapper = page.locator(".animate-screen-in");
   if (await wrapper.count() > 0) {

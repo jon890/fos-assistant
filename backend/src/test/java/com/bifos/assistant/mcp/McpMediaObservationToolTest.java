@@ -235,7 +235,7 @@ class McpMediaObservationToolTest {
             assertThat(tool.path("inputSchema").path("properties").isObject()).isTrue();
             if (McpMediaObservationTools.RECORD.equals(tool.path("name").asString())) {
                 var schema = tool.path("inputSchema");
-                assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+                assertThat(schema.has("additionalProperties")).isFalse();
                 assertThat(schema.path("required"))
                     .extracting(JsonNode::asString)
                     .containsExactlyInAnyOrder("assetId", "expectedRevision", "requestId", "observation");
