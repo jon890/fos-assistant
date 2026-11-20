@@ -48,7 +48,7 @@
 
 **월 합계.** `UsageSummaryService.monthly(Collection<Long> userIds, Instant from, Instant to)` 를 더한다. 사용자마다 기존 `monthly(Long, ...)` 를 불러 `MonthlyUsageSummary` 를 칸마다 더한다. 질의를 새로 쓰지 않으므로 자식 원장 줄과 사건 관측의 규칙이 한 곳에 남는다. 가족 그룹은 사용자가 몇 명이라 질의 수가 사람 수에 비례해도 부담이 없다. 응답의 `totalExecutions` 는 지금 `MonthlyCostView` 처럼 `pricedExecutions + unpricedExecutions` 다.
 
-**그룹 사용자.** `AppUserRepository.findByGroupId(Long)` 를 더하고 `UserDisplayNameService.namesInGroup(Long groupId)` 가 `Map<Long, String>`(번호 순)을 낸다. 꺼진 사용자도 들어간다. 그 사람이 이번 주에 겪은 실패와 이번 달 비용도 그룹의 기록이기 때문이다.
+**그룹 사용자.** `AppUserRepository.findByGroupIdOrderByIdAsc(Long)` 를 더하고 `UserDisplayNameService.namesInGroup(Long groupId)` 가 `Map<Long, String>`(번호 순)을 낸다. 꺼진 사용자도 들어간다. 그 사람이 이번 주에 겪은 실패와 이번 달 비용도 그룹의 기록이기 때문이다.
 
 **남의 실행.** 응답의 `mine` 은 실행의 사용자가 요청한 관리자일 때만 참이다. 웹은 `mine` 인 줄만 `/admin/executions/{id}` 링크로 그린다. 실행 상세 API(`/api/v1/usage/executions/{id}/tree`)는 지금처럼 남의 실행을 숨기므로 주소를 직접 열어도 열리지 않는다(DECISION10). 응답에 대화 번호, 도구 원본, 문맥 항목은 넣지 않는다.
 

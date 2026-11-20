@@ -1,0 +1,51 @@
+{
+  "name": "pr1-menu-overview",
+  "description": "관리자 메뉴 세 묶음, 휴대폰 서랍, /admin 요약 화면과 그 Control Plane 조회",
+  "pr_scope": "스펙 PR1. 관리자 메뉴를 세 묶음으로 바꾸고 휴대폰에서 서랍으로 열며, /admin 을 그룹 전체의 실패와 이번 달 사용량 요약 화면으로 바꾼다.",
+  "deferred": [
+    {
+      "what": "PR2(REQ7, REQ8): 관리자 화면들을 같은 머리 틀과 빈 상태 안내로 맞춘다",
+      "why": "같은 머리 틀 부품은 화면 틀 스펙 PR5 가 만든다. 먼저 만들면 부품이 둘이 된다",
+      "after": "이 PR 과 화면 틀 스펙 PR5 가 main 에 머지됐다"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/admin-area/spec.md",
+  "design": "docs/features/admin-area/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3",
+    "REQ4",
+    "REQ5",
+    "REQ6"
+  ],
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ4",
+        "REQ5"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ3",
+        "REQ4",
+        "REQ5",
+        "REQ6"
+      ]
+    }
+  ]
+}
