@@ -139,6 +139,27 @@ class GeneratedImageTurnTest {
 
 
     @Test
+    @DisplayName("참고한 링크는 암호화해 두고 응답에 올린 순서대로 들며 링크 없는 그림은 빈 목록이다")
+    void keepsSourceLinksInOrderAndEncrypted() {
+        List<String> links = List.of("https://shop.example.com/goods/1", "https://img.example.com/p.png");
+        images.save(conversation.id(), owner.id(), "key-" + conversation.id() + "-links", "양말 신은 아이", PROMPT, links, png(3));
+        save("call_plain", "그냥 고양이", png(4));
+        ChatMessage answer = answer("만들었어요");
+
+        artifactService.recordTurn(conversation.id(), answer.id(), NOW);
+
+        List<ChatArtifact> bound = bound(answer);
+        ChatArtifact linked = bound.getFirst();
+        assertThat(linked.generationSourceLinks()).as("링크는 평문으로 두지 않는다").isNotNull().doesNotContain("shop.example.com");
+        assertThat(linked.generationSourceLinksKeyId()).isNotNull();
+        assertThat(bound.get(1).generationSourceLinks()).isNull();
+        Map<Long, GeneratedImageDetail> details = details(answer);
+        assertThat(details.get(linked.id()).sourceLinks()).containsExactlyElementsOf(links);
+        assertThat(details.get(bound.get(1).id()).sourceLinks()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("답 없이 끝난 turn 과 turn 사이에 올라온 그림은 그 대화의 다음 답에 묶인다")
     void bindsLeftoverImagesToNextAnswer() {
         save("call_1", "남은 그림", png(1));

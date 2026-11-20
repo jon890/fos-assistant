@@ -39,6 +39,8 @@ export type MessageArtifact = {
   vaultItemId?: number | null;
   /** `FILE` 의 제목이다. 없으면 null 이고 파일 이름을 보인다 */
   title?: string | null;
+  /** 그림을 만들 때 참고한 링크 주소다. 쓴 순서다. 그림이 아니거나 없으면 빈 배열이고 옛 서버 응답에는 없다 */
+  sourceLinks?: string[];
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */
