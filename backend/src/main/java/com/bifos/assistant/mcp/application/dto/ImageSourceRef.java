@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application.dto;
 
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import tools.jackson.databind.JsonNode;
@@ -19,7 +20,7 @@ public record ImageSourceRef(Long attachmentId, String title, String link) {
     private static final String LINK = "link:";
     private static final int MAX_CHARS = 300;
     /** 링크 가리킴의 길이 상한이다. 상품 주소는 쿼리가 길어 첨부와 제목의 상한보다 크게 둔다. */
-    private static final int MAX_LINK_CHARS = 2048 + LINK.length();
+    private static final int MAX_LINK_CHARS = GeneratedImageMention.MAX_LINK_CHARS + LINK.length();
 
     public static ImageSourceRef parse(JsonNode value) {
         if (value == null || !value.isString()) {

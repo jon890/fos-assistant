@@ -603,3 +603,12 @@ IMAGE_SOURCE_LIMIT = ("plugins/image_gen/openai-codex/__init__.py", "_MAX_REFERE
 IMAGE_ASPECT_RATIOS = ("agent/image_gen_provider.py",
                        'VALID_ASPECT_RATIOS: tuple[str, ...] = ("landscape", "square", "portrait")',
                        'DEFAULT_ASPECT_RATIO = "landscape"')
+# 비율이 모델에게 보이고 이미지 서비스까지 가는 자리다. 하나라도 바뀌면 그림 규칙이 적은 비율이 그림에 닿지 않을 수 있다.
+IMAGE_ASPECT_RATIO_PATH = (
+    ("tools/image_generation_tool.py", '"enum": list(VALID_ASPECT_RATIOS)'),
+    ("tools/image_generation_tool.py", 'aspect_ratio = args.get("aspect_ratio", DEFAULT_ASPECT_RATIO)'),
+    ("tools/image_generation_tool.py", "_dispatch_to_plugin_provider(prompt, aspect_ratio,"),
+    ("tools/image_generation_tool.py", 'kwargs: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}'),
+    ("plugins/image_gen/openai-codex/__init__.py", "aspect = resolve_aspect_ratio(aspect_ratio)"),
+    ("plugins/image_gen/openai-codex/__init__.py", "size = size_for(aspect)"),
+)

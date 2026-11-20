@@ -132,6 +132,11 @@ class HermesImageSourceTest(unittest.TestCase):
         self.assertIn(values, source)
         self.assertIn(default, source)
 
+    def test_aspect_ratio_reaches_image_service(self):
+        """`aspect_ratio` 가 도구 스키마에 있고 handler 가 읽어 openai-codex 가 크기로 바꾸는 데까지 간다."""
+        for path, line in contract.IMAGE_ASPECT_RATIO_PATH:
+            self.assertIn(line, self.source(path), "%s 에 %s 가 없다" % (path, line))
+
     def test_transform_hook_receives_args(self):
         """결과 hook 은 도구 인자를 `args` 로 받는다. plugin 이 여기서 지시문을 읽는다."""
         path, call = contract.TRANSFORM_RESULT_ARGS
