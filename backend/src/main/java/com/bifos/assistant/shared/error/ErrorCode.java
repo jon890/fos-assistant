@@ -23,6 +23,8 @@ public enum ErrorCode {
     USER_BUSY(HttpStatus.CONFLICT),
     /** 먼저 살펴보기를 막는 까닭이 있다. 까닭은 싣지 않고 화면이 상태를 다시 읽어 그린다(ADR-080). */
     PROACTIVE_CHECK_UNAVAILABLE(HttpStatus.CONFLICT),
+    /** 사건 조회 중 감지를 끄거나 바인딩을 떼어 실행 예약을 정상 취소했다. */
+    EVENT_WATCH_DISABLED(HttpStatus.CONFLICT),
     /** 없는 보고와 다른 사용자의 보고를 같은 응답으로 숨긴다. */
     PROACTIVE_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
