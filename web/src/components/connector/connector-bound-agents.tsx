@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { BoundAgent } from "@/lib/connection";
+import { bindingStateLabel, type BoundAgent } from "@/lib/connection";
 
 /**
  * 이 연결을 붙인 에이전트 목록이다. 떼기는 에이전트 화면에서 한다.
@@ -37,7 +37,11 @@ export function BoundAgents({
                 {binding.agentName}
               </Link>
               {binding.restartRequired || binding.status === "PENDING" ? (
-                <Badge variant="warning">붙이는 중</Badge>
+                <Badge
+                  variant={binding.applyFailed ? "destructive" : "warning"}
+                >
+                  {bindingStateLabel(binding)}
+                </Badge>
               ) : null}
             </li>
           ))}

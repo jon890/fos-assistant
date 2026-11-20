@@ -143,7 +143,7 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
     page.getByRole("heading", { name: `「${PRIVATE_NAME}」에 붙였어요` }),
   ).toBeVisible();
   await expect(page.getByTestId("connector-bound-result")).toContainText(
-    `이제 「${PRIVATE_NAME}」 대화에서 「${TITLE}」 도구를 써요. 몇 분 안에 쓸 수 있어요.`,
+    `이제 「${PRIVATE_NAME}」 대화에서 「${TITLE}」 도구를 써요. 몇 분 안에 자동으로 반영돼요.`,
   );
   // 붙인 에이전트 목록도 다시 읽혀 이 에이전트가 보인다.
   await expect(page.getByTestId("connection-binding")).toContainText(
@@ -463,7 +463,7 @@ test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙이
   const binding = page.getByTestId("connection-binding");
   await expect(binding).toContainText("붙이는 중");
   await expect(page.getByTestId("connector-bound-result")).toContainText(
-    "몇 분 안에 쓸 수 있어요.",
+    "몇 분 안에 자동으로 반영돼요.",
   );
 
   applied = true;
