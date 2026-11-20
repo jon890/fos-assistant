@@ -76,9 +76,10 @@ public class ConnectorBinding extends CreatedAtEntity {
     private boolean restartRequired;
 
     /**
-     * 재시작이 필요해진 가장 늦은 설치 시각이다.
+     * 재시작이 필요해진 가장 늦은 설치의 결과 트랜잭션 시각이다.
      *
-     * <p>관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다.
+     * <p>재시작 감지가 공유 gateway 기동 시각과 비교하고(ADR-20261120 / connector-auto-apply), 관리자가 목록을 본 뒤에 다시 설치가
+     * 있었으면 반영 완료가 대기를 풀지 않게 하는 데도 쓴다.
      */
     @Column(name = "restart_required_since")
     private Instant restartRequiredSince;
@@ -185,10 +186,16 @@ public class ConnectorBinding extends CreatedAtEntity {
      * <p>재시작 대기는 앞선 대기를 지우지 않고 논리 OR 로 누적한다. 재시작이 필요한 설치였으면 그 시각을 대기의 시작으로 적는다.
      */
     public void installed(boolean restartRequired, Instant now) {
+        installed(restartRequired, now, now);
+    }
+
+
+    /** 재시작 대기 시각을 상태 시각과 따로 적는다. 결과 트랜잭션이 plugin 의 답을 받은 시각을 쓴다(ADR-20261120 / connector-auto-apply). */
+    public void installed(boolean restartRequired, Instant now, Instant restartSince) {
         this.desiredEnabled = true;
         this.restartRequired = this.restartRequired || restartRequired;
         if (restartRequired) {
-            this.restartRequiredSince = now;
+            this.restartRequiredSince = restartSince;
         }
         this.checkedAt = now;
         pending(now);

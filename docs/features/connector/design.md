@@ -141,7 +141,7 @@
 
 1. 반영 예정 확인(지금 그대로, 껐다 켜기 단계는 건너뜀)
 2. 껐다 켜기 진행(PR1). 잠근 뒤 단계와 실패 표시가 그대로인지 다시 본다
-3. 재시작 감지(PR2). 실패 표시가 없고 단계가 비었으며 반영 예정 시각이 없는 재시작 대기 바인딩이 하나라도 있을 때만 `GET /api/gateway` 를 한 번 부른다. `started_at` 이 있으면 `restart_required_since < started_at - 2초` 인 바인딩마다 `resync(afterRestart=true)` 를 돌린다
+3. 재시작 감지(PR2). 실패 표시가 없고 단계가 비었으며 반영 예정 시각이 없거나 지난 재시작 대기 바인딩이 하나라도 있을 때만 `GET /api/gateway` 를 한 번 부른다. `started_at` 이 있으면 `restart_required_since < started_at - 2초` 인 바인딩마다 `resync(afterRestart=true)` 를 돌린다
 4. 24시간 알림(PR3). `waiting_since` 가 24시간 넘었고 `admin_notified_at` 이 빈 바인딩을 그룹별로 모아 알린다
 
 **`restart_required_since` 를 결과 트랜잭션 시각으로 바꾼다(PR2).** 지금은 시작 트랜잭션 시각이라 HTTP 를 보내기 전이다. 그 사이 gateway 가 다시 뜨면 옛 파일로 뜬 gateway 를 반영된 것으로 본다. 결과 트랜잭션은 plugin 이 파일을 다 쓰고 답한 뒤라 이 시각보다 늦게 뜬 gateway 는 새 파일을 읽었다. 2초는 `btime` 과 tick 의 정밀도를 덮는 여유다. 관리자 다시 확인의 `restartRequiredSince` 대조는 같은 칸을 그대로 쓰므로 바뀌지 않는다.

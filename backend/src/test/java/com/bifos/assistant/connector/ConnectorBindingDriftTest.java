@@ -19,6 +19,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingCycles;
+import com.bifos.assistant.connector.connection.application.ConnectorGatewayRestarts;
 import com.bifos.assistant.connector.connection.application.ConnectorInstallAttempts;
 import com.bifos.assistant.connector.connection.config.ConnectorBindingProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
@@ -136,6 +137,9 @@ class ConnectorBindingDriftTest {
 
     @Autowired
     ConnectorBindingCycles cycles;
+
+    @Autowired
+    ConnectorGatewayRestarts restarts;
 
     @Autowired
     NotificationService notifications;
@@ -441,7 +445,7 @@ class ConnectorBindingDriftTest {
 
     private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
         return new ConnectorBindingApplier(
-            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings, attempts, cycles);
+            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings, attempts, cycles, restarts);
     }
 
 

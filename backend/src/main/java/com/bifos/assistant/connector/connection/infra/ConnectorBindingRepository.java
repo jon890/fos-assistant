@@ -65,6 +65,19 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
 
 
     /**
+     * 재시작 감지가 맡는 재시작 대기 바인딩의 번호들이다(ADR-20261120 / connector-auto-apply). 실패 표시가 있거나 껐다 켜기 단계거나
+     * 반영 예정 시각이 아직 오지 않은 바인딩은 뺀다. 꺼진 동안 {@code plugin_updated} 를 받은 바인딩은 켠 뒤 반영 예정 시각이 남는데,
+     * 반영 예정 확인은 재시작 대기를 건너뛰므로 시각이 지나면 여기서 맡는다. 생성자 식을 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
+        + " from ConnectorBinding b"
+        + " where b.restartRequired = true and b.applyFailedAt is null and b.cyclePhase is null"
+        + " and (b.applyDueAt is null or b.applyDueAt <= :now)"
+        + " order by b.id")
+    List<DueBinding> findRestartWaiting(@Param("now") Instant now);
+
+
+    /**
      * 그 에이전트들에 붙어 바인딩과 연결이 모두 그 상태인 줄이다. 에이전트 목록의 할 수 있는 일이 쓴다. 생성자 식을 문자열로 두는
      * 까닭은 {@link #findApplyDue} 와 같다.
      */
