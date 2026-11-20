@@ -22,7 +22,7 @@
 | REQ14 | plugin 이 Hermes 루트 목록에서 `source` 가 `manual:fos-assistant:<번호>` 인 줄만 고치고 그 밖의 줄(구독 로그인)보다 뒤 우선순위로 둔다. 쓰기는 Hermes 의 인증 저장 함수와 그 잠금을 거친다. 번호와 key 지문이 같은 줄은 Hermes 의 상태(막힘, `last_status_at`, `request_count`)를 그대로 둔다. 방식은 `credential_pool_strategies.<공급자>` 에 `fill_first` 나 `round_robin` 으로 쓴다. 어느 `config.yaml` 이 profile 실행에 읽히는지는 PR3 의 계약 테스트가 정한다 |
 | REQ15 | plugin 의 새 `GET /api/credential-pool/<공급자>` 가 우리 줄마다 상태, 오류 코드, 풀리는 시각, 사용 횟수(`request_count`), 마지막 상태 시각(`last_status_at`)을 원문 없이 낸다. 화면을 열 때 부르고 실패하면 상태 칸만 비운다 |
 | REQ16 | plugin 의 새 `POST /api/credential-pool/<공급자>/<번호>/reset` 이 Hermes 의 `reset_status` 를 부른다 |
-| REQ18 | `browser.application.GatewaySecretService.regenerate` 가 값을 바꾼다. `admin.secret` 이 이어서 `connector.connection.application` 에 더한 `reinstallBrowserBindings()` 를 부른다. 이 메서드는 브라우저를 쓰는 플러그인(`ownerBrowser`)의 바인딩을 상태와 상관없이 기존 `reinstall` 과 같은 두 단계(시작 트랜잭션, 실행)로 다시 설치하고 결과 수를 dto 로 돌려준다. 다시 설치한 바인딩은 Hermes 재시작이 필요해 재시작 대기가 된다(아래 「실패와 일관성」) |
+| REQ18 | `browser.application.GatewaySecretService.regenerate` 가 값을 바꾼다. `admin.secret` 이 이어서 `connector.connection.application` 의 새 서비스 `ConnectorBrowserBindings.reinstallAll()` 를 부른다. 이 메서드는 브라우저를 쓰는 플러그인(`ownerBrowser`)의 바인딩을 상태와 상관없이 기존 `reinstall` 과 같은 두 단계(시작 트랜잭션, 실행)로 다시 설치하고 결과 수를 dto 로 돌려준다. 다시 설치한 바인딩은 Hermes 재시작이 필요해 재시작 대기가 된다(아래 「실패와 일관성」) |
 | REQ19 | `agent` 의 기동 단계가 함께 쓰는(`SHARED_HOUSEHOLD`) profile 목록을 plugin 의 새 `DELETE /api/env/provider-keys` 에 보낸다. plugin 이 Hermes `PROVIDER_REGISTRY` 의 API key 이름만 지우고 공급자별 줄 수를 돌려준다. 모든 profile 이 성공했을 때만 표지 줄(`import:provider_env`)을 남긴다. 실패하면 다음 기동에서 다시 돈다 |
 
 ## 책임과 경계

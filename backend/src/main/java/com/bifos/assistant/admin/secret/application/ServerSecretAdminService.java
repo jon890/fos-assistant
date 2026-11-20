@@ -2,7 +2,7 @@ package com.bifos.assistant.admin.secret.application;
 
 import com.bifos.assistant.admin.secret.application.dto.ServerSecretOverview;
 import com.bifos.assistant.browser.application.GatewaySecretService;
-import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
+import com.bifos.assistant.connector.connection.application.ConnectorBrowserBindings;
 import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.crypto.application.ServerSecretService;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +20,11 @@ public class ServerSecretAdminService {
 
     private final ServerSecretService store;
     private final GatewaySecretService gateway;
-    private final ConnectorBindingService bindings;
+    private final ConnectorBrowserBindings bindings;
 
 
     public ServerSecretOverview overview() {
-        return new ServerSecretOverview(store.storeAvailable(), gateway.status(), bindings.countBrowserBindings());
+        return new ServerSecretOverview(store.storeAvailable(), gateway.status(), bindings.count());
     }
 
 
@@ -34,7 +34,7 @@ public class ServerSecretAdminService {
      */
     public BrowserBindingReinstall regenerateGateway(Long adminId) {
         gateway.regenerate(adminId);
-        return bindings.reinstallBrowserBindings();
+        return bindings.reinstallAll();
     }
 
 

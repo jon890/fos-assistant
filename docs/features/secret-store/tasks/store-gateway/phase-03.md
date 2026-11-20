@@ -28,7 +28,7 @@
 
 ### 1. `admin/secret/application/ServerSecretAdminService.java` 와 `admin/secret/application/dto/ServerSecretOverview.java`
 
-`overview()`: `ServerSecretService.storeAvailable()`, `GatewaySecretService.status()`, `ConnectorBindingService.countBrowserBindings()`(비어 있을 수 있음)를 묶는다. Hermes 가 내려가도 화면이 열린다. `regenerateGateway(Long adminId)`: `GatewaySecretService.regenerate` 뒤 `ConnectorBindingService.reinstallBrowserBindings()` 를 부르고 그 결과를 돌려준다. 값 쓰기가 실패하면 다시 설치를 부르지 않는다. 값이 바뀐 뒤 다시 설치가 카탈로그를 읽지 못해도 오류 응답이 아니라 200 과 `catalogUnavailable` 참으로 돌려준다(값은 이미 바뀌었다). `deleteGateway(Long adminId)`: `GatewaySecretService.delete`.
+`overview()`: `ServerSecretService.storeAvailable()`, `GatewaySecretService.status()`, `ConnectorBrowserBindings.count()`(비어 있을 수 있음)를 묶는다. Hermes 가 내려가도 화면이 열린다. `regenerateGateway(Long adminId)`: `GatewaySecretService.regenerate` 뒤 `ConnectorBrowserBindings.reinstallAll()` 를 부르고 그 결과를 돌려준다. 값 쓰기가 실패하면 다시 설치를 부르지 않는다. 값이 바뀐 뒤 다시 설치가 카탈로그를 읽지 못해도 오류 응답이 아니라 200 과 `catalogUnavailable` 참으로 돌려준다(값은 이미 바뀌었다). `deleteGateway(Long adminId)`: `GatewaySecretService.delete`.
 
 ### 2. `crypto/application/ServerSecretService.java`
 

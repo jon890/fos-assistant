@@ -27,6 +27,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
+import com.bifos.assistant.connector.connection.application.ConnectorBrowserBindings;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
@@ -217,6 +218,9 @@ class ConnectorBindingServiceTest {
 
     @Autowired
     BrowserGatewayTokens tokens;
+
+    @Autowired
+    ConnectorBrowserBindings browserBindings;
 
 
     @BeforeEach
@@ -787,10 +791,10 @@ class ConnectorBindingServiceTest {
         service.bind(first, firstAgent.code(), BROWSER);
         service.bind(second, secondAgent.code(), BROWSER);
         service.bind(first, firstAgent.code(), PLAIN);
-        assertThat(service.countBrowserBindings()).hasValue(2);
+        assertThat(browserBindings.count()).hasValue(2);
         clearInvocations(connector);
 
-        BrowserBindingReinstall result = service.reinstallBrowserBindings();
+        BrowserBindingReinstall result = browserBindings.reinstallAll();
 
         assertThat(result).isEqualTo(new BrowserBindingReinstall(2, 2, 0, false));
         verify(connector, times(2))
@@ -815,7 +819,7 @@ class ConnectorBindingServiceTest {
         when(connector.bindConnector(eq(firstAgent.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenThrow(new IllegalStateException("dashboard down"));
 
-        BrowserBindingReinstall result = service.reinstallBrowserBindings();
+        BrowserBindingReinstall result = browserBindings.reinstallAll();
 
         assertThat(result.total()).isEqualTo(2);
         assertThat(result.failed()).isEqualTo(1);
@@ -828,8 +832,8 @@ class ConnectorBindingServiceTest {
     void reinstallReportsUnavailableCatalog() {
         when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
 
-        assertThat(service.reinstallBrowserBindings()).isEqualTo(new BrowserBindingReinstall(0, 0, 0, true));
-        assertThat(service.countBrowserBindings()).isEmpty();
+        assertThat(browserBindings.reinstallAll()).isEqualTo(new BrowserBindingReinstall(0, 0, 0, true));
+        assertThat(browserBindings.count()).isEmpty();
     }
 
 

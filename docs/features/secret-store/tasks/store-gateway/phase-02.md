@@ -28,7 +28,7 @@
 - 옛 비밀을 함께 받지 않는다. 바꾸면 옛 표식은 바로 무효다(스펙 DECISION20).
 - 가져오기는 이름의 줄이 있으면(값이 비어 있어도) 건너뛴다(스펙 DECISION16). 가져온 줄의 `updated_by` 는 NULL 이다.
 - 새로 만드는 값은 `SecureRandom` 32바이트를 소문자 16진수 64자로 쓴다. 기존 32자 이상 규칙을 만족한다.
-- `reinstallBrowserBindings` 는 바인딩 상태를 가리지 않는다. 재시작 대기 바인딩도 옛 표식을 쥐고 있다.
+- `reinstallAll` 은 바인딩 상태를 가리지 않는다. 재시작 대기 바인딩도 옛 표식을 쥐고 있다.
 
 ## 작업 항목
 
@@ -44,9 +44,11 @@
 
 `SmartInitializingSingleton`. 옛 값은 `LiveProperties<BrowserProperties>` 의 `current().gatewaySecret()` 로 읽는다(테스트가 설정을 바꿔 볼 수 있다). `ServerSecrets.exists("browser_gateway")` 가 거짓이고 옛 값이 비어 있지 않고 `ServerSecrets.available()` 이면 그 값을 쓰고 `browser gateway secret imported` 를 info 로 남긴다. 실패하면 예외 클래스 이름만 경고하고 기동을 이어 간다.
 
-### 4. `connector/connection/application/ConnectorBindingService.java` 와 `connector/connection/application/dto/BrowserBindingReinstall.java`
+### 4. `connector/connection/application/ConnectorBrowserBindings.java` 와 `connector/connection/application/dto/BrowserBindingReinstall.java`
 
-`public BrowserBindingReinstall reinstallBrowserBindings()`: 카탈로그에서 `ownerBrowser()` 인 커넥터 id 를 읽는다. 카탈로그를 읽지 못하면 예외를 던지지 않고 `catalogUnavailable` 참인 결과를 돌려준다. 대상 바인딩 번호를 모은 뒤 **바인딩마다** 따로 트랜잭션을 연다: 연결 주인 사용자 잠금을 잡고 바인딩을 다시 읽어(없으면 건너뜀) 기존 `reinstall` 로 attempt 를 만들어 커밋하고, 트랜잭션 밖에서 `execute` 한다. `attempts.begin` 의 예외(`AGENT_NOT_FOUND`, `AGENT_BUSY` 등)와 `execute` 의 `CALL_FAILED` 는 그 바인딩의 실패로 세고 다음으로 간다. 결과 dto `BrowserBindingReinstall(int total, int restartPending, int failed, boolean catalogUnavailable)`. `OptionalInt countBrowserBindings()` 는 확인 창용 수이고 카탈로그를 읽지 못하면 비어 있다. 메서드에 `@Transactional` 을 붙이지 않는다(외부 호출을 트랜잭션 밖에서 한다). 필요한 조회를 `ConnectorBindingRepository` 에 더한다.
+`ConnectorBindingService` 는 파일 길이 상한(500줄)에 닿아 있어 새 서비스로 둔다. 설치 입력은 `ConnectorInstallAttempts.begin` 을 `ConnectorBindingService.reinstall` 과 같은 인자로 부른다.
+
+`public BrowserBindingReinstall reinstallAll()`: 카탈로그에서 `ownerBrowser()` 인 커넥터 id 를 읽는다. 카탈로그를 읽지 못하면 예외를 던지지 않고 `catalogUnavailable` 참인 결과를 돌려준다. 대상 바인딩 번호를 모은 뒤 **바인딩마다** 따로 트랜잭션을 연다: 연결 주인 사용자 잠금을 잡고 바인딩을 다시 읽어(없으면 건너뜀) 기존 `reinstall` 로 attempt 를 만들어 커밋하고, 트랜잭션 밖에서 `execute` 한다. `attempts.begin` 의 예외(`AGENT_NOT_FOUND`, `AGENT_BUSY` 등)와 `execute` 의 `CALL_FAILED` 는 그 바인딩의 실패로 세고 다음으로 간다. 결과 dto `BrowserBindingReinstall(int total, int restartPending, int failed, boolean catalogUnavailable)`. `OptionalInt count()` 는 확인 창용 수이고 카탈로그를 읽지 못하면 비어 있다. 메서드에 `@Transactional` 을 붙이지 않는다(외부 호출을 트랜잭션 밖에서 한다). 필요한 조회를 `ConnectorBindingRepository` 에 더한다.
 
 ### 5. `backend/src/main/resources/application.yml` 과 `backend/docs/adr/ADR-20261008-browser-gateway-token.md` 와 `docs/features/user-browser.md`
 
@@ -76,7 +78,7 @@ cd backend && ./gradlew archTest checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/browser/application/GatewaySecretService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/browser/application/GatewaySecretImporter.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/browser/application/dto/GatewaySecretStatus.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorBindingService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorBrowserBindings.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/BrowserBindingReinstall.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/infra/ConnectorBindingRepository.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
