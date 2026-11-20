@@ -107,6 +107,17 @@ public class ConnectorBinding extends CreatedAtEntity {
     @Column(name = "apply_failed_at")
     private Instant applyFailedAt;
 
+    /**
+     * 자동 대기가 시작된 시각이다(ADR-20261120 / connector-auto-apply). 비어 있을 때만 적고 단계가 바뀌어도 그대로 둔다. 관리자 알림의
+     * 24시간을 여기서 센다. {@code READY} 와 사람이 시작한 설치가 비운다.
+     */
+    @Column(name = "waiting_since")
+    private Instant waitingSince;
+
+    /** 지금 대기에 관리자 알림을 보낸 시각이다. 한 대기에 한 번만 보낸다. {@link #waitingSince} 가 비워질 때 함께 비운다. */
+    @Column(name = "admin_notified_at")
+    private Instant adminNotifiedAt;
+
     /** 커밋한 설치 시도다. 결과를 한 번 적용한 뒤 비우며, 시각이 같아도 새 시도와 옛 응답을 구분한다. */
     @Column(name = "install_attempt_id", columnDefinition = "BINARY(16)")
     private UUID installAttemptId;
@@ -217,6 +228,7 @@ public class ConnectorBinding extends CreatedAtEntity {
         this.applyDueAt = null;
         clearCycle();
         this.applyFailedAt = null;
+        clearWaiting();
         this.checkedAt = now;
         this.updatedAt = now;
     }
@@ -278,8 +290,36 @@ public class ConnectorBinding extends CreatedAtEntity {
     }
 
 
+    /** 자동 반영이 실패했다. 실패도 관리자를 기다리는 대기라 대기 시각이 비었으면 함께 적는다. */
     public void markApplyFailed(Instant now) {
         this.applyFailedAt = now;
+        if (this.waitingSince == null) {
+            this.waitingSince = now;
+        }
+    }
+
+
+    /**
+     * 결과를 적은 뒤 자동 대기가 남았으면 대기 시각을 적는다. 재시작 대기, 껐다 켜기 단계, 반영 예정이 자동 대기다. 이미 적혀 있으면
+     * 그대로 둔다. 단계가 바뀌어도 24시간은 처음 대기에서 센다(스펙 DECISION17).
+     */
+    public void trackWaiting(Instant now) {
+        boolean waiting = this.restartRequired || this.cyclePhase != null || this.applyDueAt != null;
+        if (this.status == BindingStatus.PENDING && waiting && this.waitingSince == null) {
+            this.waitingSince = now;
+        }
+    }
+
+
+    /** 이 대기에 관리자 알림을 보냈다. */
+    public void adminNotified(Instant now) {
+        this.adminNotifiedAt = now;
+    }
+
+
+    private void clearWaiting() {
+        this.waitingSince = null;
+        this.adminNotifiedAt = null;
     }
 
 
@@ -291,12 +331,15 @@ public class ConnectorBinding extends CreatedAtEntity {
     /**
      * 사람이 시작한 설치가 실패한 바인딩을 다시 잇는다. 실패 표시를 비우고, 실패한 {@code IDLE_WAIT} 면 기다림 상한을 지금부터 다시 센다.
      * 옛 시각이 남으면 다음 주기가 상한이 지났다고 보고 주인이 대화 중이어도 바로 끈다.
+     *
+     * <p>대기 시각과 알림 기록도 비운다. 새 반영이 시작됐으므로 그 결과가 다시 대기면 24시간을 처음부터 센다(스펙 DECISION17).
      */
     public void resumeAfterFailure(Instant now) {
         if (this.applyFailedAt != null && this.cyclePhase == CyclePhase.IDLE_WAIT) {
             this.cycleAt = now;
         }
         this.applyFailedAt = null;
+        clearWaiting();
     }
 
 

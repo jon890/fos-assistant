@@ -171,6 +171,7 @@ public class ConnectorBindingInstalls {
             if (attempt.automatic() && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
                 binding.markApplyFailed(now);
             }
+            binding.trackWaiting(now);
         }
     }
 
