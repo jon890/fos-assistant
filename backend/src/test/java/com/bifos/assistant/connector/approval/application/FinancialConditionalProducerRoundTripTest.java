@@ -61,7 +61,7 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
 
     @Override
     String pluginScript() {
-        return "conditional_plugin_http.ts";
+        return "conditional_plugin_http.py";
     }
 
 

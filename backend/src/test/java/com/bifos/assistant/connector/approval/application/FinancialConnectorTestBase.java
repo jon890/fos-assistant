@@ -218,9 +218,9 @@ abstract class FinancialConnectorTestBase {
     }
 
 
-    /** 이 클래스가 띄울 {@code test/e2e/financial/} 아래 fixture 다. 조건주문 검사는 조건 SDK 원본을 설치하는 fixture 를 쓴다. */
+    /** 이 클래스가 띄울 {@code hermes/tests/fixtures/} 아래 fixture 다. 조건주문 검사는 조건 SDK 원본을 설치하는 fixture 를 쓴다. */
     String pluginScript() {
-        return "producer_plugin_http.ts";
+        return "producer_plugin_http.py";
     }
 
 
@@ -274,7 +274,7 @@ abstract class FinancialConnectorTestBase {
 
 
     /**
-     * 클래스가 함께 쓰는 {@code producer_plugin_http.ts} 프로세스다.
+     * 클래스가 함께 쓰는 {@code producer_plugin_http.py} 프로세스다.
      *
      * <p>기동할 때 bun 거래 대역과 SDK 원고 생성이 함께 돌아 한 번에 2초 가까이 걸린다. 검사마다 새 profile 이름을 쓰고
      * {@code /fixture/configure} 가 대역 카운터와 응답 mode 를 되돌리므로 검사 사이에 다시 띄우지 않는다. 설치 원본을 다시 쓰는
@@ -293,7 +293,7 @@ abstract class FinancialConnectorTestBase {
 
 
         static SharedPlugin start(String script, int springPort, String token) throws Exception {
-            var process = new ProcessBuilder("bun", "../test/e2e/financial/" + script,
+            var process = new ProcessBuilder("python3", "../hermes/tests/fixtures/" + script,
                 "http://127.0.0.1:" + springPort, token).redirectError(ProcessBuilder.Redirect.INHERIT).start();
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {

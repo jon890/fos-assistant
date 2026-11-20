@@ -5,6 +5,7 @@ import importlib
 import json
 import pathlib
 import subprocess
+import sys
 
 from test_connector_manifest import ConnectorGateCase
 
@@ -26,8 +27,8 @@ class ConnectorArgumentLabelsTest(ConnectorGateCase):
         self.assertEqual(self.catalog()[0]["tools"]["list_scopes"]["arg_labels"], {"scope": "범위"})
 
     def test_consumer_fixture_matches_actual_python_producer(self):
-        script = pathlib.Path(__file__).parent / "scripts/export_argument_catalog.ts"
-        subprocess.run(["bun", str(script), "--check"], check=True)
+        script = pathlib.Path(__file__).parent / "fixtures/export_argument_catalog.py"
+        subprocess.run([sys.executable, str(script), "--check"], check=True)
 
     def test_invalid_labels_keep_connector_in_catalog(self):
         invalid = [[], 1, {"scope": 1}, {"scope": {}}, {"__proto__": "이름"},
