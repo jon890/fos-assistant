@@ -6,7 +6,6 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import com.bifos.assistant.connector.connection.application.ConnectorVerifier;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorVerified;
-import com.bifos.assistant.connector.connection.application.dto.ConnectorOperationFailure;
 import com.bifos.assistant.connector.connection.domain.ConnectionAuth;
 import com.bifos.assistant.connector.connection.domain.ConnectionFields;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
@@ -34,6 +33,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -195,20 +195,30 @@ public class ConnectorOAuthFlows {
             ConnectorOAuthCompletion failed = discarded(Outcome.VERIFY_FAILED, flow, connectorId, app, token.accessToken());
             return new ConnectorOAuthCompletion(failed.outcome(), connectorId, null, verified.failure().code().name());
         }
+        AtomicBoolean committed = new AtomicBoolean();
         try {
             connectionService.store(user, manifest, connection -> {
                 if (connection.id() != flow.connectionId()) {
                     throw new IllegalStateException("the connection of this flow changed");
                 }
                 oauth.commit(vault, flow.nonce(), signer.currentUrl(flow.connectionId()).orElseThrow());
+                committed.set(true);
                 tokens.promote(flow.connectionId(), flow.nonce());
                 alerts.reconnected(user.id(), flow.connectionId());
             }, flow.fields(), verified.listed());
         } catch (ConnectorOAuthFlowConflict ex) {
             tokens.dropPending(flow.connectionId(), flow.nonce());
             return ConnectorOAuthCompletion.of(Outcome.SUPERSEDED, connectorId);
-        } catch (ConnectorOperationFailure ex) {
+        } catch (RuntimeException ex) {
+            warn("store", connectorId, ex);
             tokens.dropPending(flow.connectionId(), flow.nonce());
+            if (committed.get()) {
+                // 파일은 새로 허락한 계정의 토큰인데 연결 저장이 되돌려졌다. 준비 안 됨으로 남겨 다시 연결하게 한다.
+                transactions.executeWithoutResult(status -> {
+                    bindings.lockOwner(user.id());
+                    connections.findById(flow.connectionId()).ifPresent(found -> found.pending(clock.instant()));
+                });
+            }
             return ConnectorOAuthCompletion.of(Outcome.UNAVAILABLE, connectorId);
         }
         return ConnectorOAuthCompletion.of(Outcome.CONNECTED, connectorId);

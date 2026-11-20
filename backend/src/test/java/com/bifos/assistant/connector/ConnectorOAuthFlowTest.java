@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -72,6 +73,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -131,6 +133,9 @@ class ConnectorOAuthFlowTest {
 
     @Autowired
     TestClock clock;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private MockMvc mvc;
     private AppUser owner;
@@ -366,6 +371,23 @@ class ConnectorOAuthFlowTest {
         doThrow(new IllegalStateException("boom")).when(oauth).commit(any(), any(), any());
         mvc.perform(complete(started("{\"repo\":\"me/notes\"}"), CODE, null, null)).andExpect(jsonPath("$.outcome").value("UNAVAILABLE"));
         assertThat(connections.findById(manual.id()).orElseThrow().status()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("대시보드 commit 뒤 연결 저장이 되돌려지면 기존 연결을 준비 안 됨으로 남긴다")
+    void rolledBackStoreAfterCommitLeavesConnectionPending() throws Exception {
+        ConnectorConnection manual = manualConnection();
+        // commit 은 성공하고, 같은 트랜잭션에서 행을 지워 뒤이은 연결 저장이 실패하게 한다. 되돌려지면 행은 앞 상태로 남는다.
+        doAnswer(call -> jdbc.update("delete from connector_connection where id = ?", manual.id()))
+            .when(oauth).commit(any(), any(), any());
+
+        mvc.perform(complete(started("{\"repo\":\"me/other\"}"), CODE, null, null)).andExpect(jsonPath("$.outcome").value("UNAVAILABLE"));
+
+        ConnectorConnection kept = connections.findById(manual.id()).orElseThrow();
+        assertThat(kept.status()).as("파일은 새 토큰이라 옛 계정 정보로 쓸 수 있다고 보이면 안 된다").isEqualTo(ConnectionStatus.PENDING);
+        assertThat(kept.fields().auth()).isEqualTo(ConnectionAuth.MANUAL);
+        assertThat(tokens.pending(manual.id(), NONCE)).isEmpty();
     }
 
 
