@@ -1,5 +1,6 @@
 package com.bifos.assistant.context.eval;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.memory.application.MemoryTexts;
@@ -141,7 +142,8 @@ class MemoryEmbeddingEvalTest {
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),
             new QueryEmbedder(settings, timed));
-        ContextAssembler hybrid = new ContextAssembler(memoryService, properties, clock, hybridSection);
+        ContextAssembler hybrid = new ContextAssembler(
+            memoryService, properties, groupId -> MemoryContextBudget.DEFAULTS, clock, hybridSection);
         ContextAssembler keyword = TestContextAssemblers.of(memoryService, properties, clock);
 
         clock.set(BASE);

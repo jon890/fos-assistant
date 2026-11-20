@@ -315,12 +315,13 @@ public class McpToolService {
         McpCaller caller,
         String title,
         String content,
+        String summary,
         String evidence,
         Long memoryId,
         String collection,
         boolean sensitive,
         boolean archivable) {
-        return memoryRemember.remember(caller, title, content, evidence, memoryId, collection, sensitive, archivable);
+        return memoryRemember.remember(caller, title, content, summary, evidence, memoryId, collection, sensitive, archivable);
     }
 
 

@@ -165,7 +165,7 @@ export const memoryScenario: Scenario = {
       await call(context, "/memories", {
         method: "POST",
         token: context.tokens.dad,
-        body: { scope: "USER", title: "너무 긴 항목", content: "가".repeat(9_000), alwaysInject: true },
+        body: { scope: "USER", title: "너무 긴 항목", content: "가".repeat(11_000), alwaysInject: true },
       }),
       200,
       "상한을 넘는 Memory 생성",
@@ -230,7 +230,7 @@ export const memoryScenario: Scenario = {
     }
 
     step("같은 사용자와 같은 에이전트가 받는 Memory 구역은 항상 층 본문과 색인이 정해진 모양 그대로다");
-    // Memory 표를 넓히기 전의 코드가 낸 글과 글자 하나까지 같아야 한다. 표를 넓힌 뒤에도 이 검사가 그대로 통과한다.
+    // 화면으로 만든 짧은 개인 사실은 본문이 요약이라 요약 구역에 들고, 긴 본문은 색인에 제목만 있다(docs/features/memory.md 의 「요약 구역」).
     const groupAlways = expectStatus(
       await call(context, "/memories", {
         method: "POST",
@@ -253,7 +253,6 @@ export const memoryScenario: Scenario = {
       await call(context, "/memories", {
         method: "POST",
         token: context.tokens.dad,
-        // 본문이 개인 사실 구역의 상한(200자)을 넘어 색인에만 실린다
         body: { scope: "USER", title: "지원 이력", content: `색인으로만 실리는 본문 ${"가".repeat(200)}`, alwaysInject: false },
       }),
       200,
@@ -266,7 +265,7 @@ export const memoryScenario: Scenario = {
         body: { scope: "USER", title: "딸 이름", content: "딸 이름은 홍지수다", alwaysInject: false },
       }),
       200,
-      "개인 사실 구역에 싣는 개인 Memory 생성",
+      "요약 구역에 드는 짧은 개인 Memory 생성",
     ).json<MemoryView>();
     const groupIndexed = expectStatus(
       await call(context, "/memories", {
@@ -292,7 +291,11 @@ export const memoryScenario: Scenario = {
       "# 지금 묻는 사람에 대해 아는 것",
       `- ${userAlways.content}`,
       "# 지금 묻는 사람에 대해 기억한 것",
-      "아래는 이 사람에 대해 기억한 짧은 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.",
+      [
+        "아래는 이 사람에 대해 기억한 것의 요약이다. 줄마다 번호로 memory_read 를 불러 상세를 읽는다.",
+        "일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 상세를 읽는다.",
+        "진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.",
+      ].join("\n"),
       `- [${userFact.id}] ${userFact.title}: ${userFact.content}`,
       "# 더 물어볼 수 있는 것",
       "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.",
@@ -346,7 +349,7 @@ export const memoryScenario: Scenario = {
       .map((item) => ({ collection: item.key }));
     let completed: Promise<void> | undefined;
     try {
-      // 제목만으로도 조립 상한을 넘는 합성 자료를 만든다. 본문은 개인 사실 구역의 항목 상한보다 길다.
+      // 제목만으로도 조립 상한을 넘는 합성 자료를 만든다. 본문이 요약 상한(200자)보다 길어 색인에만 있다.
       for (let i = 0; i < 50; i++) {
         created.push(
           expectStatus(
