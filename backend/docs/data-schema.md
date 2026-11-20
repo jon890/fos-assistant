@@ -331,6 +331,12 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
 **지금은 읽지도 쓰지도 않는다.** 「결과물 자동 보관」 스위치를 없애 자동 보관이 늘 돈다([파일 공간 스펙](../../docs/features/workspace/spec.md) REQ16). 칸을 지우는 마이그레이션은 되돌릴 수 없어 칸을 남겼다([설계](../../docs/features/workspace/design.md) DECISION11). 엔티티는 검사의 스키마가 같은 칸을 갖도록 넣기와 고치기에서 뺀 매핑만 둔다.
 
+#### 평가 전용 사용자 컬럼
+
+`evaluation` 은 BOOLEAN NOT NULL DEFAULT FALSE 다. 참이면 배포 뒤 확인과 품질 평가가 쓰는 평가 전용 사용자다. 그룹마다 많아야 하나다.
+이 사용자는 로그인하지 않고 일반 화면과 집계에서 빠진다. 뜻과 숨기는 곳은 [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 의 「평가 전용 사용자」 가 갖는다.
+`AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼고 `AppUserRepository.markEvaluation` 의 전용 `UPDATE` 로만 켠다. 끄는 길은 두지 않는다.
+
 #### 푸시 기기와 설정 컬럼
 
 `push_devices` 는 TEXT NULL 이고 웹 푸시 기기(브라우저 구독) 목록의 JSON 글이다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)). 비면 기기가 없다.
@@ -1073,6 +1079,18 @@ action을 지우면 실행 내용도 지운다.
 ### 지운 발견·문제 후보 표
 
 `proactive_check_finding`(결과 블록의 발견 하나)과 `proactive_check_problem`(버전 3 의 문제 후보 하나, [ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md))은 `V20261105040322` 가 지웠다. 쓰임이던 다음 입력과 되풀이 판정은 제안 줄과 `proactive_check.report_json` 이 갖고, 받아들인 문제 키는 `report_json` 에 남는다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md)).
+
+## 품질 확인 표
+
+### quality_run
+
+배포 뒤 확인이나 품질 평가 한 번이 한 줄이다. 뜻과 결과의 모양은 [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 의 「저장: `quality_run`」 이 갖는다.
+
+**테이블을 늘리지 않는다는 결정(2026-11-01)의 예외로 사용자가 승인했다(2026-11-20).** 확인 한 번은 예약 작업과 수명과 뜻이 다르다(위 「테이블을 추가하는 기준」 의 「본체와 수명이 다를 때」). `task_run` 은 예약 작업 줄과 예정 시각의 유일 제약에 매여 있고, `decision_feedback_event` 는 보관 기간이 지나면 지워진다. 정기 평가와 문항 후보도 이 표와 `result_json` 으로 받아 이 기능의 새 표는 이것 하나다.
+
+- `status` 는 `RUNNING`, `PASSED`, `FAILED` 이고 끝난 줄은 다시 바뀌지 않는다
+- `result_json` 은 기능·문항별 결과 배열이다. 고정 까닭 코드, 숫자, 대화의 공개 식별자와 실행 번호만 담고 질문과 답 본문, 도구 인자를 담지 않는다. 실패한 기능의 대화와 실행 번호는 30일 뒤 비운다
+- 줄은 지우지 않는다. `requested_by_user_id` 는 사용자를 지우면 비운다(`ON DELETE SET NULL`)
 
 ## 판단 피드백 표
 

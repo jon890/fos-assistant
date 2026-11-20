@@ -59,7 +59,8 @@ public class PersonAccessService {
                         .filter(Objects::nonNull)
                         .max(Instant::compareTo)
                         .orElse(null);
-                return new PersonAccess(person, matchingUsers != null, lastConversationAt);
+                boolean evaluation = matchingUsers != null && matchingUsers.stream().anyMatch(AppUser::evaluation);
+                return new PersonAccess(person, matchingUsers != null, lastConversationAt, evaluation);
             })
             .toList();
     }
@@ -92,7 +93,7 @@ public class PersonAccessService {
             : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
                 .max(Instant::compareTo)
                 .orElse(null);
-        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt);
+        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt, joined.stream().anyMatch(AppUser::evaluation));
     }
 
 
@@ -144,6 +145,6 @@ public class PersonAccessService {
             : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
                 .max(Instant::compareTo)
                 .orElse(null);
-        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt);
+        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt, joined.stream().anyMatch(AppUser::evaluation));
     }
 }

@@ -69,6 +69,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `memory` / `Memory` | C: 문서 본체의 최초 저장만 자동화 | U/acceptedAt은 문서 변경·수락의 업무 시각. revision.changedAt은 별도로 보존 |
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
+| `quality_run` / `QualityRun` | C: 확인·평가 한 번의 기록 행의 저장 시각 | started_at, finished_at 은 업무 시각으로 유지 |
 | `result_delivery` / `ResultDelivery` | C: 결과 전달 묶음 행의 저장 시각 | U는 전달 상태의 업무 시각. 상태·attempt bulk 인자 유지 |
 | `subagent_usage_job` / `SubagentUsageJob` | 제외: 사용량 대조 큐의 수락 시각. C+120초로 실패 조건을 계산 | nextAttemptAt/expiresAt/recordedAt 유지 |
 | `task` / `Task` | C+U: 예약 작업 설정 행의 저장 시각. 실행 수명은 TaskRun이 담당 | archivedAt은 명시 전달. 대화 연결 bulk는 U 명시 |
