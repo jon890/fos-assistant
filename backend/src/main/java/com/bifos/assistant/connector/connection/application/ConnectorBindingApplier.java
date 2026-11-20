@@ -68,6 +68,8 @@ public class ConnectorBindingApplier {
     private final ConnectorInstallAttempts attempts;
     /** 껐다 켜기 단계를 진행한다(ADR-20261120 / connector-auto-apply). 반영 예정 확인과 같은 주기에 돈다. */
     private final ConnectorBindingCycles cycles;
+    /** 공유 gateway 가 다시 뜬 뒤 재시작 대기 바인딩을 반영 맞춘다(ADR-20261120 / connector-auto-apply). 같은 주기에 돈다. */
+    private final ConnectorGatewayRestarts restarts;
 
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
@@ -85,6 +87,7 @@ public class ConnectorBindingApplier {
     public void runScheduled() {
         applyDue();
         cycles.advance();
+        restarts.detect();
     }
 
 
