@@ -42,20 +42,18 @@ type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
  */
 type Chooser = "auto" | "open" | "closed";
 
-/** 상세 화면의 뒤로 가기다. 목록 화면으로 돌아간다 */
 const BACK = { href: "/connections", label: PAGE_HEADS.connections.title };
 
 function NotFound() {
   return (
     <PageFrame title="찾을 수 없는 서비스예요" back={BACK}>
-      <div data-testid="connector-not-found">
-        <Link
-          href="/connections"
-          className="text-sm text-foreground underline underline-offset-4"
-        >
-          서비스 연결로 돌아가기
-        </Link>
-      </div>
+      <Link
+        href="/connections"
+        data-testid="connector-not-found"
+        className="text-sm text-foreground underline underline-offset-4"
+      >
+        서비스 연결로 돌아가기
+      </Link>
     </PageFrame>
   );
 }
