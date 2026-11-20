@@ -77,7 +77,7 @@
 
 | 파일 | 갖는 것 |
 | --- | --- |
-| `test/model-eval/concepts/questions.json` | 문항마다 개념, 보낼 글, 기대(`link` 답에 있어야 할 주소 앞부분, `tool` 불러야 할 도구, `absent` 답에 없어야 할 말) |
+| `test/model-eval/concepts/questions.json` | 문항마다 개념, 보낼 글, 기대. 기대는 답의 링크(경로와 질의 문자열이 똑같은 `links`, 앞부분이 맞는 `linkPrefixes`, 없어야 할 앞부분 `noLinkPrefixes`), 불러야 할 도구(`tools`), 하나 이상 있어야 할 낱말(`includes`), 없어야 할 낱말(`absent`)이다 |
 | `test/model-eval/concepts/score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수 |
 | `test/model-eval/concepts/run.ts` | `send` 는 문항마다 새 대화를 만들어 보낸다. `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다. 답변 품질 평가의 `run.ts` 와 같은 명령, 환경 변수, 종료 코드 |
 
