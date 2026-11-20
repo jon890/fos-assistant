@@ -22,6 +22,7 @@ import com.bifos.assistant.connector.connection.application.dto.AgentConnectionV
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOperationFailure;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
@@ -102,7 +103,8 @@ class ConnectorConnectionControllerTest {
                     "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true, "메모를 한 건 남겨요.")),
                 ConnectionStatus.PENDING,
                 true,
-                BINDINGS)));
+                BINDINGS, null, false, false, false,
+                new ConnectorOAuthSummary("github", false, List.of("token"), "https://accounts.example.test/settings", null))));
 
         MvcResult result = mvc.perform(get("/api/v1/connectors"))
             .andExpect(status().isOk())
@@ -116,6 +118,11 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[0].myStatus").value("PENDING"))
             .andExpect(jsonPath("$[0].available").value(true))
             .andExpect(jsonPath("$[0].ownerBrowser").value(false))
+            .andExpect(jsonPath("$[0].oauth.provider").value("github"))
+            .andExpect(jsonPath("$[0].oauth.ready").value(false))
+            .andExpect(jsonPath("$[0].oauth.fields[0]").value("token"))
+            .andExpect(jsonPath("$[0].oauth.settingsUrl").value("https://accounts.example.test/settings"))
+            .andExpect(jsonPath("$[0].oauth.clientSecret").doesNotExist())
             .andExpect(jsonPath("$[0].fields[0].key").value("token"))
             .andExpect(jsonPath("$[0].fields[0].secret").value(true))
             .andExpect(jsonPath("$[0].fields[0].pattern").value("^demo_.+$"))

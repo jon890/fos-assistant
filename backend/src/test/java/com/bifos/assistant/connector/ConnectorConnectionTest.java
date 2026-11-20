@@ -6,10 +6,12 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.connector.connection.domain.ConnectionAuth;
 import com.bifos.assistant.connector.connection.domain.ConnectionFields;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.infra.ConnectionFieldsConverter;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +66,41 @@ class ConnectorConnectionTest {
         assertThat(connection.fields()).isEqualTo(ConnectionFields.empty());
         assertThat(connection.vaultStored()).isFalse();
         assertThat(connection.checkedAt()).isEqualTo(LATER);
+    }
+
+
+    @Test
+    @DisplayName("이전 수동 연결은 방식 표시가 없어도 읽고 열 길이를 늘리지 않고 다시 쓴다")
+    void keepsOldManualFieldsAtColumnLimit() {
+        ConnectionFieldsConverter converter = new ConnectionFieldsConverter();
+        String json = "{\"values\":{\"scope\":\"%s\"},\"secretPrefixes\":{\"token\":\"demo\"}}";
+        String legacy = json.formatted("x".repeat(ConnectorConnection.FIELDS_LENGTH - json.formatted("").length()));
+
+        ConnectionFields fields = converter.convertToEntityAttribute(legacy);
+
+        assertThat(fields.auth()).isEqualTo(ConnectionAuth.MANUAL);
+        assertThat(converter.convertToDatabaseColumn(fields)).isEqualTo(legacy);
+        assertThat(converter.convertToEntityAttribute("""
+            {"values":{},"secretPrefixes":{},"auth":{"method":"manual"}}
+            """)).isEqualTo(ConnectionFields.empty());
+    }
+
+
+    @Test
+    @DisplayName("OAuth 연결의 제공자와 다시 연결 필요 표시는 JSON 왕복 뒤 남고 해제하면 비워진다")
+    void preservesOAuthAuthAndClearsItOnDisconnect() {
+        ConnectionFieldsConverter converter = new ConnectionFieldsConverter();
+        ConnectionFields oauth = new ConnectionFields(Map.of("scope", "a"), Map.of(), new ConnectionAuth("github", true));
+        String stored = converter.convertToDatabaseColumn(oauth);
+        ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
+
+        assertThat(stored).contains("\"auth\":{\"method\":\"oauth\",\"provider\":\"github\",\"reconnectRequired\":true}");
+        assertThat(converter.convertToEntityAttribute(stored)).isEqualTo(oauth);
+        connection.connected(converter.convertToEntityAttribute(stored), LATER);
+        connection.disconnected(LATER);
+
+        assertThat(connection.fields().auth()).isEqualTo(ConnectionAuth.MANUAL);
+        assertThat(converter.convertToDatabaseColumn(connection.fields())).doesNotContain("\"auth\"");
     }
 
 

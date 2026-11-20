@@ -23,7 +23,7 @@ public final class ConnectorManifests {
      *
      * @throws com.bifos.assistant.shared.error.ApiException {@code CONNECTOR_UNAVAILABLE}. 카탈로그를 읽지 못했을 때
      */
-    static List<ConnectorManifest> read(HermesConnectorClient connector) {
+    public static List<ConnectorManifest> read(HermesConnectorClient connector) {
         final List<ConnectorManifest> manifests;
         try {
             manifests = connector.readCatalog();
