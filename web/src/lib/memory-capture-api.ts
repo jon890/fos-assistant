@@ -17,6 +17,8 @@ export type MemoryCapture = {
   /** 이 기록을 남긴 대화가 그 전에 바깥 글을 읽었다. 제안 카드가 그 사실을 보인다. */
   externalRead?: boolean;
   createdAt: string;
+  /** 합치기에서 대신한(제안이면 받아들일 때 대신할) 옛 기억 가운데 지금 볼 수 있는 것의 제목이다. 합치기가 아니면 비어 있다. */
+  replacedTitles?: string[];
 };
 
 const READ_FAILED = "기억 기록을 읽지 못했어요.";

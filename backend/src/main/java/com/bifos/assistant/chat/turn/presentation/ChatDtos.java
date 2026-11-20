@@ -308,7 +308,8 @@ public final class ChatDtos {
     /**
      * 대화의 답 아래에 그릴 기억 기록 하나다(ADR-20261007 / memory-remember).
      * <p>{@code kind} 는 {@code CREATED}, {@code UPDATED}, {@code PROPOSED} 이고 {@code status} 는 항목의 지금 승인 상태다. 풀지
-     * 못한 항목은 본문을 싣지 않는다.
+     * 못한 항목은 본문을 싣지 않는다. {@code replacedTitles} 는 합치기에서 대신한(제안이면 대신할) 옛 기억 가운데 요청자가 지금 읽을 수 있는 것의
+     * 제목이고 합치기가 아니면 빈 배열이다.
      */
     public record MemoryCaptureView(
         Long id,
@@ -320,7 +321,8 @@ public final class ChatDtos {
         String content,
         boolean alwaysInject,
         boolean externalRead,
-        Instant createdAt) {
+        Instant createdAt,
+        List<String> replacedTitles) {
         static MemoryCaptureView from(CapturedMemory captured) {
             var capture = captured.capture();
             var memory = captured.memory();
@@ -334,7 +336,8 @@ public final class ChatDtos {
                 memory.readable() ? memory.content() : "",
                 memory.alwaysInject(),
                 capture.externalRead(),
-                capture.createdAt());
+                capture.createdAt(),
+                captured.replacedTitles());
         }
     }
 
