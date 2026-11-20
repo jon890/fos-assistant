@@ -129,7 +129,9 @@ const KINDS: Record<
     name: "다른 에이전트",
     tools: ["agent_list", "agent_delegate", "agent_status", "agent_stop"],
   },
-  connections: { name: "외부 서비스 연결", tools: ["connector_list", "connector_attach"],
+  connections: {
+    name: "외부 서비스 연결",
+    tools: ["connector_list", "connector_attach"],
   },
   "tool-search": {
     name: "도구 찾기",
