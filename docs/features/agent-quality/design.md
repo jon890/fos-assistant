@@ -56,9 +56,9 @@
 
 | 화면이나 경로 | 바꿀 패키지 | 바꾸는 것 |
 | --- | --- | --- |
-| 로그인 확인과 매 요청 인증 | `people`(`SignInController`), `user`(`AllowedUserResolver.resolveAllowed`) | `evaluation` 행을 거절한다. 그래서 그 주소로 서명된 토큰이 생겨도 통과하지 못한다 |
+| 로그인 확인과 매 요청 인증 | `people`(`SignInPolicy.admit`, `recordCompletion`), `user`(`AllowedUserResolver.resolveAllowed`) | `evaluation` 행을 거절한다. 그래서 그 주소로 서명된 토큰이 생겨도 통과하지 못한다. 예약 작업 경로가 쓰는 `SignInPolicy.revoked` 는 거절하지 않는다 |
 | 관리자 사용자 목록 | `people`(`PersonAccessService.list`) | 남기고 「평가용」 표시를 붙인다. 끄기와 지우기는 막지 않는다 |
-| 에이전트 고르기, 공개 목록, 멘션 후보 | `agent` | 평가 사용자 주인의 에이전트를 뺀다(관리자 에이전트 목록에는 남긴다) |
+| 에이전트 고르기, 공개 목록, 멘션 후보 | 없음 | 두 에이전트가 `PRIVATE` 이라 주인 말고는 읽지 못한다(`AgentService.readableBy`). 별도 필터를 두지 않는다. 관리자 에이전트 목록에는 남는다 |
 | 사용량 집계 | `usage` | 사용자별 행에서 빼고 「평가」 한 줄로 합친다 |
 | 기본 도구 대기 알림 | `agent`(`AgentPendingToolsets`) | 평가 사용자의 에이전트를 뺀다 |
 | 반응 집계 | `feedback` | PR3 이 뺀다 |
