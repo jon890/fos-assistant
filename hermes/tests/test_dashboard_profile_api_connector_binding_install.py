@@ -656,19 +656,34 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
         """설치되지 않은 스킬과 뗀 스킬에는 같은 이름이 색인에 남아도 설치 출처를 붙이지 않는다."""
         self.set_shell(terminal=False, docker=False)
         self.assertEqual(self.bind().status_code, 200)
-        skills = [{"name": "demo-report", "enabled": False}, {"name": "demo-runner", "enabled": True}]
+        skills = [{"name": "demo-report", "enabled": False}, {"name": "demo-runner", "enabled": True}, {"enabled": True}]
 
         def read():
             return self.request("/api/skills", "GET", token="valid", query_profiles=("alice",),
                                 full_response=True, skills_payload=skills).body
 
-        installed, skipped = read()
+        installed, skipped, missing_name = read()
         self.assertEqual(installed["connector_id"], DEMO)
         self.assertEqual(installed["connector_title"], "검사용 메모")
         self.assertIs(installed["enabled"], False)
         self.assertNotIn("connector_id", skipped)
+        self.assertEqual(missing_name, {"enabled": True})
         self.assertEqual(self.bind(enabled=False).status_code, 200)
         self.assertEqual(read(), skills)
+
+    def test_skill_list_preserves_response_when_ownership_record_is_unreadable(self):
+        """설치 기록의 값이 잘못돼도 대시보드가 읽은 스킬 목록은 그대로 돌려준다."""
+        self.assertEqual(self.bind().status_code, 200)
+        recorded = self.root / "alice" / ".fos-connectors.json"
+        state = json.loads(recorded.read_text(encoding="utf-8"))
+        state[DEMO]["mcp_server"] = None
+        recorded.write_text(json.dumps(state), encoding="utf-8")
+        skills = [{"name": "demo-report", "enabled": True}]
+
+        response = self.request("/api/skills", "GET", token="valid", query_profiles=("alice",),
+                                full_response=True, skills_payload=skills)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, skills)
 
     def test_shell_off_binds_without_the_runner_and_stays_configured(self):
         """셸 조건이 없으면 요구 env 스킬만 빠지고, 조건이 그대로인 동안 상태 판정은 어긋남으로 보지 않는다(REQ2, REQ3, REQ4)."""

@@ -18,9 +18,6 @@ def _skill_owners(profile):
         state = _connector_state(_strict_json((directory / CONNECTOR_STATE).read_bytes()))
     except FileNotFoundError:
         return {}
-    except (OSError, ValueError):
-        logger.warning("dashboard-profile-api: 스킬 설치 출처를 읽지 못했다")
-        return {}
 
     owners = {}
     for plugin, entry in state.items():
@@ -36,15 +33,30 @@ def _skill_owners(profile):
 async def _with_skill_owners(profile, response):
     from starlette.responses import JSONResponse
 
-    owners = await asyncio.to_thread(_skill_owners, profile)
+    try:
+        owners = await asyncio.to_thread(_skill_owners, profile)
+    except Exception:
+        logger.warning("dashboard-profile-api: 스킬 설치 출처를 읽지 못했다")
+        return response
     if not owners:
         return response
 
-    payload = json.loads(b"".join([chunk async for chunk in response.body_iterator]))
-    for skill in payload:
-        owner = owners.get(skill["name"])
-        if owner is not None:
-            skill["connector_id"], skill["connector_title"] = owner
-    headers = dict(response.headers)
-    headers.pop("content-length", None)
-    return JSONResponse(payload, headers=headers)
+    raw = b"".join([chunk async for chunk in response.body_iterator])
+    try:
+        payload = json.loads(raw)
+        if isinstance(payload, list):
+            for skill in payload:
+                name = skill.get("name") if isinstance(skill, dict) else None
+                if isinstance(name, str) and name in owners:
+                    skill["connector_id"], skill["connector_title"] = owners[name]
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return JSONResponse(payload, headers=headers)
+    except (ValueError, TypeError):
+        logger.warning("dashboard-profile-api: 스킬 목록에 설치 출처를 더하지 못했다")
+
+        async def original_body():
+            yield raw
+
+        response.body_iterator = original_body()
+        return response
