@@ -1,5 +1,6 @@
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
+import { openAdminMenu } from "./helpers.ts";
 
 /** 응답이 계약 밖의 칸으로 파일 이름을 실어 보내도 화면은 그리지 않아야 한다. */
 const STRAY_FILE_NAME = "가족-여행-계획.txt";
@@ -23,11 +24,11 @@ function usageTable(page: Page) {
   return page.getByRole("table", { name: "실행 공간별 용량" });
 }
 
-test("관리자 메뉴의 파일 공간은 주인, 용량, 항목 수와 일부만 셌는지를 보이고 파일 이름은 보이지 않는다", async ({ page }) => {
+test("관리자 메뉴의 파일 공간은 주인, 용량, 항목 수와 일부만 셌는지를 보이고 파일 이름은 보이지 않는다", async ({ page }, testInfo) => {
   await fakeUsage(page, { status: 200, json: { available: true, spaces: SPACES } });
   await page.goto("/admin/people");
 
-  await page.getByRole("navigation", { name: "관리자 메뉴" }).getByRole("link", { name: "파일 공간", exact: true }).click();
+  await (await openAdminMenu(page, testInfo)).getByRole("link", { name: "파일 공간", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/workspaces$/);
   await expect(page).toHaveTitle(/파일 공간/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("파일 공간");

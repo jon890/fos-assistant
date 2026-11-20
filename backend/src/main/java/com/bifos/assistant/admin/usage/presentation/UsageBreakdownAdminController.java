@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UsageBreakdownAdminController {
 
-    /** 가족이 사는 곳의 달력으로 달을 끊는다. {@code UsageController} 와 같은 시간대이므로 바꾸면 함께 고친다. */
+    /** 가족이 사는 곳의 달력으로 달을 끊는다. {@code UsageController}, {@code AdminOverviewService} 와 같은 시간대이므로 바꾸면 함께 고친다. */
     private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
     private final CurrentUserProvider currentUser;

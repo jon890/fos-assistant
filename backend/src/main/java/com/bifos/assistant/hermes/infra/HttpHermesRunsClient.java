@@ -100,6 +100,9 @@ public class HttpHermesRunsClient implements HermesRunsClient {
 
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
+        // 보내기 전에 적는다. Hermes 는 응답보다 먼저 실행을 cancelled 로 바꾸므로, 응답 뒤에 적으면 그 사이에 완료 대기가 읽은
+        // cancelled 를 사용자 중지가 아니라 끊긴 실행으로 본다. 응답을 받지 못해도 Hermes 가 받았을 수 있어 실패해도 지우지 않는다.
+        sessionRuns.terminals().markStopped(profileName, runId);
         try {
             restClient
                 .post()
@@ -107,7 +110,6 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                 .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                 .retrieve()
                 .toBodilessEntity();
-            sessionRuns.terminals().markStopped(profileName, runId);
         } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (HttpClientErrorException.Conflict ex) {
@@ -115,7 +117,6 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                 throw HermesCallFailure.of(ex, "could not stop the Hermes run");
             }
             releaseIfLost(apiBaseUrl, profileName, runId);
-            sessionRuns.terminals().markStopped(profileName, runId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");
         }

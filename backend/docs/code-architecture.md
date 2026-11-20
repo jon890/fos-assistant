@@ -526,7 +526,7 @@ IntelliJ의 Reformat Code와 완전히 같은 결과는 보장하지 않는다. 
 Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같은 태스크를 실행한다. 전역 Code Style이나 plugin 설치를 변경할 필요는 없다.
 
 `spotlessCheck`는 원본을 바꾸지 않고 위반이 있으면 실패한다. 설정 파일과 고정 엔진은 Spotless의 태스크 입력에 포함된다.
-실제 Gradle 회귀 `test/spotless-jdt.test.py`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
+실제 Gradle 회귀 `test/spotless-jdt.test.ts`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
 기본 범위는 `origin/main`과의 공통 조상 뒤 바뀐 파일이다. `-PformatAll=true`로 main/test Java 전체를 확인하거나 적용한다.
 전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.
 실행 명령과 커밋 분리는 `backend/AGENTS.md`의 「포맷」 절이 갖는다.
