@@ -402,7 +402,7 @@ class ConnectorGatewayRestartTest {
 
         assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, waiting.restartRequiredSince()))
             .isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isNotEqualTo(ErrorCode.CONNECTOR_RESTART_NOT_DONE));
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_APPLY_SCHEDULED));
         verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 

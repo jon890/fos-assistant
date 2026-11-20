@@ -169,6 +169,9 @@ v0.21.4 이후의 host singleton 과 multiplex 정책은 [「연동에 영향을
 
 상태 확인과 다시 시작 같은 운영 명령은 비공개 저장소 `fos-home-infra` 가 갖는다.
 
+재시작 감지는 gateway 가 다시 뜰 때 새 pid 로 뜬다는 것과, 대시보드 plugin 이 같은 컨테이너의 같은 pid 공간에서 그 pid 를 읽는다는 것에 기댄다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md)).
+plugin 은 기본 root 의 `gateway.pid` 를 정리 없는 `get_running_pid` 로 읽고 `/proc` 의 시작 시각을 답한다. pid 를 그대로 둔 채 다시 읽는 방식의 재시작으로 바뀌면 기동 시각이 바뀌지 않아 재시작 대기가 풀리지 않는다. Hermes 를 올릴 때 이 두 가지를 다시 본다.
+
 `hermes gateway start` 로 띄운 프로세스는 s6 밖에서 돈다.
 포트는 응답하지만 컨테이너를 다시 띄우면 사라지고 s6 가 되살리지 않는다.
 
