@@ -32,6 +32,9 @@ LAUNCHER_VAULT_DIR_ENV = LAUNCHER_ENV_PREFIX + "DIR"
 LAUNCHER_REVISION_ENV = LAUNCHER_ENV_PREFIX + "REVISION"
 LAUNCHER_ENV = frozenset({LAUNCHER_VAULT_DIR_ENV, VAULT_KEY_FILE_ENV, LAUNCHER_REVISION_ENV})
 REVISION_RE = re.compile(r"^[0-9a-f]{64}\Z")
+# 단추 연결의 토큰 통로 주소를 받을 env 를 가리키는 머리 인자다. 칸 인자(`<key>=<env>`)와 따로 읽는다
+# (docs/features/connector-oauth/design.md 의 「실행기와 직접 실행」).
+LAUNCHER_OAUTH_ARG = "@oauth="
 
 
 def _launcher_paths() -> dict:
@@ -73,8 +76,14 @@ def _launcher_server(manifest: dict, server: dict, vault: str, revision: str) ->
     env = {name: value for name, value in server["env"].items() if name not in field_env}
     env.update({LAUNCHER_VAULT_DIR_ENV: paths[LAUNCHER_VAULT_DIR_ENV], VAULT_KEY_FILE_ENV: paths[VAULT_KEY_FILE_ENV],
                 LAUNCHER_REVISION_ENV: revision})
+    # 통로 주소는 실행기가 OAuth 파일에서 넣는다. 정의에는 빈 값을 둔다. `${이름}` 을 두면 profile `.env` 에 값이 없을 때
+    # 그 글자가 그대로 프로세스에 간다. 선언이 틀려 `oauth` 가 None 인 플러그인도 서버 env 의 그 이름은 비운다.
+    if manifest.get("oauth_env") is not None:
+        env[manifest["oauth_env"]] = ""
+    oauth = manifest.get("oauth")
     args = [LAUNCHER_PYTHON_FLAG, paths["script"], vault, manifest["id"],
             *("%s=%s" % (field["key"], field["env"]) for field in manifest["fields"]),
+            *([LAUNCHER_OAUTH_ARG + oauth["token_env"]] if oauth else []),
             LAUNCHER_ARGS_SEPARATOR, server["command"], *server["args"]]
     launched = {"command": paths["command"], "args": args, "env": env, "enabled": True}
     if "tools" in server:
@@ -96,12 +105,18 @@ def _launcher_parts(server) -> dict | None:
     if len(head) < 2 or not real or not isinstance(server.get("env"), dict):
         return None
     fields = {}
+    oauth_env = None
     for pair in head[2:]:
+        if pair.startswith("@"):
+            if not pair.startswith(LAUNCHER_OAUTH_ARG) or oauth_env is not None:
+                return None
+            oauth_env = pair[len(LAUNCHER_OAUTH_ARG):]
+            continue
         key, separator, env_name = pair.partition("=")
         if not separator or key in fields:
             return None
         fields[key] = env_name
-    return {"script": args[1], "vault": head[0], "connector": head[1], "fields": fields,
+    return {"script": args[1], "vault": head[0], "connector": head[1], "fields": fields, "oauth_env": oauth_env,
             "command": real[0], "args": real[1:]}
 
 
@@ -137,8 +152,10 @@ def _launcher_current(manifest: dict, server: dict) -> bool:
     paths = _launcher_paths()
     env = server["env"]
     revision = env.get(LAUNCHER_REVISION_ENV)
+    oauth = manifest.get("oauth")
     # 칸 env 는 실행기가 보관 파일에서 넣는다. 정의 env 에 같은 이름이 있으면 이 설치가 쓴 정의가 아니다.
     return (server.get("command") == paths["command"] and parts["script"] == paths["script"]
+            and parts["oauth_env"] == (oauth["token_env"] if oauth else None)
             and not set(parts["fields"].values()) & set(env)
             and bool(VAULT_ID_RE.match(parts["vault"])) and parts["connector"] == manifest["id"]
             and list(parts["fields"].items()) == [(field["key"], field["env"]) for field in manifest["fields"]]
@@ -164,7 +181,24 @@ def _binding_env(profile_dir: pathlib.Path, manifest: dict, entry: dict) -> dict
             raise ValueError("바인딩의 보관 파일을 읽지 못했다") from None
         if stored is None or stored["connector"] != manifest["id"]:
             raise ValueError("바인딩의 보관 파일이 없다")
-        return {field["env"]: stored["values"].get(field["key"], "") for field in fields}
+        env = {field["env"]: stored["values"].get(field["key"], "") for field in fields}
+        if manifest.get("oauth") is not None:
+            # 실행기와 같게 OAuth 파일의 통로 주소를 넣는다. 없거나 풀지 못하면 빈 값이다(붙여 넣기 연결).
+            env[manifest["oauth"]["token_env"]] = _oauth_token_url(entry["vault"], manifest["id"])
+        return env
     env_path = profile_dir / ".env"
     text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
     return {field["env"]: _env_value(text, field["env"]) for field in fields}
+
+
+def _oauth_token_url(vault: str, connector: str, pending: bool = False) -> str:
+    """OAuth 파일의 토큰 통로 주소다. 파일이 없거나 풀지 못하거나 다른 플러그인의 것이면 빈 값이다."""
+    from .connector_oauth_store import _read_oauth
+
+    try:
+        stored = _read_oauth(vault, pending=pending)
+    except Exception:
+        return ""
+    if stored is None or stored["connector"] != connector:
+        return ""
+    return stored["token_url"]

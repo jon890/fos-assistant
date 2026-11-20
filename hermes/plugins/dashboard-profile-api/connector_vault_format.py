@@ -65,3 +65,56 @@ def _unseal_vault(vault: str, stored: dict, keys) -> dict:
     if not isinstance(values, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in values.items()):
         raise ValueError("보관 파일의 모양이 올바르지 않다")
     return {"v": 2, "connector": stored["connector"], "values": values}
+
+
+# OAuth 파일 안 글의 칸이다(docs/features/connector-oauth/design.md 의 「OAuth 파일」). `nonce` 는 대기 파일에만 있다.
+OAUTH_KEYS = frozenset({"provider", "refresh_token", "granted_scopes", "token_url"})
+
+
+def _oauth_aad(vault: str, connector: str) -> bytes:
+    """OAuth 파일 암호문을 그 연결과 플러그인에 묶는 글이다. 보관 파일과 다른 글이라 두 파일을 서로 바꿔 넣으면 풀리지 않는다."""
+    return ("connector-oauth:%s:%s" % (vault, connector)).encode("utf-8")
+
+
+def _oauth_data(value) -> dict:
+    """OAuth 파일 안 글의 모양을 본다. 틀리면 `ValueError` 다. 값은 예외 메시지에 싣지 않는다."""
+    if (not isinstance(value, dict) or not OAUTH_KEYS <= set(value) <= OAUTH_KEYS | {"nonce"}
+            or any(not isinstance(value[key], str) for key in value if key != "granted_scopes")
+            or not isinstance(value["granted_scopes"], list)
+            or any(not isinstance(scope, str) for scope in value["granted_scopes"])):
+        raise ValueError("OAuth 파일의 모양이 올바르지 않다")
+    return value
+
+
+def _parse_oauth(raw: bytes) -> dict:
+    """OAuth 파일 글의 모양을 엄격히 본다. 풀지 않는다. v1 은 `{"v": 1, "connector", "oauth"}` 평문이고 v2 는 보관 파일과 같다."""
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        raise ValueError("OAuth 파일의 모양이 올바르지 않다") from None
+    if (not isinstance(value, dict) or not isinstance(value.get("connector"), str)
+            or not CONNECTOR_ID_RE.match(value["connector"])):
+        raise ValueError("OAuth 파일의 모양이 올바르지 않다")
+    version = value.get("v") if type(value.get("v")) is int else None
+    if version == 1 and set(value) == {"v", "connector", "oauth"}:
+        _oauth_data(value["oauth"])
+        return value
+    if (version == 2 and set(value) == {"v", "connector", "key_id", "sealed"}
+            and isinstance(value["key_id"], str) and KEY_ID_RE.match(value["key_id"])
+            and isinstance(value["sealed"], str)):
+        return value
+    raise ValueError("OAuth 파일의 모양이 올바르지 않다")
+
+
+def _unseal_oauth(vault: str, stored: dict, keys) -> dict:
+    """OAuth 파일을 `{"v", "connector", "oauth"}` 로 돌려준다. v2 를 풀 key 가 없거나 풀지 못하면 `ValueError` 다."""
+    if stored["v"] == 1:
+        return stored
+    key = keys.keys.get(stored["key_id"])
+    if key is None:
+        raise ValueError("OAuth 파일을 풀 key 가 없다")
+    try:
+        data = json.loads(_open(key, stored["sealed"], _oauth_aad(vault, stored["connector"])).decode("utf-8"))
+    except (UnicodeError, ValueError):
+        raise ValueError("OAuth 파일을 풀지 못했다") from None
+    return {"v": 2, "connector": stored["connector"], "oauth": _oauth_data(data)}

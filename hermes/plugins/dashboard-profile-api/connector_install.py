@@ -76,6 +76,7 @@ from .connector_vault import (
 from .profiles import (
     _check_skills_list,
 )
+from .connector_oauth_store import _has_oauth
 
 from .connector_output import (
     _sandbox_connector_output_directory,
@@ -89,6 +90,7 @@ from .sandbox import (
     _sandbox_attachment_agent_directory,
     _sandbox_attachment_path_identity,
     _sandbox_policy,
+    _sandbox_profile_settings,
     _sandbox_terminal,
     _sandbox_unavailable,
     _sandbox_verify_attachment_directories,
@@ -209,10 +211,10 @@ async def _connector_request(request):
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
             if manifest["sandbox_required"]:
-                # 실행 공간을 전제로 하는 플러그인은 정책에 등록된 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
+                # 실행 공간을 전제로 하는 플러그인은 정책이 적용되는 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
                 # 셸은 붙인 뒤에 켤 수 있기 때문이다(ADR-20261008 connector-binding-guards).
                 sandbox = _sandbox_policy()
-                if sandbox is None or profile not in sandbox["profiles"]:
+                if sandbox is None or _sandbox_profile_settings(sandbox, profile) is None:
                     return _sandbox_unavailable()
             owner_attachments = None
             if manifest["owner_attachments_env"] is not None:
@@ -238,16 +240,21 @@ async def _connector_request(request):
             revision = await asyncio.to_thread(_vault_revision, body["bind"]["vault"])
             # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 플러그인의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
             fields = {field["key"] for field in manifest["fields"]}
-            values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields})
+            # 단추로 연결한 연결(OAuth 파일이 있음)은 단추 칸이 비어도 받는다. 보관 파일 잠금은 잡지 않는다. 본 보관 파일을
+            # 쓰는 쪽이 보관 파일 잠금 다음 이 전역 잠금을 잡으므로 읽는 동안 파일이 바뀌지 않는다(docs/features/connector-oauth/design.md).
+            oauth = (manifest.get("oauth") is not None
+                     and await asyncio.to_thread(_has_oauth, body["bind"]["vault"]))
+            values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields},
+                                   oauth=oauth)
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             owner_output = None
             if manifest["owner_output_env"] is not None and owner is not None:
                 # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 플러그인 id 로만 만든다.
-                # 실행 공간 정책에 등록된 profile 에만 준다. 미등록 profile 은 그 디렉터리를 붙이지 않는다.
+                # 실행 공간 정책이 적용되는 profile 에만 준다.
                 # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 플러그인이 파일 출력만 거절한다(ADR-20261008 connector-output-files).
                 sandbox = _sandbox_policy()
-                if sandbox is not None and profile in sandbox["profiles"]:
+                if sandbox is not None and _sandbox_profile_settings(sandbox, profile) is not None:
                     try:
                         owner_output = await asyncio.to_thread(_sandbox_connector_output_directory, sandbox,
                                                                profile, owner, body["plugin"])
