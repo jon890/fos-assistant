@@ -208,7 +208,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className="min-w-0 text-sm leading-6">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
         rehypePlugins={
           fades && fades.length > 0
             ? [[rehypeRevealFade, { fades, sourceLength: source.length }]]
