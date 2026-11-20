@@ -261,6 +261,18 @@ public class ConnectorBinding extends CreatedAtEntity {
     }
 
 
+    /**
+     * 사람이 시작한 설치가 실패한 바인딩을 다시 잇는다. 실패 표시를 비우고, 실패한 {@code IDLE_WAIT} 면 기다림 상한을 지금부터 다시 센다.
+     * 옛 시각이 남으면 다음 주기가 상한이 지났다고 보고 주인이 대화 중이어도 바로 끈다.
+     */
+    public void resumeAfterFailure(Instant now) {
+        if (this.applyFailedAt != null && this.cyclePhase == CyclePhase.IDLE_WAIT) {
+            this.cycleAt = now;
+        }
+        this.applyFailedAt = null;
+    }
+
+
     /** 앞선 대기 값을 지우지 않고 논리 OR 로 누적한다. */
     public void markRestartRequired(boolean restartRequired) {
         this.restartRequired = this.restartRequired || restartRequired;

@@ -270,6 +270,32 @@ class ConnectorBindingCycleTest {
 
 
     @Test
+    @DisplayName("끄기가 실패한 IDLE_WAIT 에 값을 다시 등록하면 기다림 상한을 지금부터 다시 세어 대화 중에는 끄지 않는다")
+    void registerAfterFailedIdleWaitRestartsTheWait() {
+        bindNeedingCycle();
+        stubCycleOffFailure(new IllegalStateException());
+        applier.runScheduled();
+        assertThat(onlyBinding().applyFailedAt()).isNotNull();
+
+        clock.advance(Duration.ofMinutes(30));
+        stubInstall(NEEDS_CYCLE);
+        connectionService.register(owner, DEMO, Map.of("token", "demo_ok_new_0123456789"));
+        ConnectorBinding resumed = onlyBinding();
+        assertThat(resumed.applyFailedAt()).isNull();
+        assertThat(resumed.cycleAt()).as("기다림을 지금부터 센다").isAfter(T0.plus(Duration.ofMinutes(29)));
+
+        doReturn(1).when(limiter).used(anyLong());
+        stubCycleOff(CYCLED_OFF);
+        clearInvocations(connector);
+        applier.runScheduled();
+
+        verify(connector, never()).bindConnector(
+            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true));
+        assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.IDLE_WAIT);
+    }
+
+
+    @Test
     @DisplayName("자동 끄기가 409 로 거절돼도 예외로 끝나지 않고 실패 표시를 남긴다")
     void conflictOnCycleOffMarksFailure() {
         bindNeedingCycle();

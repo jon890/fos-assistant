@@ -130,7 +130,7 @@ public class ConnectorInstallAttempts {
             if (replaceValues) {
                 cycleStep = phase == CyclePhase.OFF ? CycleStep.OFF : CycleStep.NONE;
             } else if (afterRestart && !automatic) {
-                binding.clearApplyFailed();
+                binding.resumeAfterFailure(now);
                 cycleStep = phase == CyclePhase.IDLE_WAIT ? CycleStep.OFF : CycleStep.ON;
             } else if (checkInstallation && waiting == null) {
                 waiting = ResyncOutcome.CYCLE_PENDING;
@@ -140,7 +140,7 @@ public class ConnectorInstallAttempts {
             waiting = null;
         }
         if (!automatic && waiting == null) {
-            binding.clearApplyFailed();
+            binding.resumeAfterFailure(now);
         }
         UUID attemptId = UUID.randomUUID();
         if (waiting == null) {
