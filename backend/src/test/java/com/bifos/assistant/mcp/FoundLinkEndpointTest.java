@@ -130,6 +130,22 @@ class FoundLinkEndpointTest {
 
 
     @Test
+    @DisplayName("읽기 서비스가 넘어간 주소를 돌려줘도 함께 알린 적어 넣은 주소는 받지 않는다")
+    void excludesTypedUrlsSentWithTheReport() throws Exception {
+        ObjectNode body = body(
+            McpCallSigner.context(token, "found_links", root),
+            page("https://final.example.com/landed", "https://typed.example.com/go", "https://final.example.com/a.png"));
+        body.putArray("typed").add("https://typed.example.com/go");
+        web.image("https://final.example.com/a.png", "image/png", png(6));
+
+        assertThat(post(REPORT, body, token).statusCode()).isEqualTo(204);
+
+        assertThat(code(source(root, "link:https://typed.example.com/go"))).isEqualTo("IMAGE_SOURCE_UNKNOWN");
+        assertThat(source(root, "link:https://final.example.com/a.png").statusCode()).isEqualTo(200);
+    }
+
+
+    @Test
     @DisplayName("다른 대화와 다른 사용자의 실행이 알린 주소는 422 IMAGE_SOURCE_UNKNOWN 이고 바깥에 요청하지 않는다")
     void rejectsLinksFoundElsewhere() throws Exception {
         String otherRoot = McpCallSigner.newRoot();
@@ -146,6 +162,19 @@ class FoundLinkEndpointTest {
             assertThat(code(response)).as(link).isEqualTo("IMAGE_SOURCE_UNKNOWN");
         }
         assertThat(web.requested()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("앞 답의 실행이 알린 주소를 같은 대화의 다음 실행이 받는다")
+    void laterRunInTheSameConversationFetchesEarlierLinks() throws Exception {
+        web.image("https://img.example.com/earlier.png", "image/png", png(4));
+        assertThat(report(root, page(null, "https://img.example.com/earlier.png")).statusCode()).isEqualTo(204);
+        jdbc.update("UPDATE agent_execution SET status = 'SUCCEEDED' WHERE id = ?", execution.id());
+        String nextRoot = McpCallSigner.newRoot();
+        run(user, conversation, nextRoot);
+
+        assertThat(source(nextRoot, "link:https://img.example.com/earlier.png").statusCode()).isEqualTo(200);
     }
 
 
@@ -171,6 +200,13 @@ class FoundLinkEndpointTest {
         ObjectNode noPages = json.createObjectNode();
         noPages.set("_fos_ctx", McpCallSigner.context(token, "found_links", root));
         assertThat(post(REPORT, noPages, token).statusCode()).isEqualTo(400);
+        assertThat(report(root, page("https://shop.example.com/" + "x".repeat(2_048), "/a.png")).statusCode()).isEqualTo(400);
+        ObjectNode manyTyped = body(McpCallSigner.context(token, "found_links", root), page(null, "https://shop.example.com/ok"));
+        ArrayNode typed = manyTyped.putArray("typed");
+        for (int index = 0; index < 51; index++) {
+            typed.add("https://shop.example.com/" + index);
+        }
+        assertThat(post(REPORT, manyTyped, token).statusCode()).isEqualTo(400);
         ObjectNode numbers = page(null);
         ((ArrayNode)numbers.get("links")).add(1);
         assertThat(report(root, numbers).statusCode()).isEqualTo(400);
@@ -189,11 +225,14 @@ class FoundLinkEndpointTest {
         web.status("https://shop.example.com/gone", 404);
         report(root, page(
             null,
+            "https://10.0.0.5/inner.png",
             "https://shop.example.com:8443/port",
             "https://shop.example.com/plain",
             "https://img.example.com/huge.png",
             "https://shop.example.com/gone"));
 
+        assertFailure("link:https://10.0.0.5/inner.png", 422, "IMAGE_SOURCE_LINK_BLOCKED");
+        assertThat(web.requested()).as("내부망 꼴의 주소로는 바깥에 요청하지 않는다").isEmpty();
         assertFailure("link:https://shop.example.com:8443/port", 422, "IMAGE_SOURCE_LINK_BLOCKED");
         assertFailure("link:https://shop.example.com/plain", 422, "IMAGE_SOURCE_LINK_NO_IMAGE");
         assertFailure("link:https://img.example.com/huge.png", 422, "IMAGE_SOURCE_LINK_TOO_LARGE");

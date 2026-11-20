@@ -63,8 +63,9 @@ class FoundLinksFixture(base.PluginFixture):
             os.environ["FOS_CTX_POLICY_URL"] = self.saved_env
         super().tearDown()
 
-    def result(self, tool, result, call="call_1", session=base.VECTOR_SESSION):
-        return self.plugin.transform_tool_result(tool_name=tool, result=result, session_id=session, tool_call_id=call, args={})
+    def result(self, tool, result, call="call_1", session=base.VECTOR_SESSION, args=None):
+        return self.plugin.transform_tool_result(
+            tool_name=tool, result=result, session_id=session, tool_call_id=call, args={} if args is None else args)
 
 
 class PagesTest(FoundLinksFixture):
@@ -118,6 +119,37 @@ class PagesTest(FoundLinksFixture):
         self.assertEqual(len(set(links)), 2000)
         self.assertNotIn(long_link, links)
 
+    def test_link_followed_by_korean_particle_yields_the_real_address(self):
+        """주소 뒤에 조사나 표 구분자가 바로 붙어도 그 앞까지 자른 주소를 뽑는다. 붙은 꼴도 한글 경로일 수 있어 함께 낸다."""
+        text = "사진은 https://a.example.com/x.png를 보고 |https://a.example.com/y| **https://a.example.com/z**"
+
+        self.assertEqual(self.found_links.absolute_links(text), [
+            "https://a.example.com/x.png", "https://a.example.com/x.png를",
+            "https://a.example.com/y", "https://a.example.com/y|",
+            "https://a.example.com/z",
+        ])
+        self.assertEqual(self.found_links.absolute_links("https://a.example.com/상품/1"),
+                         ["https://a.example.com/", "https://a.example.com/상품/1"], "한글 경로는 붙은 꼴이 맞는 주소다")
+
+    def test_long_runs_of_closing_brackets_do_not_stall(self):
+        """닫는 괄호를 길게 이어 붙인 본문도 금방 끝난다. 길이의 제곱으로 느려지면 나쁜 페이지 하나가 결과 hook 을 붙잡는다."""
+        import time
+        hostile = ("https://a.example.com/" + ")" * 2000 + " ") * 60 + "https://a.example.com/" + "]" * 400000
+        started = time.monotonic()
+
+        links = self.found_links.absolute_links(hostile)
+
+        self.assertLess(time.monotonic() - started, 2.0)
+        self.assertEqual(set(links), {"https://a.example.com/"})
+
+    def test_typed_urls_are_the_extract_arguments(self):
+        """비서가 `web_extract` 에 적어 넣은 주소를 따로 낸다. 검색에는 없다."""
+        self.assertEqual(self.found_links.typed_urls("web_extract", {"urls": ["https://t.example.com/a", 3, ""]}),
+                         ["https://t.example.com/a"])
+        self.assertEqual(self.found_links.typed_urls("web_extract", {"urls": "https://t.example.com/a"}), ["https://t.example.com/a"])
+        self.assertEqual(self.found_links.typed_urls("web_search", {"query": "https://t.example.com/a"}), [])
+        self.assertEqual(self.found_links.typed_urls("web_extract", None), [])
+
     def test_other_shapes_yield_nothing(self):
         """JSON 이 아니거나 모양이 다른 결과, 다른 도구는 빈 목록이다."""
         for tool, result in (("web_search", "not json"), ("web_search", "[]"), ("web_extract", json.dumps({"results": "x"})),
@@ -132,7 +164,7 @@ class ReportTest(FoundLinksFixture):
     def test_reports_signed_pages_and_keeps_the_result(self):
         """알리는 본문에 서명한 맥락과 후보가 있고 hook 은 None 을 돌려준다."""
         self.assertIsNone(self.result("web_search", SEARCH))
-        self.assertIsNone(self.result("web_extract", EXTRACT, call="call_2"))
+        self.assertIsNone(self.result("web_extract", EXTRACT, call="call_2", args={"urls": ["shop.example.com/goods/1"]}))
 
         self.assertEqual([request["path"] for request in self.requests], ["/internal/hermes/found-links"] * 2)
         first = self.requests[0]
@@ -145,6 +177,8 @@ class ReportTest(FoundLinksFixture):
                                                   base.VECTOR_ROOT, base.VECTOR_SESSION, "call_1"))
         self.assertEqual(first["body"]["pages"], self.found_links.pages("web_search", SEARCH))
         self.assertEqual(self.requests[1]["body"]["pages"][0]["base"], "https://shop.example.com/goods/1")
+        self.assertNotIn("typed", first["body"], "검색에는 적어 넣은 주소가 없다")
+        self.assertEqual(self.requests[1]["body"]["typed"], ["shop.example.com/goods/1"])
 
     def test_rejections_and_failures_leave_the_result_alone(self):
         """옛 Control Plane 의 거절, 서버 오류, 연결 실패에도 예외 없이 None 이다."""

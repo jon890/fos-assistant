@@ -28,6 +28,12 @@ public class FoundLinkService {
     public static final String TOOL = "found_links";
     /** 한 호출이 알릴 수 있는 후보의 수다. fos-ctx 의 {@code found_links.MAX_LINKS} 와 같다. */
     static final int MAX_LINKS = 2_000;
+    /** 한 호출이 보낼 수 있는 페이지의 수다. 읽기 도구 한 번이 읽는 주소의 수보다 넉넉하다. */
+    static final int MAX_PAGES = 200;
+    /** 한 호출이 보낼 수 있는 「비서가 적어 넣은 주소」 의 수다. fos-ctx 의 {@code found_links.MAX_TYPED} 와 같다. */
+    static final int MAX_TYPED = 50;
+    /** 기준 주소와 적어 넣은 주소 하나의 길이 상한이다. */
+    static final int MAX_LINK_CHARS = 2_048;
 
     private final McpCallerResolver callers;
     private final FoundLinks links;
@@ -43,18 +49,19 @@ public class FoundLinkService {
         }
         McpCaller caller = callers.resolve(principal, TOOL, body.get("_fos_ctx"));
         List<FoundPage> pages = pages(body.get("pages"));
+        List<String> typed = typed(body.get("typed"));
         AgentExecution origin = caller.originExecution();
         if (origin.conversationId() == null) {
             return;
         }
-        int kept = links.record(origin.conversationId(), pages);
+        int kept = links.record(origin.conversationId(), pages, typed);
         log.debug("찾은 주소를 남겼다 executionId={} hashes={}", origin.id(), kept);
     }
 
 
     private static List<FoundPage> pages(JsonNode node) {
-        if (node == null || !node.isArray()) {
-            throw invalid("pages must be an array");
+        if (node == null || !node.isArray() || node.size() > MAX_PAGES) {
+            throw invalid("pages must be an array within the limit");
         }
         List<FoundPage> pages = new ArrayList<>();
         int total = 0;
@@ -63,6 +70,9 @@ public class FoundLinkService {
             JsonNode links = page.get("links");
             if (!page.isObject() || links == null || !links.isArray() || (base != null && !base.isNull() && !base.isString())) {
                 throw invalid("each page needs links and an optional base");
+            }
+            if (base != null && base.isString() && base.asString().length() > MAX_LINK_CHARS) {
+                throw invalid("base is too long");
             }
             total += links.size();
             if (total > MAX_LINKS) {
@@ -78,6 +88,25 @@ public class FoundLinkService {
             pages.add(new FoundPage(base == null || base.isNull() ? null : base.asString(), values));
         }
         return pages;
+    }
+
+
+    /** 비서가 읽기 도구에 적어 넣은 주소다. 없으면 빈 목록이다. 옛 fos-ctx 는 이 칸을 보내지 않는다. */
+    private static List<String> typed(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return List.of();
+        }
+        if (!node.isArray() || node.size() > MAX_TYPED) {
+            throw invalid("typed must be an array within the limit");
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode url : node) {
+            if (!url.isString() || url.asString().length() > MAX_LINK_CHARS) {
+                throw invalid("each typed url must be a string within the limit");
+            }
+            values.add(url.asString());
+        }
+        return values;
     }
 
 

@@ -30,6 +30,8 @@ MAX_LINKS = 2000
 MAX_LINK_CHARS = 2048
 # Hermes 의 callback 제한(기본 30초)보다 훨씬 짧게 둔다. 웹 도구마다 한 번 부르므로 답을 늦추지 않아야 한다.
 REPORT_TIMEOUT = 5.0
+# 한 호출에서 보내는 「비서가 적어 넣은 주소」 의 수다. Control Plane 의 `FoundLinkService.MAX_TYPED` 와 같다.
+MAX_TYPED = 50
 # 검색 결과 항목에서 주소를 찾는 칸이다. 실패 응답의 `error` 는 남이 쓴 결과가 아니라 읽지 않는다.
 SEARCH_FIELDS = ("url", "title", "description")
 
@@ -37,30 +39,57 @@ _ABSOLUTE = re.compile(r"https?://[^\s<>\"'\\]+", re.IGNORECASE)
 # 마크다운 링크와 사진의 대상이다. `<` `>` 로 감싼 대상은 벗긴다.
 _MARKDOWN_TARGET = re.compile(r"\]\(\s*<?([^)\s>]+)")
 _ATTRIBUTE = re.compile(r"(?:src|href)\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", re.IGNORECASE)
-_TRAILING = ".,;:!?"
+_TRAILING = ".,;:!?*"
+# 주소에 쓸 수 있는 ASCII 문자(RFC 3986 의 unreserved, reserved 와 `%`)다. Control Plane 의 `LinkTarget.URL_CHARACTERS` 와 같다.
+_URL_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#[]@!$&'()*+,;=%")
+# 다듬기 전의 덩어리가 이보다 길면 버린다. 닫는 괄호를 길게 이어 붙인 본문이 다듬기를 오래 붙잡지 못하게 한다.
+MAX_FOUND_CHARS = MAX_LINK_CHARS * 2
 _SKIPPED_PREFIXES = ("#", "data:", "javascript:", "mailto:", "tel:")
 
 
 def _trim(link: str) -> str:
-    """주소 끝에 붙은 문장 부호와, 여는 짝이 없는 닫는 괄호를 뗀다."""
-    while link:
-        last = link[-1]
+    """주소 끝에 붙은 문장 부호와, 여는 짝이 없는 닫는 괄호를 뗀다. 괄호 수는 한 번만 세고 줄여 간다."""
+    opened = {")": link.count("("), "]": link.count("[")}
+    closed = {")": link.count(")"), "]": link.count("]")}
+    end = len(link)
+    while end:
+        last = link[end - 1]
         if last in _TRAILING:
-            link = link[:-1]
-        elif last == ")" and link.count(")") > link.count("("):
-            link = link[:-1]
-        elif last == "]" and link.count("]") > link.count("["):
-            link = link[:-1]
+            end -= 1
+        elif last in closed and closed[last] > opened[last]:
+            closed[last] -= 1
+            end -= 1
         else:
             break
+    return link[:end]
+
+
+def _url_prefix(link: str) -> str:
+    """주소에 쓸 수 없는 첫 문자(한글 조사, `|` 등) 앞까지다. Control Plane 의 `LinkTarget.urlPrefix` 와 같은 경계다."""
+    for index, character in enumerate(link):
+        if character not in _URL_CHARACTERS:
+            return link[:index]
     return link
 
 
 def absolute_links(text) -> list:
-    """글에서 `http://`, `https://` 로 시작하는 주소를 나온 순서대로 뽑는다."""
+    """글에서 `http://`, `https://` 로 시작하는 주소를 나온 순서대로 뽑는다.
+
+    주소 뒤에 한글 조사처럼 주소에 쓸 수 없는 글자가 바로 붙었으면 그 앞까지 자른 꼴을 먼저, 붙은 꼴을 그다음에 낸다.
+    한글 경로를 그대로 적은 주소는 붙은 꼴이 맞는 주소다. 상한을 넘는 덩어리는 다듬지 않고 버린다.
+    """
     if not isinstance(text, str):
         return []
-    return [link for link in (_trim(found) for found in _ABSOLUTE.findall(text)) if link]
+    links = []
+    for found in _ABSOLUTE.findall(text):
+        if len(found) > MAX_FOUND_CHARS:
+            continue
+        whole = _trim(found)
+        cut = _trim(_url_prefix(found))
+        for link in (cut, whole) if cut != whole else (whole,):
+            if link and _ABSOLUTE.fullmatch(link):
+                links.append(link)
+    return links
 
 
 def relative_links(text) -> list:
@@ -104,6 +133,21 @@ def _extract_pages(parsed) -> list:
     return found
 
 
+def typed_urls(tool_name, args) -> list:
+    """비서가 `web_extract` 에 적어 넣은 주소다. Control Plane 이 찾은 주소에서 뺀다(fos-assistant 스펙 agent-found-image DECISION25).
+
+    읽기 서비스에 따라 결과 항목의 `url` 이 넘어간 뒤의 최종 주소일 수 있어, 적어 넣은 원래 주소를 따로 보낸다.
+    """
+    if tool_name != EXTRACT_TOOL or not isinstance(args, dict):
+        return []
+    urls = args.get("urls")
+    if isinstance(urls, str):
+        urls = [urls]
+    if not isinstance(urls, list):
+        return []
+    return [url for url in urls if isinstance(url, str) and 0 < len(url) <= MAX_LINK_CHARS][:MAX_TYPED]
+
+
 def pages(tool_name, result) -> list:
     """도구 결과에서 `[{"base": 기준 주소나 None, "links": [후보]}]` 를 만든다. 뽑을 것이 없거나 모양이 다르면 빈 목록이다."""
     if tool_name not in TOOLS or not isinstance(result, str):
@@ -131,7 +175,7 @@ def pages(tool_name, result) -> list:
     return kept
 
 
-def report(tool_name, result, session_id, tool_call_id) -> None:
+def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
     """웹 도구의 결과에서 뽑은 주소를 Control Plane 에 알린다. 알릴 것이 없거나 맥락이 없으면 아무것도 하지 않는다.
 
     주소와 결과 글은 로그에 남기지 않는다. 옛 Control Plane 은 이 경로를 몰라 거절로 답하고, 그때도 넘어간다.
@@ -147,7 +191,11 @@ def report(tool_name, result, session_id, tool_call_id) -> None:
     ctx = build_context(CTX_TOOL, session_id, tool_call_id)
     if not url or not token or not ctx:
         return
-    body = json.dumps({"_fos_ctx": ctx, "pages": found}, ensure_ascii=False).encode("utf-8")
+    payload = {"_fos_ctx": ctx, "pages": found}
+    typed = typed_urls(tool_name, args)
+    if typed:
+        payload["typed"] = typed
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url, data=body, method="POST",
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token},

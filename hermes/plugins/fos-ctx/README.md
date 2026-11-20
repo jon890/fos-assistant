@@ -284,7 +284,9 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 - `transform_tool_result` 는 도구 이름이 `web_search` 나 `web_extract` 이고 session 과 `tool_call_id` 가 있을 때 결과 글을 JSON 으로 읽어 주소 후보를 뽑는다. `execute_code` 안에서 돈 호출은 `tool_call_id` 가 없어 알리지 않는다
 - `web_search` 는 `success` 가 참일 때 `data.web[]` 항목의 `url`, `title`, `description` 에서 `http://`, `https://` 주소를 뽑는다. 실패 응답의 `error` 글은 읽지 않는다. 기준 주소는 없다
 - `web_extract` 는 `error` 가 없는 항목마다 `content` 에서 절대 주소, 마크다운 링크와 사진의 대상, `src` 와 `href` 속성 값을 뽑는다. 항목의 `url` 은 비서가 적어 넣은 주소라 후보가 아니고 상대 주소를 푸는 기준으로만 보낸다
+- 절대 주소 뒤에 한글 조사처럼 주소에 쓸 수 없는 글자가 바로 붙었으면 그 앞까지 자른 꼴과 붙은 꼴을 둘 다 보낸다. 한글 경로를 그대로 적은 주소는 붙은 꼴이 맞는 주소다
 - 후보 하나는 `MAX_LINK_CHARS`(2,048)자까지, 한 호출은 `MAX_LINKS`(2,000)개까지다. 같은 후보는 한 번만 보낸다
+- `web_extract` 는 비서가 인자 `urls` 에 적어 넣은 주소를 `typed` 로 따로 보낸다(`MAX_TYPED` 50개까지). 읽기 서비스에 따라 결과 항목의 `url` 이 넘어간 뒤의 최종 주소일 수 있어, Control Plane 이 적어 넣은 원래 주소도 찾은 주소에서 빼게 하려는 것이다
 - 뽑기만 한다. 같은 주소인지, 상대 주소를 어떻게 푸는지, 받아도 되는지는 Control Plane 이 정한다
 - **결과 글을 바꾸지 않는다.** hook 은 이 두 도구에서 늘 None 을 돌려준다. 알리지 못해도 도구 결과는 그대로 모델에게 간다. 주소와 결과 글은 로그에 남기지 않는다
 
@@ -292,10 +294,11 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 
 ```json
 {"_fos_ctx": {"v": 1, "session_id": "...", "root_session_id": "...", "tool_call_id": "...", "sig": "..."},
- "pages": [{"base": "https://shop.example.com/goods/1", "links": ["/img/a.jpg", "https://cdn.example.com/b.png"]}]}
+ "pages": [{"base": "https://shop.example.com/goods/1", "links": ["/img/a.jpg", "https://cdn.example.com/b.png"]}],
+ "typed": ["https://shop.example.com/goods/1"]}
 ```
 
-`_fos_ctx` 는 도구 이름 `found_links` 로 서명한다. 검색 결과처럼 기준 주소가 없으면 `base` 는 null 이다.
+`_fos_ctx` 는 도구 이름 `found_links` 로 서명한다. 검색 결과처럼 기준 주소가 없으면 `base` 는 null 이다. `typed` 는 적어 넣은 주소가 있을 때만 붙는다.
 
 | 응답 | fos-ctx 가 하는 일 |
 | --- | --- |

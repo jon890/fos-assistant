@@ -219,7 +219,7 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
     if isinstance(tool_name, str) and tool_name in FOUND_LINK_TOOLS:
         # 웹 검색과 페이지 읽기의 결과에서 주소를 뽑아 Control Plane 에 알린다. 결과 글은 바꾸지 않고, 알리지 못해도 그대로 간다.
         try:
-            report_found_links(tool_name, result, session_id or "", tool_call_id or "")
+            report_found_links(tool_name, result, session_id or "", tool_call_id or "", args)
         except Exception as exc:  # noqa: BLE001 - 알리지 못해도 도구 결과는 그대로 모델에게 간다
             logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)
         return None

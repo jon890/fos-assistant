@@ -36,16 +36,30 @@ public class FoundLinks {
     private final ConversationRepository conversations;
 
 
-    /** 후보에서 만든 해시를 그 대화에 더한다. 지운 대화에는 더하지 않는다. 남길 것이 없으면 아무것도 하지 않는다. */
+    /**
+     * 후보에서 만든 해시를 그 대화에 더한다. 지운 대화에는 더하지 않는다. 남길 것이 없으면 아무것도 하지 않는다.
+     *
+     * @param typed 비서가 읽기 도구에 적어 넣은 주소. 읽기 서비스가 결과의 주소를 넘어간 뒤의 최종 주소로 바꿔 줄 수 있어 따로 받는다
+     * @return 남긴 해시의 수
+     */
     @Transactional
-    public int record(Long conversationId, List<FoundPage> pages) {
+    public int record(Long conversationId, List<FoundPage> pages, List<String> typed) {
+        // 비서가 읽기 도구에 적어 넣은 주소다. 본문이 되풀이해도 찾은 주소로 남기지 않는다(DECISION25).
+        Set<String> excluded = new LinkedHashSet<>();
+        for (String url : typed) {
+            // scheme 없이 적어 넣은 주소도 같은 주소로 본다.
+            LinkTarget.of(url).map(LinkTarget::hash).ifPresent(excluded::add);
+        }
         Set<String> hashes = new LinkedHashSet<>();
         for (FoundPage page : pages) {
             URI base = absolute(page.base());
             String own = base == null ? null : LinkTarget.of(base.toString()).map(LinkTarget::hash).orElse(null);
             for (String link : page.links()) {
                 for (String form : forms(link, base)) {
-                    LinkTarget.of(form).map(LinkTarget::hash).filter(hash -> !hash.equals(own)).ifPresent(hashes::add);
+                    LinkTarget.of(form)
+                        .map(LinkTarget::hash)
+                        .filter(hash -> !hash.equals(own) && !excluded.contains(hash))
+                        .ifPresent(hashes::add);
                 }
             }
         }
@@ -135,6 +149,12 @@ public class FoundLinks {
         if (base == null) {
             return null;
         }
+        if (written.startsWith("?")) {
+            // java.net.URI 는 쿼리만 있는 상대 주소를 풀 때 경로의 마지막 조각을 떼어 표준(RFC 3986)과 다르다. 경로에 직접 붙인다.
+            String whole = base.toString();
+            int cut = indexOfAny(whole, "?#");
+            return (cut < 0 ? whole : whole.substring(0, cut)) + written;
+        }
         try {
             URI resolved = base.resolve(new URI(LinkTarget.asciiEncoded(written)));
             String scheme = resolved.getScheme();
@@ -148,9 +168,19 @@ public class FoundLinks {
     }
 
 
+    private static int indexOfAny(String text, String characters) {
+        for (int index = 0; index < text.length(); index++) {
+            if (characters.indexOf(text.charAt(index)) >= 0) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+
     /** 기준 주소가 http(s) 절대 주소면 그 주소를, 아니면 null 을 돌려준다. */
     private static URI absolute(String base) {
-        if (base == null) {
+        if (base == null || base.length() > MAX_LINK_CHARS) {
             return null;
         }
         try {
