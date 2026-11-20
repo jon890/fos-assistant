@@ -209,22 +209,15 @@ def prepare(args, session_id: str, tool_call_id: str):
     _sweep(folder)
     deadline = time.monotonic() + FETCH_BUDGET
     copies, written = {}, []
-    for source in ([base] if base else []) + refs:
-        key = source.strip()
-        if key in copies:
-            continue
-        raw, content_type, problem = _fetch(url, token, ctx, key, deadline)
-        if problem == OLD_SERVER:
-            _remove(written)
-            return message([OLD_SERVER])
-        if problem:
-            problems.append(key + ": " + problem)
-            copies[key] = None
-            continue
-        path = folder / (secrets.token_hex(16) + EXTENSIONS[content_type])
-        path.write_bytes(raw)
-        written.append(str(path))
-        copies[key] = str(path)
+    try:
+        problems = _fetch_all(url, token, ctx, ([base] if base else []) + refs, folder, deadline, copies, written)
+    except BaseException:
+        # 쓰기가 실패해도 이미 쓴 사본을 남기지 않는다. 막는 글은 부르는 쪽이 만든다.
+        _remove(written)
+        raise
+    if problems is OLD_SERVER:
+        _remove(written)
+        return message([OLD_SERVER])
     if problems:
         _remove(written)
         return message(problems)
@@ -235,3 +228,24 @@ def prepare(args, session_id: str, tool_call_id: str):
     elif "image_url" in args:
         changed["image_url"] = None
     return changed
+
+
+def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written):
+    """가리킴을 차례로 받아 사본을 쓴다. 문제 목록을 돌려주고, 옛 Control Plane 이면 `OLD_SERVER` 를 돌려준다."""
+    problems = []
+    for source in sources:
+        key = source.strip()
+        if key in copies:
+            continue
+        raw, content_type, problem = _fetch(url, token, ctx, key, deadline)
+        if problem == OLD_SERVER:
+            return OLD_SERVER
+        if problem:
+            problems.append(key + ": " + problem)
+            copies[key] = None
+            continue
+        path = folder / (secrets.token_hex(16) + EXTENSIONS[content_type])
+        written.append(str(path))
+        path.write_bytes(raw)
+        copies[key] = str(path)
+    return problems

@@ -11,6 +11,8 @@ import os
 import pathlib
 import threading
 import time
+import unittest
+import unittest.mock
 
 import test_fos_ctx as base
 
@@ -203,6 +205,23 @@ class RejectTest(ImageSourceFixture):
         self.assertBlocked(self.call("attachment:11", call=""), "이 호출에서는 사진을 받을 수 없다")
         self.assertEqual(self.requests, [])
 
+    def test_write_failure_blocks_and_removes_copies(self):
+        """사본을 쓰다 실패하면 받지 못했다고 막고 이미 쓴 사본을 남기지 않는다."""
+        original = pathlib.Path.write_bytes
+        calls = []
+
+        def fail_second(path, data):
+            calls.append(path)
+            if len(calls) == 2:
+                raise OSError("disk full")
+            return original(path, data)
+
+        with unittest.mock.patch.object(pathlib.Path, "write_bytes", fail_second):
+            decision = self.call("attachment:11", ["attachment:12"])
+
+        self.assertBlocked(decision, "사진을 받지 못했다")
+        self.assertEqual(self.copied(), [])
+
     def test_guard_block_comes_first(self):
         """도구 판정이 막은 호출은 사진을 받지 않고 판정의 글을 그대로 돌려준다."""
         self.guard_answer = json.dumps({"decision": "block", "message": "사람이 없는 실행이다"}).encode("utf-8")
@@ -211,6 +230,4 @@ class RejectTest(ImageSourceFixture):
 
 
 if __name__ == "__main__":
-    import unittest
-
     unittest.main()
