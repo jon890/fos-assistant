@@ -10,8 +10,9 @@
 # utf8mb4_unicode_ci 가 되고 MysqlMigrationTest 가 잡는다. 까닭과 규칙은 backend/docs/data-schema.md 의 「마이그레이션 작성 규칙」 에 있다.
 #
 # 검사용 서버는 버리는 데이터라 내구성 설정을 끈다. 데이터 디렉터리를 메모리(tmpfs)에 두고, 커밋마다 디스크에 동기화하지 않으며
-# binlog 와 doublewrite, performance_schema 를 끈다. 마이그레이션 검사가 DB 를 여러 번 새로 만들어 DDL 이 많아 이 비용이 크다.
+# binlog 와 doublewrite 를 끈다. 마이그레이션 검사가 DB 를 여러 번 새로 만들어 DDL 이 많아 이 비용이 크다.
 # tmpfs 는 O_DIRECT 를 받지 않으므로 flush 방식을 fsync 로 적는다.
+# performance_schema 는 켜 둔다. 행 잠금 검사가 그 표로 잠금 대기를 확인한다.
 # 정렬 규칙, 문자 집합, SQL 모드처럼 쿼리 결과를 바꾸는 값은 운영과 같게 둔다. 바꾸는 것은 장애 때 데이터를 지키는 설정뿐이다.
 set -Eeuo pipefail
 
@@ -39,8 +40,7 @@ docker run -d --name "${NAME}" --label fos-assistant.temp=mysql-migration-check 
   --skip-log-bin \
   --innodb-flush-log-at-trx-commit=0 \
   --innodb-doublewrite=OFF \
-  --innodb-flush-method=fsync \
-  --performance-schema=OFF >/dev/null
+  --innodb-flush-method=fsync >/dev/null
 
 host_port="$(docker port "${NAME}" 3306/tcp | head -n 1 | sed 's/.*://')"
 
