@@ -1,5 +1,9 @@
 package com.bifos.assistant.chat;
 
+import java.util.Arrays;
+import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -93,13 +97,17 @@ class ArtifactTest {
         + "artifact_write 에서는 HTML 과 CSS 는 content, HTML 이 부를 인터넷의 사진은 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
         + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
         + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
-        + "아래 네 줄은 image_generate 도구가 있고 사용자가 그림을 만들어 달라고 했을 때만 따른다.\n"
+        + "아래 여섯 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
         + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
         + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
         + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
-        + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.\n"
+        + "- 이 대화에 보낸 사진이나 이 대화에서 만든 그림을 바탕으로 고칠 때는 바탕 한 장을 image_url 에, 참고할 것을 reference_image_urls 에 넣는다."
+        + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적고 파일 경로나 인터넷 주소는 쓰지 않는다.\n"
+        + "- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다."
+        + " 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다.\n"
+        + "- 그림을 만들지 못했거나 쓸 수 없는 사진이라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진과 그 까닭)과 다시 부탁하는 방법을 답한다.\n"
         + "[파일 공간]\n"
         + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
         + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
@@ -122,6 +130,12 @@ class ArtifactTest {
 
     @Autowired
     ArtifactService artifactService;
+
+    @Autowired
+    GeneratedImageService generatedImages;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     ArtifactStore store;
@@ -251,6 +265,25 @@ class ArtifactTest {
         assertThat(Files.isDirectory(root.resolve(String.valueOf(conversation.id()))))
             .as("turn 을 시작할 때 대화 폴더를 만든다")
             .isTrue();
+    }
+
+
+    @Test
+    @DisplayName("만든 그림이 있는 대화의 입력에는 파일이 남은 그림의 제목이 새것부터 들어간다")
+    void preambleListsLiveGeneratedImageTitles() {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        generatedImages.save(conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "수채화 고양이", "지시문", png(31));
+        generatedImages.save(conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "지난 그림", "지시문", png(32));
+        generatedImages.save(conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "새 신발", "지시문", png(33));
+        jdbc.update(
+            "UPDATE chat_artifact SET deleted_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND path = ?",
+            conversation.id(),
+            "generated/지난 그림.png");
+
+        assertThat(artifactService.agentPreamble(conversation))
+            .contains("만든 그림은 generated:<그림 제목> 으로 적고")
+            .contains("이 대화에서 만든 그림: 「새 신발」, 「수채화 고양이」\n")
+            .doesNotContain("지난 그림");
     }
 
 
@@ -1016,5 +1049,15 @@ class ArtifactTest {
                 Files.delete(each);
             }
         }
+    }
+
+
+    /** PNG 머리 바이트 뒤에 `filler` 값을 채운 테스트용 그림이다. */
+    private static byte[] png(int filler) {
+        byte[] bytes = new byte[128];
+        Arrays.fill(bytes, (byte)filler);
+        byte[] magic = {(byte)0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+        System.arraycopy(magic, 0, bytes, 0, magic.length);
+        return bytes;
     }
 }

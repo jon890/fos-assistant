@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.GeneratedImageTitle;
@@ -15,6 +16,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
 import java.util.HashMap;
@@ -126,6 +128,54 @@ public class GeneratedImageService {
     }
 
 
+    /**
+     * 그 대화에서 만든 그림을 제목으로 찾아 원본 바이트를 읽는다(ADR-20261120 / image-source). 파일은 읽기만 한다.
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     *
+     * @throws ApiException {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 은 그 제목의 그림이 없을 때, {@link ErrorCode#IMAGE_SOURCE_GONE} 은 보관
+     * 기간 정리로 파일을 지웠을 때다
+     */
+    public GeneratedImageSource readByTitle(Long conversationId, String title) {
+        ChatArtifact image = artifacts.findGeneratedImages(conversationId).stream()
+            .filter(it -> GeneratedImageTitle.ofPath(it.path()).equals(title))
+            .findFirst()
+            .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "no generated image has this title"));
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(conversationId, image.path());
+        if (file.isEmpty() || !Files.isRegularFile(file.get())) {
+            throw gone();
+        }
+        try {
+            if (Files.size(file.get()) > maxBytes) {
+                throw gone();
+            }
+            byte[] bytes = Files.readAllBytes(file.get());
+            return new GeneratedImageSource(contentTypeOf(extensionOf(bytes)), bytes);
+        } catch (IOException ex) {
+            throw gone();
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.VALIDATION_FAILED) {
+                throw gone();
+            }
+            throw ex;
+        }
+    }
+
+
+    /**
+     * 그 대화에서 만든 그림 가운데 파일이 남은 것의 제목이다. 새것부터 {@code limit} 개까지다(스펙 generated-image REQ17).
+     *
+     * <p>실행 입력에 넣어, 모델이 Hermes 기록을 압축한 뒤에도 고칠 그림을 제목으로 가리킬 수 있게 한다.
+     */
+    public List<String> liveTitles(Long conversationId, int limit) {
+        return artifacts.findGeneratedImages(conversationId).stream()
+            .filter(it -> !it.isDeleted())
+            .map(it -> GeneratedImageTitle.ofPath(it.path()))
+            .limit(limit)
+            .toList();
+    }
+
+
     /** 저장한 지시문을 푼다. 풀지 못하면 빈 값이다. 평문으로 둔 지시문은 그대로 돌려준다. */
     public Optional<String> promptOf(ChatArtifact artifact, Long ownerUserId) {
         if (artifact.generationPrompt() == null) {
@@ -188,6 +238,20 @@ public class GeneratedImageService {
             return "webp";
         }
         throw invalid("generated image must be PNG, JPEG or WebP");
+    }
+
+
+    private static String contentTypeOf(String extension) {
+        return switch (extension) {
+            case "png" -> "image/png";
+            case "jpg" -> "image/jpeg";
+            default -> "image/webp";
+        };
+    }
+
+
+    private static ApiException gone() {
+        return new ApiException(ErrorCode.IMAGE_SOURCE_GONE, "this generated image is no longer kept");
     }
 
 

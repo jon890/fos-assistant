@@ -88,6 +88,19 @@ public class AttachmentService {
     }
 
 
+    /**
+     * 그림을 고칠 바탕으로 요청자가 그 대화에 보낸 원본을 바이트 그대로 읽는다(ADR-20261120 / image-source).
+     *
+     * <p>판정과 상한은 원본 조회와 같다. 원본 파일은 읽기만 한다.
+     */
+    public InspectedImage readSentOriginal(CurrentUser user, Long conversationId, Long attachmentId) {
+        ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
+        InspectedImage result = inspection.readRaw(attachment);
+        requireInspectable(user, conversationId, attachmentId);
+        return result;
+    }
+
+
     /** 변환 진행 중에도 원본을 읽지 않고 SQL 상태만 다시 확인한다. */
     public void validateInspection(CurrentUser user, Long conversationId, Long attachmentId) {
         requireInspectable(user, conversationId, attachmentId);

@@ -169,6 +169,15 @@ public enum ErrorCode {
      */
     ARTIFACT_VAULT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /**
+     * 그림을 고칠 바탕으로 가리킨 것이 그 실행의 대화에 보낸 사진이나 그 대화에서 만든 그림이 아니다(ADR-20261120 / image-source).
+     *
+     * <p>모양이 틀린 가리킴, 남의 대화의 번호, 없는 번호, 요청자가 보내지 않은 사진, 없는 제목을 가르지 않는다. 가르면 번호를 훑어
+     * 남의 것이 있는지 알아낼 수 있다. 404 가 아니다. fos-ctx 는 404 를 받기 경로가 없는 옛 Control Plane 으로 읽는다.
+     */
+    IMAGE_SOURCE_UNKNOWN(HttpStatus.UNPROCESSABLE_ENTITY),
+    /** 그림을 고칠 바탕으로 가리킨 사진이나 그림이 있었지만 지웠거나 보관 기간이 지나 파일이 없다. */
+    IMAGE_SOURCE_GONE(HttpStatus.GONE),
+    /**
      * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 origin 실행을 하나로 정하지 못했다.
      *
      * <p>서명 없음, 서명 틀림, origin 없음, origin 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야

@@ -35,6 +35,17 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<String> findGeneratedImagePaths(@Param("conversationId") Long conversationId);
 
 
+    /** 그 대화에서 만든 그림 행이다. 새것부터 두고 지워진 것도 담는다. 보관 사본은 뺀다(ADR-20261120 / image-source). */
+    @Query("""
+            select a from ChatArtifact a
+             where a.conversationId = :conversationId
+               and a.generationCallKey is not null
+               and a.vaultUserId is null
+             order by a.id desc
+            """)
+    List<ChatArtifact> findGeneratedImages(@Param("conversationId") Long conversationId);
+
+
     /**
      * 그 대화에서 아직 답에 묶이지 않은 그림 행을 이 답에 묶는다(ADR-20261119 / generated-image).
      *
