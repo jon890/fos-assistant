@@ -499,6 +499,18 @@ class ArtifactSourceFetcherTest {
     }
 
 
+    @Test
+    @DisplayName("스티커 받기는 넘기기와 404 를 따라가지 않고 상태 0 으로 거절한다")
+    void stickerParseKeepsRejectingRedirectAndNotFound() throws Exception {
+        for (String status : List.of("302 Found\r\nLocation: https://images.example.com/b.png", "404 Not Found")) {
+            try (ArtifactSourceResponse response = parsed("HTTP/1.1 " + status + "\r\nContent-Length: 0\r\n\r\n")) {
+                assertThat(response.status()).isZero();
+                assertThat(response.headers()).isEmpty();
+            }
+        }
+    }
+
+
     private static ArtifactSourceResponse parsed(String response) throws IOException {
         return ArtifactSourceSocketTransport.parse(new Socket(), new ByteArrayInputStream(response.getBytes()));
     }

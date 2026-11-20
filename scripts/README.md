@@ -11,5 +11,6 @@
 스크립트 안에서 저장소 root 를 자기 위치로 구할 때는 두 단계 위(`../..`)다.
 
 `checks/check-hermes-contract.sh` 는 CI 와 사람이 직접 부르며 로컬 검사에는 들어 있지 않다.
+`checks/migration-test-prune.ts` 도 CI 와 사람이 직접 부르며, 후보를 경고로만 알린다.
 `checks/format-connectors.mjs` 와 `checks/quality-report.mjs` 는 `checks/quality.sh` 가 부른다.
 `ci/check-connector-package.sh` 는 패키지 검사 중 `checks/check-connectors.sh` 를 부른다.
