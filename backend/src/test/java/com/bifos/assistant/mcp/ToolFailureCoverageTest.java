@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,10 @@ class ToolFailureCoverageTest {
         "com.bifos.assistant.mcp.application.McpToolService",
         "com.bifos.assistant.mcp.application.McpConnectorListTool",
         "com.bifos.assistant.mcp.presentation.McpRpc");
+    /** 실패 글을 끝 줄이 붙은 {@code String} 으로 두는 클래스와 그 상수다. 이름 규칙 대신 상수를 하나씩 본다. */
+    private static final Map<String, List<String>> STRING_FAILURES = Map.of(
+        "com.bifos.assistant.connector.approval.application.ConnectorApprovalResume",
+        List.of("NONE", "NOT_YET", "HELD", "ENDED", "RETRY", "SENT"));
 
 
     @Test
@@ -49,6 +54,20 @@ class ToolFailureCoverageTest {
             }
         }
         assertThat(failureTexts).as("모은 실패 글이 있어야 이 검사가 뜻이 있다").hasSizeGreaterThan(10);
+    }
+
+
+    @Test
+    @DisplayName("String 으로 둔 실패 글 상수도 끝 줄로 끝난다")
+    void stringFailureConstantsEndWithStep() throws Exception {
+        for (Map.Entry<String, List<String>> entry : STRING_FAILURES.entrySet()) {
+            Class<?> type = Class.forName(entry.getKey());
+            for (String name : entry.getValue()) {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                assertThat(endsWithStep((String)field.get(null))).as("%s.%s", entry.getKey(), name).isTrue();
+            }
+        }
     }
 
 

@@ -267,7 +267,7 @@ Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 �
 | `attachment:<첨부 번호>` | 그 대화의 사진. 첨부 번호는 실행 입력의 사진 참조 목록이 주는 `attachment_id` 다(`attachment_inspect` 와 같은 번호) |
 | `generated:<제목>` | 그 대화에서 만든 그림. 제목은 결과물 파일 이름에서 확장자를 뗀 것이다 |
 
-두 인자의 값이 모두 가리킴이어야 한다. 경로, 주소, data URL 이 하나라도 있으면 막는다. 합쳐 16장을 넘으면 막고 줄여 달라고 알린다(스펙 DECISION25). 같은 가리킴이 두 번 오면 한 번만 받는다.
+두 인자의 값이 모두 가리킴이어야 한다. 경로, 주소, data URL 이 하나라도 있으면 막는다. 합쳐 16장을 넘으면 막고 어느 사진을 뺄지 사용자에게 묻게 한다(스펙 DECISION25). 같은 가리킴이 두 번 오면 한 번만 받는다.
 16 은 Hermes 의 openai-codex plugin 의 `_MAX_REFERENCE_IMAGES` 다. 이 저장소가 정한 값이 아니라 계약 검사가 Hermes 를 올릴 때 다시 본다.
 
 ### fos-ctx 의 hook

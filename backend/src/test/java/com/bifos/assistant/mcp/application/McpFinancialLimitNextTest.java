@@ -21,7 +21,7 @@ class McpFinancialLimitNextTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"applied", "pending"})
+    @ValueSource(strings = {"applied", "approval_requested"})
     @DisplayName("바꿨거나 승인을 기다리는 결과에는 next 칸이 없다")
     void changedStatusHasNoNext(String status) {
         assertThat(McpFinancialLimitTools.withNext(Map.of("status", status))).doesNotContainKey("next");

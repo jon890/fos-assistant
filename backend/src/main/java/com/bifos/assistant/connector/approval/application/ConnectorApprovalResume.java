@@ -63,7 +63,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
         + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.").text();
     static final String NOT_YET = ToolFailureText.askUser("사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.").text();
     static final String HELD = ToolFailureText.askUser("사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.").text();
-    /** 끝낸 줄의 결과(ADR-092 의 복구 안내)를 뒤에 붙일 때 쓰는 앞글이다. 끝 줄은 그 결과가 갖는다. */
+    /** 끝낸 줄의 결과를 뒤에 붙일 때 쓰는 앞글이다. 뒤에 붙는 복구 안내(ADR-092)는 끝 줄 규칙의 대상이 아니다(docs/features/tool-fallback/design.md 의 DECISION2). */
     static final String ENDED_LEAD = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
     static final String ENDED = ToolFailureText.askUser(ENDED_LEAD).text();
     static final String RUNNING = "이미 이어 가는 중이다. 새로 준비하지 말고 그 결과를 기다린다.";
