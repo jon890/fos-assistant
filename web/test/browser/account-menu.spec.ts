@@ -50,10 +50,22 @@ test("이름 메뉴는 키보드로 열고 고르고 Esc 로 닫는다", async (
   await expect(trigger).toBeFocused();
 
   await page.keyboard.press("Enter");
+  // 화살표마다 다음 줄에 초점이 간 것을 기다린다. 이어 빠르게 누르면 초점 이동이 따라오지 못해 입력이 빠진다.
+  // 이름표와 구분선은 초점을 받지 않는다.
+  const steps = [
+    page.getByRole("menuitem", { name: "설정" }),
+    page.getByRole("menuitem", { name: "관리자 화면" }),
+    page.getByRole("menuitemradio", { name: "밝게" }),
+  ];
   const dark = page.getByRole("menuitemradio", { name: "어둡게" });
-  // 첫 줄에서 내려가며 「어둡게」 에 닿을 때까지 화살표를 누른다.
-  for (let step = 0; step < 6 && !(await dark.evaluate((element) => element === document.activeElement)); step += 1)
-    await page.keyboard.press("ArrowDown");
+  for (const item of steps) {
+    await expect(async () => {
+      if (!(await item.evaluate((element) => element === document.activeElement)))
+        await page.keyboard.press("ArrowDown");
+      await expect(item).toBeFocused({ timeout: 500 });
+    }).toPass();
+  }
+  await page.keyboard.press("ArrowDown");
   await expect(dark).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
