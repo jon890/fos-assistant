@@ -196,3 +196,29 @@ test("끝난 답의 접힌 줄은 쓴 종류를 셋까지 잇고 플러그인 �
   await expect(panel).toContainText("검사용 메모 · 범위 목록 보기");
   await expect(panel).not.toContainText("mcp__");
 });
+
+test("끝까지 하지 못한 답은 다시 열어도 접힌 줄이 「끝까지 하지 못했어요」 로 시작한다", async ({
+  page,
+}) => {
+  const input = "작업 과정 실패 다시 열기 검사";
+  await script(input, tool("web_search", "실패 검색어"));
+  await send(page, input);
+  await expect(
+    page.locator('[data-testid="activity-block"][data-mode="saved"]').last(),
+  ).toBeVisible({ timeout: 30_000 });
+
+  // 실패한 turn 을 저장된 이력으로 다시 연 경우를 만든다.
+  await page.route("**/api/chat/conversations/*/messages", async (route) => {
+    const response = await route.fetch();
+    const turns = (await response.json()) as { role: string; status?: string }[];
+    for (const turn of turns) if (turn.role === "ASSISTANT") turn.status = "FAILED";
+    await route.fulfill({ response, json: turns });
+  });
+  await page.reload();
+  await expect(
+    page
+      .locator('[data-testid="activity-block"][data-mode="saved"]')
+      .last()
+      .getByTestId("activity-toggle"),
+  ).toHaveText("작업 과정: 끝까지 하지 못했어요 · 웹 검색");
+});

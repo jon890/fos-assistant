@@ -118,6 +118,8 @@ type Props =
       executionId: number;
       initialExpanded?: boolean;
       cancelled?: boolean;
+      /** 끝까지 하지 못한 답이다. 다시 열어도 접힌 줄이 「끝까지 하지 못했어요」 로 시작한다 */
+      failed?: boolean;
       /** 끝난 답이 연 원문. 펼친 안쪽 끝에만 그린다 */
       sourceReads?: SourceReadSummary | null;
       /** 끝난 답이 본문을 받은 기억. 펼친 안쪽 끝에만 그린다 */
@@ -190,7 +192,9 @@ export function ActivityBlock(props: Props) {
       ? activityOutcome(props.state.items)
       : cancelled
         ? "stopped"
-        : "done";
+        : props.failed
+          ? "failed"
+          : "done";
   const summaryLabel = activitySummaryLabel(
     props.mode === "live"
       ? activityUses(props.state.items)
