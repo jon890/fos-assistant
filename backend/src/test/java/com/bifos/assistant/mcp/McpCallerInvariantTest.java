@@ -150,6 +150,7 @@ class McpCallerInvariantTest {
         arguments.put("follow_up_list", json.createObjectNode());
         arguments.put("follow_up_done", json.createObjectNode().put("follow_up", "할 일 검사 7391"));
         arguments.put("memory_forget", json.createObjectNode().put("memory_id", 1));
+        arguments.put("connector_attach", json.createObjectNode().put("connector", "demo-notes"));
         arguments.put("content_draft_write", json.createObjectNode());
         arguments.put("content_draft_read", json.createObjectNode());
         arguments.put("content_draft_image", json.createObjectNode());

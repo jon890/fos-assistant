@@ -1,6 +1,6 @@
 # 서비스 개념 기술 설계
 
-스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1-REQ6), PR2(REQ7-REQ10), PR3(REQ11-REQ14)의 구조를 정하고, PR4 가 같은 자리에 무엇을 더하는지 경계만 적는다. PR4 의 도구 인자와 승인 카드 흐름은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1-REQ6), PR2(REQ7-REQ10), PR3(REQ11-REQ14), PR4(REQ15-REQ16)의 구조를 정한다.
 
 ## 요구사항 연결
 
@@ -20,8 +20,8 @@
 | REQ12 | PR3. `follow_up_list` 가 챙기는 할 일을 주고 `follow_up_done` 이 `follow_up` 인자 하나(번호나 제목)로 찾아 끝낸다. 바로 끝내는 조건은 REQ11 과 같은 판정이다 |
 | REQ13 | PR3. `memory_forget` 은 지우지 않고 PR2 의 Control Plane 승인 줄을 만든다. `mcp` 의 port `MemoryForgetRequests` 를 `connector.action` 이 구현하고, 승인하면 `MemoryForgetRunner` 가 `memory` 의 `MemoryForgetting` 으로 지운다 |
 | REQ14 | PR3. 개념 목록의 기억 줄과 할 일 줄이 화면을 설명하고 새 도구를 가리킨다. 평가 세트에 직접 처리 문항을 더한다 |
-| REQ15 | PR4. PR1 의 `connector_list` 결과와 `ConnectorBindingService` 의 붙이기를 승인 카드 뒤에서 부른다. 비공개·주인 판정은 지금 화면의 붙이기 검사를 그대로 쓴다 |
-| REQ16 | REQ15 행의 PR4 자리와 같다 |
+| REQ15 | PR4. 아래 「PR4 연결 붙이기 승인 카드」. `connector_attach` 는 붙이지 않고 PR2 의 Control Plane 승인 줄을 만든다. `mcp` 의 port `ConnectorAttachRequests` 를 `connector.action` 이 구현하고, 승인하면 `ConnectorAttachRunner` 가 화면과 같은 `ConnectorBindingService.bind` 를 부른다 |
+| REQ16 | PR4. `ConnectorAttachRequester` 가 카드를 띄우기 전에 플러그인, 에이전트의 주인과 공개 범위, 연결 상태를 보고 카드 없이 까닭과 링크를 돌려준다. 승인할 때는 화면의 붙이기 검사가 한 번 더 본다 |
 | REQ17 | 각 PR 의 도구가 `McpCaller.user()` 만으로 대상을 찾고, 실패는 `isError` 결과와 까닭으로 돌려준다. 지금 `file_space_put` 의 실패 결과 모양을 따른다 |
 | REQ18 | REQ17 행과 같다 |
 
@@ -40,6 +40,8 @@
 | `followup`(PR3) | 바로 챙기는 줄 만들기, 한 실행의 상한, 끝낼 대상 찾기(`FollowUpAgentRequests`) |
 | `memory`(PR3) | 지울 수 있는 기억의 판정과 지우기(`MemoryForgetting`). 화면의 지우기와 같은 권한이다 |
 | `connector.action`(PR3) | 기억 지우기 승인 줄의 요청(`MemoryForgetRequester`)과 승인 뒤 실행(`MemoryForgetRunner`). `memory` 는 `connector` 보다 아래 층이라 승인 줄을 직접 만들지 못한다 |
+| `mcp`(PR4) | `connector_attach` 의 인자 검사와 결과 글. port `ConnectorAttachRequests` 로 부른다 |
+| `connector.action`(PR4) | 붙이기 승인 줄의 요청(`ConnectorAttachRequester`)과 승인 뒤 실행(`ConnectorAttachRunner`). 붙이기 자체는 `connector.connection` 의 `ConnectorBindingService.bind` 가 화면과 같게 한다 |
 | `connector.action`(PR2) | Control Plane 승인 줄(`ControlPlaneActions`, `ControlPlaneApprovals`)의 저장, 카드 표시 값, 승인과 결과 알림 줄. 지금 승인 줄과 같은 표와 화면을 쓴다. `connector.approval` 의 공개 승인 API 가 이 줄을 먼저 가른다 |
 
 지시문은 실행 입력의 앞 단락(`ArtifactService.agentPreamble`)이 아니라 `instructions` 에 둔다.
@@ -214,6 +216,64 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | `memory_forget` | 카드만 띄우므로 늘 받는다(스펙 DECISION32) |
 | `follow_up_done` | 바로 바꾸는 도구라 `writes_allowed` 가 참일 때만 받는다(스펙 REQ10). 받더라도 살펴보기 트리는 바로 바꾸는 실행이 아니라 상태를 바꾸지 않는다 |
 
+## PR4 연결 붙이기 승인 카드
+
+### 도구
+
+`connector_attach` 의 인자는 `connector` 하나다. `connector_list` 의 `id` 다. 붙일 에이전트는 인자로 받지 않고 origin 실행의 에이전트다. 맡긴 실행이면 맡겨진 에이전트이고 카드는 루트 실행의 대화에 뜬다(스펙 DECISION27).
+
+카드를 띄우기 전에 `ConnectorAttachRequester` 가 아래 차례로 본다. 카드를 띄우지 못하면 `isError` 와 `status`, 까닭, 안내할 `link` 를 돌려준다(스펙 REQ16, REQ18).
+
+| 차례 | 경우 | `status` | `link` |
+| --- | --- | --- | --- |
+| 1 | 요청자의 카탈로그에 그 플러그인이 없다 | `not_found` | `/connections` |
+| 2 | 이 실행의 에이전트가 요청자의 것이 아니다(남의 에이전트, 주인 없는 에이전트) | `not_owner` | `/connections/{id}` |
+| 3 | 요청자의 에이전트지만 그룹에 공개했다 | `agent_not_private` | `/connections/{id}` |
+| 4 | 내 연결이 `READY` 가 아니다 | `not_connected` | `/connections/{id}?agent=<code>` |
+| 5 | 이미 이 에이전트에 붙어 있다 | `already_attached`. 오류가 아니다. `thisAgent` 로 지금 쓸 수 있는지(`ready`, `pending`)를 함께 준다 | 없음 |
+| 6 | `single_binding` 플러그인이고 그 연결이 이미 다른 에이전트에 붙어 있다 | `single_binding` | `/connections/{id}` |
+| 7 | 그 밖 | `approval_requested` | 없음 |
+
+같은 실행이 같은 플러그인으로 다시 불렀는데 앞 카드가 이미 끝났으면 `closed` 와 그 상태를, 요청하다 예외가 나면 `unavailable` 을 돌려준다. 둘 다 `isError` 다.
+
+결과 글에는 플러그인의 이름을 넣지 않는다. 판정은 `connector_list` 와 같은 카탈로그(`ConnectorConnectionService.catalog`)로 한다.
+
+### 승인 줄
+
+PR2 의 Control Plane 승인 줄과 같다(위 「지우기 승인 카드」). 다른 값만 적는다.
+
+| 칸 | 값 |
+| --- | --- |
+| `tool_name`, `hermes_tool` | `connector_attach`, `fos_connector_attach`. 카드 제목은 「이 에이전트에 붙이기」 다 |
+| 인자 | `{"connector","agent","tools","caution","connector_id","agent_code"}`. 카드는 이름표(`서비스`, `에이전트`, `쓸 수 있게 되는 도구`, `주의`, `서비스 번호`, `에이전트 번호`)로 그린다 |
+| `tools` | 연결 카드와 같은 한 줄이다(「도구 3개 · 조회 1 · 쓰기 2」). 위험도의 차례와 이름은 화면의 `toolRiskCounts` 와 같다 |
+| `caution` | 화면의 붙이기 확인 창과 같은 안내다. 그 에이전트에 셸, 파일, 코드 실행 도구가 켜졌거나 도구를 읽지 못했으면 그 경고를 덧붙인다([`connector.md`](../connector.md) 의 「에이전트 사용 시작 안내」) |
+| 같은 요청 | 사용자, origin 실행, 플러그인 번호와 에이전트 번호의 해시 |
+
+### 승인 뒤 붙이기
+
+**붙이기는 승인 트랜잭션 밖에서 돈다.** 지우기 두 가지는 승인 줄을 잠근 트랜잭션 안에서 끝나지만, 붙이기는 Hermes 대시보드에 설치를 보내고 `ConnectorInstallAttempts` 가 바깥 트랜잭션을 허용하지 않는다. 그래서 실행기가 `ControlPlaneActionRunner.outsideTransaction()` 으로 알리면 `ControlPlaneApprovals.approve` 가 세 걸음으로 나눈다.
+
+1. 사용자 행과 승인 줄을 잠가 기다리는 줄인지와 기한을 보고 `EXECUTING` 으로 커밋한다
+2. 트랜잭션 밖에서 `ConnectorAttachRunner` 가 `ConnectorBindingService.bind` 를 부른다. 주인, 비공개, 연결 준비, `single_binding`, 스킬 이름 겹침은 화면과 같은 검사가 승인하는 때에 다시 본다
+3. 승인 줄을 다시 잠가 아직 `EXECUTING` 이면 `SUCCEEDED` 나 `FAILED` 와 알림 글을 적는다
+
+2에서 서버가 내려가면 줄이 `EXECUTING` 으로 남고, 지금의 정리(`markInterrupted`, `markStale`)가 결과를 모르는 줄(`UNKNOWN`)로 끝낸다. 그 줄의 알림 줄은 「「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 외부 서비스 연결 화면에서 상태를 확인해 주세요」 다. 다시 실행하지 않는다.
+
+알림 줄은 화면의 사용 시점 안내(`boundReadiness`)와 같은 나눔이다(스펙 DECISION26).
+
+| 붙인 뒤 상태 | 알림 줄 |
+| --- | --- |
+| 재시작 대기 | 「서비스」 를 「에이전트」 에 붙였어요. 관리자가 반영을 확인하면 쓸 수 있어요 |
+| `READY` 이고 재시작 대기가 아니다 | 「서비스」 를 「에이전트」 에 붙였어요. 바로 쓸 수 있어요 |
+| 나머지 | 「서비스」 를 「에이전트」 에 붙였어요. 몇 분 안에 쓸 수 있어요 |
+| 붙이기가 거절됐다 | 붙이지 못했다는 말과 화면의 붙이기 오류와 같은 까닭 |
+| 설치 호출이 실패했다(`CONNECTOR_OPERATION_FAILED`) | 붙이는 중이라는 말과 외부 서비스 연결 화면에서 상태를 확인하라는 안내. 바인딩이 `PENDING` 으로 남았을 수 있다 |
+
+### 먼저 살펴보기에서 받는 PR4 도구
+
+`connector_attach` 는 카드만 띄우므로 늘 받는다(스펙 DECISION32). 살펴보기의 에이전트가 요청자의 비공개 에이전트가 아니면 위 표의 2나 3으로 끝난다.
+
 ## 실패와 일관성
 
 - 개념 목록은 고정된 글이라 실패할 곳이 없다. 글의 길이는 실행 기록의 문맥 길이(`AssembledContext.chars`)에 든다
@@ -233,6 +293,7 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | REQ6 | 판정의 단위 테스트와 문항 형식 테스트가 CI 에서 돈다. 실제 모델 결과는 아래 「평가를 돌리는 때」 |
 | REQ7-REQ10(PR2) | `TaskAgentRequests` 통합 테스트가 기본값(에이전트, 비운 모델 단계, `SINGLE` 대화, 맡긴 실행의 `NEW_PER_RUN`), 하루 발화 수 거절, 이름이 겹칠 때의 후보, 남의 작업, 매일 깨우기 제외를 본다. `ControlPlaneApprovals` 통합 테스트가 카드 줄, 승인 뒤 지움과 알림 줄, 거절, 다음 turn 으로 전하지 않음을 본다. `McpController` 웹 테스트가 인자 스키마, 실패 결과, 먼저 살펴보기의 받는 조건을 본다. 지시문 요소는 평가 세트의 `instructionIncludes` 가 본다 |
 | REQ11-REQ14(PR3) | `McpFollowUpDirectToolTest` 가 HTTP 경계에서 실행 출처마다의 상태(사람이 보낸 메시지, 바깥 글을 읽은 대화, 예약 작업의 실행, 맡긴 실행, 살펴보기 트리), 제안 받아들이기, 끝내기와 후보, 남의 할 일을 본다. `McpMemoryForgetToolTest` 가 카드 줄과 내용, 승인 뒤 지움과 알림 줄, 거절, 그룹 기억의 권한, 남의 기억과 문서, 살펴보기에서 받는 것을 본다. 모델이 따르는지는 평가 세트의 할 일과 기억 문항이 본다 |
+| REQ15-REQ16(PR4) | `McpConnectorAttachToolTest` 가 HTTP 경계에서 카드 줄과 내용(서비스, 도구 수, 주의), 승인 뒤 바인딩과 사용 시점 알림 줄, 거절, 그룹 공개 에이전트와 남의 에이전트, 준비되지 않은 연결의 링크, 이미 붙은 연결, 없는 플러그인, 승인하는 때의 재검사, 남의 연결, 끊긴 줄의 알림 줄, 살펴보기에서 받는 것을 본다. Hermes 대시보드의 커넥터 경로만 대역이다. 모델이 따르는지는 평가 세트의 붙이기 문항이 본다. 평가 계정은 그 플러그인을 연결하지 않은 것이 전제라, 문항은 붙였다고 말하지 않고 연결 화면 링크를 붙이는지만 본다 |
 | DECISION18 | 저장소 테스트가 `ServiceConceptsInstructions` 의 주소마다 `web/src/app` 아래 경로가, 도구 이름마다 `McpToolCatalog` 의 이름이 있는지 본다. 질의 문자열(`?agent=`)은 떼고, `{id}` 나 `<code>` 같은 틀 자리는 동적 경로 폴더(`[id]`)와 맞춘다 |
 
 **평가를 돌리는 때.** 평가는 운영 Control Plane 과 실제 모델을 거친다. 바뀐 지침은 배포한 뒤에야 운영에 있으므로 PR 이 머지되기 전에는 바뀐 지침으로 돌릴 수 없다. 구현자는 실제 provider 와 운영에 닿지 않는다. 그래서 PR 에는 평가 틀과 문항을 넣는다. 머지 전에 코디네이터가 이 브랜치의 문항과 실행기로 지금 운영(바뀌기 전 지침)을 돌려 기준선을 PR 본문에 남기고, 머지·배포 뒤 다시 돌려 기능 완료 증거와 PR 댓글에 남긴다(스펙 DECISION33).
@@ -260,3 +321,6 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | DECISION17 | 기억을 가리키는 인자 | 번호(`memory_id`)만 받고 결과에 제목과 내용을 넣지 않는다 | 작성자 | 제목으로 찾아 후보를 돌려주면 그 collection 을 읽지 못하는 에이전트에게 기억 제목이 넘어간다. Memory 접근 권한은 Control Plane 이 정한다는 규칙을 지킨다 |
 | DECISION18 | 기억 지우기 승인 줄을 만드는 곳 | `connector.action` 이 `mcp` 의 port 를 구현한다 | 작성자 | `memory` 와 `mcp` 는 `connector` 보다 아래 층이라 승인 줄을 직접 만들지 못한다. `connector` 는 이미 `memory` 를 쓴다 |
 | DECISION19 | 살펴보기에서 `follow_up_done` | 쓰기를 켠 살펴보기만 받되 상태는 바꾸지 않는다 | 작성자 | 스펙 REQ10 은 바로 바꾸는 도구를 쓰기 스위치로 받게 하고, REQ12 는 사람이 시키지 않은 실행이 끝내지 못하게 한다. 둘을 모두 지킨다 |
+| DECISION20 | 붙일 에이전트를 정하는 방법 | 인자로 받지 않고 origin 실행의 에이전트로 정한다 | 작성자 | 스펙 REQ15 가 「지금 에이전트」 에 붙인다고 정했다. 모델이 다른 에이전트의 code 를 넣어 권한을 넓히는 길을 두지 않는다. 다른 에이전트에 붙이는 일은 연결 화면이 한다 |
+| DECISION21 | 승인한 붙이기를 실행하는 자리 | 승인 줄을 `EXECUTING` 으로 커밋한 뒤 트랜잭션 밖에서 화면과 같은 `ConnectorBindingService.bind` 를 부른다 | 작성자 | 붙이기는 외부 설치 호출을 보내고 시작 상태를 먼저 커밋해야 한다(`ConnectorInstallAttempts`). 승인 트랜잭션 안에서 부르면 사용자 행 잠금을 쥔 채 외부 호출을 기다린다. 버린 안은 붙이기 로직을 승인 트랜잭션용으로 따로 만드는 것이다. 검사와 실패 처리가 화면과 달라진다 |
+| DECISION22 | 붙이기 카드의 주의 줄 | 화면의 붙이기 확인 창과 같은 안내를 카드에 넣는다 | 작성자 | 스펙 REQ15 의 「지금 화면의 붙이기와 같게」. 화면은 붙이기 전에 그 안내를 보이고, 대화에서는 승인 카드가 그 확인 창의 자리다 |

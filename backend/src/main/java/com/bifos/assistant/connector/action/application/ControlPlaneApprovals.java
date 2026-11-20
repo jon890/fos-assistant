@@ -28,9 +28,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -40,6 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>카드는 플러그인 승인 줄과 같은 {@code connector_action} 줄이라 자리, 건수, 승인 요청 알림, 만료, 거절 알림 줄을 그대로 쓴다.
  * 상시 허락과 대화 허락이 없다. 승인한 결과는 에이전트를 다시 돌리지 않고 알림 줄로만 남는다(스펙 DECISION21).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ControlPlaneApprovals {
@@ -51,12 +55,20 @@ public class ControlPlaneApprovals {
     private final ConnectorActionBodies bodies;
     private final AgentExecutionRepository executions;
     private final AppUserRepository users;
-    private final List<ControlPlaneActionRunner> runners;
+    private final ObjectProvider<ControlPlaneActionRunner> runners;
     private final LiveProperties<ConnectorPolicyProperties> policy;
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;
+    private final TransactionTemplate transactions;
     private final Clock clock;
+
+
+    /**
+     * 첫 트랜잭션의 결과다. 끝난 동작이면 {@code view} 만 있고, 트랜잭션 밖에서 돌 동작이면 실행기와 인자가 있다.
+     */
+    private record Begun(ConnectorActionView view, ControlPlaneActionRunner runner, Map<String, String> args) {
+    }
 
 
     /**
@@ -101,9 +113,33 @@ public class ControlPlaneApprovals {
     /**
      * 승인하고 그 동작을 한 번 한다. 사용자 행, 승인 줄 순서로 잠근다. 남의 줄이거나 Control Plane 줄이 아니면 없는 줄과 같다.
      * 기다리는 줄이 아니거나 기한이 지났으면 {@code CONNECTOR_ACTION_NOT_PENDING} 이다.
+     *
+     * <p>이 메서드에 {@code @Transactional} 을 붙이지 않는다. 보통 동작은 승인과 실행, 결과가 한 트랜잭션이다. 실행기가
+     * {@link ControlPlaneActionRunner#outsideTransaction()} 으로 알린 동작(연결 붙이기)은 {@code EXECUTING} 을 먼저 커밋하고 트랜잭션 밖에서
+     * 실행한 뒤 다른 트랜잭션이 결과를 적는다(서비스 개념 설계의 「승인 뒤 붙이기」). 부르는 쪽도 트랜잭션 없이 부른다.
      */
-    @Transactional
     public ConnectorActionView approve(CurrentUser user, UUID actionId) {
+        Begun begun = transactions.execute(status -> begin(user, actionId));
+        if (begun.view() != null) {
+            return begun.view();
+        }
+        ControlPlaneActionOutcome outcome;
+        try {
+            outcome = begun.runner().run(user, begun.args());
+        } catch (RuntimeException ex) {
+            // 승인은 이미 커밋됐다. 예외를 내보내면 줄이 EXECUTING 으로 남으므로 실패로 끝내 사용자가 다시 요청하게 한다.
+            log.warn("control plane action failed actionId={} tool={} kind={}", actionId, begun.runner().toolName(), ex.getClass().getSimpleName());
+            String tool = begun.runner().toolName();
+            outcome = ControlPlaneActionOutcome.failed("「" + ControlPlaneActions.policy(tool).orElseThrow().title() + "」 요청을 처리하다 문제가 생겼어요. "
+                + ControlPlaneActions.screen(tool) + "에서 상태를 확인한 뒤 다시 요청해 주세요");
+        }
+        ControlPlaneActionOutcome result = outcome;
+        return transactions.execute(status -> finish(user, actionId, result));
+    }
+
+
+    /** 승인의 첫 트랜잭션이다. 트랜잭션 안에서 도는 동작은 여기서 끝내 화면 값을 돌려주고, 밖에서 도는 동작은 실행기와 인자를 돌려준다. */
+    private Begun begin(CurrentUser user, UUID actionId) {
         users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
         var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (!Objects.equals(action.userId(), user.id()) || !ControlPlaneActions.owns(action)) {
@@ -114,7 +150,36 @@ public class ControlPlaneApprovals {
             throw new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, "control plane action is not pending");
         }
         action.beginExecution(now);
-        ControlPlaneActionOutcome outcome = run(user, action);
+        Optional<Map<String, String>> args = action.executableArgs().flatMap(ControlPlaneApprovals::parse);
+        Optional<ControlPlaneActionRunner> runner = runners.stream()
+            .filter(candidate -> candidate.toolName().equals(action.toolName()))
+            .findFirst();
+        if (args.isPresent() && runner.isPresent() && runner.get().outsideTransaction()) {
+            // 상태만 커밋한다. 결과를 적는 트랜잭션이 사건을 낸다.
+            actions.save(action);
+            return new Begun(null, runner.get(), args.get());
+        }
+        // 실행기의 저장소 예외는 잡지 않는다. 이 트랜잭션이 되돌림으로 표시돼 실패로 적어도 커밋되지 않는다.
+        // 그대로 내보내 승인 전체를 되돌리고 카드는 기다리는 채로 남긴다. 사용자는 다시 승인할 수 있다.
+        ControlPlaneActionOutcome outcome = args.isEmpty() || runner.isEmpty()
+            ? ControlPlaneActionOutcome.failed(UNREADABLE)
+            : runner.get().run(user, args.get());
+        return new Begun(record(action, outcome, now), null, null);
+    }
+
+
+    /** 트랜잭션 밖에서 돈 동작의 결과를 적는다. 그 사이 정리가 줄을 끝냈으면 건드리지 않고 지금 상태를 돌려준다. */
+    private ConnectorActionView finish(CurrentUser user, UUID actionId, ControlPlaneActionOutcome outcome) {
+        users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
+        var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
+        if (action.status() != ActionStatus.EXECUTING) {
+            return ConnectorActionDetails.view(action, Optional.empty());
+        }
+        return record(action, outcome, clock.instant());
+    }
+
+
+    private ConnectorActionView record(ConnectorAction action, ControlPlaneActionOutcome outcome, Instant now) {
         if (outcome.succeeded()) {
             bodies.succeed(action, outcome.message(), now);
         } else {
@@ -122,20 +187,6 @@ public class ControlPlaneApprovals {
         }
         new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
         return ConnectorActionDetails.view(action, Optional.empty());
-    }
-
-
-    private ControlPlaneActionOutcome run(CurrentUser user, ConnectorAction action) {
-        Optional<Map<String, String>> args = action.executableArgs().flatMap(ControlPlaneApprovals::parse);
-        Optional<ControlPlaneActionRunner> runner = runners.stream()
-            .filter(candidate -> candidate.toolName().equals(action.toolName()))
-            .findFirst();
-        if (args.isEmpty() || runner.isEmpty()) {
-            return ControlPlaneActionOutcome.failed(UNREADABLE);
-        }
-        // 실행기의 저장소 예외는 잡지 않는다. 이 트랜잭션이 되돌림으로 표시돼 실패로 적어도 커밋되지 않는다.
-        // 그대로 내보내 승인 전체를 되돌리고 카드는 기다리는 채로 남긴다. 사용자는 다시 승인할 수 있다.
-        return runner.get().run(user, args.get());
     }
 
 
