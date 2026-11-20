@@ -163,6 +163,63 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
   ).toBeUndefined();
 });
 
+test("에이전트 답의 제목과 줄바꿈, 출처 절, Mermaid 그림을 읽기 쉽게 그린다", async ({ page }) => {
+  await page.goto("/new");
+  await page.getByRole("textbox", { name: "메시지" }).fill("답 모양 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const answer = page.getByTestId("assistant-body").last();
+  const heading = answer.getByRole("heading", { name: "집에서 할 수 있는 것" });
+  await expect(heading).toHaveCSS("font-size", "18px");
+  await expect(answer.getByRole("heading", { name: "출처" })).toBeVisible();
+  // 본문은 15px 이고 줄바꿈 한 번이 줄바꿈으로 보인다(spec REQ17, REQ18).
+  const lines = answer.locator("p", { hasText: "물을 자주 먹입니다." });
+  await expect(lines).toHaveCSS("font-size", "15px");
+  await expect(lines.locator("br")).toHaveCount(1);
+  const sources = answer.locator("section.answer-sources");
+  await expect(sources).toHaveCSS("font-size", "14px");
+  await expect(sources.getByRole("link", { name: "NHS · 소아 발열 안내" })).toBeVisible();
+
+  const diagram = answer.getByTestId("mermaid-diagram");
+  await expect(diagram).toHaveCount(1);
+  await expect(diagram.locator("svg")).toBeVisible();
+  await expect(answer.getByText("그림을 그리지 못했어요")).toBeVisible();
+  // 그림과 표는 화면보다 넓어도 본문 폭 안에서 가로로 민다.
+  const viewport = page.viewportSize();
+  const box = await diagram.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport?.width ?? Number.POSITIVE_INFINITY);
+});
+
+test("에이전트 답의 Mermaid 블록에 든 HTML 라벨과 click 지시와 보안 설정 변경을 실행하지 않는다", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as typeof window & { __mermaidClick?: () => void }).__mermaidClick = () => {
+      (window as typeof window & { __mermaidClicked?: boolean }).__mermaidClicked = true;
+    };
+  });
+  await page.goto("/new");
+  await page.getByRole("textbox", { name: "메시지" }).fill("그림 보안 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const answer = page.getByTestId("assistant-body").last();
+  // strict 설정이면 그림을 그리거나 원문으로 보인다. 어느 쪽이든 아래 표식이 생기지 않아야 한다.
+  await expect(answer.getByTestId("mermaid-diagram").or(answer.getByText("그림을 그리지 못했어요"))).toBeVisible();
+  const diagram = answer.getByTestId("mermaid-diagram");
+  if ((await diagram.count()) > 0) {
+    // 노드와 링크를 모두 눌러 본다. click 지시가 살아 있으면 표식이 생긴다.
+    await diagram.evaluate((root) => {
+      root.querySelectorAll("g, a").forEach((element) => {
+        element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    });
+    await expect(diagram.locator("img[onerror], [onclick]")).toHaveCount(0);
+  }
+  const flags = await page.evaluate(() => {
+    const target = window as typeof window & { __mermaidXss?: unknown; __mermaidClicked?: unknown; __mermaidHref?: unknown };
+    return [target.__mermaidXss, target.__mermaidClicked, target.__mermaidHref];
+  });
+  expect(flags).toEqual([undefined, undefined, undefined]);
+});
+
 test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) => {
   await page.goto("/new");
   await page
