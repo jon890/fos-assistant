@@ -67,7 +67,7 @@ public class FollowUp {
     @Column(name = "conversation_id")
     private Long conversationId;
 
-    /** 제안한 실행이다. 사람이 직접 더했으면 비어 있다. */
+    /** 제안했거나 사용자가 시켜 바로 만든 실행이다. 사람이 화면에서 직접 더했으면 비어 있다. */
     @Column(name = "proposed_by_execution_id")
     private Long proposedByExecutionId;
 
@@ -182,6 +182,25 @@ public class FollowUp {
     }
 
 
+    /**
+     * 사용자가 대화나 예약 작업 지시문에서 직접 시켜 에이전트가 바로 만든 할 일이다(서비스 개념 스펙 REQ11). 사람이 더한 것처럼 바로
+     * {@code OPEN} 이고, 만든 실행을 남겨 한 실행의 상한과 판단 피드백에 쓴다.
+     */
+    public static FollowUp openedByAgent(
+        Long userId,
+        Long conversationId,
+        Long executionId,
+        String title,
+        String titleKey,
+        Instant dueAt,
+        boolean waiting,
+        Instant now) {
+        FollowUp followUp = opened(userId, conversationId, title, titleKey, dueAt, waiting, now);
+        followUp.proposedByExecutionId = executionId;
+        return followUp;
+    }
+
+
     private static FollowUp started(
         Long userId,
         Long conversationId,
@@ -272,7 +291,7 @@ public class FollowUp {
     }
 
 
-    /** 에이전트가 제안한 줄인가. */
+    /** 에이전트가 제안했거나 바로 만든 줄인가. */
     public boolean proposedByAgent() {
         return proposedByExecutionId != null;
     }

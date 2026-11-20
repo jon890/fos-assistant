@@ -65,7 +65,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | --- | --- | --- |
 | `GET /api/v1/push/config` | `{enabled, publicKey}`. 서버에 키가 없으면 `enabled: false` 이고 화면은 「이 서버는 아직 알림을 보낼 수 없어요」 를 보인다 | PR1 |
 | `GET /api/v1/push/devices` | 기기 목록(`id`, `name`, `registeredAt`, `endpointHash`), 최근 등록 순 | PR1 |
-| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`. 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
+| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`, `publicKey`(구독할 때 쓴 VAPID 공개 키. 서버 비밀값 기능이 지금 키와 비교해 다르면 409 `PUSH_KEY_CHANGED` 로 거절하고, 웹은 다시 구독해 한 번 더 등록한다. 그 전의 Control Plane 은 이 칸을 읽지 않는다). 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
 | `DELETE /api/v1/push/devices/current` | 본문의 `endpoint` 와 같은 내 기기를 지운다. 없어도 204 | PR1 |
 | `PATCH /api/v1/push/devices/{id}`, `DELETE /api/v1/push/devices/{id}` | 이름 고치기와 지우기. 남의 기기와 없는 기기는 같은 404 `PUSH_DEVICE_NOT_FOUND` | PR2 |
 | `GET /api/v1/push/settings`, `PUT /api/v1/push/settings` | 끈 묶음과 조용한 시간. 관리자 아닌 사용자가 `ADMIN` 묶음을 보내면 무시한다 | PR2 |
@@ -121,7 +121,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | `web/src/app/settings/notifications/page.tsx` 와 부품, `web/src/components/shell/settings-area.ts` | 설정 묶음 「알림」. `SETTINGS_GROUPS` 에 묶음을 더하고, `/settings/...` 아래면 늘 「에이전트」 를 고르던 `selectedSettingsHref` 를 `/settings` 자체만 「에이전트」 로 고치게 바꾼다. [화면 틀 스펙](../app-shell/spec.md) 의 묶음 설명도 함께 고친다. PR1 은 이 기기 상태와 기기 목록, PR2 는 기기 이름 고치기와 지우기, 묶음 스위치, 조용한 시간 | PR1, PR2 |
 | `web/src/lib/push.ts` | 지원과 허락 상태, iOS 판정, 기기 이름, 구독 만들기와 끊기, 주소 해시 | PR1 |
 | `web/src/app/api/push/**` | Control Plane 으로 넘기는 경로 | PR1, PR2 |
-| `web/src/app/n/[notificationId]/page.tsx` | 서버에서 읽음 표시를 부르고 `notificationHref` 로 `redirect`. 갈 곳이 없거나 읽기가 404 면 알림 목록(`/notifications`, 화면 틀 PR4 뒤에는 그 넘김을 따른다). 로그인이 없으면 `/signin?next=` 로 보낸다 | PR1 |
+| `web/src/app/n/[notificationId]/page.tsx` | 서버에서 읽음 표시를 부르고 `notificationHref` 로 `redirect`. 갈 곳이 없거나 읽기가 404 면 알림 목록(「지금 볼 것」 의 알림 탭 `/now?tab=notifications`. 전의 주소 `/notifications` 의 넘김을 거치지 않고 바로 연다). 로그인이 없으면 `/signin?next=` 로 보낸다 | PR1 |
 | `web/src/app/signin/page.tsx` | `next` 를 받아 `redirectTo` 로 넘긴다. 디코딩한 값이 `/` 로 시작하고 `//`, `\`, 제어 문자가 없는 같은 사이트 경로만 받고 아니면 `/`. Auth.js 의 `redirectTo` 가 다른 출처를 거르는지도 테스트로 본다 | PR1 |
 | 이름 메뉴의 로그아웃 | 서비스 워커 구독이 있으면 해제 API 와 `unsubscribe()` 를 2초 안에서 기다린 뒤 지금처럼 `/signout` 을 부른다. 실패해도 로그아웃은 막지 않는다 | PR1 |
 

@@ -330,12 +330,13 @@ sequenceDiagram
 ### 제안 도구
 
 Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 트리에서도 이 도구를 받는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)).
-관리자의 쓰기 도구 허용 설정과 관계없이 `PROPOSED` 만 만든다.
-판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 도구 정의와 결과 글은 `McpToolService.tools` 와 `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
+**사용자가 직접 시킨 할 일만 바로 챙기는 `OPEN` 으로 만들고, 그 밖에는 `PROPOSED` 만 만든다**([ADR-20261120 / agent-service-writes](../../backend/docs/adr/ADR-20261120-agent-service-writes.md)). 바로 만드는 것은 모델이 `requested` 를 주었고, 사람이 보낸 메시지의 실행(그 대화가 바깥 글을 읽지 않음)이거나 예약 작업의 실행일 때다. 스스로 판단한 할 일, 먼저 살펴보기와 맡긴 실행, 바깥 글을 읽은 대화의 할 일은 관리자의 쓰기 도구 허용 설정과 관계없이 제안이다.
+챙기는 할 일을 읽는 `follow_up_list` 와 끝내는 `follow_up_done` 도 같은 서버에 있다. 끝내기는 바로 만드는 조건과 같은 실행에서만 상태를 바꾼다.
+판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 실행 출처의 판정과 대상 찾기는 [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」 가, 도구 정의와 결과 글은 `McpToolCatalog`, `McpFollowUpTools`, `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다. 대화가 없는 실행에서 부르면 거절한다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/hooks.py` 의 `REQUIRED_TOOLS` 에 넣는다
-- **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
+- **실행 사건에 할 일 도구(제안, 목록, 끝내기)의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
 - 값이 틀린 인자에는 `isError` 와 무엇이 틀렸는지 한 줄로 답한다. 모델이 고쳐 다시 부를 수 있게 하려는 것이다
 
 ### 제안 억제
@@ -348,6 +349,8 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 | 같은 대화에서 `REJECTED_COOLDOWN` 안에 `REJECTED` 된 같은 `title_key` 가 있다 | 거절한다 |
 | 같은 대화의 `PROPOSED` 가 `MAX_OPEN_PROPOSALS_PER_CONVERSATION` 에 닿았다 | 거절한다. 점검 대화는 `CHECK_PROPOSAL_WINDOW` 안에 만든 제안만 센다 |
 | 한 실행이 `MAX_PROPOSALS_PER_EXECUTION` 만큼 이미 제안했다 | 거절한다 |
+
+바로 챙기는 줄은 위 표의 억제 규칙을 쓰지 않는다. 같은 제목의 제안이 있으면 받아들이고, 한 실행의 상한은 `FollowUpAgentRequests` 가 따로 갖는다.
 
 「한 실행」 은 호출의 origin 실행이다. 그 실행이 부른 하위 에이전트의 호출도 함께 센다.
 두 상한은 세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 한두 개 넘을 수 있다.
@@ -417,6 +420,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 | 대화 화면에서 승인하거나 거절했다, 승인 기한이 지났다, 실행이 끝났다 | 그 줄이 만든 `APPROVAL_REQUESTED` 알림을 읽음으로 바꾸고 `read` 사건을 보낸다. 알림은 그 알림을 만든 승인 줄의 공개 식별자(`source_public_id`)로 특정하므로, 같은 대화의 다른 기다리는 줄이나 처리하는 동안 새로 생긴 줄의 알림은 읽지 않음으로 남는다. 대화가 지워졌어도 읽음이 된다. 만료 알림(`APPROVAL_EXPIRED`)은 알려 주는 글이라 그대로 둔다 |
 | 읽음으로 바꾸다 실패했다 | 줄의 승인, 거절, 만료는 이미 커밋돼 있으므로 로그만 남긴다. 알림은 사용자가 눌러 읽을 때까지 읽지 않음으로 남는다 |
 | 승인 요청 알림을 눌렀는데 이미 승인했거나 만료됐다 | 대화의 승인 카드 자리가 지금 상태를 보인다 |
+| 로그인이 풀린 기기에서 푸시를 눌렀다 | `/n/<id>` 가 로그인 화면으로 보내고, 로그인하면 같은 주소로 돌아와 읽음과 넘김을 한다. 다른 사용자로 로그인하면 남의 알림이라 404 이고 알림 목록이 열린다 |
 
 ### 웹 푸시
 
@@ -427,6 +431,10 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 - 서버에 VAPID 키가 없으면 등록을 409 `PUSH_NOT_CONFIGURED` 로 거절한다
 - 보내기는 알림을 저장한 트랜잭션이 커밋된 뒤 `PushDispatcher` 가 가상 스레드에서 한다. 알림을 만든 일은 기다리지 않고, 되돌아간 트랜잭션은 보내지 않는다. 서버에 키가 없으면 건너뛴다
 - 푸시 글은 제목, 본문, 여는 주소 `/n/<알림 공개 식별자>` 다. 보낼 때 주소 정책을 다시 보고, 같은 기기가 다른 사용자에게도 있으면 보내지 않는다
+- 사용자는 설정의 「알림」(`/settings/notifications`)에서 기기마다 「이 기기에서 알림 받기」 로 등록한다. 「이 기기」 는 브라우저 구독 주소의 해시가 서버 목록에 있는지로 정하고, 서버에서 지운 기기는 구독이 남아도 다시 등록하지 않는다. 아이폰과 iPad 의 브라우저 탭에서는 홈 화면에 추가하는 안내를 보인다
+- 서비스 워커(`web/public/sw.js`)가 받은 글을 그대로 시스템 알림으로 띄운다. 앱을 보고 있어도 띄운다. 누르면 열린 창을 앞으로 가져와 여는 주소로 옮기고, 창이 없으면 새로 연다
+- 여는 주소 `/n/<id>` 는 그 알림을 읽음으로 바꾸고 웹 알림을 누른 것과 같은 곳으로 넘긴다. 갈 곳이 없거나 읽지 못하면 알림 목록이다. 로그인이 풀렸으면 `/signin?next=` 로 보내 로그인 뒤 같은 주소로 돌아온다. 다른 화면의 로그인 이동은 바꾸지 않는다
+- 로그아웃 전에 웹이 이 브라우저의 기기를 서버 목록에서 빼고 구독을 끊는다. 2초 안에서만 기다리고 실패해도 로그아웃한다
 
 ### API(알림)
 
