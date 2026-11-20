@@ -1,9 +1,10 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
+import { pickAgent } from "./helpers.ts";
 import { TOOL_DETAIL_SECRETS } from "../../../test/e2e/fake-hermes.ts";
 
 test("작업 과정과 SSE와 실행 조회에서 비밀값과 UUID 원문을 내보내지 않는다", async ({ page }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await pickAgent(page, "브라우저 비서");
   const streamed = page.waitForResponse((response) => response.request().method() === "POST"
     && response.url().endsWith("/api/chat/stream"));
   await page.getByRole("textbox", { name: "메시지" }).fill("도구 가리기 검사");

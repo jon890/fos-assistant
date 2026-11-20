@@ -280,7 +280,7 @@ class ArtifactTest {
             conversation.id(),
             "generated/지난 그림.png");
 
-        assertThat(artifactService.agentPreamble(conversation))
+        assertThat(artifactService.agentPreamble(conversation, false))
             .contains("만든 그림은 generated:<그림 제목> 으로 적고")
             .contains("이 대화에서 만든 그림: 「새 신발」, 「수채화 고양이」\n")
             .doesNotContain("지난 그림");

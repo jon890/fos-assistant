@@ -2153,6 +2153,7 @@ proxy 검사와 유휴 정리, 복구는 이 label 로 정책의 profile 을 식
 | `docker_volumes` 의 나머지 | 운영자가 정한 것 | 적힌 대로 |
 
 `/workspace` 와 `/root` 밖의 파일 시스템은 이미지의 것이고 컨테이너를 지우면 사라진다.
+대화의 결과물 폴더(`ArtifactStore.agentFolder`)는 붙이지 않는다. 실행 공간의 파일 도구가 그 경로에 쓰면 컨테이너 안의 같은 이름 경로에 써지고 Control Plane 은 보지 못한다. 그래서 실행 공간 에이전트는 「내 파일」 에 넣을 파일을 `/workspace` 에 만든다([`workspace.md`](../../docs/features/workspace.md) 의 「보관한 결과물」).
 
 **`external_skills/<n>` 는 컨테이너를 만들 때의 버전 디렉터리다.**
 Hermes 는 컨테이너를 만들 때만 `skills.external_dirs` 를 붙이고(`tools/environments/docker.py` 의 `_readonly_skill_mount_args`), 컨테이너 키의 지문에는 스킬 경로가 없다.

@@ -80,8 +80,9 @@ tasks.test {
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
     // model-eval 태그는 실제 모델을 부르는 답 판정이고 memoryJudgeEval 이 따로 돌린다.
     // embedding-eval 태그는 실제 임베딩 서비스를 부르는 회수 측정이고 memoryEmbeddingEval 이 따로 돌린다.
+    // link-race 태그는 스레드로 링크를 바꿔치기하는 #359 재현이고 linkRaceTest 가 따로 돌린다.
     useJUnitPlatform {
-        excludeTags("mysql", "model-eval", "embedding-eval")
+        excludeTags("mysql", "model-eval", "embedding-eval", "link-race")
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
@@ -116,6 +117,20 @@ tasks.withType<Test>().configureEach {
     inputs.files(fileTree("config/archunit/store"))
         .withPropertyName("archunitStore")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+/** #359 의 링크 바꿔치기 경쟁을 합성 환경에서 되풀이한다. 시간은 -PlinkRace.seconds 로 준다. CI 에서 돌리지 않는다. */
+tasks.register<Test>("linkRaceTest") {
+    group = "verification"
+    description = "실행 공간의 링크 바꿔치기 경쟁(#359)을 합성 환경에서 재현한다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("link-race")
+    }
+    providers.gradleProperty("linkRace.seconds").orNull?.let { systemProperty("linkRace.seconds", it) }
+    testLogging.showStandardStreams = true
+    outputs.upToDateWhen { false }
 }
 
 tasks.register<Test>("archTest") {

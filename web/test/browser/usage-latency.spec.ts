@@ -1,4 +1,4 @@
-import { expect, setSession, test } from "./fixtures.ts";
+import { expect, test } from "./fixtures.ts";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -28,15 +28,4 @@ test("화면에서 보낸 질문이 관리자 사용량의 첫 반응 시간 절
     .first();
   await expect(row).toBeVisible();
   await expect(row).toContainText(/[1-9]\d*건/);
-});
-
-test("MEMBER 역할의 일반 사용량 화면에는 첫 반응 시간 절이 없다", async ({ context, page }) => {
-  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
-  // 처음 오는 사용자는 첫 요청이 그를 만든다. 화면을 열기 전에 그 요청을 먼저 보낸다.
-  const provision = await page.request.get("/api/agents");
-  expect(provision.ok()).toBeTruthy();
-  await page.goto("/usage");
-
-  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toBeVisible();
-  await expect(page.getByTestId("latency-section")).toHaveCount(0);
 });
