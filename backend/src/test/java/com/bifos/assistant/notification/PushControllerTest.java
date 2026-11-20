@@ -21,6 +21,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,7 +89,7 @@ class PushControllerTest {
         assertThat(on.path("enabled").asBoolean()).isTrue();
         assertThat(on.path("publicKey").asString()).isEqualTo(keys.publicKeyBase64Url()).isNotBlank();
 
-        when(keys.current()).thenReturn(java.util.Optional.empty());
+        when(keys.current()).thenReturn(Optional.empty());
         JsonNode off = body(mvc.perform(get("/api/v1/push/config")).andReturn().getResponse(), 200);
         assertThat(off.path("enabled").asBoolean()).isFalse();
         assertThat(off.path("publicKey").isNull()).isTrue();
