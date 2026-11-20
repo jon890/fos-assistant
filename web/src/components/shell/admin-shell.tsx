@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   Bot,
@@ -16,10 +15,8 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
+import { useBackToChatHref } from "./back-to-chat";
 import { ScreenTransition } from "./screen-transition";
-
-/** 화면 틀이 마지막으로 본 대화의 경로를 적어 두는 `sessionStorage` 의 이름이다. */
-export const LAST_CONVERSATION_KEY = "last-conversation-path";
 
 const LINKS = [
   { href: "/admin/people", label: "사용자", icon: Users },
@@ -43,21 +40,6 @@ function selected(pathname: string, href: string): boolean {
   return under(pathname, href);
 }
 
-/** 적어 둔 대화가 없거나 저장소를 읽지 못하면 새 대화 화면으로 돌아간다. */
-function readBackHref(): string {
-  try {
-    const stored = sessionStorage.getItem(LAST_CONVERSATION_KEY);
-    return stored?.startsWith("/chat/") ? stored : "/";
-  } catch {
-    return "/";
-  }
-}
-
-// 이 탭의 `sessionStorage` 는 관리자 영역에 머무는 동안 바뀌지 않으므로 구독할 것이 없다.
-function subscribeNothing(): () => void {
-  return () => {};
-}
-
 /**
  * 관리자 영역(`/admin` 아래)의 틀이다. 사이드바 대신 머리와 관리자 메뉴를 그린다.
  *
@@ -71,11 +53,7 @@ export function AdminShell({
   ready: boolean;
 }) {
   const pathname = usePathname();
-  const backHref = useSyncExternalStore(
-    subscribeNothing,
-    readBackHref,
-    () => "/",
-  );
+  const backHref = useBackToChatHref();
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">

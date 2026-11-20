@@ -10,14 +10,9 @@ import {
   SAMPLE_TITLE,
 } from "./dev-docs-fixture.ts";
 import { expect, setSession, test } from "./fixtures.ts";
+import { openAccountMenu } from "./helpers.ts";
 
 const REPO = "https://github.com/jon890/fos-assistant";
-
-async function openSidebar(page: Page, testInfo: TestInfo): Promise<void> {
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "사이드바 열기" }).click();
-  }
-}
 
 function catalog(page: Page) {
   return page.getByRole("navigation", { name: "문서 목록" });
@@ -27,12 +22,13 @@ function article(page: Page) {
   return page.locator("article");
 }
 
-test("사이드바 「고급」 의 「개발 문서」 로 로드맵과 커밋이 보이고 고치는 단추가 없다", async ({ page }, testInfo) => {
+test("이름 메뉴의 설정에서 「개발 문서」 로 로드맵과 커밋이 보이고 고치는 단추가 없다", async ({ page }, testInfo) => {
   await page.goto("/new");
-  await openSidebar(page, testInfo);
+  await openAccountMenu(page, testInfo);
+  await page.getByRole("menuitem", { name: "설정" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
   await page
-    .getByRole("navigation", { name: "주요 화면" })
-    .getByRole("group", { name: "고급" })
+    .getByRole("navigation", { name: "설정 메뉴" })
     .getByRole("link", { name: "개발 문서", exact: true })
     .click();
   await expect(page).toHaveURL(/\/dev-docs$/);

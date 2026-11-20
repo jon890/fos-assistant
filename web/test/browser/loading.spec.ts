@@ -97,39 +97,39 @@ test("뼈대의 폭이 내용이 온 뒤 바깥 틀의 폭과 같다", async ({ 
 test("사이드바에서 다른 화면으로 옮기는 동안 누른 줄과 사이드바 안내에 표시가 붙는다", async ({ page }, testInfo) => {
   let releaseRequest: () => void = () => {};
   const heldUntilReleased = new Promise<void>((resolve) => { releaseRequest = resolve; });
-  const isUsagePath = (url: URL) => url.pathname === "/usage";
+  const isTasksPath = (url: URL) => url.pathname === "/tasks";
   // 미리 읽기까지 붙잡아 목적지를 아직 받지 못한 상태로 누른다. 빌드한 서버는 화면에 보이는 링크를 미리
   // 읽는데, 그 결과에 loading 화면이 들어 있으면 누르자마자 그 화면으로 옮겨 이동하는 중 표시가 켜지지
   // 않는다. 표시는 목적지를 아직 받지 못했을 때를 위한 것이다. 링크가 보이기 전에 붙잡도록 먼저 건다.
-  await page.route(isUsagePath, async (route: Route) => {
+  await page.route(isTasksPath, async (route: Route) => {
     if (isRscRequest(route.request())) await heldUntilReleased;
     await route.continue();
   });
-  await page.goto("/agents");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   const status = sidebarStatus(page);
   try {
-    const usageLink = mainNavLink(page, "사용량");
-    await usageLink.click();
+    const tasksLink = mainNavLink(page, "예약 작업");
+    await tasksLink.click();
 
     // 좁은 폭에서는 누르자마자 서랍이 닫혀 화면 밖으로 밀려난다. DOM 에는 남지만 Playwright 는 그
     // 자리를 여전히 보이는 것으로 셀 수 있어, 사이드바에 하나뿐인 안내만 본다.
     if (testInfo.project.name !== "mobile") {
-      await expect(usageLink.getByTestId("nav-pending")).toBeVisible();
+      await expect(tasksLink.getByTestId("nav-pending")).toBeVisible();
     }
     await expect(status).toHaveText("이동하는 중");
 
     releaseRequest();
-    await expect(page.getByRole("heading", { name: "사용량", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "예약 작업", exact: true })).toBeVisible();
 
     if (testInfo.project.name !== "mobile") {
-      await expect(usageLink.getByTestId("nav-pending")).toHaveCount(0);
+      await expect(tasksLink.getByTestId("nav-pending")).toHaveCount(0);
     }
     await expect(status).toHaveText("");
   } finally {
     releaseRequest();
-    await page.unroute(isUsagePath);
+    await page.unroute(isTasksPath);
   }
 });
 
@@ -162,11 +162,11 @@ test("지금 열린 대화 줄을 다시 누르면 옮기지 않는다", async (
     // 기준점: 뒤이어 다른 화면으로 옮기는 요청이 나간 것을 본 뒤에 판정한다.
     // 같은 대화로 가는 요청이 나갔다면 그보다 먼저 나갔을 것이다.
     if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-    const usageRequest = page.waitForRequest(
-      (request) => isRscNavigationRequest(request) && new URL(request.url()).pathname === "/usage",
+    const tasksRequest = page.waitForRequest(
+      (request) => isRscNavigationRequest(request) && new URL(request.url()).pathname === "/tasks",
     );
-    await mainNavLink(page, "사용량").click();
-    await usageRequest;
+    await mainNavLink(page, "예약 작업").click();
+    await tasksRequest;
 
     expect(rscPaths).not.toContain(`/chat/${conversationId}`);
   } finally {
@@ -179,7 +179,6 @@ test("사이드바 링크의 이름이 그대로 맞는다", async ({ page }, te
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   // 회전 표시는 aria-hidden 이라 링크 이름에 들어가지 않는다. 지금 검사들이 쓰는 이름이 그대로 맞아야 한다.
-  await expect(mainNavLink(page, "사용량")).toBeVisible();
-  await expect(mainNavLink(page, "에이전트")).toBeVisible();
+  await expect(mainNavLink(page, "예약 작업")).toBeVisible();
   await expect(mainNavLink(page, "에이전트 관리")).toHaveCount(0);
 });

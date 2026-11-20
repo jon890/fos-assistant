@@ -1,7 +1,6 @@
 import type {
   Page,
   Route,
-  TestInfo,
 } from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 
@@ -180,12 +179,6 @@ async function fakeWorkspaceRoutes(page: Page, state: FakeWorkspace) {
   });
 }
 
-async function openSidebar(page: Page, testInfo: TestInfo): Promise<void> {
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "사이드바 열기" }).click();
-  }
-}
-
 function entryRow(page: Page, name: string) {
   return page
     .getByTestId("workspace-entry")
@@ -196,22 +189,17 @@ function crumbNav(page: Page) {
   return page.getByRole("navigation", { name: "경로" });
 }
 
-test("사이드바의 「고급」 묶음에서 파일 공간을 열고 에이전트 작업 폴더로 들어가면 함께 쓰는 에이전트가 보인다", async ({
+test("설정의 「내 데이터」 묶음에서 파일 공간을 열고 에이전트 작업 폴더로 들어가면 함께 쓰는 에이전트가 보인다", async ({
   page,
-}, testInfo) => {
+}) => {
   await fakeWorkspaceRoutes(page, { available: true });
-  await page.goto("/usage");
-  await openSidebar(page, testInfo);
+  await page.goto("/settings");
 
-  const advanced = page
-    .getByRole("navigation", { name: "주요 화면" })
-    .getByRole("group", { name: "고급" });
-  await expect(advanced.getByRole("link")).toHaveText([
-    /^파일 공간/,
-    /^내 브라우저/,
-    /^개발 문서/,
-  ]);
-  await advanced.getByRole("link", { name: "파일 공간" }).click();
+  const group = page
+    .getByRole("navigation", { name: "설정 메뉴" })
+    .getByRole("group", { name: "내 데이터" });
+  await expect(group.getByRole("link")).toHaveText([/^파일 공간/, /^사용량/]);
+  await group.getByRole("link", { name: "파일 공간" }).click();
 
   await expect(page).toHaveURL(/\/files$/);
   await expect(

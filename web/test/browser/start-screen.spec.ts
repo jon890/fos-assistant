@@ -269,8 +269,9 @@ test("unmount 뒤 도착한 목록 응답은 새 화면의 선택을 덮어쓰�
   await page.goto("/new");
   await expect.poll(() => page.evaluate(() => (window as unknown as { agentReads: unknown[] }).agentReads.length)).toBeGreaterThan(0);
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await page.locator('a[href="/agents"]').first().click();
-  await expect(page).toHaveURL(/\/agents$/);
+  // 사이드바가 남는 화면으로 떠나 ChatPanel 을 내린다. 그 화면의 홈 링크로 돌아온다.
+  await page.locator('a[href="/tasks"]').first().click();
+  await expect(page).toHaveURL(/\/tasks$/);
   await page.evaluate(() => (window as unknown as { resumeAgentReads(): void }).resumeAgentReads());
   await page.getByRole("link", { name: "검사용 비서 홈" }).click();
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");

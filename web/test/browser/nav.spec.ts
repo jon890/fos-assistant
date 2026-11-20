@@ -1,14 +1,16 @@
 import { parseRgb } from "./color.ts";
 import { expect, setSession, test } from "./fixtures.ts";
+import { openAccountMenu } from "./helpers.ts";
 
 test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", async ({ context, page }, testInfo) => {
   await page.goto("/new");
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
-  await expect(page.getByText("브라우저 테스트", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("admin-entry")).toBeVisible();
-  await expect(page.getByTestId("admin-entry")).toHaveText("관리자");
+  await openAccountMenu(page, testInfo);
+  const menu = page.getByRole("menu");
+  await expect(menu.getByText("브라우저 테스트", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText(["설정", "관리자 화면", "로그아웃"]);
+  await expect(menu.getByRole("menuitemradio")).toHaveText(["밝게", "어둡게", "기기 설정"]);
+  await expect(page.getByTestId("admin-entry")).toHaveAttribute("href", "/admin");
 
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   const me = await page.request.get("/api/me");
@@ -19,10 +21,9 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
     role: "MEMBER",
   });
   await page.goto("/new");
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
-  await expect(page.getByText("가족 사용자", { exact: true })).toBeVisible();
+  await openAccountMenu(page, testInfo);
+  await expect(page.getByRole("menu").getByText("가족 사용자", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["설정", "로그아웃"]);
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 });
 

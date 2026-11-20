@@ -138,17 +138,18 @@ test.describe("지금 화면", () => {
     }
   });
 
-  test("「지금 볼 것」 은 사이드바의 「새 대화」 바로 아래에 있고 주요 화면 메뉴에는 없다", async ({ page }, testInfo) => {
-    await page.goto("/usage");
+  test("「지금 볼 것」 은 사이드바의 대화 검색 바로 아래, 예약 작업 위에 있다", async ({ page }, testInfo) => {
+    await page.goto("/tasks");
     const sidebar = await openSidebar(page, testInfo);
     const link = sidebar.getByRole("link", { name: /^지금 볼 것/ });
     await expect(link).toBeVisible();
     const linkBox = await link.boundingBox();
-    const newBox = await sidebar.getByTestId("new-conversation-link").boundingBox();
     const searchBox = await sidebar.getByRole("searchbox", { name: "대화 검색" }).boundingBox();
-    expect(linkBox && newBox && searchBox, "사이드바 요소의 자리를 읽지 못했다").toBeTruthy();
-    expect(linkBox!.y, "링크가 「새 대화」 아래에 있지 않다").toBeGreaterThanOrEqual(newBox!.y + newBox!.height);
-    expect(linkBox!.y, "링크가 「대화 검색」 위에 있지 않다").toBeLessThan(searchBox!.y);
+    const tasksBox = await sidebar.getByRole("navigation", { name: "주요 화면" })
+      .getByRole("link", { name: "예약 작업", exact: true }).boundingBox();
+    expect(linkBox && searchBox && tasksBox, "사이드바 요소의 자리를 읽지 못했다").toBeTruthy();
+    expect(linkBox!.y, "링크가 「대화 검색」 아래에 있지 않다").toBeGreaterThanOrEqual(searchBox!.y + searchBox!.height);
+    expect(linkBox!.y, "링크가 「예약 작업」 위에 있지 않다").toBeLessThan(tasksBox!.y);
     await expect(
       sidebar.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: /^지금 볼 것/ }),
     ).toHaveCount(0);
