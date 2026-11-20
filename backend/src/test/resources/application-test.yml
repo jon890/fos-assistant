@@ -27,6 +27,8 @@ assistant:
     purge-cron: "-"
     # 검사가 뜰 때마다 기다리는 기본 도구 켜기가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     pending-toolsets-cron: "-"
+    # 검사가 뜰 때마다 Hermes 를 부르지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    sandbox-sweep-on-start: false
   people:
     # 검사가 뜰 때마다 사용자 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     purge-cron: "-"

@@ -128,7 +128,8 @@ public class LinkImageFetcher {
                 return image(type, response, first.uri());
             }
             if (!"text/html".equals(type)) {
-                throw reject(Reason.NO_IMAGE, "not_image", first.uri().getHost(), null);
+                // 사진을 다른 종류로 적어 주는 이미지 서버가 있다. 머리 바이트가 받는 사진 형식일 때만 받는다.
+                return image(null, response, first.uri());
             }
             html = new String(readUpTo(response.body(), properties.maxPageBytes()), StandardCharsets.UTF_8);
         }
@@ -140,10 +141,10 @@ public class LinkImageFetcher {
         Fetched second = follow(preview.get(), redirects, cancellation);
         try (ArtifactSourceResponse response = second.response()) {
             String type = LinkPageParts.mediaType(response.headers().get("content-type"));
-            if (!LinkPageParts.IMAGE_TYPES.contains(type)) {
+            if ("text/html".equals(type)) {
                 throw reject(Reason.NO_IMAGE, "preview_not_image", second.uri().getHost(), null);
             }
-            return image(type, response, second.uri());
+            return image(LinkPageParts.IMAGE_TYPES.contains(type) ? type : null, response, second.uri());
         }
     }
 
@@ -237,6 +238,11 @@ public class LinkImageFetcher {
     }
 
 
+    /**
+     * 사진 바이트를 상한까지 받고 형식을 확인한다.
+     *
+     * @param type 응답 머리가 받는 사진 형식으로 적은 종류. 다른 종류로 적었으면 null 이고, 머리 바이트로 형식을 정한다
+     */
     private LinkImage image(String type, ArtifactSourceResponse response, URI uri) throws IOException {
         String length = response.headers().get("content-length");
         if (length != null) {
@@ -253,6 +259,14 @@ public class LinkImageFetcher {
         byte[] bytes = readUpTo(response.body(), properties.maxImageBytes() + 1);
         if (bytes.length > properties.maxImageBytes()) {
             throw reject(Reason.TOO_LARGE, "too_large", uri.getHost(), null);
+        }
+        if (type == null) {
+            Optional<String> sniffed = LinkPageParts.sniffImageType(bytes);
+            if (sniffed.isEmpty()) {
+                throw reject(Reason.NO_IMAGE, "not_image", uri.getHost(), null);
+            }
+            log.info("링크 사진의 형식을 머리 바이트로 정했다 type={} host={}", sniffed.get(), uri.getHost());
+            return new LinkImage(sniffed.get(), bytes);
         }
         if (!LinkPageParts.matchesImage(type, bytes)) {
             throw reject(Reason.NO_IMAGE, "image_bytes", uri.getHost(), null);

@@ -1,5 +1,6 @@
 package com.bifos.assistant.admin.people.presentation;
 
+import com.bifos.assistant.people.application.dto.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -33,6 +34,7 @@ public final class PeopleAdminDtos {
      *
      * @param joined 그 메일 주소의 {@code app_user} 가 있는가. 로그인 완료 기록만 있고 일반 요청으로
      * 사용자와 기본 에이전트가 아직 만들어지지 않았으면 거짓이다
+     * @param evaluation 배포 뒤 확인에 쓰는 평가 전용 사용자인가. 화면이 「평가용」 으로 표시한다
      */
     public record PersonView(
         Long id,
@@ -43,9 +45,20 @@ public final class PeopleAdminDtos {
         boolean joined,
         Instant lastLoginAt,
         Instant lastConversationAt,
-        Instant purgeScheduledAt) {
+        Instant purgeScheduledAt,
+        boolean evaluation) {
+
+        static PersonView of(PersonAccess access) {
+            return of(access.person(), access.joined(), access.lastConversationAt(), access.evaluation());
+        }
+
 
         static PersonView of(AllowedPerson person, boolean joined, Instant lastConversationAt) {
+            return of(person, joined, lastConversationAt, false);
+        }
+
+
+        private static PersonView of(AllowedPerson person, boolean joined, Instant lastConversationAt, boolean evaluation) {
             return new PersonView(
                 person.id(),
                 person.email(),
@@ -55,7 +68,8 @@ public final class PeopleAdminDtos {
                 joined,
                 person.lastLoginAt(),
                 lastConversationAt,
-                person.purgeScheduledAt());
+                person.purgeScheduledAt(),
+                evaluation);
         }
     }
 

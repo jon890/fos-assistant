@@ -21,6 +21,7 @@ import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
 import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.testsupport.InMemoryServerSecrets;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.net.URI;
@@ -272,9 +273,10 @@ class BrowserGatewayTest {
             Duration.ofMinutes(30),
             Duration.ofMinutes(30),
             baseUrl,
-            secret);
+            null);
         return new BrowserGatewayTokens(
             LiveProperties.fixed(BrowserProperties.class, properties),
+            InMemoryServerSecrets.with(BrowserGatewayTokens.SECRET_NAME, secret),
             Clock.fixed(Instant.parse("2026-10-08T00:00:00Z"), ZoneOffset.UTC));
     }
 

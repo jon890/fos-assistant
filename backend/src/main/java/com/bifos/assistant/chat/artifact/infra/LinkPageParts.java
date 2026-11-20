@@ -206,6 +206,15 @@ final class LinkPageParts {
     }
 
 
+    /**
+     * 응답 머리가 사진 형식을 다른 이름(예: {@code multipart/form-data}, {@code application/octet-stream})으로 적은 경우에 머리 바이트로 형식을
+     * 정한다. 받는 네 형식만 판정하고, 머리 바이트로 알 수 없는 형식(SVG 등)은 빈 값이다.
+     */
+    static Optional<String> sniffImageType(byte[] bytes) {
+        return IMAGE_TYPES.stream().filter(type -> matchesImage(type, bytes)).findFirst();
+    }
+
+
     private static boolean startsWith(byte[] bytes, int[] prefix) {
         if (bytes.length < prefix.length) {
             return false;

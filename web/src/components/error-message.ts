@@ -142,6 +142,7 @@ const ADMIN_MESSAGES: Record<string, string> = {
     "이 profile 이름을 이미 쓰고 있어요. 다른 이름을 입력해 주세요.",
   HERMES_UNAVAILABLE:
     "Hermes 런타임에 연결하지 못했어요. 연결 상태를 확인해 주세요.",
+  SECRET_STORE_UNAVAILABLE: "KEK 가 없어 저장할 수 없습니다",
 };
 
 export function describeAdminError(code: string, fallback: string): string {
