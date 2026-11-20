@@ -80,7 +80,8 @@ test("답 안에 그림 두 장이 만든 순서로 보이고 지시문은 눌�
 for (const width of [1280, 390]) {
   test(`참고한 링크가 지시문 칸에 새 창 링크로 보이고 링크 없는 그림에는 없다 (폭 ${width})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    const links = ["https://shop.example.com/goods/1", "https://img.example.com/p.png"];
+    const links = ["https://shop.example.com/goods/1", "https://img.example.com/p.png", "https://shop.example.com/a/%EC%83%81%ED%92%88"];
+    const shown = ["https://shop.example.com/goods/1", "https://img.example.com/p.png", "https://shop.example.com/a/상품"];
     await openWithImages(page, [image("양말 신은 아이", { sourceLinks: links }), image("그냥 고양이", { sourceLinks: [] })]);
 
     const images = page.getByTestId("assistant-message").last().getByTestId("generated-image");
@@ -88,9 +89,9 @@ for (const width of [1280, 390]) {
     const list = images.nth(0).getByTestId("generated-image-source-links");
     await expect(list).toBeVisible();
     const anchors = list.getByRole("link");
-    await expect(anchors).toHaveCount(2);
+    await expect(anchors).toHaveCount(3);
     for (const [index, link] of links.entries()) {
-      await expect(anchors.nth(index)).toHaveText(link);
+      await expect(anchors.nth(index)).toHaveText(shown[index]);
       await expect(anchors.nth(index)).toHaveAttribute("href", link);
       await expect(anchors.nth(index)).toHaveAttribute("target", "_blank");
       await expect(anchors.nth(index)).toHaveAttribute("rel", "noopener noreferrer");
