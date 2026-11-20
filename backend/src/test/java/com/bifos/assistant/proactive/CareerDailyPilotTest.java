@@ -221,7 +221,9 @@ class CareerDailyPilotTest {
         assertThat(firstCommand.instructions())
             .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
             .contains("- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다.")
-            .contains("- 이번 실행은 읽기만 한다.");
+            .contains("- 이번 실행은 읽기만 한다.")
+            .as("서비스 개념 목록(스펙 service-concepts REQ1)")
+            .contains("# 이 서비스의 기능", "/tasks/new");
         ChatMessage discovery = lastMessage(first);
         assertThat(discovery.role()).isEqualTo(MessageRole.ASSISTANT);
         assertThat(discovery.content()).contains("**새로 알릴 것**").contains("](" + POSITION_URL + ")");

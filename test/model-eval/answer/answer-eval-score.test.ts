@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
+  collectAnswers,
   exitCode,
   failedQuestion,
   linkState,
@@ -246,4 +247,24 @@ test("같은 문항을 두 번 적으면 보고서도 센 것과 같은 마지�
   assert.equal(set.similar, 1);
   assert.match(report, /\| s0 \| 비슷하다 \| 고쳐 적음 \|/);
   assert.doesNotMatch(report, /처음/);
+});
+
+test("나뉜 답의 출처를 메시지마다 모아 중복을 빼고 마지막 후속 답에 출처가 없어도 채점한다", () => {
+  const contents = [
+    "11월 18일 뉴스\n\n## 출처\n- https://example.org/a",
+    "추가 뉴스\n\n## 출처\n- https://example.org/b\n- https://example.org/a",
+    "앞서 전한 뉴스의 요약이에요. 본문 링크 https://example.org/c",
+  ];
+  const answers = collectAnswers([
+    { role: "USER", executionId: null, content: "이번 주 뉴스", status: "COMPLETED", artifacts: [] },
+    ...contents.map((content, index) => ({ role: "ASSISTANT", executionId: index + 1, content, status: "COMPLETED", artifacts: [] })),
+  ], [1]);
+  const links = new Map<string, LinkState>([
+    ["https://example.org/a", "open"],
+    ["https://example.org/b", "closed"],
+  ]);
+  assert.deepEqual(sourceLinks(answers), ["https://example.org/a", "https://example.org/b"]);
+  const result = scoreQuestion(question("split", "sources", true), answers, NOON, links, null);
+  assert.deepEqual([result.passed, result.sourceLinks, result.openLinks, result.closedLinks], [true, 2, 1, 1]);
+  assert.equal(scoreQuestion(question("date", "date"), answers, NOON, links, null).passed, true);
 });

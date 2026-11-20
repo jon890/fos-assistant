@@ -9,6 +9,7 @@ import static com.bifos.assistant.mcp.presentation.McpRpc.text;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
+import com.bifos.assistant.mcp.application.McpConnectorListTool;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFileSpaceTools;
@@ -75,6 +76,7 @@ public class McpController {
         AGENT_STATUS,
         AGENT_STOP,
         FOLLOW_UP_PROPOSE,
+        McpConnectorListTool.NAME,
         McpMediaObservationTools.LIST);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE, FILE_SPACE_PUT);
@@ -88,6 +90,7 @@ public class McpController {
     private final McpContentDraftSnapshots contentSnapshots;
     private final McpFinancialLimitTools financialLimits;
     private final McpApprovalResumeTool approvalResume;
+    private final McpConnectorListTool connectorList;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -101,6 +104,7 @@ public class McpController {
             Map.entry(ARTIFACT_WRITE, (caller, id, args) -> artifactCalls.writeArtifact(caller, id, args)),
             Map.entry(FILE_SPACE_PUT, (caller, id, args) -> fileSpaceCalls.put(caller, id, args)),
             Map.entry(AGENT_LIST, this::listAgents),
+            Map.entry(McpConnectorListTool.NAME, this::listConnectors),
             Map.entry(AGENT_STATUS, this::agentStatus),
             Map.entry(AGENT_DELEGATE, this::agentDelegate),
             Map.entry(AGENT_STOP, this::agentStop),
@@ -295,6 +299,15 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, tools.listAgents(caller));
+    }
+
+
+    /** {@code agent_list} 와 같이 인자가 없는 도구다. 키가 하나라도 남으면 인자 오류다. */
+    private Map<String, Object> listConnectors(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (!arguments.isEmpty()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, connectorList.list(caller));
     }
 
 

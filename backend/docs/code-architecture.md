@@ -341,7 +341,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.action.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 실으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길
@@ -526,7 +526,7 @@ IntelliJ의 Reformat Code와 완전히 같은 결과는 보장하지 않는다. 
 Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같은 태스크를 실행한다. 전역 Code Style이나 plugin 설치를 변경할 필요는 없다.
 
 `spotlessCheck`는 원본을 바꾸지 않고 위반이 있으면 실패한다. 설정 파일과 고정 엔진은 Spotless의 태스크 입력에 포함된다.
-실제 Gradle 회귀 `test/spotless-jdt.test.py`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
+실제 Gradle 회귀 `test/spotless-jdt.test.ts`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
 기본 범위는 `origin/main`과의 공통 조상 뒤 바뀐 파일이다. `-PformatAll=true`로 main/test Java 전체를 확인하거나 적용한다.
 전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.
 실행 명령과 커밋 분리는 `backend/AGENTS.md`의 「포맷」 절이 갖는다.

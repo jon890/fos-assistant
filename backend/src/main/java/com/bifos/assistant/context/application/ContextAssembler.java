@@ -141,13 +141,16 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
+     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침, 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
      * 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
      * @param scope 실행을 여는 쪽이 정한 범위다. 먼저 살펴보기는 기억 지침도 받지 않는다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, InstructionScope scope) {
-        String instructions = RESPONSE_INSTRUCTIONS + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS;
+        // 서비스 개념 목록은 모든 범위에 같은 글로 넣는다. 범위마다 다른 절과 기억 글 앞에 두어 실행마다 같은 앞부분을 길게 한다
+        String instructions = RESPONSE_INSTRUCTIONS
+            + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS
+            + ContextBudgetWriter.SEPARATOR + ServiceConceptsInstructions.SECTION;
         if (scope.conversation()) {
             instructions += ContextBudgetWriter.SEPARATOR + SEARCH_INSTRUCTIONS;
         }

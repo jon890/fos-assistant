@@ -269,11 +269,11 @@ export function withoutAskGuide(instructions: string): string {
 
 /**
  * Control Plane 이 instructions 맨 앞에 붙이는 모델 지침 절의 제목이다. 붙는 순서대로 둔다.
- * 「# 최신 정보와 출처」 는 대화 실행에만, 「# 기억」 은 `memory_remember` 를 받는 실행에만 붙는다. 절마다 제목 뒤에 빈 줄 없는 한 단락이 온다.
+ * 「# 이 서비스의 기능」 은 모든 실행에 붙고 `ServiceConceptsInstructions` 의 상수다. 「# 최신 정보와 출처」 는 대화 실행에만, 「# 기억」 은 `memory_remember` 를 받는 실행에만 붙는다. 절마다 제목 뒤에 빈 줄 없는 한 단락이 온다.
  * `ContextAssembler` 의 지침 상수와 같아야 한다. 절이 늘었는데 여기 없으면 그 절부터 답에 섞여 저장된 답을
  * 비교하는 검사가 한꺼번에 깨진다. `test/e2e/unit/fake-hermes-controls.test.ts` 가 둘을 맞춰 본다.
  */
-export const MODEL_GUIDE_HEADERS = ["# 답변 형식", "# 도구 호출", "# 승인 카드", "# 최신 정보와 출처", "# 기억"] as const;
+export const MODEL_GUIDE_HEADERS = ["# 답변 형식", "# 도구 호출", "# 승인 카드", "# 이 서비스의 기능", "# 최신 정보와 출처", "# 기억"] as const;
 
 /** 모델 지침은 답에 복사하지 않고, Memory 본문은 기존처럼 되돌려 검증한다. */
 export function withoutResponseGuide(instructions: string): string {

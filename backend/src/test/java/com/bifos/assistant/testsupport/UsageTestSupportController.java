@@ -63,8 +63,8 @@ public class UsageTestSupportController {
         if (users.findByEmail(requested.email()).isPresent()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "test admin user already exists");
         }
-        users.save(AppUser.of(
-            requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN));
+        Long groupId = requested.groupId() == null ? caller.groupId() : requested.groupId();
+        users.save(AppUser.of(requested.email(), requested.displayName(), groupId, UserRole.ADMIN));
         return requested;
     }
 
@@ -89,7 +89,8 @@ public class UsageTestSupportController {
                 .provider(seed.provider() == null ? DEFAULT_PROVIDER : seed.provider())
                 .model(seed.model() == null ? DEFAULT_MODEL : seed.model())
                 .costMode(agent.costMode())
-                .status(ExecutionStatus.SUCCEEDED)
+                .status(seed.status() == null ? ExecutionStatus.SUCCEEDED : seed.status())
+                .errorCode(seed.errorCode())
                 .timing(seed.startedAt(), seed.startedAt().plusMillis(1_200L))
                 .tokens(seed.inputTokens(), null, seed.outputTokens(), seed.inputTokens() + seed.outputTokens())
                 .cost(new ExecutionCost(seed.estimatedCostMicros(), seed.actualCostMicros(), "USD", "test-support"))
@@ -127,6 +128,8 @@ public class UsageTestSupportController {
      * @param model 비우면 {@link #DEFAULT_MODEL} 을 쓴다
      * @param runtimeFingerprint 비우면 지문 없이 심는다
      * @param actualCostMicros 비우면 구독 경로처럼 실제 청구액이 없는 실행이 된다
+     * @param status 비우면 성공한 실행이다
+     * @param errorCode 비우면 오류 코드가 없다
      */
     public record SeededExecution(
         String agentCode,
@@ -138,11 +141,17 @@ public class UsageTestSupportController {
         Long outputTokens,
         Long contextChars,
         Long estimatedCostMicros,
-        Long actualCostMicros) {
+        Long actualCostMicros,
+        ExecutionStatus status,
+        String errorCode) {
     }
 
-    /** 관리자 권한으로 따로 심을 브라우저 검사 사용자다. */
-    public record SeededAdminUser(String email, String displayName) {
+    /**
+     * 관리자 권한으로 따로 심을 브라우저 검사 사용자다.
+     *
+     * @param groupId 비우면 부른 사람의 그룹이다. 그룹 전체를 세는 화면을 다른 검사의 실행과 섞지 않으려면 새 번호를 준다
+     */
+    public record SeededAdminUser(String email, String displayName, Long groupId) {
     }
 
 

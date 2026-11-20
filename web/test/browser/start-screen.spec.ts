@@ -1,5 +1,6 @@
 import { FAKE_STARTER_PROMPTS } from "../../../test/e2e/fake-hermes.ts";
 import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import { agentSwitcher, expectPickedAgent, pickAgent } from "./helpers.ts";
 import type { Locator, Page } from "../../node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
@@ -41,12 +42,13 @@ async function expectImageLoaded(locator: Locator): Promise<void> {
     .toBeGreaterThan(0);
 }
 
-test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이 보인다", async ({ page }) => {
+test("새 대화 화면에 인사와 첫 에이전트의 이름표와 추천 질문이 보이고 카드는 없다", async ({ page }) => {
   await page.goto("/new");
 
   await expect(page.getByRole("heading", { level: 1, name: /님, 무엇을 도와드릴까요\?$/ })).toBeVisible();
-  const picker = page.getByRole("radiogroup", { name: "에이전트" });
-  await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
+  // 에이전트 카드(radio 묶음)가 없다. 고르기는 이름표의 목록이 맡는다.
+  await expect(page.getByRole("radio")).toHaveCount(0);
   await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(composer(page)).toHaveAttribute("placeholder", "무엇이든 물어보세요");
   await expectNoHorizontalScroll(page);
@@ -63,11 +65,11 @@ test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
   await expect(composer(page)).toHaveValue("쓰던 글");
   // 첫 메시지 뒤에는 새 대화 화면이 사라지고 입력창이 아래로 간다.
-  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
   await expect(page.getByRole("button", { name: PROMPT, exact: true })).toHaveCount(0);
 });
 
-test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문으로 바뀐다", async ({ page }) => {
+test("이름표 목록에서 다른 에이전트를 고르면 그 에이전트의 추천 질문으로 바뀐다", async ({ page }) => {
   // 가짜 Hermes 가 모든 profile 에 같은 추천을 답하므로 에이전트마다 다른 추천은 응답을 정해 준다.
   await page.route(STARTERS_PATTERN, async (route) => {
     const own = route.request().url().includes(`/agents/${PERSONA_AGENT_CODE}/`) ? "성격 추천이다" : "브라우저 추천이다";
@@ -76,10 +78,8 @@ test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문�
   await page.goto("/new");
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toBeVisible();
 
-  await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
+  await pickAgent(page, "성격 비서");
 
-  await expect(page.getByRole("radio", { name: "성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toHaveCount(0);
 });
@@ -94,7 +94,7 @@ test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르�
   await composer(page).press("Enter");
 
   await expect(list).toHaveCount(0);
-  await expect(page.getByRole("radio", { name: "빈 성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "빈 성격 비서");
   await expect(composer(page)).toHaveValue("");
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page).toHaveURL(/\/new$/);
@@ -108,7 +108,7 @@ test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼�
   await expect(list.getByRole("option", { name: "빈 성격 비서", exact: true })).toBeVisible();
   await composer(page).press("Shift+Enter");
 
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
   await expect(composer(page)).toHaveValue("@빈\n");
   await expect(list).toHaveCount(0);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
@@ -152,7 +152,7 @@ test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전�
   await expect(page.getByText("아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수 있어요.")).toBeVisible();
   await expect(composer(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: "다시 읽기" })).toHaveCount(0);
-  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
 
   await page.unroute("**/api/agents");
   await page.getByRole("link", { name: "에이전트 만들기" }).click();
@@ -274,12 +274,12 @@ test("unmount 뒤 도착한 목록 응답은 새 화면의 선택을 덮어쓰�
   await expect(page).toHaveURL(/\/tasks$/);
   await page.evaluate(() => (window as unknown as { resumeAgentReads(): void }).resumeAgentReads());
   await page.getByRole("link", { name: "검사용 비서 홈" }).click();
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
   await page.evaluate(async () => {
     (window as unknown as { releaseAgentReads(): void }).releaseAgentReads();
     await new Promise(requestAnimationFrame);
   });
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
   await expect(page.getByText("늦은 비서", { exact: true })).toHaveCount(0);
 });
 
@@ -315,11 +315,11 @@ test("Strict Mode의 이전 요청과 finally는 다음 요청의 읽는 중 상
   await page.evaluate(() => {
     (window as unknown as { agentReads: Array<(response: Response) => void> }).agentReads[2](Response.json([{ code: "browser", name: "최신 비서", acceptsAttachments: true }]));
   });
-  await expect(page.getByRole("main").getByText("최신 비서", { exact: true })).toBeVisible();
+  await expectPickedAgent(page, "최신 비서");
   await expect(composer(page)).toBeEnabled();
 });
 
-test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보인다", async ({ page }) => {
+test("에이전트가 하나여도 이름표 목록이 열리고 그 한 줄과 에이전트 관리가 보인다", async ({ page }) => {
   await page.route("**/api/agents", async (route) => {
     await route.fulfill({ json: [agentRow("browser", "하나뿐인 비서")] });
   });
@@ -328,17 +328,19 @@ test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보
   });
   await page.goto("/new");
 
-  const main = page.getByRole("main");
-  await expect(main.getByText("하나뿐인 비서", { exact: true })).toBeVisible();
+  await expectPickedAgent(page, "하나뿐인 비서");
   await expect(page.getByRole("button", { name: "하나뿐인 질문이다", exact: true })).toBeVisible();
-  await expect(page.getByRole("radiogroup")).toHaveCount(0);
   await expectNoHorizontalScroll(page);
+  await agentSwitcher(page).click();
+  const list = page.getByTestId("agent-switcher-list");
+  await expect(list.getByRole("menuitemradio")).toHaveCount(1);
+  await expect(list.getByRole("menuitemradio", { name: "하나뿐인 비서", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(list.getByRole("menuitem", { name: "에이전트 관리" })).toHaveAttribute("href", "/agents");
 });
 
-test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴다", async ({ page }) => {
+test("새 대화에서 사진을 먼저 올리면 이름표와 @ 목록이 잠긴다", async ({ page }) => {
   await page.goto("/new");
-  const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
-  await expect(browserCard).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
 
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "lock.png", mimeType: "image/png", buffer: PNG_1X1 },
@@ -349,11 +351,15 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
   // 빈 대화가 생겨도 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
-  const personaCard = page.getByRole("radio", { name: "성격 비서", exact: true });
-  await expect(personaCard).toBeDisabled();
-  await personaCard.click({ force: true });
-  await expect(browserCard).toHaveAttribute("aria-checked", "true");
-  await expect(personaCard).toHaveAttribute("aria-checked", "false");
+  await expect(agentSwitcher(page)).toHaveAttribute("data-locked", "true");
+  await expect(agentSwitcher(page)).toHaveAccessibleDescription("이미 시작한 대화라 바꿀 수 없어요");
+  await agentSwitcher(page).click();
+  await expect(page.getByTestId("agent-switcher-locked")).toHaveText(
+    "이미 시작한 대화라 에이전트를 바꿀 수 없어요. 다른 에이전트는 새 대화에서 고를 수 있어요",
+  );
+  await expect(page.getByRole("menuitemradio")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expectPickedAgent(page, "브라우저 비서");
 
   await composer(page).fill("@");
   await expect(composer(page)).toHaveValue("@");
@@ -362,7 +368,7 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
 
 test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 가도 사진이 메시지에 남는다", async ({ page }, testInfo) => {
   await page.goto("/new");
-  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toBeVisible();
+  await expect(agentSwitcher(page)).toBeVisible();
 
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "start.png", mimeType: "image/png", buffer: PNG_1X1 },
@@ -376,7 +382,7 @@ test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 
   const userMessage = page.getByTestId("user-message").last();
   await expectImageLoaded(userMessage.getByTestId("message-attachment"));
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
   await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
 
   // 새로 읽어도 사진이 남아 있어야 한다. 입력창이 새로 만들어졌다면 정리가 그 사진을 서버에서 지운다.
@@ -398,7 +404,7 @@ test("사진을 올려 두고 추천 질문으로 새 대화 화면을 벗어나
   // 추천 질문은 첨부를 싣지 않는다. 새 대화 화면이 사라질 때 입력창이 새로 만들어지면 정리가 사진을 지운다.
   await page.getByRole("button", { name: PROMPT, exact: true }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
   await expect(page.getByTestId("user-message").first().getByTestId("message-attachment")).toHaveCount(0);
   await expect(previews).toHaveCount(1);
 

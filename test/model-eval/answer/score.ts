@@ -1,6 +1,6 @@
 // 답변 품질 평가의 판정 규칙이다. 네트워크와 파일을 쓰지 않는 순수 함수만 둔다.
 // 기준은 docs/features/answer-quality/spec.md 의 DECISION10 이, 세는 규칙은 docs/features/answer-quality.md 의 「답변 품질 평가」 가 갖는다.
-import type { ExecutionNode } from "../control-plane.ts";
+import type { ExecutionNode, MessageView } from "../control-plane.ts";
 
 export type Check = "sources" | "date" | "none";
 export type Question = { id: string; category: string; messages: string[]; check: Check; compare: boolean };
@@ -54,6 +54,29 @@ const URL_PATTERN = /https?:\/\/[^\s<>()\[\]"'`]+/g;
 /** 주소 안의 괄호 한 겹(`…/A_(B)`)까지 받는다. */
 const MARKDOWN_LINK = /\[[^\]]*\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g;
 
+/** 기록한 실행의 질문 뒤부터 다음 사용자 메시지 전까지, 자동 turn 을 포함한 비서 답을 모은다. */
+export function collectAnswers(messages: MessageView[], executionIds: (number | null)[]): string[] {
+  const ids = new Set(executionIds.filter((id) => id !== null));
+  const answers: string[] = [];
+  let segment: MessageView[] | null = null;
+  const collect = () => {
+    if (!segment?.some((message) => message.role === "ASSISTANT" && message.executionId !== null && ids.has(message.executionId))) return;
+    for (const message of segment) {
+      if (message.role === "ASSISTANT" && message.content?.trim()) answers.push(message.content);
+    }
+  };
+  for (const message of messages) {
+    if (message.role === "USER") {
+      collect();
+      segment = [];
+    } else {
+      segment?.push(message);
+    }
+  }
+  collect();
+  return answers;
+}
+
 /** 그 줄이 「출처」 절의 머리면 같은 줄에 이어진 본문(없으면 빈 글)을, 아니면 null 을 돌려준다. */
 function headingRest(line: string): string | null {
   if (HASH_HEADING.test(line)) return "";
@@ -62,7 +85,8 @@ function headingRest(line: string): string | null {
 }
 
 /** 답 끝의 「출처」 절에 든 주소다. 절이 없으면 빈 목록이다. 절 밖의 링크는 세지 않는다. */
-export function sourceLinks(answer: string): string[] {
+export function sourceLinks(answer: string | string[]): string[] {
+  if (Array.isArray(answer)) return [...new Set(answer.flatMap((message) => sourceLinks(message)))];
   const lines = answer.split(/\r?\n/);
   let start = -1;
   let rest = "";
@@ -128,15 +152,16 @@ export function linkState(status: number | null): LinkState {
 
 export function scoreQuestion(
   question: Question,
-  answer: string,
+  answer: string | string[],
   startedAt: Date,
   links: Map<string, LinkState>,
   root: ExecutionNode | null,
 ): QuestionScore {
   const urls = sourceLinks(answer);
   const states = urls.map((url) => links.get(url) ?? "closed");
+  const answers = Array.isArray(answer) ? answer : [answer];
   const passed =
-    question.check === "none" ? true : question.check === "date" ? mentionsDate(answer, startedAt) : urls.length > 0;
+    question.check === "none" ? true : question.check === "date" ? answers.some((text) => mentionsDate(text, startedAt)) : urls.length > 0;
   return {
     id: question.id,
     category: question.category,

@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-root = pathlib.Path(__file__).resolve().parents[2]
+root = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "hermes/tests"))
 import test_connector_snapshot as fixture
 from mcp.types import CallToolResult, TextContent
