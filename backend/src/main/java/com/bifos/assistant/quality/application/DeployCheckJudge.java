@@ -37,21 +37,27 @@ public class DeployCheckJudge {
 
     private static final Set<String> BUSY_CODES = Set.of("USER_BUSY", "CONVERSATION_BUSY");
 
-    /** 「출처」 가 든 마크다운 제목 줄이다. {@code test/model-eval/answer/score.ts} 와 같은 뜻이다. */
-    private static final Pattern HASH_HEADING = Pattern.compile("^\\s{0,3}#{1,6}\\s.*출처");
+    /**
+     * 「출처」 가 든 마크다운 제목 줄이다. {@code test/model-eval/answer/score.ts} 와 같은 뜻이다. JavaScript 의 {@code \s} 처럼 줄바꿈 없는 공백과
+     * 전각 공백도 공백으로 받도록 이 클래스의 정규식은 유니코드 문자 분류를 쓴다.
+     */
+    private static final Pattern HASH_HEADING = Pattern.compile("^\\s{0,3}#{1,6}\\s.*출처", Pattern.UNICODE_CHARACTER_CLASS);
 
     /** 제목 표시 없이 「출처」 로 시작하는 줄이다. 콜론 뒤 같은 줄의 글은 절의 본문이다. */
     private static final Pattern PLAIN_HEADING = Pattern.compile(
-        "^(?:참고\\s*)?출처(?:\\s*목록)?\\s*(?:\\*\\*|__)?\\s*(?:[:：]\\s*(?:\\*\\*|__)?(.*)|(?:\\([^)]*\\))?\\s*)$");
+        "^(?:참고\\s*)?출처(?:\\s*목록)?\\s*(?:\\*\\*|__)?\\s*(?:[:：]\\s*(?:\\*\\*|__)?(.*)|(?:\\([^)]*\\))?\\s*)$",
+        Pattern.UNICODE_CHARACTER_CLASS);
 
-    private static final Pattern LEADING_MARKS = Pattern.compile("^[\\s>*_\\-•·]+");
+    private static final Pattern LEADING_MARKS = Pattern.compile("^[\\s>*_\\-•·]+", Pattern.UNICODE_CHARACTER_CLASS);
 
-    private static final Pattern NEXT_HEADING = Pattern.compile("^\\s{0,3}(?:#{1,6}\\s+\\S|(?:\\*\\*|__)[^*_]+(?:\\*\\*|__)\\s*:?\\s*$)");
+    private static final Pattern NEXT_HEADING = Pattern.compile("^\\s{0,3}(?:#{1,6}\\s+\\S|(?:\\*\\*|__)[^*_]+(?:\\*\\*|__)\\s*:?\\s*$)",
+        Pattern.UNICODE_CHARACTER_CLASS);
 
-    private static final Pattern URL = Pattern.compile("https?://[^\\s<>()\\[\\]\"'`]+");
+    private static final Pattern URL = Pattern.compile("https?://[^\\s<>()\\[\\]\"'`]+", Pattern.UNICODE_CHARACTER_CLASS);
 
     /** 주소 안의 괄호 한 겹까지 받는다. */
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\((https?://(?:[^\\s()]|\\([^\\s()]*\\))+)\\)");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile(
+        "\\[[^\\]]*\\]\\((https?://(?:[^\\s()]|\\([^\\s()]*\\))+)\\)", Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[.,;:!?]+$");
 

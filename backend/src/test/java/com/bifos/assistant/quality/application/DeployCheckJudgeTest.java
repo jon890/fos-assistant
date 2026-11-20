@@ -225,4 +225,12 @@ class DeployCheckJudgeTest {
             .containsExactly("https://example.org/a");
         assertThat(DeployCheckJudge.sourceLinks("환율은 [여기](https://example.org/a) 를 본다.\n출처는 없다.")).isEmpty();
     }
+
+
+    @Test
+    @DisplayName("줄바꿈 없는 공백과 전각 공백이 든 출처 머리도 받는다")
+    void sourceHeadingsWithUnicodeSpaces() {
+        assertThat(DeployCheckJudge.sourceLinks("본문\n\n##\u00a0출처\n- https://example.org/x")).containsExactly("https://example.org/x");
+        assertThat(DeployCheckJudge.sourceLinks("본문\n\n출처\u3000목록\n- https://example.org/y")).containsExactly("https://example.org/y");
+    }
 }
