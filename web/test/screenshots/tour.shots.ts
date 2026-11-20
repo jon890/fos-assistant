@@ -482,7 +482,7 @@ test("사용량과 비용", async ({ page }) => {
     (await page.request.post(support, { headers, data: seeds })).ok(),
   ).toBeTruthy();
 
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
   await expect(page.getByTestId("breakdown-table")).toContainText("생활 비서");
   await shot(page, "tour-07-usage");
 });

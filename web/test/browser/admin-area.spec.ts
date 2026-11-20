@@ -242,18 +242,10 @@ test("MEMBER 역할이 관리자 영역의 에이전트 주소를 열면 홈으�
   await expect(page).toHaveURL(HOME_URL);
 });
 
-test("ADMIN 역할도 일반 사용량 화면에서는 금액과 설정별 사용량 탭과 사용량 내역을 보지 않고 실행 건수를 본다", async ({ page }) => {
-  const sent = await page.request.post("/api/chat", { data: { text: "일반 사용량 검사", agentCode: "browser" } });
-  expect(sent.ok()).toBeTruthy();
-
-  await page.goto("/usage");
-  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toBeVisible();
-  await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
-  await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("main")).not.toContainText("USD");
-  await expect(page.getByRole("link", { name: "설정별 사용량", exact: true })).toHaveCount(0);
-  await expect(page.getByText("사용량 내역", { exact: true })).toHaveCount(0);
-  await expect(page.getByTestId("breakdown-axis")).toHaveCount(0);
+test("ADMIN 역할도 옛 사용자 사용량 주소는 404다", async ({ page }) => {
+  const response = await page.goto("/usage");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toHaveCount(0);
 });
 
 test("관리자 영역의 사용량에는 금액과 탭 넷이 있고 실행 한 줄은 관리자 영역의 상세로 간다", async ({ page }) => {
