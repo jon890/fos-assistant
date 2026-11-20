@@ -23,7 +23,7 @@ Hermes HTTP 계약과 지난 연결 호환을 구현하고 해당 경계에서 �
 
 ### 1. Hermes OAuth 통신
 
-`HermesConnectorOAuthClient`와 구현체는 대시보드 README의 `/api/connector-oauth/*` 계약을 쓴다. 호출별 응답을 파싱하고 흐름 충돌(HTTP 409), 일시 장애와 실제 공급자 응답을 구분한다. 외부 응답 원문이나 비밀값은 예외에 담지 않는다. `call`과 `list`의 보관 파일 경로는 `oauth: pending`과 `oauth: current`를 선택해서 보낼 수 있도록 한다. 기존 수동 호출 본문은 유지한다.
+`HermesConnectorOAuthClient`와 구현체는 대시보드 README의 `/api/connector-oauth/*` 계약을 쓴다. 호출별 응답을 파싱하고 흐름 충돌(HTTP 409), 일시 장애와 실제 공급자 응답을 구분한다. 외부 응답 원문이나 비밀값은 예외에 담지 않는다. 확인 도구의 `call` 보관 파일 경로는 `oauth: pending`과 `oauth: current`를 선택해서 보낸다. 표준 플러그인의 `/tools`와 기존 수동 호출 본문은 유지한다.
 
 ### 2. 저장 JSON 호환
 
@@ -31,7 +31,7 @@ Hermes HTTP 계약과 지난 연결 호환을 구현하고 해당 경계에서 �
 
 ### 3. 공유 JSON과 기존 연결 테스트
 
-`HttpHermesConnectorOAuthClientTest`에서 Hermes 공유 JSON으로 교환과 갱신, `missing` 응답을 대조한다. 409, 5xx, 알 수 없는 응답과 필수 칸 오류를 확인한다. 확인 도구와 목록 호출의 OAuth 모드는 `HttpHermesConnectorClientTest`가 본다. `ConnectorConnectionTest`에서 이전의 수동 JSON, OAuth의 저장과 다시 읽기, 해제 뒤 수동 상태와 최대 길이의 수동 호환을 검증한다.
+`HttpHermesConnectorOAuthClientTest`에서 Hermes 공유 JSON으로 교환과 갱신, `missing` 응답을 대조한다. 409, 5xx, 알 수 없는 응답과 필수 칸 오류를 확인한다. 확인 도구의 OAuth 모드는 `HttpHermesConnectorClientTest`가 본다. `ConnectorConnectionTest`에서 이전의 수동 JSON, OAuth의 저장과 다시 읽기, 해제 뒤 수동 상태와 최대 길이의 수동 호환을 검증한다.
 
 ## 검증
 

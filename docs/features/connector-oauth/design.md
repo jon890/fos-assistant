@@ -114,6 +114,8 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | 직접 실행(`connector_run.py` 가 부르는 `connector_launch.py` 의 `_binding_env`) | 승인한 쓰기와 금융 준비도 같은 OAuth 파일을 읽어 넣는다 |
 | 확인·선택지 호출(`call`, `list`) | 본문 모양 검사에 `oauth` key 를 더한다. `oauth: "current"` 면 본 자리의 보관 파일과 OAuth 파일을, `oauth: "pending"` 이면 대기 보관 파일의 칸 값과 대기 OAuth 파일의 `token_url` 을 넣는다. 처음 연결은 본 자리 보관 파일이 없어도 된다 |
 
+단추 연결을 선언하는 플러그인은 `assistant.json` 에 확인 도구를 선언한다. Control Plane 은 이 도구를 `call` 로 부른다. `/tools` 는 `assistant.json` 이 없는 표준 플러그인의 확인 경로다.
+
 ### 대시보드 plugin 경로(서비스 토큰)
 
 | 경로 | 받는 것 | 답하는 것 |

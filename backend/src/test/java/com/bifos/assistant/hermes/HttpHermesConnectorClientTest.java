@@ -135,7 +135,8 @@ class HttpHermesConnectorClientTest {
         String brokenFields = withOAuth.replace("\"fields\":[\"token\"]", "\"fields\":[\"scope\"]");
         String brokenProvider = withOAuth.replace("\"github\"", "\"unknown\"");
         String brokenUrl = withOAuth.replace("https://accounts.example.test/settings", "javascript:alert(1)");
-        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenUrl, item)) + "]";
+        String standard = withOAuth.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\",\"schema\":3");
+        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenUrl, standard, item)) + "]";
         server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
 
@@ -1247,16 +1248,12 @@ class HttpHermesConnectorClientTest {
                 {"tool":"list_scopes","vault":"c7","oauth":"pending","owner_browser":"https://browser.example.test/call"}
                 """, JsonCompareMode.STRICT))
             .andRespond(withSuccess("{\"ok\":true,\"result\":[]}", MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/api/connectors/demo-notes/tools"))
-            .andExpect(content().json("{\"vault\":\"c7\",\"oauth\":\"current\"}", JsonCompareMode.STRICT))
-            .andRespond(withSuccess("{\"ok\":true,\"tools\":[]}", MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/api/connectors/demo-notes/tools"))
-            .andExpect(content().json("{\"vault\":\"c7\"}", JsonCompareMode.STRICT))
-            .andRespond(withSuccess("{\"ok\":true,\"tools\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+            .andExpect(content().json("{\"tool\":\"list_scopes\",\"vault\":\"c7\",\"oauth\":\"current\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"result\":[]}", MediaType.APPLICATION_JSON));
 
-        client.callWithVault(DEMO, "list_scopes", "c7", "https://browser.example.test/call", VaultAccess.PENDING);
-        client.listToolsWithVault(DEMO, "c7", VaultAccess.CURRENT);
-        client.listToolsWithVault(DEMO, "c7");
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", "https://browser.example.test/call", VaultAccess.PENDING).ok()).isTrue();
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null, VaultAccess.CURRENT).ok()).isTrue();
         server.verify();
     }
 

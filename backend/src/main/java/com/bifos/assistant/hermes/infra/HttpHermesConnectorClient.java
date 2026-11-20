@@ -123,9 +123,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
 
     @Override
-    public ConnectorToolListing listToolsWithVault(String connectorId, String vault, VaultAccess oauth) {
-        return HttpHermesConnectorToolList.post(client, baseUrl, token, connectorId,
-            HermesConnectorBodies.withOAuth(Map.of(VAULT, vault), oauth));
+    public ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
+        return HttpHermesConnectorToolList.post(client, baseUrl, token, connectorId, Map.of(VAULT, vault));
     }
 
 

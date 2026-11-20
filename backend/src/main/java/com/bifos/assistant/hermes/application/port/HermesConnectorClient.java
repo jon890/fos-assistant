@@ -175,12 +175,6 @@ public interface HermesConnectorClient {
 
     /** 보관 파일의 값으로 {@link #listTools} 와 같은 것을 받는다. 값은 Control Plane 을 거치지 않는다. */
     default ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
-        return listToolsWithVault(connectorId, vault, null);
-    }
-
-
-    /** OAuth 확인의 호출 모드로 표준 플러그인의 도구 목록을 읽는다. */
-    default ConnectorToolListing listToolsWithVault(String connectorId, String vault, VaultAccess oauth) {
         return ConnectorToolListing.failure(ConnectorCallError.UNAVAILABLE);
     }
 

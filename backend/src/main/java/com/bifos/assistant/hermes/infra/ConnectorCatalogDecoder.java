@@ -65,17 +65,20 @@ final class ConnectorCatalogDecoder {
             ConnectorUnknownErrors.read(item.get("unknown_errors")),
             readable && schema(schema) == SCHEMA_DECLARING ? defaultToolPolicy(item) : null,
             ConnectorEventWatch.read(item.get("event_watch")),
-            oauth(item, fields));
+            oauth(item, fields, standard));
     }
 
 
     /** 대시보드가 검사한 선언을 읽고, 어긋난 OAuth 칸은 카탈로그의 나머지와 독립적으로 버린다. */
-    private static ConnectorOAuthDeclaration oauth(JsonNode item, List<ConnectorField> fields) {
+    private static ConnectorOAuthDeclaration oauth(JsonNode item, List<ConnectorField> fields, boolean standard) {
         JsonNode declared = item.get("oauth");
         if (declared == null || declared.isNull()) {
             return null;
         }
         try {
+            if (standard) {
+                throw new IllegalStateException();
+            }
             return readOAuth(declared, fields);
         } catch (IllegalArgumentException | IllegalStateException ex) {
             log.warn("connector {} OAuth 선언의 모양이 맞지 않는다", text(item, "id"));
