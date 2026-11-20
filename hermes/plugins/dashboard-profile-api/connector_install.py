@@ -90,6 +90,7 @@ from .sandbox import (
     _sandbox_attachment_agent_directory,
     _sandbox_attachment_path_identity,
     _sandbox_policy,
+    _sandbox_profile_settings,
     _sandbox_terminal,
     _sandbox_unavailable,
     _sandbox_verify_attachment_directories,
@@ -210,10 +211,10 @@ async def _connector_request(request):
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
             if manifest["sandbox_required"]:
-                # 실행 공간을 전제로 하는 플러그인은 정책에 등록된 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
+                # 실행 공간을 전제로 하는 플러그인은 정책이 적용되는 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
                 # 셸은 붙인 뒤에 켤 수 있기 때문이다(ADR-20261008 connector-binding-guards).
                 sandbox = _sandbox_policy()
-                if sandbox is None or profile not in sandbox["profiles"]:
+                if sandbox is None or _sandbox_profile_settings(sandbox, profile) is None:
                     return _sandbox_unavailable()
             owner_attachments = None
             if manifest["owner_attachments_env"] is not None:
@@ -250,10 +251,10 @@ async def _connector_request(request):
             owner_output = None
             if manifest["owner_output_env"] is not None and owner is not None:
                 # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 플러그인 id 로만 만든다.
-                # 실행 공간 정책에 등록된 profile 에만 준다. 미등록 profile 은 그 디렉터리를 붙이지 않는다.
+                # 실행 공간 정책이 적용되는 profile 에만 준다.
                 # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 플러그인이 파일 출력만 거절한다(ADR-20261008 connector-output-files).
                 sandbox = _sandbox_policy()
-                if sandbox is not None and profile in sandbox["profiles"]:
+                if sandbox is not None and _sandbox_profile_settings(sandbox, profile) is not None:
                     try:
                         owner_output = await asyncio.to_thread(_sandbox_connector_output_directory, sandbox,
                                                                profile, owner, body["plugin"])
