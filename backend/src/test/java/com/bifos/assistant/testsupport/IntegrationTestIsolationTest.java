@@ -64,6 +64,7 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
         context.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
         context.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
+        context.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
         context.refresh();
         stub.willReportSessionRuntime(new SessionRuntime("model", "provider"));
         clock.set(FIXED);
@@ -161,6 +162,7 @@ class IntegrationTestIsolationTest {
             broken.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
             broken.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
             broken.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
+            broken.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
             broken.refresh();
 
             assertThatThrownBy(() -> IntegrationTestIsolation.afterTest(broken, Duration.ofSeconds(5)))

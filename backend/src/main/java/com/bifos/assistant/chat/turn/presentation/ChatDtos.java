@@ -194,10 +194,11 @@ public final class ChatDtos {
      * @param prompt 그림 지시문. 그림이 아니거나 풀지 못하면 null
      * @param vaultItemId 그 그림이나 넣은 파일의 살아 있는 보관본 번호. 없으면 null
      * @param title {@code FILE} 의 제목. 없으면 null 이고 화면이 파일 이름을 쓴다
+     * @param sourceLinks 그림을 만들 때 참고한 링크 주소. 쓴 순서다. 그림이 아니거나 없으면 빈 목록이다
      */
     public record ArtifactView(
         String path, long byteSize, boolean deleted, String autoVault, String autoVaultError, String kind, String prompt,
-        Long vaultItemId, String title) {
+        Long vaultItemId, String title, List<String> sourceLinks) {
         static ArtifactView from(ChatArtifact artifact, GeneratedImageDetail image) {
             return new ArtifactView(
                 artifact.path(),
@@ -208,13 +209,14 @@ public final class ChatDtos {
                 artifact.isGeneratedImage() ? "IMAGE" : "HTML",
                 image == null ? null : image.prompt(),
                 image == null ? null : image.vaultItemId(),
-                null);
+                null,
+                image == null ? List.of() : image.sourceLinks());
         }
 
 
         static ArtifactView from(PutFileDetail file) {
             return new ArtifactView(
-                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title());
+                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title(), List.of());
         }
     }
 

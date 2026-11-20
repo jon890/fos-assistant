@@ -13,6 +13,7 @@ import threading
 import time
 import unittest
 import unittest.mock
+import sys
 
 import test_fos_ctx as base
 
@@ -23,6 +24,13 @@ PHOTOS = {
     "attachment:12": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x02" * 40),
     "attachment:13": ("image/jpeg", b"\xff\xd8\xff" + b"\x03" * 40),
     "generated:수채화 고양이": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x04" * 40),
+    "link:shop.example.com/goods/1": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x05" * 40),
+    "link:https://img.example.com/p.jpg": ("image/jpeg", b"\xff\xd8\xff" + b"\x06" * 40),
+}
+# 링크 가리킴마다 Control Plane 이 `X-Image-Source-Link` 로 돌려주는 받은 주소다.
+LINKS = {
+    "link:shop.example.com/goods/1": "https://shop.example.com/goods/1",
+    "link:https://img.example.com/p.jpg": "https://img.example.com/p.jpg",
 }
 
 
@@ -33,6 +41,7 @@ class ImageSourceFixture(base.PluginFixture):
         super().setUp()
         self.requests = []
         self.answers = {}
+        self.links = dict(LINKS)
         self.guard_answer = b'{"decision": "allow"}'
         test = self
 
@@ -40,9 +49,11 @@ class ImageSourceFixture(base.PluginFixture):
             def log_message(self, *args):
                 pass
 
-            def reply(self, status, content_type, payload):
+            def reply(self, status, content_type, payload, link=None):
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
+                if link:
+                    self.send_header("X-Image-Source-Link", link)
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
@@ -60,7 +71,7 @@ class ImageSourceFixture(base.PluginFixture):
                     self.reply(status, "application/json", json.dumps({"code": code}).encode("utf-8"))
                     return
                 content_type, payload = PHOTOS[source]
-                self.reply(200, content_type, payload)
+                self.reply(200, content_type, payload, test.links.get(source))
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -90,6 +101,9 @@ class ImageSourceFixture(base.PluginFixture):
 
     def copied(self):
         return sorted(self.copies.iterdir()) if self.copies.exists() else []
+
+    def remembered_links(self, call="call_1"):
+        return sys.modules[self.plugin.__name__ + ".image_source"].links_for(base.VECTOR_SESSION, call)
 
 
 class FetchTest(ImageSourceFixture):
@@ -154,6 +168,65 @@ class FetchTest(ImageSourceFixture):
         self.assertEqual(self.requests, [])
 
 
+class LinkTest(ImageSourceFixture):
+    """사용자가 보낸 링크를 `link:` 로 받는지 본다(스펙 generated-image REQ20, REQ21, REQ23, ADR-20261120 / link-image-source)."""
+
+    def test_link_and_attachment_become_copies_and_link_is_remembered(self):
+        """링크를 바탕으로, 첨부를 참고로 받고 받은 주소를 쓴 순서대로 기억한다. 결과 hook 이 사본과 함께 잊는다."""
+        decision = self.call("link:shop.example.com/goods/1", ["attachment:11", "link:https://img.example.com/p.jpg"])
+
+        self.assertEqual(decision["action"], "modify")
+        args = decision["args"]
+        self.assertEqual(pathlib.Path(args["image_url"]).read_bytes(), PHOTOS["link:shop.example.com/goods/1"][1])
+        self.assertEqual([body["source"] for body in (request["body"] for request in self.requests)],
+                         ["link:shop.example.com/goods/1", "attachment:11", "link:https://img.example.com/p.jpg"])
+        self.assertEqual(self.remembered_links(), ["https://shop.example.com/goods/1", "https://img.example.com/p.jpg"])
+
+        self.plugin.transform_tool_result(
+            tool_name="image_generate", result=json.dumps({"success": False, "error": "rate limit"}),
+            args=args, session_id=base.VECTOR_SESSION, tool_call_id="call_1")
+        self.assertEqual(self.copied(), [])
+        self.assertEqual(self.remembered_links(), [])
+
+    def test_link_reasons_block_with_each_message(self):
+        """링크를 받지 못한 까닭마다 다른 글로 막는다. 끝맺음은 사진과 같다."""
+        self.answers = {
+            "link:a.example.com/1": (422, "IMAGE_SOURCE_LINK_BLOCKED"),
+            "link:a.example.com/2": (422, "IMAGE_SOURCE_LINK_NO_IMAGE"),
+            "link:a.example.com/3": (422, "IMAGE_SOURCE_LINK_TOO_LARGE"),
+            "link:a.example.com/4": (502, "IMAGE_SOURCE_LINK_FAILED"),
+            "link:a.example.com/5": (422, "IMAGE_SOURCE_UNKNOWN"),
+        }
+
+        decision = self.call("link:a.example.com/1", ["link:a.example.com/%d" % number for number in range(2, 6)])
+
+        self.assertEqual(decision["action"], "block")
+        for line in ("link:a.example.com/1: 열 수 없는 주소다",
+                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
+                     "link:a.example.com/3: 사진이 너무 크다",
+                     "link:a.example.com/4: 링크를 열지 못했다",
+                     "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
+            self.assertIn(line, decision["message"])
+        self.assertTrue(decision["message"].endswith("사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."))
+
+    def test_attachment_received_but_link_failed_blocks_and_forgets(self):
+        """첨부는 받았어도 링크 하나를 못 받으면 막고, 받은 첨부 사본을 지우며 링크를 기억하지 않는다."""
+        self.answers = {"link:shop.example.com/goods/1": (502, "IMAGE_SOURCE_LINK_FAILED")}
+
+        decision = self.call("attachment:11", ["link:shop.example.com/goods/1"])
+
+        self.assertEqual(decision["action"], "block")
+        self.assertEqual(self.copied(), [])
+        self.assertEqual(self.remembered_links(), [])
+
+    def test_link_answer_without_received_address_is_failed(self):
+        """Control Plane 이 받은 주소를 돌려주지 않으면 남길 링크가 없어 받지 못한 것으로 막는다."""
+        self.links = {}
+        decision = self.call("link:shop.example.com/goods/1")
+        self.assertEqual(decision["action"], "block")
+        self.assertIn("사진을 받지 못했다", decision["message"])
+
+
 class RejectTest(ImageSourceFixture):
     """쓸 수 없는 사진이 하나라도 있으면 막는지 본다(스펙 generated-image REQ16, DECISION25, DECISION32)."""
 
@@ -184,7 +257,7 @@ class RejectTest(ImageSourceFixture):
 
         decision = self.call("attachment:11", ["attachment:12", "attachment:13"])
 
-        self.assertBlocked(decision, "attachment:12: 이 대화에 보낸 사진이나 이 대화에서 만든 그림이 아니다",
+        self.assertBlocked(decision, "attachment:12: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다",
                            "attachment:13: 지웠거나 보관 기간이 지나 쓸 수 없다")
         self.assertNotIn("attachment:11", decision["message"])
         self.assertEqual(self.copied(), [])

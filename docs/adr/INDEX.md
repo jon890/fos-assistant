@@ -130,10 +130,11 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261117 / native-delegation-wake](ADR-20261117-native-delegation-wake.md) | Hermes 내장 위임의 끝은 profile 플러그인 hook 이 Control Plane 에 알리고, Control Plane 이 맡긴 에이전트의 결과와 같은 자동 turn 으로 전한다 | backend, frontend, hermes | Accepted. ADR-040 의 깨우기를 내장 위임으로 넓힌다 |
 | [ADR-20261119 / file-space-put](ADR-20261119-file-space-put.md) | 에이전트가 「내 파일」 에 넣는 파일은 Control Plane 이 실행 공간과 대화 폴더에서 읽어 보관함에 넣는다 | backend, frontend | Accepted. [ADR-20261101 / artifact-vault](ADR-20261101-artifact-vault.md) 의 대상과 파일 하나 상한을 넓힌다 |
 | [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) | 비서가 만든 그림은 fos-ctx 가 Control Plane 에 올리고 대화의 결과물로 묶는다 | backend, frontend, hermes | Accepted. ADR-027 의 답에 묶는 결과물에 그림을 더한다 |
-| [ADR-20261119 / image-gen-defaults](ADR-20261119-image-gen-defaults.md) | 기본 비서의 「그림 만들기」 는 Control Plane 이 켜고 이미지 서비스를 함께 넣으며 사람이 없는 실행에서는 막는다 | backend, hermes | Accepted. ADR-20261008 default-toolsets 의 기본 도구에 `image_gen` 을 더한다 |
+| [ADR-20261119 / image-gen-defaults](ADR-20261119-image-gen-defaults.md) | 기본 비서의 「그림 만들기」 는 Control Plane 이 켜고 이미지 서비스를 함께 넣으며 사람이 없는 실행에서는 막는다 | backend, hermes | Accepted. [ADR-20261008 / default-toolsets](ADR-20261008-default-toolsets.md) 의 기본 도구에 `image_gen` 을 더한다 |
 | [ADR-20261119 / tier-model-names](ADR-20261119-tier-model-names.md) | 모델 단계를 고르는 곳에는 모든 사용자에게 그 단계의 모델과 강도를 보이고, 고르는 모양은 세로 목록으로 한다 | backend, frontend | Accepted. ADR-063 의 단계 목록 값과 [ADR-20261101 / model-setting](ADR-20261101-model-setting.md) 의 슬라이더 모양을 대체한다 |
 | [ADR-20261120 / generated-image-draft](ADR-20261120-generated-image-draft.md) | 만든 그림은 사진 첨부 사본으로 블로그 원고에 넣는다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 그림 행을 원고의 사진 판정에 잇되 원고의 두 지문은 바꾸지 않는다 |
 | [ADR-20261120 / image-source](ADR-20261120-image-source.md) | 그림을 고칠 바탕 사진은 모델이 가리키고 fos-ctx 가 Control Plane 에서 받아 넘긴다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 hook 에 받기를 더하고 ADR-091 의 사진 권한은 넓히지 않는다 |
+| [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) | 사용자가 보낸 링크의 사진은 Control Plane 이 대화에 있는지 확인하고 허용 목록 없이 공개 주소에서만 받는다 | backend, hermes | Accepted. [ADR-20261120 / image-source](ADR-20261120-image-source.md) 의 받기 길에 `link:` 가리킴을 더한다 |
 | [ADR-20261120 / web-push](ADR-20261120-web-push.md) | 알림을 그대로 웹 푸시로 보내고 기기는 사용자 줄의 JSON 칸에 두며 암호화는 JDK 로 한다 | backend, frontend | Accepted. ADR-070 의 알림 원장에 바깥 채널을 더하고 ADR-072 의 열린 질문 셋에 답한다 |
 
 ## 보관

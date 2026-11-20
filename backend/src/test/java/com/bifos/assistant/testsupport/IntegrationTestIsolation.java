@@ -180,6 +180,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(FailingAccessRevoker.class).reset());
         attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
         attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
+        attempt(failures, () -> context.getBean(FakeLinkImageWeb.class).reset());
         attempt(failures, () -> context.getBean(EchoCdpRelayConnector.class).reset());
         attempt(
             failures,
