@@ -6,7 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatFullTime } from "@/lib/format";
 import type { PushDevice } from "@/lib/push";
-import type { PushScreenState } from "@/lib/push-device";
+import type { DeniedHelp, PushScreenState } from "@/lib/push-device";
 import { IosInstallGuide } from "./ios-install-guide";
 import { usePushSettings } from "./use-push-settings";
 
@@ -17,14 +17,26 @@ const BLOCKED_NOTICES: Partial<Record<PushScreenState, string>> = {
     "iOS 16.4 이상에서 받을 수 있어요. 기기를 업데이트한 뒤 이 화면을 다시 열어 주세요.",
   unsupported:
     "이 브라우저는 알림을 받을 수 없어요. 최신 Chrome, Edge, Firefox, Safari 에서 열어 주세요.",
-  denied:
-    "이 브라우저에서 알림을 막아 두었어요. 주소창 옆 사이트 설정에서 알림을 허용한 뒤 이 화면을 다시 열어 주세요.",
 };
+
+/** 알림을 막았을 때의 안내다. 홈 화면 앱은 주소창이 없어 기기 설정에서 다시 켠다. */
+function deniedNotice(help: DeniedHelp, appName: string): string {
+  if (help === "ios-app")
+    return `이 앱의 알림을 막아 두었어요. 기기의 「설정 → 알림 → ${appName}」 에서 알림을 허용한 뒤 이 화면을 다시 열어 주세요.`;
+  if (help === "app")
+    return `이 앱의 알림을 막아 두었어요. 기기 설정의 앱 알림에서 ${appName} 의 알림을 허용한 뒤 이 화면을 다시 열어 주세요.`;
+  return "이 브라우저에서 알림을 막아 두었어요. 주소창 옆 사이트 설정에서 알림을 허용한 뒤 이 화면을 다시 열어 주세요.";
+}
 
 /**
  * 「알림」 화면의 이 기기 상태와 내 기기 목록이다(docs/features/attention/spec.md 의 REQ1-REQ3).
  */
-export function PushSettings() {
+export function PushSettings({
+  appName,
+}: {
+  /** 홈 화면 앱의 이름이다. 기기 설정에서 찾을 이름이라 안내에 넣는다 */
+  appName: string;
+}) {
   const { view, busy, actionError, enable, disable, reload } =
     usePushSettings();
 
@@ -47,7 +59,10 @@ export function PushSettings() {
       </Notice>
     );
 
-  const blocked = BLOCKED_NOTICES[view.state];
+  const blocked =
+    view.state === "denied"
+      ? deniedNotice(view.denied, appName)
+      : BLOCKED_NOTICES[view.state];
   return (
     <div className="space-y-6">
       <section aria-labelledby="this-device-title" className="space-y-3">

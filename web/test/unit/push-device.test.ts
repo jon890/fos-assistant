@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   base64UrlToBytes,
+  deniedHelp,
   deviceName,
   iosInfo,
   pushScreenState,
@@ -93,4 +94,11 @@ test("공개 키를 바이트로 바꾸고 기존 구독의 키와 비교한다"
   assert.equal(sameKey(new Uint8Array([1, 2, 3, 255, 239]).buffer, key), true);
   assert.equal(sameKey(new Uint8Array([1, 2, 3]).buffer, key), false);
   assert.equal(sameKey(null, key), false);
+});
+
+test("알림을 막은 뒤 다시 켜는 곳은 브라우저 탭, iOS 홈 화면 앱, 그 밖의 앱으로 나뉜다", () => {
+  assert.equal(deniedHelp(false, false), "browser");
+  assert.equal(deniedHelp(true, false), "browser");
+  assert.equal(deniedHelp(true, true), "ios-app");
+  assert.equal(deniedHelp(false, true), "app");
 });

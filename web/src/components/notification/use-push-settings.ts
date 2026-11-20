@@ -18,9 +18,11 @@ import {
   type PushDevice,
 } from "@/lib/push";
 import {
+  deniedHelp,
   deviceName,
   iosInfo,
   pushScreenState,
+  type DeniedHelp,
   type PushScreenState,
 } from "@/lib/push-device";
 
@@ -33,6 +35,8 @@ export type PushSettingsView =
       devices: PushDevice[];
       /** 이 브라우저 구독의 주소 해시다. 구독이 없으면 null 이다 */
       thisHash: string | null;
+      /** 알림을 막았을 때 다시 켜는 곳이다 */
+      denied: DeniedHelp;
     };
 
 /** 등록이 이 코드로 거절되면 서버의 공개 키가 바뀐 것이라 다시 구독한다 */
@@ -71,19 +75,27 @@ async function readView(): Promise<ReadResult> {
     const thisHash = subscription
       ? await endpointHash(subscription.endpoint)
       : null;
+    const ios = iosInfo(navigator.userAgent, navigator.maxTouchPoints);
+    const standalone = isStandalone();
     const state = pushScreenState({
       serverEnabled: loaded.config.enabled && Boolean(loaded.config.publicKey),
       supported: pushSupported(),
       permission: notificationPermission(),
-      ios: iosInfo(navigator.userAgent, navigator.maxTouchPoints),
-      standalone: isStandalone(),
+      ios,
+      standalone,
       registered:
         thisHash !== null &&
         loaded.devices.some((device) => device.endpointHash === thisHash),
     });
     return {
       config: loaded.config,
-      view: { phase: "ready", state, devices: loaded.devices, thisHash },
+      view: {
+        phase: "ready",
+        state,
+        devices: loaded.devices,
+        thisHash,
+        denied: deniedHelp(ios.ios, standalone),
+      },
     };
   } catch {
     return {

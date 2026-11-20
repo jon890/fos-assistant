@@ -72,6 +72,18 @@ function olderThan(
 }
 
 /**
+ * 알림을 막은 뒤 다시 켜는 곳이다(스펙 REQ3). 홈 화면 앱은 주소창이 없어 사이트 설정으로 갈 수 없다.
+ *
+ * <p>`ios-app` 은 iOS 홈 화면 앱으로, 기기 설정의 알림에서 앱 이름을 골라야 한다. `app` 은 그 밖의 설치한 앱이다.
+ */
+export type DeniedHelp = "browser" | "ios-app" | "app";
+
+export function deniedHelp(ios: boolean, standalone: boolean): DeniedHelp {
+  if (!standalone) return "browser";
+  return ios ? "ios-app" : "app";
+}
+
+/**
  * user agent 로 iOS 인지와 버전을 읽는다.
  *
  * <p>iPadOS 의 Safari 는 Mac 처럼 보이는 user agent 를 보내므로, Mac 이면서 터치 지점이 둘 이상이면 iPad 로 본다.

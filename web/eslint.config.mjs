@@ -17,6 +17,7 @@ const NODE_TEST_READ_FILES = [
   "src/lib/dev-docs/read.ts",
   "src/lib/dev-docs/source.ts",
   "src/lib/mermaid.ts",
+  "src/lib/push-device.ts",
   "src/lib/push-open.ts",
   "src/lib/usage-paging.ts",
   "src/lib/workspace-file.ts",

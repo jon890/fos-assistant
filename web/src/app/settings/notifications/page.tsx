@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PushSettings } from "@/components/notification/push-settings";
+import { appName } from "@/lib/app-name";
 
 export const metadata: Metadata = { title: "알림" };
 
@@ -18,7 +19,7 @@ export default async function NotificationSettingsPage() {
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
         웹을 열어 두지 않아도 이 기기에서 비서의 알림을 받아요.
       </p>
-      <PushSettings />
+      <PushSettings appName={appName()} />
     </div>
   );
 }

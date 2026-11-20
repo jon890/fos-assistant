@@ -302,6 +302,9 @@ test.describe("로그아웃", () => {
     await page.getByRole("menuitem", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/signin$/);
     expect(calls.deletes).toEqual([{ endpoint: ENDPOINT }]);
+    // 같은 탭의 sessionStorage 에 대역 구독 상태가 남는다. 구독을 끊었으면 키가 비어 있다.
+    const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem("__push_fake") ?? "null"));
+    expect(stored).toMatchObject({ key: null });
   });
 
   test("기기 빼기가 멈춰도 2초 뒤 로그아웃한다", async ({ page }, testInfo) => {
@@ -332,6 +335,15 @@ test.describe("아이폰", () => {
     const steps = thisDevice(page).getByTestId("ios-install-step");
     await expect(steps).toHaveCount(3);
     await expect(steps).toContainText(["공유", "홈 화면에 추가", "앱에서 다시 열기"]);
+    await expect(page.getByRole("button", { name: "이 기기에서 알림 받기" })).toHaveCount(0);
+  });
+
+  test("홈 화면 앱에서 알림을 막았으면 기기 설정에서 다시 켜는 방법을 보인다", async ({ page }) => {
+    await fakeBrowser(page, { standalone: true, permission: "denied" });
+    await routePush(page, { devices: [] });
+    await page.goto("/settings/notifications");
+    await expect(thisDevice(page).getByText("이 앱의 알림을 막아 두었어요. 기기의 「설정 → 알림 → 검사용 비서」 에서 알림을 허용한 뒤 이 화면을 다시 열어 주세요.")).toBeVisible();
+    await expect(thisDevice(page).getByText(/주소창/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "이 기기에서 알림 받기" })).toHaveCount(0);
   });
 
