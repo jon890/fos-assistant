@@ -92,12 +92,12 @@ function AdminMenu({
           aria-labelledby={`admin-menu-${group.id}`}
           className="flex flex-col gap-1"
         >
-          <h2
+          <p
             id={`admin-menu-${group.id}`}
             className="px-3 text-xs font-medium text-muted-foreground"
           >
             {group.label}
-          </h2>
+          </p>
           {group.links.map((link) => {
             const current = selected(pathname, link.href);
             return (

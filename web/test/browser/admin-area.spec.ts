@@ -95,7 +95,7 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
     .toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
 
   const menu = await openAdminMenu(page, testInfo);
-  await expect(menu.getByRole("heading")).toHaveText(["살펴보기", "비서 설정", "사용자와 자원"]);
+  await expect(menu.locator("section > p")).toHaveText(["살펴보기", "비서 설정", "사용자와 자원"]);
   await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간"]);
   await expect(menu.getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
@@ -106,7 +106,11 @@ test("하위 화면에서는 그 줄 하나만 골라지고 실행 상세는 사
   let menu = await openAdminMenu(page, testInfo);
   await expect(menu.locator('[aria-current="page"]')).toHaveText(["모델"]);
 
-  await page.goto("/admin/executions/1");
+  // 실제 실행이 없으면 상세가 실행 기록으로 돌려보내 같은 줄이 골라진다. 가짜 응답으로 상세 주소에 머문다.
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalFixture() }));
+  await page.goto("/admin/executions/980");
+  await expect(page.getByTestId("execution-tree")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/executions\/980$/);
   menu = await openAdminMenu(page, testInfo);
   await expect(menu.locator('[aria-current="page"]')).toHaveText(["사용량과 비용"]);
 });
