@@ -10,12 +10,16 @@ export async function POST(request: Request) {
   if (rejected) return rejected;
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;
-  const { subject } = parsed.body;
+  const { subject, expectedPublicKey } = parsed.body;
   const result = await callControlPlane(
     "/api/v1/admin/secrets/vapid/regenerate",
     {
       method: "POST",
-      body: { subject: typeof subject === "string" ? subject : undefined },
+      body: {
+        subject: typeof subject === "string" ? subject : undefined,
+        expectedPublicKey:
+          typeof expectedPublicKey === "string" ? expectedPublicKey : null,
+      },
     },
   );
   return result.ok

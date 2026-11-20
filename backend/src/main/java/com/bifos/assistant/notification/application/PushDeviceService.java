@@ -3,6 +3,7 @@ package com.bifos.assistant.notification.application;
 import com.bifos.assistant.notification.application.dto.PushConfig;
 import com.bifos.assistant.notification.application.dto.PushRegistration;
 import com.bifos.assistant.notification.config.PushProperties;
+import com.bifos.assistant.notification.domain.VapidKeyPair;
 import com.bifos.assistant.notification.domain.PushDevice;
 import com.bifos.assistant.notification.domain.PushDevices;
 import com.bifos.assistant.notification.domain.PushEndpointPolicy;
@@ -80,8 +81,9 @@ public class PushDeviceService {
 
     /** 화면이 구독을 만들 때 읽는 서버 설정이다. */
     public PushConfig config() {
-        boolean enabled = keys.enabled();
-        return new PushConfig(enabled, enabled ? keys.publicKeyBase64Url() : null);
+        // 한 번 읽은 값으로 두 칸을 채운다. 따로 읽으면 그 사이 키가 지워져 켜짐인데 공개 키가 없는 응답이 나온다.
+        Optional<VapidKeyPair> pair = keys.current();
+        return new PushConfig(pair.isPresent(), pair.map(VapidKeyPair::publicKeyBase64Url).orElse(null));
     }
 
 

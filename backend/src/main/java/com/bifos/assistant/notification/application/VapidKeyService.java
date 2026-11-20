@@ -12,8 +12,11 @@ import com.bifos.assistant.notification.infra.GeneratedVapidKeys;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -81,10 +84,30 @@ public class VapidKeyService {
      * @throws ApiException KEK 가 없으면 {@code SECRET_STORE_UNAVAILABLE}, 연락처가 이상하면 {@code VALIDATION_FAILED}
      */
     public int regenerate(Long adminId, String subject) {
+        return regenerate(adminId, subject, null, false);
+    }
+
+
+    /**
+     * 화면이 확인 창을 보일 때 읽은 키가 지금도 그대로일 때만 만든다. 그새 다른 관리자가 키를 만들었으면 확인 창 없이 기기가 해제되므로
+     * 거절한다.
+     *
+     * @param expectedPublicKey 화면이 읽은 공개 키. 키가 없던 화면이면 null
+     * @throws ApiException 지금 키가 화면이 읽은 것과 다르면 {@code VAPID_STATE_CHANGED}
+     */
+    public int regenerate(Long adminId, String subject, String expectedPublicKey) {
+        return regenerate(adminId, subject, expectedPublicKey, true);
+    }
+
+
+    private int regenerate(Long adminId, String subject, String expectedPublicKey, boolean checkExpected) {
         String normalized = validSubject(subject);
         GeneratedVapidKeys generated = VapidKeys.generate(normalized);
         Map<String, Object> meta = Map.of("publicKey", generated.publicKey(), "subject", normalized);
         List<Long> released = lock.run(() -> transaction.execute(status -> {
+            if (checkExpected && !Objects.equals(currentPublicKey(), expectedPublicKey)) {
+                throw new ApiException(ErrorCode.VAPID_STATE_CHANGED, "VAPID key changed since the screen was read");
+            }
             // 값 쓰기가 KEK 없음으로 거절되면 기기는 아직 그대로이고 트랜잭션이 되돌아간다.
             secrets.write(VapidKeys.SECRET_NAME, generated.sealed(), meta, adminId);
             return releaseAllDevices();
@@ -101,6 +124,14 @@ public class VapidKeyService {
             return releaseAllDevices();
         }));
         return released.size();
+    }
+
+
+    private String currentPublicKey() {
+        return secrets.find(VapidKeys.SECRET_NAME)
+            .filter(ServerSecretRecord::set)
+            .map(row -> text(row.meta().get("publicKey")))
+            .orElse(null);
     }
 
 
@@ -130,12 +161,29 @@ public class VapidKeyService {
 
     private static String validSubject(String subject) {
         String value = subject == null ? "" : subject.strip();
-        boolean shape = value.startsWith("mailto:") && value.length() > "mailto:".length()
-            || value.startsWith("https://") && value.length() > "https://".length();
-        if (!shape || value.length() > SUBJECT_MAX) {
+        if (value.length() > SUBJECT_MAX || !validUri(value)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "subject must be a mailto: or https: address");
         }
         return value;
+    }
+
+
+    /** RFC 8292 의 {@code sub} 이다. https 는 호스트가, mailto 는 {@code 이름@호스트} 가 있어야 한다. */
+    private static boolean validUri(String value) {
+        try {
+            URI uri = new URI(value);
+            if ("https".equals(uri.getScheme())) {
+                return uri.getHost() != null && !uri.getHost().isBlank();
+            }
+            if ("mailto".equals(uri.getScheme())) {
+                String address = uri.getSchemeSpecificPart();
+                int at = address == null ? -1 : address.indexOf('@');
+                return at > 0 && at < address.length() - 1 && address.indexOf('@', at + 1) < 0 && !address.contains("?");
+            }
+            return false;
+        } catch (URISyntaxException ex) {
+            return false;
+        }
     }
 
 

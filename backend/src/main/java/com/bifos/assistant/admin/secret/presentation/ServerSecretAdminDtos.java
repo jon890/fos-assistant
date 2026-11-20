@@ -55,8 +55,8 @@ public final class ServerSecretAdminDtos {
         }
     }
 
-    /** VAPID 새로 만들기 요청이다. 연락처가 비어 있으면 만드는 관리자의 이메일을 쓴다 */
-    public record RegenerateVapidRequest(String subject) {
+    /** VAPID 새로 만들기 요청이다. 연락처가 비어 있으면 만드는 관리자의 이메일을 쓴다. {@code expectedPublicKey} 는 화면이 읽은 공개 키(없었으면 null)이고 지금 키와 다르면 거절한다 */
+    public record RegenerateVapidRequest(String subject, String expectedPublicKey) {
     }
 
     /** VAPID 새로 만들기와 지우기 응답이다 */

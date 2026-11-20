@@ -53,7 +53,8 @@ public class ServerSecretAdminController {
     @PostMapping("/vapid/regenerate")
     public VapidChangedView regenerateVapid(@RequestBody(required = false) RegenerateVapidRequest request) {
         CurrentUser admin = currentUser.requireAdmin();
-        int released = secrets.regenerateVapid(admin.id(), admin.email(), request == null ? null : request.subject());
+        int released = secrets.regenerateVapid(admin.id(), admin.email(), request == null ? null : request.subject(),
+            request == null ? null : request.expectedPublicKey());
         OverviewView view = OverviewView.of(secrets.overview(), userNames::find);
         return new VapidChangedView(view.storeAvailable(), view.vapid(), released);
     }

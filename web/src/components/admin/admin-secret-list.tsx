@@ -226,7 +226,9 @@ export function AdminSecretList() {
             storeAvailable={overview.storeAvailable}
             busy={busy}
             onRegenerate={(subject) =>
-              changeVapid(() => regenerateVapid(subject))
+              changeVapid(() =>
+                regenerateVapid(subject, overview.vapid.publicKey),
+              )
             }
             onDelete={() => changeVapid(deleteVapid)}
           />

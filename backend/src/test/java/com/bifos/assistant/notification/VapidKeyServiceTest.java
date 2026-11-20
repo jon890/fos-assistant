@@ -179,12 +179,43 @@ class VapidKeyServiceTest {
         String before = keys.publicKeyBase64Url();
         devices.register(alice, registration("https://fcm.googleapis.com/fcm/send/alice", before));
 
-        for (String bad : new String[] {null, "", "ops@example.invalid", "mailto:", "http://example.invalid", "ftp://x"}) {
+        for (String bad : new String[] {null, "", "ops@example.invalid", "mailto:", "http://example.invalid", "ftp://x",
+            "https://not a host", "https:///path", "mailto:a b@example.invalid", "mailto:@example.invalid"}) {
             assertThatThrownBy(() -> service.regenerate(alice.id(), bad))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         }
         assertThat(keys.publicKeyBase64Url()).isEqualTo(before);
         assertThat(devices.list(alice)).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("화면이 읽은 공개 키가 지금과 다르면 409 로 거절하고 키와 기기는 그대로다")
+    void staleExpectedKeyIsRejected() {
+        String before = keys.publicKeyBase64Url();
+        devices.register(alice, registration("https://fcm.googleapis.com/fcm/send/alice", before));
+
+        for (String stale : new String[] {null, "BOtherKey"}) {
+            assertThatThrownBy(() -> service.regenerate(alice.id(), "mailto:ops@example.invalid", stale))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VAPID_STATE_CHANGED));
+        }
+        assertThat(keys.publicKeyBase64Url()).isEqualTo(before);
+        assertThat(devices.list(alice)).hasSize(1);
+
+        service.regenerate(alice.id(), "mailto:ops@example.invalid", before);
+        assertThat(keys.publicKeyBase64Url()).isNotEqualTo(before);
+        assertThat(devices.list(alice)).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("키가 없다고 읽은 화면은 그새 키가 생기면 거절된다")
+    void emptyExpectationRejectedWhenKeyAppeared() {
+        assertThatThrownBy(() -> service.regenerate(alice.id(), "mailto:ops@example.invalid", null))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VAPID_STATE_CHANGED));
+        service.delete(alice.id());
+        service.regenerate(alice.id(), "mailto:ops@example.invalid", null);
+        assertThat(keys.enabled()).isTrue();
     }
 
 

@@ -35,11 +35,18 @@ export type VapidChanged = {
   releasedUsers: number;
 };
 
-export function regenerateVapid(subject: string): Promise<Response> {
+/** `expectedPublicKey` 는 화면이 읽은 공개 키다. 키가 없던 화면이면 null 이고, 서버는 지금 키가 다르면 거절한다. */
+export function regenerateVapid(
+  subject: string,
+  expectedPublicKey: string | null,
+): Promise<Response> {
   return fetch("/api/admin/secrets/vapid/regenerate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subject: subject.trim() || undefined }),
+    body: JSON.stringify({
+      subject: subject.trim() || undefined,
+      expectedPublicKey,
+    }),
   });
 }
 

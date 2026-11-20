@@ -88,7 +88,7 @@ class PushControllerTest {
         assertThat(on.path("enabled").asBoolean()).isTrue();
         assertThat(on.path("publicKey").asString()).isEqualTo(keys.publicKeyBase64Url()).isNotBlank();
 
-        when(keys.enabled()).thenReturn(false);
+        when(keys.current()).thenReturn(java.util.Optional.empty());
         JsonNode off = body(mvc.perform(get("/api/v1/push/config")).andReturn().getResponse(), 200);
         assertThat(off.path("enabled").asBoolean()).isFalse();
         assertThat(off.path("publicKey").isNull()).isTrue();
