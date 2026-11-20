@@ -121,7 +121,11 @@ export function AgentSwitcher({
           onValueChange={(code) => onSelect(code)}
         >
           {agents.map((agent) => {
-            const line = capabilitiesLine(agent.capabilities);
+            // 준비된 플러그인과 스킬이 없으면 한 줄 소개로 대신한다. 연결이 아직 준비되지 않은 담당 에이전트가 빈 줄이 되지 않게 한다.
+            const line =
+              capabilitiesLine(agent.capabilities) ||
+              agent.description?.trim() ||
+              "";
             const lineId = `${descriptionId}-${agent.code}`;
             return (
               <DropdownMenuRadioItem

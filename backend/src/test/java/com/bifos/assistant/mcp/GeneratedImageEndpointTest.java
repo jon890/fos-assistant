@@ -7,6 +7,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
@@ -39,6 +40,7 @@ import java.util.Date;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
@@ -64,6 +66,9 @@ class GeneratedImageEndpointTest {
     private static final Instant NOW = Instant.parse("2026-11-19T00:00:00Z");
     /** `hermes/tests/test_generated_image.py` 의 `VECTOR_SIG` 와 같은 확인 값이다. */
     private static final String VECTOR_SIG = "d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee";
+    /** `hermes/tests/test_generated_image.py` 의 `VECTOR_LINKS_SIG` 와 같은 확인 값이다. 참고한 링크 두 개의 여덟째 줄이 붙는다. */
+    private static final String VECTOR_LINKS_SIG = "83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d";
+    private static final List<String> LINKS = List.of("https://shop.example.com/goods/1", "https://img.example.com/p.png");
     private static final byte[] PNG = png(64);
 
     @LocalServerPort
@@ -89,6 +94,9 @@ class GeneratedImageEndpointTest {
 
     @Autowired
     ChatArtifactRepository rows;
+
+    @Autowired
+    GeneratedImageService images;
 
     @Autowired
     ArtifactStore store;
@@ -146,6 +154,35 @@ class GeneratedImageEndpointTest {
             sha256("수채화 고양이".getBytes(StandardCharsets.UTF_8)),
             sha256("창가에 앉은 고양이".getBytes(StandardCharsets.UTF_8)));
         assertThat(hmac(key, signed)).isEqualTo(VECTOR_SIG);
+        assertThat(hmac(key, signed + "\n" + sha256(String.join("\n", LINKS).getBytes(StandardCharsets.UTF_8))))
+            .isEqualTo(VECTOR_LINKS_SIG);
+    }
+
+
+    @Test
+    @DisplayName("참고한 링크가 든 올리기는 여덟째 줄 서명으로 받고 링크를 남기며, 일곱 줄 서명과 틀린 링크는 거절한다")
+    void acceptsSourceLinksWithEighthSignatureLine() throws Exception {
+        String root = "fos-" + UUID.randomUUID();
+        Conversation conversation = conversation();
+        running(root, conversation.id(), ExecutionStatus.RUNNING);
+
+        ObjectNode sevenLines = meta(root, root, "call_7", "양말", "지시문", PNG);
+        sevenLines.set("source_links", json.valueToTree(LINKS));
+        assertThat(send(token, sevenLines.toString(), PNG).statusCode()).as("링크가 있는데 일곱 줄 서명이다").isEqualTo(403);
+        for (List<String> bad : List.of(
+            List.of("http://shop.example.com/goods/1"),
+            List.of("https://shop.example.com/a b"),
+            IntStream.range(0, 17).mapToObj(i -> "https://shop.example.com/" + i).toList())) {
+            assertThat(send(token, linked(root, "call_bad", bad, png(72)).toString(), png(72)).statusCode()).as(bad.toString()).isEqualTo(403);
+        }
+
+        HttpResponse<String> response = send(token, linked(root, "call_1", LINKS, PNG).toString(), PNG);
+
+        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
+        ChatArtifact row = rows.findAll().stream().filter(it -> it.conversationId().equals(conversation.id())).findFirst().orElseThrow();
+        assertThat(row.generationSourceLinks()).isNotNull();
+        assertThat(images.sourceLinksOf(row, owner.id())).containsExactlyElementsOf(LINKS);
+        assertThat(rows.findGeneratedImagePaths(conversation.id())).hasSize(1);
     }
 
 
@@ -298,6 +335,24 @@ class GeneratedImageEndpointTest {
             sha256(image),
             sha256(title.getBytes(StandardCharsets.UTF_8)),
             sha256(prompt.getBytes(StandardCharsets.UTF_8)))));
+        return meta;
+    }
+
+
+    /** 참고한 링크를 넣고 여덟째 줄까지 서명한 meta 다. */
+    private ObjectNode linked(String root, String call, List<String> links, byte[] image) {
+        ObjectNode meta = meta(root, root, call, "양말", "지시문", image);
+        meta.set("source_links", json.valueToTree(links));
+        meta.put("sig", hmac(sha256(token.getBytes(StandardCharsets.UTF_8)), String.join(
+            "\n",
+            "v1-generated-image",
+            root,
+            root,
+            call,
+            sha256(image),
+            sha256("양말".getBytes(StandardCharsets.UTF_8)),
+            sha256("지시문".getBytes(StandardCharsets.UTF_8)),
+            sha256(String.join("\n", links).getBytes(StandardCharsets.UTF_8)))));
         return meta;
     }
 

@@ -1,6 +1,10 @@
 import { describeError } from "@/components/error-message";
 import { formatDuration, subagentLabel } from "@/lib/format";
-import { isReadableDetail, toolLabel } from "@/lib/tool-label";
+import {
+  isReadableDetail,
+  toolLabel,
+  type ConnectorToolName,
+} from "@/lib/tool-label";
 
 /** 여러 사건을 합쳐 그리려고 만든 한 줄이다. */
 export type MergedEventRow =
@@ -8,6 +12,8 @@ export type MergedEventRow =
       kind: "tool";
       key: number;
       toolName: string | null;
+      /** 플러그인 도구의 서비스 이름과 도구 제목 */
+      connector: ConnectorToolName | null;
       durationMs: number | null;
       detail: string | null;
       finished: boolean;
@@ -92,7 +98,7 @@ export function ExecutionEventRow({
   return (
     <li data-testid="execution-event-row" data-tool={row.toolName ?? "도구"}>
       <p className="truncate text-sm text-muted-foreground">
-        {toolLabel(row.toolName, false)} ·{" "}
+        {toolLabel(row.toolName, false, row.connector)} ·{" "}
         {row.finished ? formatDuration(row.durationMs ?? 0) : "끝나지 않음"}
         {row.finished && row.detail && readable ? ` · ${row.detail}` : ""}
       </p>

@@ -164,8 +164,9 @@ export function StarterPrompts({
                 variant="outline"
                 disabled={disabled}
                 onClick={() => onPrompt(prompt)}
+                // 긴 주소처럼 끊을 자리가 없는 글도 단추 폭 안에서 줄을 바꾼다. 단추가 inline-flex 라 최소 폭 계산에도 들어가야 해 anywhere 를 쓴다.
                 className={cn(
-                  "max-w-full justify-start whitespace-normal text-left",
+                  "h-auto max-w-full justify-start whitespace-normal text-left wrap-anywhere",
                   "rounded-full px-3 py-1.5 font-normal",
                 )}
               >

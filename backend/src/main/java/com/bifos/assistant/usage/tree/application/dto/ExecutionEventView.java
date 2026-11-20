@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.tree.application.dto;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
 import com.bifos.assistant.usage.execution.domain.ToolDetailPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.execution.application.dto.ConnectorToolName;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import java.time.Instant;
 
@@ -11,6 +12,9 @@ import java.time.Instant;
  *
  * <p>화면은 우리 이름만 읽는다. Hermes 의 원래 사건 이름은 여기까지 오지 않는다. 근거는 ADR-013 에
  * 있다.
+ *
+ * <p>{@code connector} 는 플러그인 도구 사건에만 싣는 서비스 이름과 도구 제목이다. 플러그인 선언에 있는 공개 정보라 누구에게나
+ * 싣는다(docs/features/app-shell/design.md 「작업 과정의 이름」).
  */
 public record ExecutionEventView(
     int sequence,
@@ -25,7 +29,8 @@ public record ExecutionEventView(
     Long inputTokens,
     Long outputTokens,
     Instant occurredAt,
-    String subagentUsageStatus) {
+    String subagentUsageStatus,
+    ConnectorToolName connector) {
 
     /**
      * 사건 한 줄을 보는 사람에게 맞춰 옮긴다.
@@ -41,6 +46,12 @@ public record ExecutionEventView(
 
 
     public static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus) {
+        return from(event, viewer, subagentUsageStatus, null);
+    }
+
+
+    public static ExecutionEventView from(
+        ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus, ConnectorToolName connector) {
         boolean hidden = event.eventType().isTool() && !ToolDetailPolicy.visibleTo(viewer, event.toolName());
         boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionEventView(
@@ -56,6 +67,7 @@ public record ExecutionEventView(
             internal ? event.inputTokens() : null,
             internal ? event.outputTokens() : null,
             event.occurredAt(),
-            subagentUsageStatus);
+            subagentUsageStatus,
+            connector);
     }
 }

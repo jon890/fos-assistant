@@ -145,6 +145,10 @@ jobs:
       - name: 실제 MySQL 검사
         if: matrix.suite == 'mysql'
         run: scripts/checks/check-mysql-migration.sh
+      # 버전 날짜로 14일이 지난 마이그레이션 데이터 테스트가 남아 있으면 경고만 낸다. 지우는 절차는 backend/docs/data-schema.md 가 갖는다.
+      - name: 지울 마이그레이션 데이터 테스트 후보 (경고)
+        if: matrix.suite == 'mysql'
+        run: bun scripts/checks/migration-test-prune.ts --github
       - name: 실패한 백엔드 검사 보고서
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
