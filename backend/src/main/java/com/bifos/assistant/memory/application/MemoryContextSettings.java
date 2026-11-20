@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 그룹의 기억 요약 구역 예산과 기억 전체 상한을 {@code group_setting} 의 {@code MEMORY_CONTEXT} 줄 하나로 읽고 쓴다
- * ({@code docs/features/memory/design.md} 의 「그룹 설정 {@code MEMORY_CONTEXT}」).
+ * ({@code docs/features/memory.md} 의 「기억 예산 설정」).
  *
  * <p>JSON 은 {@code {"version":1,"summaryMaxChars":4000,"maxChars":10000}} 이다. 줄이 없는 그룹은 {@link MemoryContextBudget#DEFAULTS}
  * 다. 읽을 때 모르는 버전이거나 형식이 깨졌으면 기본값으로 돌고 경고를 남긴다(스펙 DECISION19). 오류로 올리면 그 그룹의 모든 실행이 멈추고, 기본값으로
