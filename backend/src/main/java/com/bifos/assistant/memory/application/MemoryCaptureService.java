@@ -168,11 +168,24 @@ public class MemoryCaptureService {
             .toList());
         return rows.stream()
             .filter(row -> byId.containsKey(row.memoryId()))
-            .map(row -> new CapturedMemory(row, byId.get(row.memoryId()), row.replacedMemoryIds().stream()
+            .map(row -> new CapturedMemory(row, byId.get(row.memoryId()), shownReplaced(user, row, byId.get(row.memoryId()))
+                .stream()
                 .filter(titles::containsKey)
                 .map(titles::get)
                 .toList()))
             .toList();
+    }
+
+
+    /**
+     * 기록 줄에 보일 대신한 번호다. 아직 받아들이지 않은 제안은 받아들일 때 다시 판정하므로, 그 사이 다른 합치기로 대체되거나 바뀐 기억은 빼고 지금 대신할 수
+     * 있는 번호만 보인다.
+     */
+    private List<Long> shownReplaced(CurrentUser user, MemoryCapture row, Memory memory) {
+        if (row.replacedMemoryIds().isEmpty() || memory.status() != MemoryStatus.PROPOSED) {
+            return row.replacedMemoryIds();
+        }
+        return replacements.replaceable(user, MemoryAccess.owner(), row.replacedMemoryIds(), memory.id());
     }
 
 
@@ -297,9 +310,20 @@ public class MemoryCaptureService {
 
     /**
      * 같은 제목과 본문의 줄이 이미 있을 때다. 승인 전의 제안을 사용자가 지금 직접 말했으면 받아들인 것으로 본다. 거절한 줄은 다시
-     * 만들지 않는다.
+     * 만들지 않는다. 새 항목을 만들지 않은 결과면 이번 호출의 {@code replaces} 는 모두 대신하지 못한 번호로 알린다(스펙 REQ6). 모델이
+     * 합쳤다고 잘못 답하지 않게 한다.
      */
     private MemoryRememberResult existingOutcome(
+        CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
+        MemoryRememberResult result = existingOutcomeOf(user, existing, direct, request);
+        if (result.outcome() == MemoryRememberOutcome.REMEMBERED || request.replaces().isEmpty()) {
+            return result;
+        }
+        return new MemoryRememberResult(result.outcome(), result.memoryId(), List.of(), notReplaced(request.replaces(), List.of()));
+    }
+
+
+    private MemoryRememberResult existingOutcomeOf(
         CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
         return switch (existing.status()) {
             case ACCEPTED -> new MemoryRememberResult(

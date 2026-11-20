@@ -17,6 +17,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,22 @@ class MemoryReplacementsTest {
         assertThat(replacements.supersede(DAD, CORE, 9L, List.of(4L))).isEmpty();
         verify(memories, never()).supersedeWithin(any(), any(), any(), any());
         verify(memories, never()).supersede(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("옛 제목은 요청자가 읽을 수 있고 풀리는 기억의 것만 번호 순으로 낸다")
+    void titlesOnlyReadable() {
+        Memory readable = memory(3L, true, MemoryEntryType.MEMORY);
+        when(readable.title()).thenReturn("읽히는 제목");
+        when(readable.isReadableBy(DAD.id(), DAD.groupId())).thenReturn(true);
+        Memory unreadable = memory(4L, false, MemoryEntryType.MEMORY);
+        when(unreadable.isReadableBy(DAD.id(), DAD.groupId())).thenReturn(true);
+        Memory others = memory(5L, true, MemoryEntryType.MEMORY);
+        when(others.isReadableBy(DAD.id(), DAD.groupId())).thenReturn(false);
+        when(memories.findAllById(any())).thenReturn(List.of(readable, unreadable, others));
+
+        assertThat(replacements.titlesOf(DAD, List.of(3L, 4L, 5L))).containsExactly(Map.entry(3L, "읽히는 제목"));
     }
 
 

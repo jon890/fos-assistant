@@ -261,6 +261,59 @@ class McpMemoryReplacesToolTest {
 
 
     @Test
+    @DisplayName("합친 글이 이미 기억한 글과 같아 새로 남기지 않으면 replaces 를 대신하지 않고 대신하지 못함으로 알린다")
+    void reportsReplacesWhenAlreadyKnown() throws Exception {
+        Memory other = fact("다른 음식 메모", "국수를 좋아한다");
+        askedInThisTurn();
+        call(remember("이미 아는 음식 메모", "매운 음식을 좋아한다"));
+        Memory known = newest();
+
+        JsonNode result = call(merge("이미 아는 음식 메모", "매운 음식을 좋아한다", other.id()));
+
+        assertThat(text(result)).startsWith("이미 같은 내용을 기억하고 있다.").contains("대신하지 못함: " + other.id() + ".");
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, other.id())).isNull();
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, known.id())).isNull();
+    }
+
+
+    @Test
+    @DisplayName("합치기 제안을 거절하면 옛 기억은 대신되지 않고 그대로 쓰인다")
+    void rejectedProposalKeepsOld() throws Exception {
+        Memory old = fact("거절 전 운동 메모", "주말에 등산한다");
+        call(merge("운동 정리", "주말에 등산하고 평일에 걷는다", old.id()));
+        Memory proposal = newest();
+
+        memoryService.reject(currentDad(), proposal.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isNull();
+        assertThat(instructions()).contains("거절 전 운동 메모");
+    }
+
+
+    @Test
+    @DisplayName("제안을 받아들이기 전에 옛 기억이 다른 합치기로 대체되면 제안 카드 목록에서 빠지고 받아들여도 덮지 않는다")
+    void proposalSkipsOldSupersededMeanwhile() throws Exception {
+        Memory old = fact("먼저 합쳐질 메모", "아침에 커피를 마신다");
+        call(merge("커피 정리 제안", "아침에 커피를 마시고 오후엔 차를 마신다", old.id()));
+        Memory proposal = newest();
+        askedInThisTurn();
+        call(merge("커피 정리", "아침에 커피를 마신다, 디카페인으로", old.id()));
+        Long direct = newest().id();
+
+        assertThat(captureService.capturesOf(currentDad(), conversation.id()))
+            .filteredOn(captured -> captured.memory().id().equals(proposal.id()))
+            .singleElement()
+            .extracting(CapturedMemory::replacedTitles)
+            .isEqualTo(List.of());
+        memoryService.accept(currentDad(), proposal.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isEqualTo(direct);
+        assertThat(captures.findFirstByMemoryIdAndKindOrderByIdDesc(proposal.id(), MemoryCaptureKind.PROPOSED).orElseThrow()
+            .replacedMemoryIds()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("합친 새 기억을 되돌리면 옛 기억이 다음 조립에 다시 든다")
     void undoRestoresReplaced() throws Exception {
         Memory old = fact("예전 직장 메모", "판교로 출근한다");

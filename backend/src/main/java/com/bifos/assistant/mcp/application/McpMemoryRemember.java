@@ -219,12 +219,16 @@ public class McpMemoryRemember {
                 "제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다."
                     + replacedText(remembered, "받아들이면 대신한다"),
                 false);
-            case ALREADY_KNOWN -> result("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.", false);
+            case ALREADY_KNOWN -> result(
+                "이미 같은 내용을 기억하고 있다. 새로 남기지 않았다." + replacedText(remembered, "대신했다"), false);
             case SUPERSEDED_BEFORE -> result(
-                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다.",
+                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다."
+                    + replacedText(remembered, "대신했다"),
                 true);
-            case ALREADY_PROPOSED -> result("같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다.", false);
-            case REJECTED_BEFORE -> result("사용자가 이 내용을 거절했다. 다시 남기지 않는다.", true);
+            case ALREADY_PROPOSED -> result(
+                "같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다." + replacedText(remembered, "받아들이면 대신한다"), false);
+            case REJECTED_BEFORE -> result(
+                "사용자가 이 내용을 거절했다. 다시 남기지 않는다." + replacedText(remembered, "대신했다"), true);
             case TOO_MANY -> result("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.", true);
             case COLLECTION_NOT_ALLOWED -> result("이 에이전트가 쓸 수 없는 collection 이다. collection 없이 다시 부른다.", true);
             case UPDATE_TARGET_NOT_FOUND -> result("고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.", true);
