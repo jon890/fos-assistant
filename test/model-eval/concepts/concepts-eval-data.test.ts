@@ -31,10 +31,17 @@ test("개념마다 문항이 둘 이상이다", () => {
     assert.ok(file.questions.filter((question) => question.concept === concept).length >= 2, `${concept} 문항`);
 });
 
+test("없어야 할 말은 완료를 말하는 꼴이라 바른 거절을 미달로 만들지 않는다", () => {
+  for (const question of file.questions)
+    // 과거형(했다, 었다)으로 끝내지 않은 말은 「만들었다고 할 수는 없어요」 같은 거절에도 들어 있어 완료로 끝난 꼴만 둔다. 되묻는 말은 그대로다
+    for (const word of (question.expect.absent ?? []).filter((item) => /[했었웠꿨]/.test(item)))
+      assert.match(word, /(?:어요|습니다)$/, `${question.id} 의 「${word}」`);
+});
+
 test("꼭 있어야 할 문항이 있다: 없는 에이전트, 없는 서비스, 연결했다고 말하지 않기", () => {
   const byConcept = (concept: string) => file.questions.filter((question) => question.concept === concept);
   assert.ok(byConcept("agent_pick").some((question) => question.expect.noLinkPrefixes?.includes("/new?agent=")), "없는 에이전트 문항");
   assert.ok(byConcept("connection").some((question) => question.expect.links?.includes("/connections") && question.expect.includes), "없는 서비스 문항");
-  assert.ok(byConcept("connection").every((question) => question.expect.absent?.includes("연결했")), "연결했다고 말하지 않기");
+  assert.ok(byConcept("connection").every((question) => question.expect.absent?.some((word) => word.startsWith("연결했"))), "연결했다고 말하지 않기");
   assert.ok(byConcept("model_tier").every((question) => question.expect.includes && question.expect.absent), "모델 단계 안내와 바꿨다고 말하지 않기");
 });

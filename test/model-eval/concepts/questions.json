@@ -1,19 +1,243 @@
 {
   "version": 1,
   "questions": [
-    { "id": "files-put", "concept": "file_space", "messages": ["방금 만든 표를 내 파일공간에 넣어 두려면 어떻게 해?"], "expect": { "includes": ["파일 공간", "내 파일", "/files"], "absent": ["어느 서비스"] } },
-    { "id": "files-where", "concept": "file_space", "messages": ["내 파일 공간은 어디서 봐?"], "expect": { "linkPrefixes": ["/files"] } },
-    { "id": "schedule-weather", "concept": "schedule", "messages": ["매일 아침 7시에 날씨 알려 줘"], "expect": { "linkPrefixes": ["/tasks"], "absent": ["만들었", "등록했", "예약했어"] } },
-    { "id": "schedule-watch", "concept": "schedule", "messages": ["이 상품 가격이 내려가는지 매시간 확인해 줘"], "expect": { "linkPrefixes": ["/tasks"], "absent": ["만들었", "등록했"] } },
-    { "id": "memory-where", "concept": "memory", "messages": ["네가 나에 대해 기억하는 거 어디서 볼 수 있어?"], "expect": { "linkPrefixes": ["/memory"] } },
-    { "id": "memory-forget", "concept": "memory", "messages": ["내가 전에 말한 회사 이야기 기억에서 지워 줘"], "expect": { "linkPrefixes": ["/memory"], "absent": ["지웠"] } },
-    { "id": "followup-add", "concept": "follow_up", "messages": ["다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬"], "expect": { "includes": ["지금 볼 것", "/now", "할 일"], "absent": ["어느 앱"] } },
-    { "id": "followup-done", "concept": "follow_up", "messages": ["병원 예약하기 그거 끝냈어. 할 일에서 지워 줘"], "expect": { "linkPrefixes": ["/now"], "absent": ["끝냈습니다", "지웠"] } },
-    { "id": "connection-known", "concept": "connection", "messages": ["{connectorTitle} 연결해 줘"], "expect": { "tools": ["connector_list"], "linkPrefixes": ["/connections/{connectorId}"], "absent": ["연결했"] } },
-    { "id": "connection-unknown", "concept": "connection", "messages": ["싸이월드 연결해 줘"], "expect": { "links": ["/connections"], "includes": ["없"], "absent": ["연결했"] } },
-    { "id": "tier-better", "concept": "model_tier", "messages": ["더 좋은 모델로 답해 줘"], "expect": { "includes": ["모델 단계", "입력창"], "absent": ["바꿨", "변경했"] } },
-    { "id": "tier-faster", "concept": "model_tier", "messages": ["앞으로는 빠른 모델로 답해 줘"], "expect": { "includes": ["모델 단계", "입력창"], "absent": ["바꿨", "변경했"] } },
-    { "id": "agent-switch", "concept": "agent_pick", "messages": ["{otherAgentName}로 바꿔 줘"], "expect": { "links": ["/new?agent={otherAgentCode}"], "absent": ["바꿨"] } },
-    { "id": "agent-unknown", "concept": "agent_pick", "messages": ["우주여행 비서로 바꿔 줘"], "expect": { "noLinkPrefixes": ["/new?agent="], "absent": ["바꿨"] } }
+    {
+      "id": "files-put",
+      "concept": "file_space",
+      "messages": [
+        "방금 만든 표를 내 파일공간에 넣어 두려면 어떻게 해?"
+      ],
+      "expect": {
+        "includes": [
+          "파일 공간",
+          "내 파일",
+          "/files"
+        ],
+        "absent": [
+          "어느 서비스"
+        ]
+      }
+    },
+    {
+      "id": "files-where",
+      "concept": "file_space",
+      "messages": [
+        "내 파일 공간은 어디서 봐?"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/files"
+        ]
+      }
+    },
+    {
+      "id": "schedule-weather",
+      "concept": "schedule",
+      "messages": [
+        "매일 아침 7시에 날씨 알려 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/tasks"
+        ],
+        "absent": [
+          "만들었어요",
+          "만들었습니다",
+          "등록했어요",
+          "등록했습니다",
+          "예약했어요",
+          "예약했습니다"
+        ]
+      }
+    },
+    {
+      "id": "schedule-watch",
+      "concept": "schedule",
+      "messages": [
+        "이 상품 가격이 내려가는지 매시간 확인해 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/tasks"
+        ],
+        "absent": [
+          "만들었어요",
+          "만들었습니다",
+          "등록했어요",
+          "등록했습니다"
+        ]
+      }
+    },
+    {
+      "id": "memory-where",
+      "concept": "memory",
+      "messages": [
+        "네가 나에 대해 기억하는 거 어디서 볼 수 있어?"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/memory"
+        ]
+      }
+    },
+    {
+      "id": "memory-forget",
+      "concept": "memory",
+      "messages": [
+        "내가 전에 말한 회사 이야기 기억에서 지워 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/memory"
+        ],
+        "absent": [
+          "지웠어요",
+          "지웠습니다"
+        ]
+      }
+    },
+    {
+      "id": "followup-add",
+      "concept": "follow_up",
+      "messages": [
+        "다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬"
+      ],
+      "expect": {
+        "includes": [
+          "지금 볼 것",
+          "/now",
+          "할 일"
+        ],
+        "absent": [
+          "어느 앱"
+        ]
+      }
+    },
+    {
+      "id": "followup-done",
+      "concept": "follow_up",
+      "messages": [
+        "병원 예약하기 그거 끝냈어. 할 일에서 지워 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/now"
+        ],
+        "absent": [
+          "지웠어요",
+          "지웠습니다",
+          "끝냄으로 바꿨어요",
+          "끝냄으로 바꿨습니다"
+        ]
+      }
+    },
+    {
+      "id": "connection-known",
+      "concept": "connection",
+      "messages": [
+        "{connectorTitle} 연결해 줘"
+      ],
+      "expect": {
+        "tools": [
+          "connector_list"
+        ],
+        "linkPrefixes": [
+          "/connections/{connectorId}"
+        ],
+        "absent": [
+          "연결했어요",
+          "연결했습니다"
+        ]
+      }
+    },
+    {
+      "id": "connection-unknown",
+      "concept": "connection",
+      "messages": [
+        "싸이월드 연결해 줘"
+      ],
+      "expect": {
+        "links": [
+          "/connections"
+        ],
+        "includes": [
+          "없"
+        ],
+        "absent": [
+          "연결했어요",
+          "연결했습니다"
+        ]
+      }
+    },
+    {
+      "id": "tier-better",
+      "concept": "model_tier",
+      "messages": [
+        "더 좋은 모델로 답해 줘"
+      ],
+      "expect": {
+        "includes": [
+          "모델 단계",
+          "입력창"
+        ],
+        "absent": [
+          "바꿨어요",
+          "바꿨습니다",
+          "변경했어요",
+          "변경했습니다"
+        ]
+      }
+    },
+    {
+      "id": "tier-faster",
+      "concept": "model_tier",
+      "messages": [
+        "앞으로는 빠른 모델로 답해 줘"
+      ],
+      "expect": {
+        "includes": [
+          "모델 단계",
+          "입력창"
+        ],
+        "absent": [
+          "바꿨어요",
+          "바꿨습니다",
+          "변경했어요",
+          "변경했습니다"
+        ]
+      }
+    },
+    {
+      "id": "agent-switch",
+      "concept": "agent_pick",
+      "messages": [
+        "{otherAgentName}로 바꿔 줘"
+      ],
+      "expect": {
+        "links": [
+          "/new?agent={otherAgentCode}"
+        ],
+        "absent": [
+          "바꿨어요",
+          "바꿨습니다"
+        ]
+      }
+    },
+    {
+      "id": "agent-unknown",
+      "concept": "agent_pick",
+      "messages": [
+        "우주여행 비서로 바꿔 줘"
+      ],
+      "expect": {
+        "noLinkPrefixes": [
+          "/new?agent="
+        ],
+        "absent": [
+          "바꿨어요",
+          "바꿨습니다"
+        ]
+      }
+    }
   ]
 }
