@@ -7,7 +7,6 @@ import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthApp;
-import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthToken;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.Outcome;
@@ -41,10 +40,8 @@ public class ConnectorOAuthConnections implements ConnectionOAuth {
     @Override
     public Optional<ConnectorCallError> refreshForCheck(long connectionId) {
         return switch (tokens.refresh(connectionId, null).outcome()) {
-            case OK -> {
-                alerts.recovered(connectionId);
-                yield Optional.empty();
-            }
+            // 다시 연결 필요였으면 갱신이 이미 표시를 지우고 끊김 알림을 읽음으로 바꿨다.
+            case OK -> Optional.empty();
             // OAuth 파일이 없다. 막지 않고 확인 도구의 실패로 준비 안 됨을 남겨 다시 연결하게 한다.
             case MISSING -> Optional.empty();
             // 갱신이 이미 다시 연결 필요와 알림을 남겼다.
@@ -74,8 +71,9 @@ public class ConnectorOAuthConnections implements ConnectionOAuth {
             if (app == null || (declared.appScope() == AppScope.SHARED && sharedByAnother(connection))) {
                 return failed;
             }
-            String accessToken = tokens.current(connection.id()).map(ConnectorOAuthToken::accessToken).orElse(null);
-            Outcome outcome = oauth.revoke(connection.vault(), connection.connectorId(), app.credentials(), accessToken);
+            // 메모리의 access token 은 넘기지 않는다. 그 사이 갱신으로 무효가 됐거나 만료됐을 수 있다. 대시보드가 보관 파일 잠금 안에서
+            // 최신 refresh token 으로 새로 받아 취소한다.
+            Outcome outcome = oauth.revoke(connection.vault(), connection.connectorId(), app.credentials(), null);
             if (outcome != Outcome.OK) {
                 log.warn("connector OAuth revoke did not succeed connection={} outcome={}", connection.id(), outcome);
                 return failed;

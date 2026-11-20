@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -114,7 +115,7 @@ class ConnectorOAuthRevokeTest {
 
 
     @Test
-    @DisplayName("해제는 보관 파일을 지우기 전에 메모리의 토큰과 함께 허락을 취소하고 앱 설치 화면 주소를 답한다")
+    @DisplayName("해제는 보관 파일을 지우기 전에 허락을 취소하고 앱 설치 화면 주소를 답한다. 메모리에 토큰이 있어도 넘기지 않아 대시보드가 새로 받는다")
     void revokesBeforeDeletingTheVault() {
         ConnectorConnection connection = connection(PLUGIN, new ConnectionAuth("github", false));
         when(oauth.refresh(eq(connection.vault()), eq(PLUGIN), any()))
@@ -127,7 +128,7 @@ class ConnectorOAuthRevokeTest {
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(disconnected.oauthRevoke()).isEqualTo(new ConnectionOAuthRevoke(Status.REVOKED, null, INSTALL));
         InOrder order = inOrder(oauth, hermes);
-        order.verify(oauth).revoke(eq(connection.vault()), eq(PLUGIN), any(), eq(ACCESS_TOKEN));
+        order.verify(oauth).revoke(eq(connection.vault()), eq(PLUGIN), any(), isNull());
         order.verify(hermes).deleteVault(connection.vault());
         assertThat(tokens.current(connection.id())).isEmpty();
     }
