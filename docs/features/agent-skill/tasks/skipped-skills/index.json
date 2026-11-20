@@ -1,0 +1,35 @@
+{
+  "name": "skipped-skills",
+  "description": "설치하지 못한 에이전트용 스킬을 바인딩에 남기고 에이전트 연결 절에 까닭을 안내한다",
+  "pr_scope": "Control Plane 이 붙이기 응답의 skipped_skills 를 바인딩에 저장해 연결 목록 응답에 내고, 웹 연결 절이 REQ9 문구로 그린다.",
+  "deferred": [],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/agent-skill/spec.md",
+  "design": "docs/features/agent-skill/design.md",
+  "verification_plan": "phase-02.md",
+  "requirements": [
+    "REQ8",
+    "REQ9"
+  ],
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ8"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ9"
+      ]
+    }
+  ]
+}
