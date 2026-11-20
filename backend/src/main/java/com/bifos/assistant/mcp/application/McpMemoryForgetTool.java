@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.port.MemoryForgetRequests;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +29,24 @@ public class McpMemoryForgetTool {
     public Map<String, Object> forget(McpCaller caller, long memoryId) {
         try {
             Map<String, Object> body = requests.request(caller.user(), caller.originExecution().id(), memoryId);
-            return McpToolService.result(
-                JSON.writeValueAsString(body), !MemoryForgetRequests.REQUESTED.equals(body.get("status")));
+            if (MemoryForgetRequests.REQUESTED.equals(body.get("status"))) {
+                return McpToolService.success(JSON.writeValueAsString(body));
+            }
+            return McpToolService.jsonFailure(body, nextFor(String.valueOf(body.get("status"))));
         } catch (RuntimeException ex) {
             log.warn("memory forget tool failed executionId={} kind={}", caller.executionId(), ex.getClass().getSimpleName());
-            return McpToolService.result(JSON.writeValueAsString(Map.of("status", "unavailable", "message", UNAVAILABLE)), true);
+            return McpToolService.jsonFailure(Map.of("status", "unavailable", "message", UNAVAILABLE), nextFor("unavailable"));
         }
+    }
+
+
+    /** 기억 지우기를 청하지 못한 까닭마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(String status) {
+        return switch (status) {
+            case "not_found" -> ToolFailureText.alternative(status, "memory_search 로 지울 기억의 번호를 찾아 다시 부르고, 없으면 사용자에게 되묻는다");
+            case "unavailable" -> ToolFailureText.alternative(status, "다른 방법이 없으니 /memory 화면에서 지우라고 안내하고 잠시 뒤 다시 해 달라고 알린다");
+            default -> ToolFailureText.askUser(status);
+        };
     }
 
 

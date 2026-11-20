@@ -299,7 +299,7 @@ class McpMemorySearchToolTest {
     private void assertUnavailable(Long id) throws Exception {
         JsonNode response = call("memory_read", arguments().put("id", id));
         assertThat(response.path("result").path("isError").asBoolean()).isTrue();
-        assertThat(text(response)).isEqualTo("Memory 항목을 읽을 수 없습니다.");
+        assertThat(text(response)).isEqualTo("Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다");
     }
 
 

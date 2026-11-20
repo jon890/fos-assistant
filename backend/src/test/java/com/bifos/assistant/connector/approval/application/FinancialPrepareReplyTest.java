@@ -20,14 +20,14 @@ class FinancialPrepareReplyTest {
         for (FinancialPrepareStage stage : FinancialPrepareStage.values()) {
             String message = ConnectorFinancialIntake.rejectedMessage(new FinancialPrepareRejected(stage));
             if (DISCLOSED.contains(stage)) {
-                assertThat(message).as(stage.code()).isNotEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+                assertThat(message).as(stage.code()).isNotEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
             } else {
-                assertThat(message).as(stage.code()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+                assertThat(message).as(stage.code()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
             }
         }
         assertThat(ConnectorFinancialIntake.rejectedMessage(new FinancialPrepareRejected(FinancialPrepareStage.CONFLICT_CHECK)))
             .doesNotContain("실행 중");
         assertThat(ConnectorFinancialIntake.rejectedMessage(new IllegalStateException("x")))
-            .isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+            .isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
     }
 }

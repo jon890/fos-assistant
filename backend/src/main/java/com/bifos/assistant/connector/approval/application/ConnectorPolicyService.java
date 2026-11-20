@@ -38,6 +38,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,23 +71,23 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Service
 public class ConnectorPolicyService {
-    static final String CONTEXT_MESSAGE = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
+    static final ToolFailureText CONTEXT_MESSAGE = ToolFailureText.askUser("이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
 
-    private static final String POLICY_UNAVAILABLE_MESSAGE = "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
-    private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 외부 서비스 연결에서 연결을 확인하라고 알린다.";
+    private static final ToolFailureText POLICY_UNAVAILABLE_MESSAGE = ToolFailureText.alternative("이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다.", "다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다");
+    private static final ToolFailureText NOT_READY_MESSAGE = ToolFailureText.askUser("이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 외부 서비스 연결에서 연결을 확인하라고 알린다.");
     /**
      * 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 대개 반영 예정 시각이 지나면 Control Plane 이 스스로
      * 확인해 풀린다(ADR-20261007 / connector-live-reload). 재시작이 필요한 바인딩은 관리자 반영 완료가 푼다.
      */
-    static final String BINDING_PENDING_MESSAGE = "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
+    static final ToolFailureText BINDING_PENDING_MESSAGE = ToolFailureText.askUser("이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.");
     /** 재시작이 필요한 바인딩이다. 저절로 풀리지 않고 관리자 반영 완료가 있어야 풀린다. */
-    static final String BINDING_RESTART_MESSAGE = "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
+    static final ToolFailureText BINDING_RESTART_MESSAGE = ToolFailureText.askUser("이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.");
 
-    private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
-    private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
-    private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
-    private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
-    private static final String ATTENDED_ONLY_MESSAGE = "사람이 연 대화에서만 쓸 수 있는 도구입니다. 예약 작업과 먼저 살펴보기에서는 부르지 않습니다.";
+    private static final ToolFailureText UNDECLARED_MESSAGE = ToolFailureText.askUser("이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.");
+    private static final ToolFailureText RISK_NOT_OPEN_MESSAGE = ToolFailureText.askUser("이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
+    private static final ToolFailureText ARGS_TOO_LARGE_MESSAGE = ToolFailureText.alternative("인자가 너무 커서 실행하지 않았다.", "인자를 나눠서 다시 부른다");
+    private static final ToolFailureText READ_ONLY_RUN_MESSAGE = ToolFailureText.askUser("먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.");
+    private static final ToolFailureText ATTENDED_ONLY_MESSAGE = ToolFailureText.askUser("사람이 연 대화에서만 쓸 수 있는 도구입니다. 예약 작업과 먼저 살펴보기에서는 부르지 않습니다.");
 
     private final ConnectorActionRepository actions;
     private final ConnectorBindingRepository bindings;
@@ -329,7 +330,7 @@ public class ConnectorPolicyService {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
             }
             if (bindingPending && saved.denyReason() == ActionDenyReason.NOT_READY) {
-                return new ConnectorPolicyAnswer(false, bindingPendingMessage(binding), null);
+                return new ConnectorPolicyAnswer(false, bindingPendingMessage(binding).text(), null);
             }
             // 결제 넘기기 맥락을 선언한 도구는 허용할 때 그 대화의 마지막 결제 넘기기를 싣는다. 다시 오기(replayed)는 싣지 않는다.
             return paymentContexts.attach(answer(saved), declared, origin, connection.connectorId());
@@ -394,7 +395,7 @@ public class ConnectorPolicyService {
         }
         if (recorded.passed() && !stillReady(recorded.agentId(), recorded.connectorId())) {
             log.warn("connector policy replay blocked: 허용한 줄의 연결이 지금은 READY 가 아니다");
-            return new ConnectorPolicyAnswer(false, NOT_READY_MESSAGE, null);
+            return new ConnectorPolicyAnswer(false, NOT_READY_MESSAGE.text(), null);
         }
         return answer(recorded);
     }
@@ -454,7 +455,7 @@ public class ConnectorPolicyService {
 
     static ConnectorPolicyAnswer blockedWithoutRecord(String reason) {
         log.warn("커넥터 도구 호출을 줄 없이 막았다 reason={}", reason);
-        return new ConnectorPolicyAnswer(false, CONTEXT_MESSAGE, null);
+        return new ConnectorPolicyAnswer(false, CONTEXT_MESSAGE.text(), null);
     }
 
 
@@ -466,11 +467,11 @@ public class ConnectorPolicyService {
         if (action.passed()) {
             return new ConnectorPolicyAnswer(true, "", null);
         }
-        return new ConnectorPolicyAnswer(false, message(action.denyReason()), null);
+        return new ConnectorPolicyAnswer(false, message(action.denyReason()).text(), null);
     }
 
 
-    private static String message(ActionDenyReason reason) {
+    private static ToolFailureText message(ActionDenyReason reason) {
         if (reason == null) {
             return CONTEXT_MESSAGE;
         }
@@ -487,7 +488,7 @@ public class ConnectorPolicyService {
 
 
     /** 재시작 대기는 관리자를, 반영 예정이 남았으면 잠시 뒤를 기다린다. 예정 없이 남은 바인딩은 저절로 풀리지 않아 연결 확인을 안내한다. */
-    private static String bindingPendingMessage(ConnectorBinding binding) {
+    private static ToolFailureText bindingPendingMessage(ConnectorBinding binding) {
         if (binding.restartRequired()) {
             return BINDING_RESTART_MESSAGE;
         }

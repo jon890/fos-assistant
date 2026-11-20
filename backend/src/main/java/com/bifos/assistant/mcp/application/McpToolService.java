@@ -26,6 +26,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.usage.execution.application.dto.ContextSourceRef;
 import com.bifos.assistant.usage.execution.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
@@ -51,7 +52,9 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class McpToolService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    static final ToolFailureText INVALID_CONTEXT = ToolFailureText.askUser("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+    /** 서버 쪽 실패의 다음 방법이다. 같은 호출을 다시 부르지 않는다(docs/features/tool-fallback/spec.md 의 DECISION10). */
+    static final String SERVER_FAILURE_NEXT = "다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다";
     private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(
         "this conversation does not exist",
         "could not store artifact",
@@ -70,11 +73,13 @@ public class McpToolService {
         "artifact source URL is invalid",
         "artifact source host is not allowed");
     private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
-    private static final String NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.";
+    private static final ToolFailureText NOT_ALLOWED_IN_CHECK = ToolFailureText.askUser("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
     /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
     public static final int TASK_MAX_CHARS = 8000;
 
-    private static final String DUE_AT_FORMAT = "due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.";
+    private static final ToolFailureText DUE_AT_FORMAT = ToolFailureText.alternative(
+        "due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.", "형식에 맞게 고쳐 다시 부른다");
+    private static final ToolFailureText ARTIFACT_FAILED = ToolFailureText.alternative("결과물을 저장할 수 없습니다.", SERVER_FAILURE_NEXT);
 
     private final MemoryService memories;
     private final QueryEmbedder queryEmbedder;
@@ -104,13 +109,13 @@ public class McpToolService {
      * <p>서명 오류, profile 불일치, 부모 없음, 부모 둘 이상, 사용자 없음을 모두 이 결과 하나로 답한다(ADR-032).
      */
     public Map<String, Object> invalidContext() {
-        return result(INVALID_CONTEXT, true);
+        return failure(INVALID_CONTEXT);
     }
 
 
     /** 먼저 살펴보기 트리에서 받지 않는 도구를 부른 호출의 도구 결과다. 도구는 돌리지 않는다(ADR-080). */
     public Map<String, Object> notAllowedInCheck() {
-        return result(NOT_ALLOWED_IN_CHECK, true);
+        return failure(NOT_ALLOWED_IN_CHECK);
     }
 
 
@@ -124,10 +129,10 @@ public class McpToolService {
             // 본문을 낸 호출만 남긴다. 「참고한 기억」 이 이 줄을 읽는다
             contextSourceWriter.append(
                 caller.executionId(), new ContextSourceRef("MEMORY_READ", "memory:" + id, "INLINE", "UNKNOWN"));
-            return result(content, false);
+            return success(content);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
-                return result("Memory 항목을 읽을 수 없습니다.", true);
+                return failure(ToolFailureText.alternative("Memory 항목을 읽을 수 없습니다.", "memory_search 로 다른 항목을 찾는다"));
             }
             throw ex;
         }
@@ -149,7 +154,7 @@ public class McpToolService {
             caller.executionId(),
             page.items().size(),
             page.selector());
-        return result(ExternalData.wrap(JSON.writeValueAsString(data)), false);
+        return success(ExternalData.wrap(JSON.writeValueAsString(data)));
     }
 
 
@@ -157,19 +162,21 @@ public class McpToolService {
         CurrentUser user = caller.user();
         try {
             ArtifactWriteResult written = artifacts.write(user, request);
-            return result(toJson(written), false);
+            return success(toJson(written));
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 if (ex instanceof ArtifactSourceRejectedException rejected) {
                     log.warn(
                         "artifact source rejected userId={} executionId={} errorCode={} reason={}",
                         user.id(), caller.executionId(), ex.code(), rejected.reason());
-                    String message = "allowed_host".equals(rejected.reason())
-                        ? "source_url의 호스트가 허용되지 않았습니다. 허용된 이미지 호스트의 주소를 사용하세요. "
-                        : "source_url 주소 형식이 올바르지 않습니다. HTTPS 이미지 주소인지 확인하세요. ";
-                    return result(
-                        message + "제공받은 주소는 글자 그대로 전달하세요.",
-                        true);
+                    // 막힌 호스트를 다른 길로 열지 않고 허용된 다른 호스트를 쓰게 한다(docs/features/tool-fallback/spec.md 의 DECISION9).
+                    return failure("allowed_host".equals(rejected.reason())
+                        ? ToolFailureText.alternative(
+                            "source_url의 호스트가 허용되지 않았습니다. 제공받은 주소는 글자 그대로 전달하세요.",
+                            "허용된 이미지 호스트의 주소로 다시 부른다")
+                        : ToolFailureText.alternative(
+                            "source_url 주소 형식이 올바르지 않습니다. 제공받은 주소는 글자 그대로 전달하세요.",
+                            "HTTPS 이미지 주소인지 확인하고 주소를 고쳐 다시 부른다"));
                 }
                 throw ex;
             }
@@ -180,7 +187,7 @@ public class McpToolService {
                 ex.getClass().getSimpleName(),
                 ex.code(),
                 safeArtifactFailureMessage(ex));
-            return result("결과물을 저장할 수 없습니다.", true);
+            return failure(ARTIFACT_FAILED);
         } catch (RuntimeException ex) {
             log.warn(
                 "artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
@@ -189,7 +196,7 @@ public class McpToolService {
                 ex.getClass().getSimpleName(),
                 ErrorCode.INTERNAL_ERROR,
                 "unexpected artifact write failure");
-            return result("결과물을 저장할 수 없습니다.", true);
+            return failure(ARTIFACT_FAILED);
         }
     }
 
@@ -205,7 +212,7 @@ public class McpToolService {
         List<Map<String, Object>> listed = listable.stream()
             .map(agent -> agentSummary(agent, capabilities.getOrDefault(agent.id(), AgentCapabilities.NONE)))
             .toList();
-        return result(JSON.writeValueAsString(listed), false);
+        return success(JSON.writeValueAsString(listed));
     }
 
 
@@ -224,9 +231,9 @@ public class McpToolService {
             .status(caller.user(), caller.originExecution(), executionId, wait)
             .map(execution -> {
                 markDeliveredIfFinished(execution);
-                return result(JSON.writeValueAsString(statusOf(execution)), false);
+                return success(JSON.writeValueAsString(statusOf(execution)));
             })
-            .orElseGet(() -> result(JSON.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+            .orElseGet(() -> jsonFailure(failureBody("NOT_FOUND", EXECUTION_NOT_FOUND), ToolFailureText.askUser(EXECUTION_NOT_FOUND)));
     }
 
 
@@ -247,9 +254,9 @@ public class McpToolService {
                 if (execution.status() == ExecutionStatus.RUNNING && stop.stopRequested()) {
                     status.put("stop_requested", true);
                 }
-                return result(JSON.writeValueAsString(status), false);
+                return success(JSON.writeValueAsString(status));
             })
-            .orElseGet(() -> result(JSON.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+            .orElseGet(() -> jsonFailure(failureBody("NOT_FOUND", EXECUTION_NOT_FOUND), ToolFailureText.askUser(EXECUTION_NOT_FOUND)));
     }
 
 
@@ -266,12 +273,12 @@ public class McpToolService {
         DelegationResult delegated = delegations.delegate(caller.user(), origin, key, agentCode, task);
         if (!delegated.accepted()) {
             Failure failure = delegated.failure();
-            return result(JSON.writeValueAsString(failure(failure.name(), delegationFailureMessage(failure))), true);
+            return jsonFailure(failureBody(failure.name(), delegationFailureMessage(failure)), delegationFailure(failure));
         }
         Map<String, Object> started = new LinkedHashMap<>();
         started.put("execution_id", delegated.executionId());
         started.put("status", delegated.status().name());
-        return result(JSON.writeValueAsString(started), false);
+        return success(JSON.writeValueAsString(started));
     }
 
 
@@ -288,32 +295,33 @@ public class McpToolService {
         AgentExecution origin = caller.originExecution();
         Long conversationId = origin.conversationId();
         if (conversationId == null) {
-            return result("대화 밖의 실행에서는 할 일을 제안할 수 없다.", true);
+            return failure(ToolFailureText.askUser("대화 밖의 실행에서는 할 일을 제안할 수 없다."));
         }
         String stripped = title.strip();
         int length = stripped.codePointCount(0, stripped.length());
         if (length < 1 || length > FollowUpService.TITLE_MAX) {
-            return result("title 은 1자부터 200자까지다.", true);
+            return failure(ToolFailureText.alternative("title 은 1자부터 200자까지다.", "길이에 맞게 고쳐 다시 부른다"));
         }
         Instant due = null;
         if (dueAt != null) {
             Optional<Instant> parsed = FollowUpDueAt.parseLenient(dueAt);
             if (parsed.isEmpty()) {
-                return result(DUE_AT_FORMAT, true);
+                return failure(DUE_AT_FORMAT);
             }
             due = parsed.get();
         }
         boolean direct = requested && followUpTools.userDirected(caller);
         FollowUpProposalOutcome outcome = followUpTools.save(caller, stripped, due, waiting, direct);
         return switch (outcome) {
-            case OPENED -> result("할 일로 적었다. 바로 챙긴다. 답에 /now 링크를 붙인다.", false);
-            case CREATED -> result("할 일로 제안했다. 사용자가 지금 화면에서 받아들이면 챙긴다.", false);
-            case DUPLICATE -> result("같은 할 일이 이미 있다. 새로 만들지 않았다.", false);
-            case DECLINED_BEFORE -> result("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다.", true);
-            case TOO_MANY_PROPOSALS -> result("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.", true);
-            case TOO_MANY_IN_RUN -> result(direct
+            case OPENED -> success("할 일로 적었다. 바로 챙긴다. 답에 /now 링크를 붙인다.");
+            case CREATED -> success("할 일로 제안했다. 사용자가 지금 화면에서 받아들이면 챙긴다.");
+            case DUPLICATE -> success("같은 할 일이 이미 있다. 새로 만들지 않았다.");
+            case DECLINED_BEFORE -> failure(ToolFailureText.askUser("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다."));
+            case TOO_MANY_PROPOSALS -> failure(
+                ToolFailureText.askUser("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다."));
+            case TOO_MANY_IN_RUN -> failure(ToolFailureText.askUser(direct
                 ? "이번 답에서 이미 할 일을 많이 적었다. 더 적지 않았다. 남은 것은 사용자에게 알린다."
-                : "이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.", true);
+                : "이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다."));
         };
     }
 
@@ -332,6 +340,20 @@ public class McpToolService {
         List<Long> replaces) {
         return memoryRemember.remember(
             caller, title, content, summary, evidence, memoryId, collection, sensitive, archivable, replaces);
+    }
+
+
+    /** 위임 실패마다 모델이 해 볼 다음 방법이다. 글의 앞부분은 {@link #delegationFailureMessage} 다. */
+    private static ToolFailureText delegationFailure(Failure failure) {
+        String message = delegationFailureMessage(failure);
+        return switch (failure) {
+            case AGENT_UNAVAILABLE, AGENT_DISABLED -> ToolFailureText.alternative(message, "맡기지 않고 직접 처리하거나 다른 에이전트에 맡긴다");
+            case DEPTH_EXCEEDED, CHECK_LIMIT -> ToolFailureText.alternative(message, "맡기지 않고 직접 처리한다");
+            case TOO_MANY_CHILDREN -> ToolFailureText.alternative(message, "맡긴 일이 끝나기를 기다리거나 멈춘 뒤 다시 맡긴다");
+            case BUSY -> ToolFailureText.alternative(message, "직접 처리하거나 앞의 작업이 끝난 뒤 다시 맡긴다");
+            case SUBMIT_FAILED -> ToolFailureText.alternative(message, SERVER_FAILURE_NEXT);
+            case CHECK_TARGET -> ToolFailureText.alternative(message, "연결한 서비스의 도구를 직접 부르거나 연결한 서비스의 에이전트에 맡긴다");
+        };
     }
 
 
@@ -403,7 +425,7 @@ public class McpToolService {
     }
 
 
-    private static Map<String, Object> failure(String code, String message) {
+    private static Map<String, Object> failureBody(String code, String message) {
         Map<String, Object> failure = new LinkedHashMap<>();
         failure.put("code", code);
         failure.put("message", message);
@@ -422,7 +444,33 @@ public class McpToolService {
     }
 
 
-    static Map<String, Object> result(String text, boolean error) {
+    static Map<String, Object> success(String text) {
+        return toolResult(text, false);
+    }
+
+
+    /** 끝 줄이 있는 실패 글만 받는다(docs/features/tool-fallback/spec.md 의 REQ3). */
+    static Map<String, Object> failure(ToolFailureText failure) {
+        return toolResult(failure.text(), true);
+    }
+
+
+    /** 실패를 JSON 글로 돌려주는 도구의 결과다. 글 끝에 줄을 붙이면 JSON 이 깨지므로 같은 끝 줄을 {@code next} 칸에 넣는다. */
+    static Map<String, Object> jsonFailure(Map<String, ?> fields, ToolFailureText next) {
+        return jsonFailure(fields, next, false);
+    }
+
+
+    /** @param external 외부 서비스에서 온 글이 들어 있어 {@code <external-data>} 로 감싸야 하는가 */
+    static Map<String, Object> jsonFailure(Map<String, ?> fields, ToolFailureText next, boolean external) {
+        Map<String, Object> body = new LinkedHashMap<>(fields);
+        body.put("next", next.endLine());
+        String json = JSON.writeValueAsString(body);
+        return toolResult(external ? ExternalData.wrap(json) : json, true);
+    }
+
+
+    private static Map<String, Object> toolResult(String text, boolean error) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("content", List.of(Map.of("type", "text", "text", text)));
         result.put("isError", error);

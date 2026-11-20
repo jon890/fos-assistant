@@ -22,6 +22,7 @@ import urllib.request
 
 from .context import _read_token, build_context, logger
 from .tool_guard import guard_url
+from .next_step import alternative, ask_user
 
 TOOL = "image_generate"
 SOURCE_PATH = "image-source"
@@ -48,28 +49,37 @@ MAX_CALLS = 256
 MAX_ECHO_CHARS = 80
 EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
-NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
-                 "파일 경로와 맨 주소는 쓰지 않는다")
-TOO_MANY = "한 번에 쓸 수 있는 사진은 %d장까지다. 사용자에게 줄여 달라고 한다" % MAX_SOURCES
-UNKNOWN = "이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"
-GONE = "지웠거나 보관 기간이 지나 쓸 수 없다"
+# 문제 줄마다 끝 줄(`next_step.py`)이 붙는다. 글 전체는 마지막 문제의 끝 줄로 끝난다.
+# 참고 사진을 쓰지 못하면 설명만으로 비슷하게 그려 넣지 않고 먼저 알린다(fos-assistant 스펙 tool-fallback REQ7).
+NO_DRAW = "설명만으로 비슷하게 그려 넣지 말고, "
+ASK_PHOTO = "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"
+NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
+                            "파일 경로와 맨 주소는 쓰지 않는다",
+                            "사용자가 이 대화에 보낸 주소면 link: 로 고쳐 다시 부른다. 비서가 찾은 주소처럼 넘길 수 없으면 " + NO_DRAW
+                            + "그 사진을 넘길 수 없다는 것과 " + ASK_PHOTO)
+# 어느 사진을 뺄지는 사용자가 정한다(fos-assistant 스펙 generated-image DECISION25, DECISION32).
+TOO_MANY = ask_user("한 번에 쓸 수 있는 사진은 %d장까지다. 어느 사진을 뺄지 사용자에게 묻는다" % MAX_SOURCES)
+UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다",
+                      "이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다. 없으면 " + NO_DRAW
+                      + "그 사진을 쓸 수 없다는 것과 " + ASK_PHOTO)
+GONE = ask_user("지웠거나 보관 기간이 지나 쓸 수 없다")
 # 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
-GONE_GENERATED = (GONE + ". 같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
-                  "앞 그림을 참고하지 못했다고 답에 적는다")
+GONE_GENERATED = alternative("지웠거나 보관 기간이 지나 쓸 수 없다",
+                             "같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
+                             "앞 그림을 참고하지 못했다고 답에 적는다. 그런 장면이 아니면 사용자에게 바로 알린다")
 LINK_REASONS = {
-    "IMAGE_SOURCE_LINK_BLOCKED": "열 수 없는 주소다",
-    "IMAGE_SOURCE_LINK_NO_IMAGE": "이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
-    "IMAGE_SOURCE_LINK_TOO_LARGE": "사진이 너무 크다",
-    "IMAGE_SOURCE_LINK_FAILED": "링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다",
+    "IMAGE_SOURCE_LINK_BLOCKED": ask_user("열 수 없는 주소다. 설명만으로 비슷하게 그려 넣지 않는다"),
+    "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", NO_DRAW + "그 사진을 받지 못한 것과 " + ASK_PHOTO),
+    "IMAGE_SOURCE_LINK_TOO_LARGE": alternative("사진이 너무 크다", NO_DRAW + "더 작은 사진을 올려 달라고 먼저 알린다"),
+    "IMAGE_SOURCE_LINK_FAILED": alternative("링크를 열지 못했다. 쇼핑몰이 막았을 수 있다", NO_DRAW + "그 사진을 받지 못한 것과 " + ASK_PHOTO),
 }
-FAILED = "사진을 받지 못했다. 잠시 뒤 다시 부탁하라고 안내한다"
-# 링크를 쓰지 못했을 때 덧붙인다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
+FAILED = alternative("사진을 받지 못했다", NO_DRAW + "잠시 뒤 다시 해 달라고 알린다")
+# 링크를 쓰지 못했을 때 그 줄의 끝 줄 앞에 넣는다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
 LINK_NEXT_SCENE = ("같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
-                   "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다")
-OLD_SERVER = "이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다"
-NO_CONTEXT = "이 호출에서는 사진을 받을 수 없다. 대화에서 직접 image_generate 를 부른다"
-HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없다."
-TAIL = "그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."
+                   "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다. 그런 장면이 아니면 아래 줄을 따른다")
+OLD_SERVER = ask_user("이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다")
+NO_CONTEXT = alternative("이 호출에서는 사진을 받을 수 없다", "대화에서 직접 image_generate 를 부른다")
+HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없어 그림을 만들지 않았다. 줄마다의 다음 방법이나 바로 알림을 따른다."
 
 _copies: dict = {}
 # 호출마다 받은 링크 주소다. 사본과 같은 키로 기억하고 함께 잊는다.
@@ -84,9 +94,16 @@ def wants_sources(args) -> bool:
     return any(args.get(key) not in (None, "", []) for key in ("image_url", "reference_image_urls"))
 
 
+def with_next_scene(problem: str) -> str:
+    """링크 문제 글의 끝 줄 앞에 다음 장면 안내를 넣는다. 글은 여전히 끝 줄로 끝난다."""
+    body, end = problem.rsplit("\n", 1)
+    return body + ". " + LINK_NEXT_SCENE + "\n" + end
+
+
 def message(problems) -> str:
     """막을 때 모델이 받는 글이다. 문제마다 한 줄이다."""
-    return "\n".join([HEAD, *("- " + line for line in problems), TAIL])
+    # 끝 줄이 붙어 여러 줄인 문제 글은 둘째 줄부터 들여 쓴다
+    return "\n".join([HEAD, *("- " + line.replace("\n", "\n  ") for line in problems)])
 
 
 def _echo(value) -> str:
@@ -287,7 +304,7 @@ def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written, link
         if problem == OLD_SERVER:
             return OLD_SERVER
         if problem:
-            problems.append(key + ": " + problem + (". " + LINK_NEXT_SCENE if key.startswith(LINK_PREFIX) else ""))
+            problems.append(key + ": " + (with_next_scene(problem) if key.startswith(LINK_PREFIX) else problem))
             copies[key] = None
             continue
         path = folder / (secrets.token_hex(16) + EXTENSIONS[content_type])

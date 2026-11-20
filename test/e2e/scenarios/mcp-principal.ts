@@ -10,7 +10,7 @@ import { MEMORY_READ_PROBE } from "../fake-hermes.ts";
 export const MCP_PRINCIPAL_PROFILE = "mcp-shared-group";
 
 const AGENT_CODE = "mcp-shared";
-const NOT_READABLE = "Memory 항목을 읽을 수 없습니다.";
+const NOT_READABLE = "Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다";
 
 type MemoryView = { id: number };
 type Turn = { conversationId: string; executionId: number; assistantText: string };
