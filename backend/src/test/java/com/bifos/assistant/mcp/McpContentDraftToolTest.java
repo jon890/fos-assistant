@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftImages;
 import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.MysqlCase;
@@ -248,7 +249,7 @@ class McpContentDraftToolTest {
             jdbc.update("update agent set enabled=false where id=?", origin.agentId());
             return result;
         });
-        var tools = new McpContentDraftTools(fake, new ContentDraftInputReader(), guard, json);
+        var tools = new McpContentDraftTools(fake, mock(ContentDraftImages.class), new ContentDraftInputReader(), guard, json);
         var result = json.valueToTree(tools.write(caller, UUID.randomUUID(), null, null, body(MARKER)));
         assertThat(result.toString()).contains("호출 맥락을 확인할 수 없습니다").doesNotContain(MARKER, "currentRevision");
         assertThat(drafts.count()).isEqualTo(1);

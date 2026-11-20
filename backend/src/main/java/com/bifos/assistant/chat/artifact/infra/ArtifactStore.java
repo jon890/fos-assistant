@@ -58,33 +58,17 @@ public class ArtifactStore {
 
     @Autowired
     public ArtifactStore(ArtifactProperties properties) {
-        this(properties, false, ArtifactFileWriter::atomicMove);
-    }
-
-
-    /** Linux에서도 링크 재검사와 원자 교체 대체 경로를 검사할 때 쓴다. */
-    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback) {
-        this(properties, forceAtomicMoveFallback, ArtifactFileWriter::atomicMove);
-    }
-
-
-    /** 파일 시스템의 원자 교체 실패를 결정적으로 검사할 때 쓴다. */
-    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback, ArtifactAtomicMover atomicMover) {
-        this(properties, forceAtomicMoveFallback, atomicMover, conversationId -> {
+        this(properties, conversationId -> {
         });
     }
 
 
     /** 정리가 판정한 뒤 지우기 전에 쓰기가 끼어드는 경우를 결정적으로 검사할 때 쓴다. */
-    ArtifactStore(
-        ArtifactProperties properties,
-        boolean forceAtomicMoveFallback,
-        ArtifactAtomicMover atomicMover,
-        ArtifactCleanupProbe cleanupProbe) {
+    ArtifactStore(ArtifactProperties properties, ArtifactCleanupProbe cleanupProbe) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.paths = new ArtifactPathPolicy(root);
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
-        this.fileWriter = new ArtifactFileWriter(paths, forceAtomicMoveFallback, atomicMover);
+        this.fileWriter = new ArtifactFileWriter(paths);
         this.cleanupProbe = cleanupProbe;
         for (int index = 0; index < LOCK_COUNT; index++) {
             conversationLocks[index] = new ReentrantLock();
