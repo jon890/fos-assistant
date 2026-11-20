@@ -314,6 +314,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `connector`는 플러그인 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+OAuth 앱 설정은 `connector.oauth` 가 맡고 아래 하위 기능인 `connector.connection` 의 카탈로그 검사를 재사용한다. Control Plane 은 제공자 이름과 서버 비밀값 줄의 이름 규칙을 안다. 서비스의 로그인·교환·취소 주소는 대시보드가 결정한다([ADR-20261120 / connector-oauth](../../docs/adr/ADR-20261120-connector-oauth.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
 `connector.connection.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.

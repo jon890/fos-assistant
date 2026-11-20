@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.connection.application.dto.AdminConnectionS
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOperationFailure;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
@@ -147,7 +148,8 @@ public class ConnectorConnectionService {
                 manifest.ownerBrowserLoginUrl(),
                 manifest.schema() == ConnectorToolPolicies.STANDARD_SCHEMA,
                 manifest.singleBinding(),
-                manifest.ownerBrowser()));
+                manifest.ownerBrowser(),
+                ConnectorOAuthSummary.from(manifest.oauth())));
         }
         mine.values().stream()
             .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)

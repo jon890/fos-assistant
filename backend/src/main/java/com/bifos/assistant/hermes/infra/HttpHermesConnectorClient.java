@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -97,8 +98,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
 
     @Override
-    public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
-        return postCall(connectorId, HermesConnectorBodies.withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
+    public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser, VaultAccess oauth) {
+        Map<String, Object> body = HermesConnectorBodies.withOAuth(Map.of(TOOL, tool, VAULT, vault), oauth);
+        return postCall(connectorId, HermesConnectorBodies.withOwnerBrowser(body, ownerBrowser));
     }
 
 
