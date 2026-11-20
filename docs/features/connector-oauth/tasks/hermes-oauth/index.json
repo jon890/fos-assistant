@@ -5,12 +5,12 @@
   "deferred": [
     {
       "what": "Control Plane 의 OAuth 흐름: 서버 비밀값의 OAuth 앱 줄, 상태 값, 시작·돌아오기·확인·해제 갈래, 토큰 통로, 갱신 주기, 끊김과 알림(REQ2-REQ9, REQ11)",
-      "why": "PR1 전체가 운영 코드 줄 수 상한을 넘어 Hermes 쪽을 먼저 머지한다. 서버 비밀값 PR1a 가 머지되어야 시작한다",
+      "why": "PR1 을 Hermes, Control Plane, 웹 셋으로 나누기로 했다(코디네이터 2026-11-20). 서버 비밀값 PR1a 가 머지되어야 시작한다",
       "after": "이 계획(hermes-oauth)과 서버 비밀값 PR1a 머지"
     },
     {
       "what": "웹의 연결 단추, 돌아오는 경로, 서버 비밀값 화면의 OAuth 앱 줄, ADMIN_SECRETS 알림 이동(REQ3, REQ4, REQ5 의 화면)",
-      "why": "Control Plane API 가 있어야 화면이 동작한다. 줄 수 상한 때문에 나눈다. Control Plane PR 과 합칠지는 코디네이터가 정한다",
+      "why": "Control Plane API 가 있어야 화면이 동작한다. PR1 을 Hermes, Control Plane, 웹 셋으로 나누기로 했다(코디네이터 2026-11-20)",
       "after": "Control Plane OAuth 흐름 PR 머지"
     },
     {

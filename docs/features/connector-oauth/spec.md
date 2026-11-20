@@ -36,7 +36,7 @@ Gmail 도 OAuth 클라이언트 ID, secret, refresh token 을 사용자가 직�
 | PR2 | Google 과 Gmail 플러그인 전환 | REQ10 |
 | 저장소 밖 | 커리어 플러그인 선언에 GitHub OAuth 를 더하고 토큰 통로를 쓰게 고친다. 그 플러그인의 저장소에서 PR1 머지 뒤 한다 | REQ6 의 소비자 |
 
-PR1 이 운영 코드 크기 상한을 넘으면 plan 이 단계별 PR 로 나눈다. 나눠도 GitHub 이 먼저다.
+PR1 이 운영 코드 크기 상한을 넘으면 plan 이 단계별 PR 로 나눈다. 나눠도 GitHub 이 먼저다. 추정이 상한을 넘어 PR1 은 Hermes 대시보드 plugin, Control Plane, 웹 셋으로 나눈다(2026-11-20).
 
 **범위 밖**
 
