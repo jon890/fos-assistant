@@ -225,6 +225,10 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 이미 있던 서버의 정의(로컬 플러그인은 보관 파일 리비전 포함)나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 붙이기의 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 붙이기는 `restart_required` 가 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)).
 바인딩을 떼면 `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다.
 `reload_pending` 은 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓일 때 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다.
+재시작이 필요한 까닭이 정의나 칸 값 변경, 뗀 이름 다시 붙이기뿐이면 붙이기는 `cycle_available: true` 도 답한다. `plugin_updated` 가 참이면 거짓이다.
+**그 서버만 껐다 켜서 재시작 없이 반영할 수 있다**([ADR-20261120 / connector-auto-apply](../../../docs/adr/ADR-20261120-connector-auto-apply.md)). `bind.cycle: "off"` 를 받으면 새 정의를 소유 기록에 쓰고, 설정의 그 서버 항목에만 `enabled: false` 를 넣는다. 소유 기록의 정의는 늘 켜진 정의다. 끈 시각은 profile 의 `.fos-connector-cycle.json`(`{"<플러그인 id>": <epoch 초>}`)에 적고 답은 `cycle_off: true`, `reload_pending: false` 다.
+끈 지 120초(gateway 맞추기 주기 둘) 전에 온 설치는 꺼진 채 새 정의를 쓰고 `cycle_off: true` 로 답한다. 지난 뒤의 보통 설치는 켜고 끄기 기록에서 지우며, 끈 동안 gateway 가 옛 연결을 끊었으므로 `restart_required: false`, `reload_pending: true` 로 답한다. 떼기는 꺼진 항목도 지우고 끄기 기록에서 뺀다.
+설정 항목이 소유 기록과 `enabled` 만 다르고 끄기 기록에 그 플러그인이 있을 때만 이 plugin 이 끈 것으로 본다. 끄기 기록이 없으면 지금처럼 운영자가 바꾼 서버로 보고 409 다.
 스킬 파일을 바꾼 붙이기는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다.
 
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**

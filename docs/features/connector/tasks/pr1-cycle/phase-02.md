@@ -72,7 +72,7 @@
 ## 검증
 
 ```bash
-python3 -m unittest hermes/tests/test_dashboard_profile_api_connector_binding_cycle.py
+python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_connector_binding_cycle.py'
 python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_connector_binding*.py'
 python3 -m unittest discover -s hermes/tests
 node scripts/checks/check-file-length.mjs

@@ -34,6 +34,7 @@ from .connector_schema import (
 )
 
 from .connector_binding_write import _write_binding_files
+from .connector_cycle import CONNECTOR_CYCLE, _cycle_bytes, _cycle_elapsed, _cycle_marks, _cycle_now, _server_off
 from .connector_state import (
     CONNECTOR_DETACHED,
     CONNECTOR_TOOL_MAP,
@@ -109,7 +110,8 @@ def _skills_with_index_marker(skills_config) -> dict | None:
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
                            owner_attachments: str | None = None, owner_output: str | None = None,
-                           owner_browser: str | None = None, guard: dict | None = None, revision: str | None = None) -> dict:
+                           owner_browser: str | None = None, guard: dict | None = None, revision: str | None = None,
+                           cycle_off: bool = False) -> dict:
     """일반 에이전트의 profile 에 플러그인을 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 로컬 플러그인이면 실행기 정의(보관 파일 리비전 `revision`)를 쓰고 `.env` 의 칸 줄을 지운다. 원격이면 값을 `.env` 에 쓴다.
@@ -143,20 +145,23 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     env_path = profile_dir / ".env"
     tool_map_path = profile_dir / CONNECTOR_TOOL_MAP
     detached_path = profile_dir / CONNECTOR_DETACHED
+    cycle_path = profile_dir / CONNECTOR_CYCLE
     skills_dir = profile_dir / PROFILE_SKILLS_DIR
     plugin_dir = profile_dir / "plugins" / POLICY_PLUGIN
     bundled = (_profile_plugin_files(POLICY_PLUGIN) if enabled else None) or {}
     plugin_values = {plugin_dir / file_name: value for file_name, value in bundled.items()}
     plugin_dirs = (plugin_dir.parent, plugin_dir) if plugin_values else ()
-    for path in (config_path, state_path, env_path, tool_map_path, detached_path, skills_dir, *plugin_dirs,
+    for path in (config_path, state_path, env_path, tool_map_path, detached_path, cycle_path, skills_dir, *plugin_dirs,
                  *plugin_values):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
     _remove_backup_env_copies(profile_dir)
     originals = {path: path.read_bytes() if path.exists() else None
-                 for path in (config_path, state_path, env_path, tool_map_path, detached_path, *plugin_values)}
+                 for path in (config_path, state_path, env_path, tool_map_path, detached_path, cycle_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
     detached = _detached_servers(originals[detached_path])
+    marks = _cycle_marks(originals[cycle_path])
+    keep_off = False
     if not originals[state_path]:
         state = {}
     elif enabled:
@@ -239,6 +244,10 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if not _is_remote(server):
             server = _launcher_server(manifest, server, vault, revision or "")
         previous = servers.get(name)
+        # 이 plugin 이 끈 서버는 소유 기록의 정의로 본다. `enabled` 만 다르다(ADR-20261120 connector-auto-apply).
+        off = owned is not None and _server_off(previous, owned["server"], marks, plugin)
+        if off:
+            previous = owned["server"]
         if name in servers and (not owned or (
                 previous != owned["server"] and not _recoverable_server(previous, owned["server"], server))):
             raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
@@ -267,6 +276,14 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         # 뗀 뒤에는 옛 정의와 견줄 수 없으므로 기록을 지우기 전에 재시작을 요구한다.
         restart = (previous is not None and (previous != server or env_changed
                    or (owned is not None and previous != owned["server"]))) or name in detached.values()
+        # 끄기 요청이거나 끈 지 최소 시간 전이면 꺼진 채 새 정의를 쓴다. 지났으면 켠다. 끈 동안 gateway 가 옛 연결을 끊었다.
+        keep_off = cycle_off or (off and not _cycle_elapsed(marks, plugin))
+        if keep_off:
+            servers[name] = {**server, "enabled": False}
+            marks.setdefault(plugin, _cycle_now())
+        elif off:
+            marks.pop(plugin)
+        restart = restart and not keep_off and not off
         skills = sorted(manifest["skills"])
         for skill in skills:
             if (skills_dir / skill).exists() and skill not in previous_skills:
@@ -285,8 +302,10 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         restart = False
         name = owned["mcp_server"]
         # 기록과 다른 정의는 이 설치가 쓴 것이 아니다. 지우지 않고 멈춘다. 밖에서 이미 지워졌으면 지울 것이 없다.
-        if name in servers and servers[name] != owned["server"]:
+        if name in servers and servers[name] != owned["server"] and not _server_off(
+                servers[name], owned["server"], marks, plugin):
             raise FileExistsError("운영자가 바꾼 MCP 서버가 있다")
+        marks.pop(plugin, None)
         servers.pop(name, None)
         installed_env = owned["server"].get("env")
         removed_outputs = [value for value in (installed_env.values() if isinstance(installed_env, dict) else ())
@@ -327,7 +346,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         # 떼기는 표식 없이 뗀다. 운영자가 설정을 바꿔도 떼야 `.env` 에 비밀이 남지 않는다.
     targets = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
                state_path: (json.dumps(state) + "\n").encode(), env_path: new_env,
-               detached_path: _detached_bytes(detached),
+               detached_path: _detached_bytes(detached), cycle_path: _cycle_bytes(marks),
                # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 싣고 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있다.
                tool_map_path: _tool_map_bytes(_connector_tool_map(state, detached)) if state or detached else None,
                **desired, **{path: None for path in stale}}
@@ -335,7 +354,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     targets.update(plugin_values)
     plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
     if all(originals[path] == value for path, value in targets.items()):
-        return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False}
+        return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False,
+                "cycle_available": False, "cycle_off": keep_off}
     _write_binding_files(profile_dir, originals, targets, plugin_values, skills_dir,
                          (config_path, state_path, tool_map_path, detached_path))
     for value in removed_outputs:
@@ -348,5 +368,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 os.rmdir(current)
             except OSError:
                 pass
+    # 끄기 답은 반영 예정을 요구하지 않는다. 켜는 때는 Control Plane 이 정한다.
     return {"changed": True, "restart_required": restart, "plugin_updated": plugin_updated,
-            "reload_pending": not restart and not plugin_updated}
+            "reload_pending": not restart and not plugin_updated and not keep_off,
+            "cycle_available": restart and not plugin_updated, "cycle_off": keep_off}

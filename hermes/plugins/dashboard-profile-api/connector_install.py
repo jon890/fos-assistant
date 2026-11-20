@@ -122,9 +122,10 @@ async def _connector_request(request):
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
                 or (body["enabled"] and (body["plugin"] not in roots or "bind" not in body))
-                or ("bind" in body and (not isinstance(bind, dict) or set(bind) - {"guard"} != {"vault"}
-                                        or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
-            return _rejected("profile, 알려진 plugin, enabled와 설치할 bind.vault, sandbox_owner, owner_browser만 받는다")
+                or ("bind" in body and (not isinstance(bind, dict) or set(bind) - {"guard", "cycle"} != {"vault"}
+                                        or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])
+                                        or bind.get("cycle", "off") != "off"))):
+            return _rejected("profile, 알려진 plugin, enabled와 설치할 bind.vault, bind.cycle, sandbox_owner, owner_browser만 받는다")
         if isinstance(bind, dict) and "guard" in bind:
             try:
                 _binding_guard(bind["guard"])
@@ -256,7 +257,8 @@ async def _connector_request(request):
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
                                              body["bind"]["vault"], values, owner_attachments, owner_output,
-                                             body.get("owner_browser"), body["bind"].get("guard"), revision)
+                                             body.get("owner_browser"), body["bind"].get("guard"), revision,
+                                             cycle_off=body["bind"].get("cycle") == "off")
             if manifest.get("execution_guard") is not None:
                 installed = _connector_state(json.loads((profile_dir / CONNECTOR_STATE).read_text(encoding="utf-8")))
                 support = await asyncio.to_thread(_guard_support, profile, manifest, installed.get(body["plugin"]))
