@@ -164,27 +164,24 @@ test("사이드바는 대화 화면에 있고 대화 중심의 줄만 두며 로
   await expect(page.getByRole("complementary", { name: "사이드바" })).toHaveCount(0);
 });
 
-test("알림 단추는 사이드바 맨 위 앱 이름 옆에 있고 서랍 닫기 단추와 겹치지 않는다", async ({ page }, testInfo) => {
+test("알림 단추는 없고 「지금 볼 것」 은 사이드바 틀에만 있다", async ({ page }, testInfo) => {
   await page.goto("/new");
+  // 종 모양 알림 단추는 사이드바에도 위 막대에도 없다(spec 의 REQ17).
+  await expect(page.getByRole("link", { name: /^알림(,|$)/ })).toHaveCount(0);
+  if (testInfo.project.name === "mobile") {
+    // 휴대폰 위 막대에는 알림 단추가 있던 자리에 「지금 볼 것」 단추가 있다.
+    await expect(page.getByRole("banner").getByRole("link", { name: /^지금 볼 것/ })).toBeVisible();
+  }
   await openSidebar(page, testInfo);
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
-  const bell = sidebar.getByRole("link", { name: /^알림(,|$)/ });
-  await expect(bell).toBeVisible();
-  const home = sidebar.getByRole("link", { name: "검사용 비서 홈", exact: true });
-  const bellBox = (await bell.boundingBox())!;
-  const homeBox = (await home.boundingBox())!;
-  // 같은 줄이다.
-  expect(Math.abs(bellBox.y + bellBox.height / 2 - (homeBox.y + homeBox.height / 2))).toBeLessThan(8);
-  const account = (await sidebar.getByRole("button", { name: "계정 메뉴" }).boundingBox())!;
-  expect(bellBox.y).toBeLessThan(account.y);
-  if (testInfo.project.name === "mobile") {
-    const close = (await page.getByRole("button", { name: "사이드바 닫기" }).boundingBox())!;
-    const overlaps = bellBox.x < close.x + close.width && close.x < bellBox.x + bellBox.width
-      && bellBox.y < close.y + close.height && close.y < bellBox.y + bellBox.height;
-    expect(overlaps, "알림 단추와 서랍 닫기 단추가 겹친다").toBe(false);
-    // 휴대폰 위 막대의 알림 단추는 그대로다.
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("banner").getByRole("link", { name: /^알림(,|$)/ })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /^지금 볼 것/ })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /^알림(,|$)/ })).toHaveCount(0);
+
+  // 설정 틀과 관리자 틀에는 「지금 볼 것」 단추를 두지 않는다.
+  for (const target of ["/settings", "/admin"]) {
+    await page.goto(target);
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator('a[href="/now"]'), `${target} 에 「지금 볼 것」 이 있다`).toHaveCount(0);
   }
 });
 
