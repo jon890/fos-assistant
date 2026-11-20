@@ -146,7 +146,7 @@
 - 이미 들어 있는 것(자동으로 들어가는 HTML 과 그림, 결과가 `already` 인 것)은 다시 넣지 않고 이미 있다고 답한다
 - 도구가 실패하면 넣었다고 답하지 않고 까닭을 알린다
 
-셸·파일 도구가 실행 공간에서 도는 에이전트(켜진 도구에 `AgentToolPolicy.hasSandboxToolset` 이 참)에게는 두 줄을 바꾼다. 실행 공간 여부는 turn 마다 `AgentToolService.runsInSandbox` 가 Hermes 에서 켜진 도구를 읽어 정하고, 읽지 못하면 실행 공간이 없다고 본다.
+실행 공간에서 도는 toolset(`AgentToolPolicy` 의 `SANDBOX_TOOLSETS`, 셸·파일뿐 아니라 사진과 그림 만들기도 든다)이 하나라도 켜진 에이전트에게는 두 줄을 바꾼다(`AgentToolPolicy.hasSandboxToolset`). 실행 공간 여부는 turn 마다 `AgentToolService.runsInSandbox` 가 Hermes 에서 켜진 도구를 읽어 정하고, 읽지 못하면 실행 공간이 없다고 본다.
 
 - 넣을 파일은 `/workspace/` 아래에 만들고 `file_space_put` 의 `path` 에 그 경로를 쓴다. 결과물 폴더 경로에 만든 파일은 찾지 못한다
 - 결과물 폴더 단락의 「파일 도구로 위 폴더에 직접 쓴다」 대신, 파일 도구로 쓴 파일은 이 서비스에 보이지 않으니 위 폴더의 결과물은 `artifact_write` 로만 쓴다고 적는다
