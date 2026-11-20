@@ -81,7 +81,7 @@ public class MemoryCaptureService {
         }
         boolean direct = request.direct()
             && !request.sensitive()
-            && !MemorySensitiveHints.suspected(request.title(), request.content());
+            && !MemorySensitiveHints.suspected(request.title(), request.content(), request.summary());
         String dedupKey;
         try {
             dedupKey = texts.proposalDedupKey(user.id(), request.title(), request.content());
@@ -99,9 +99,12 @@ public class MemoryCaptureService {
         }
         MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
         String body = request.content();
-        Memory created = direct
+        // 제안에는 요약을 두지 않는다. 제안 카드가 요약을 보이기 전(PR2)에는 사용자가 보지 못한 요약이 받아들이는 순간 매 실행에 들어가기 때문이다
+        String summary = !direct || request.summary() == null ? "" : request.summary();
+        Memory created = (direct
             ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
-            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
+            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant()))
+                .fillSummary(summary, null);
         // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
         created.allowArchive(request.archivable());
         Memory saved;
@@ -221,7 +224,7 @@ public class MemoryCaptureService {
         if (!before.readable()) {
             throw conflict("an unreadable revision is not restored here");
         }
-        memoryService.revise(user, memory, before.content(), before.retrieval());
+        memoryService.revise(user, memory, before.content(), before.summary(), before.retrieval());
     }
 
 
@@ -229,7 +232,7 @@ public class MemoryCaptureService {
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
         if (!request.direct()
             || request.sensitive()
-            || MemorySensitiveHints.suspected(request.title(), request.content())) {
+            || MemorySensitiveHints.suspected(request.title(), request.content(), request.summary())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
@@ -237,13 +240,18 @@ public class MemoryCaptureService {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_TARGET_NOT_FOUND);
         }
         Memory memory = found.get();
-        if (request.content().equals(memory.content())) {
+        // 요약을 주지 않았으면 지금 요약을 둔다. 빈 글이면 지운다
+        String current = memory.storedSummary() == null
+            ? MemorySummaryBackfill.ruleSummary(memory, request.content(), memory.retrieval())
+            : memory.summary();
+        String summary = request.summary() == null ? current : request.summary();
+        if (request.content().equals(memory.content()) && summary.equals(memory.summary())) {
             return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
         }
         int base = memory.revision();
         try {
             // 암호화는 revision 을 남기기 전에 하므로 거절돼도 줄과 revision 이 바뀌지 않는다
-            memoryService.revise(user, memory, request.content(), memory.retrieval());
+            memoryService.revise(user, memory, request.content(), summary, memory.retrieval());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
                 return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
@@ -277,7 +285,10 @@ public class MemoryCaptureService {
                 existing.id());
             case REJECTED -> new MemoryRememberResult(MemoryRememberOutcome.REJECTED_BEFORE, existing.id());
             case PROPOSED -> {
-                if (!direct) {
+                // 저장된 제안의 요약이 이번 호출의 요약과 다르거나 민감해 보이면 받아들이지 않는다. 대조를 거치지 않은 요약이 들어가지 않게 한다
+                String requested = request.summary() == null ? "" : request.summary();
+                if (!direct || !existing.summary().equals(requested)
+                    || MemorySensitiveHints.suspected(existing.title(), existing.content(), existing.summary())) {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());

@@ -68,7 +68,7 @@ class ContextAssemblerSupersedeTest {
 
 
     @Test
-    @DisplayName("다른 항목이 대신한 옛 항목은 개인 사실 구역과 색인 어디에도 없고 대신한 칸을 비우면 다시 실린다")
+    @DisplayName("다른 항목이 대신한 옛 항목은 요약 구역과 색인 어디에도 없고 대신한 칸을 비우면 다시 실린다")
     void dropsSupersededFactUntilCleared() {
         Memory old = memories.create(ADMIN, MemoryScope.USER, "사는 곳", "서울 마포구에 산다", false);
         Memory fresh = memories.create(ADMIN, MemoryScope.USER, "이사한 곳", "부산 해운대구에 산다", false);

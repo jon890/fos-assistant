@@ -235,8 +235,9 @@ public class MemoryService {
             return texts.insert(Memory.accepted(
                 scope, null, user.groupId(), title, content, placement, user.id(), clock.instant()));
         }
-        return texts.insert(Memory.accepted(
-            scope, user.id(), null, title, content, placement, user.id(), clock.instant()));
+        Memory created = Memory.accepted(scope, user.id(), null, title, content, placement, user.id(), clock.instant());
+        // 화면에는 요약 칸이 없다(PR2 전). 이관과 같은 규칙으로 짧은 개인 사실은 본문을 요약으로 둔다
+        return texts.insert(created.fillSummary(MemorySummaryBackfill.ruleSummary(created, content, retrieval), null));
     }
 
 
@@ -300,7 +301,19 @@ public class MemoryService {
         MemoryRetrieval retrieval = alwaysInject
             ? MemoryRetrieval.ALWAYS
             : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
-        return revise(user, memory, content, retrieval).withArchivable(archivable);
+        return revise(user, memory, content, screenSummary(memory, content, retrieval), retrieval).withArchivable(archivable);
+    }
+
+
+    /**
+     * 이 화면은 요약 칸이 없다(PR2 전). 본문이 바뀌면 요약을 이관과 같은 규칙으로 다시 정한다. 짧은 본문은 새 본문이 요약이고 아니면 비운다. 비서가 쓴 요약도
+     * 덮는다. 화면에서 고친 사실이 옛 요약으로 매 실행에 남지 않게 한다(설계 DECISION8). 본문이 그대로면 요약도 그대로다.
+     */
+    private static String screenSummary(Memory memory, String content, MemoryRetrieval retrieval) {
+        if (content.equals(memory.content()) && memory.storedSummary() != null) {
+            return memory.summary();
+        }
+        return MemorySummaryBackfill.ruleSummary(memory, content, retrieval);
     }
 
 
@@ -364,6 +377,12 @@ public class MemoryService {
 
     Memory revise(CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval) {
         return revisionWriter.revise(user, memory, content, retrieval);
+    }
+
+
+    /** 본문과 요약, 꺼내는 방식을 고친다. 요약이 빈 글이면 지운다. */
+    Memory revise(CurrentUser user, Memory memory, String content, String summary, MemoryRetrieval retrieval) {
+        return revisionWriter.revise(user, memory, content, summary, retrieval);
     }
 
 

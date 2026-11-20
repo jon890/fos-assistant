@@ -47,6 +47,16 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     List<Long> findIdsWithoutDataKey();
 
 
+    /** 요약 칸이 아직 이관 전({@code NULL})인 줄의 번호다. 기동 요약 이관({@code MemorySummaryBackfill})이 쓴다. */
+    @Query("select m.id from Memory m where m.storedSummary is null order by m.id")
+    List<Long> findIdsWithPendingSummary();
+
+
+    /** 요약 칸이 이관 전이고 이미 데이터 key 의 암호문인 줄의 번호다. 암호화가 켜진 설치의 요약 이관이 쓴다. */
+    @Query("select m.id from Memory m where m.storedSummary is null and m.dataKeyId is not null order by m.id")
+    List<Long> findSealedIdsWithPendingSummary();
+
+
     /** 제안 중복 키가 있는 줄의 번호다. 기동할 때 그 키를 주인 key 의 HMAC 으로 바꾸는 데 쓴다(ADR-20261103 / memory-sensitivity-removal). */
     @Query("select m.id from Memory m where m.proposalDedupKey is not null order by m.id")
     List<Long> findIdsWithProposalDedupKey();

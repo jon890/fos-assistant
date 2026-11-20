@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.memory.application.MemoryTexts;
+import com.bifos.assistant.memory.MemorySummaryRows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -194,6 +196,9 @@ class ChatServiceTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MemoryTexts memoryTexts;
 
     @Autowired
     ConnectorConnectionRepository connections;
@@ -527,7 +532,8 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         Memory always = memories.create(dad, MemoryScope.USER, "자전거 보관", "자전거는 지하 2층 보관대에 둔다", true);
         Memory fact = memories.create(dad, MemoryScope.USER, "아침 음료", "사실-표식-5208 아침에는 보리차를 마신다", false);
-        // 본문이 개인 사실 구역의 상한(200자)을 넘어 색인에만 오른다
+        MemorySummaryRows.summarizeAsContent(memoryTexts, jdbc, fact);
+        // 본문이 요약 이관의 본문 상한(200자)을 넘어 색인에만 오른다
         Memory indexed = memories.create(
             dad, MemoryScope.USER, "화분 물 주기", "평문-표식-7391 화분은 열흘마다 물을 준다. " + "물".repeat(200), false);
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
@@ -559,7 +565,7 @@ class ChatServiceTest {
     @DisplayName("사용자 turn 은 질문과 관련된 기억 줄과 근거를 실행에 남기고 예약 작업 turn 은 남기지 않는다")
     void recordsSearchSourceOnlyForUserTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
-        // 본문이 개인 사실 구역의 상한(200자)을 넘어 그 구역의 후보가 아니다
+        // 본문이 요약 이관의 본문 상한(200자)을 넘어 그 구역의 후보가 아니다
         Memory tires = memories.create(
             dad, MemoryScope.USER, "자동차 관리", "타이어는 작년 11월에 네 짝을 모두 갈았다. " + "차".repeat(200), false);
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));

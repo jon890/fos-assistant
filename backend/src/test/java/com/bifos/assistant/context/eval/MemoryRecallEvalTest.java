@@ -1,5 +1,6 @@
 package com.bifos.assistant.context.eval;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -108,8 +109,9 @@ class MemoryRecallEvalTest {
     void measuresRecallAndKeepsBoundary() {
         clock.set(BASE);
         Map<String, Long> agentIds = fixture.createAgents();
-        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, clock);
-        ContextAssembler factsOff = TestContextAssemblers.of(memoryService, withFactsMaxChars(0), clock);
+        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, MemoryContextBudget.DEFAULTS, clock);
+        ContextAssembler factsOff = TestContextAssemblers.of(
+            memoryService, properties, new MemoryContextBudget(0, MemoryContextBudget.DEFAULT_MAX_CHARS), clock);
         // questionOff 는 질문을 넘기지 않는 지금까지의 조립이다. 질문으로 고른 구역이 놓친 사례를 줄였는지 견준다
         Map<String, Assembly> assemblies = new LinkedHashMap<>();
         assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
@@ -119,6 +121,7 @@ class MemoryRecallEvalTest {
         assemblies.put(LINKS_OFF, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
+        List<String> detailMisses = new ArrayList<>();
         for (Case each : DATASET.cases()) {
             scoreboard.add(NONE, noneVerdictOf(each));
             assemblies.forEach((mode, assembly) -> {
@@ -126,6 +129,9 @@ class MemoryRecallEvalTest {
                 AssembledContext context = assembly.assemble(
                     fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
                 scoreboard.add(mode, verdictOf(each, ids, context));
+                if (FACTS_ON.equals(mode) && each.category() == MemoryEvalDataset.Category.DETAIL) {
+                    detailMisses.addAll(detailMissesOf(each, ids, context));
+                }
             });
             Map<String, Long> ids = fixture.seed(each);
             scoreboard.add(FULL_INJECTION, fullInjectionVerdictOf(each, ids, agentIds.get(each.agent())));
@@ -137,6 +143,7 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
+        assertThat(detailMisses).as("요약에 없는 상세가 질문 관련 구역에 들지 않은 DETAIL 사례 항목").isEmpty();
         for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, LINKS_OFF, FULL_INJECTION)) {
             assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
         }
@@ -165,23 +172,21 @@ class MemoryRecallEvalTest {
     }
 
 
+    /** DETAIL 사례의 기대 항목 가운데 상세가 질문 관련 구역에 본문으로 들지 않은 것이다. */
+    private static List<String> detailMissesOf(Case each, Map<String, Long> ids, AssembledContext context) {
+        return each.expect().stream()
+            .filter(key -> context.bundle().items().stream()
+                .noneMatch(item -> item.source() == ContextSource.MEMORY_SEARCH
+                    && item.ref().equals("memory:" + ids.get(key))))
+            .map(key -> each.id() + ":" + key)
+            .toList();
+    }
+
+
     /** 모드 하나의 조립이다. 질문을 쓰지 않는 모드는 받은 질문을 버린다. */
     @FunctionalInterface
     private interface Assembly {
         AssembledContext assemble(CurrentUser user, Long agentId, String question);
-    }
-
-
-    /** 주입받은 설정에서 개인 사실 구역 예산만 바꾼다. 0 이면 구역을 끈다. */
-    private ContextProperties withFactsMaxChars(int factsMaxChars) {
-        return new ContextProperties(
-            properties.maxChars(),
-            properties.indexBudgetRatio(),
-            properties.resultStaleAfter(),
-            properties.memoryStaleAfter(),
-            properties.memoryCollectionStaleAfter(),
-            factsMaxChars,
-            properties.factsItemMaxChars());
     }
 
 
@@ -414,7 +419,7 @@ class MemoryRecallEvalTest {
      * recall@k 의 순위를 매긴다. 질문으로 고른 {@code MEMORY_SEARCH} 항목을 실은 순서대로, 그 뒤에 나머지 {@code INLINE} 항목을, 그 뒤에
      * {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다. 빠진 항목은 순위가 없다.
      *
-     * <p>질문으로 고른 항목을 앞에 두는 것은 그 구역이 관련도 순으로 고른 유일한 본문이라서다. 개인 사실 구역은 질문과 무관하게 최근 순으로 고르므로,
+     * <p>질문으로 고른 항목을 앞에 두는 것은 그 구역이 관련도 순으로 고른 유일한 본문이라서다. 요약 구역은 질문과 무관하게 최근 순으로 고르므로,
      * 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5 위 밖으로 밀린다.
      *
      * @return 항목 참조마다 순위

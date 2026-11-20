@@ -41,7 +41,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | 에이전트에게 쥐어 주는 도구 묶음. 플러그인 root 의 `assistant.json` 이 assistant 쪽 정보를 선언한다 | **플러그인**, 코드는 `connector` | 커넥터, 커넥터 에이전트 |
 | 사용자가 플러그인 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection`. 그 화면(`/connections`)과 메뉴는 「외부 서비스 연결」 | 화면 이름으로 「연결」 |
 | 에이전트에 연결을 붙인 것 | **바인딩**, 화면에서는 「붙이기」, 코드는 `agent_connector_binding` | |
-| 매 실행에 본문까지 싣는 짧은 개인 기억의 구역 | **개인 사실 구역**, 코드는 `MEMORY_FACTS` | 프로필 구역, 사용자 프로필 |
+| 매 실행에 기억마다 요약 한 줄을 넣는 구역. 옛 이름은 개인 사실 구역이다 | **요약 구역**, 코드는 `MEMORY_FACTS` | 프로필 구역, 사용자 프로필 |
 
 `MEMBER` 는 코드의 값이므로 그대로 쓰되, 사람을 가리킬 때는 쓰지 않는다.
 
