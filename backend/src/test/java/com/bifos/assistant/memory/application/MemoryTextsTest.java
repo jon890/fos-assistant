@@ -37,8 +37,9 @@ class MemoryTextsTest {
 
         assertThat(saved.storedTitle()).isEqualTo("합성 제목");
         assertThat(saved.storedContent()).isEqualTo("합성 본문");
+        assertThat(saved.storedSummary()).isEmpty();
         assertThat(saved.dataKeyId()).isNull();
-        assertThat(texts.seal(saved.stored(), "합성 제목", "합성 본문")).isEmpty();
+        assertThat(texts.seal(saved.stored(), "합성 제목", "합성 본문", "합성 요약")).isEmpty();
         verify(cipher, never()).seal(any(), any(), any());
     }
 

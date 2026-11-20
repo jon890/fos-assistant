@@ -10,7 +10,9 @@ import com.bifos.assistant.context.application.dto.ContextSource;
 import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.dto.MemorySearchPlacement;
 import com.bifos.assistant.context.config.ContextProperties;
+import com.bifos.assistant.memory.application.port.MemoryContextBudgets;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import com.bifos.assistant.memory.application.port.OmittedMemories;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
@@ -39,9 +41,9 @@ import org.springframework.stereotype.Service;
  * <p>Memory 를 먼저 문맥 묶음의 항목으로 만들고, 그 항목을 지금과 같은 글로 옮긴다(ADR-071). 같은 이름의 개인 문서와 그룹
  * 문서에 붙는 충돌 표시를 빼면 글이 바뀌지 않아 {@code instructions_hash} 도 그대로다.
  *
- * <p>층은 그룹 항상 층, 개인 항상 층, 개인 사실 구역, 질문과 관련된 기억 구역, 색인 층 순서다. 개인 사실 구역은 색인에 오를 짧은 개인 항목을
- * 본문까지 싣는다(ADR-20261008 / memory-facts). 질문과 관련된 기억 구역은 질문이 있을 때만 관련 있는 항목을 본문까지 싣는다
- * (ADR-20261015 / memory-hybrid-selection). 두 구역에 실은 항목은 색인에서 뺀다.
+ * <p>층은 그룹 항상 층, 개인 항상 층, 요약 구역, 질문과 관련된 기억 구역, 색인 층 순서다. 요약 구역은 요약 줄이 있는 개인 항목의
+ * 요약만 싣는다({@code docs/features/memory.md} 의 「요약 구역」). 질문과 관련된 기억 구역은 질문이 있을 때만 관련 있는 항목을 본문까지
+ * 싣고(ADR-20261015 / memory-hybrid-selection) 요약 구역에 든 항목도 후보다. 두 구역에 실은 항목은 색인에서 뺀다.
  */
 @Service
 @Slf4j
@@ -105,15 +107,18 @@ public class ContextAssembler implements OmittedMemories {
 
             사용자가 이번 메시지에서 자기에 관한 오래 쓰일 사실을 말하면 memory_remember 로 남긴다. 기억해 달라고 하지 않아도 남긴다.
             남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다. 작업 기록, 한 번만 쓰일 요청, 대화 요약은 남기지 않는다.
-            사용자의 말에 있는 부정(못, 안, 않, 없, 아니)은 content 에 그대로 살린다. 사용자가 기억한 사실을 직접 고쳐 말하면 그 번호를 memory_id 로 주어 고친다.
+            남길 때 매 대화에 늘 보일 한 줄 요약을 summary 로 함께 준다. 지원 현황, 예약처럼 금방 바뀌는 진행 중인 일은 summary 없이 archivable 을 true 로 남긴다.
+            사용자의 말에 있는 부정(못, 안, 않, 없, 아니)은 content 와 summary 에 그대로 살린다. 사용자가 기억한 사실을 직접 고쳐 말하면 그 번호를 memory_id 로 주어 고치고 summary 도 새 사실에 맞게 준다.
             도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
             """.stripTrailing();
 
-    /** 개인 사실 구역의 머리 줄과 안내 글이다. 구역을 고르는 규칙은 {@code docs/features/memory.md} 의 「개인 사실 구역」 이 갖는다. */
+    /** 요약 구역의 머리 줄과 안내 글이다. 구역을 고르는 규칙은 {@code docs/features/memory.md} 의 「요약 구역」 이 갖는다. */
     private static final String FACTS_HEADER = """
             # 지금 묻는 사람에 대해 기억한 것
 
-            아래는 이 사람에 대해 기억한 짧은 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.
+            아래는 이 사람에 대해 기억한 것의 요약이다. 줄마다 번호로 memory_read 를 불러 상세를 읽는다.
+            일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 상세를 읽는다.
+            진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.
             """.stripTrailing();
 
     private static final String INDEX_HEADER = """
@@ -130,18 +135,22 @@ public class ContextAssembler implements OmittedMemories {
 
     private final MemoryService memories;
     private final ContextProperties properties;
+    private final MemoryContextBudgets budgets;
     private final Clock clock;
     private final MemorySearchSection searchSection;
 
 
     /**
-     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
+     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침, 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
      * 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
      * @param scope 실행을 여는 쪽이 정한 범위다. 먼저 살펴보기는 기억 지침도 받지 않는다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, InstructionScope scope) {
-        String instructions = RESPONSE_INSTRUCTIONS + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS;
+        // 서비스 개념 목록은 모든 범위에 같은 글로 넣는다. 범위마다 다른 절과 기억 글 앞에 두어 실행마다 같은 앞부분을 길게 한다
+        String instructions = RESPONSE_INSTRUCTIONS
+            + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS
+            + ContextBudgetWriter.SEPARATOR + ServiceConceptsInstructions.SECTION;
         if (scope.conversation()) {
             instructions += ContextBudgetWriter.SEPARATOR + SEARCH_INSTRUCTIONS;
         }
@@ -158,9 +167,9 @@ public class ContextAssembler implements OmittedMemories {
     /**
      * 고르는 자리를 여기 하나로 모은다. 항목이 많아지면 이 클래스에서 검색으로 바꾼다.
      *
-     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 개인 사실 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
+     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 요약 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
      * 항목 하나가 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도 사라져 에이전트가
-     * 나머지 Memory 에 닿을 길이 없어진다. 개인 사실 구역은 떼어 둔 자리를 쓰지 않으므로, 색인 전체가 몫(상한의 1/4) 안에 들 때는
+     * 나머지 Memory 에 닿을 길이 없어진다. 요약 구역은 떼어 둔 자리를 쓰지 않으므로, 색인 전체가 몫(상한의 1/4) 안에 들 때는
      * 색인을 밀어내지 못한다. 몫보다 긴 색인은 몫까지만 떼어 두므로 남는 줄이 빠질 수 있다.
      *
      * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
@@ -203,7 +212,8 @@ public class ContextAssembler implements OmittedMemories {
         Instant now = clock.instant();
         List<Memory> always = memories.alwaysInjectedFor(user, access);
         List<Memory> indexed = memories.indexedFor(user, access);
-        long maxChars = properties.maxChars();
+        MemoryContextBudget budget = budgets.budgetFor(user.groupId());
+        long maxChars = budget.maxChars();
         // 개인 사실 후보를 빼기 전의 색인 전체로 몫을 정한다. 색인 전체가 몫(상한의 1/4) 안에 들 때는 구역에 실린 항목이
         // 색인에서 빠지므로 색인은 떼어 둔 자리보다 길어지지 않는다
         long indexBudget = Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
@@ -212,14 +222,17 @@ public class ContextAssembler implements OmittedMemories {
         builder.limit(maxChars - indexBudget);
         appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
-        Set<Long> facts = appendFacts(builder, indexed, now);
-        List<Memory> afterFacts = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
+        SummaryPlacement summaries = appendFacts(builder, indexed, budget.summaryMaxChars(), now);
+        // 요약 구역에 든 기억도 질문과 관련되면 상세가 질문 관련 구역에 든다. 요약 구역에 든 기억은 색인에 다시 놓지 않는다
         // 다른 범위에 같은 이름의 짝이 있는 문서는 구역에 싣지 않는다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없어 색인에 둔다
-        Set<Long> conflicting = sameNameDocuments(afterFacts).keySet();
+        Set<Long> conflicting = sameNameDocuments(indexed).keySet();
         MemorySearchPlacement search = searchSection.place(
-            question, afterFacts, conflicting, builder, memory -> memoryFreshness(memory, now));
+            question, indexed, conflicting, builder, memory -> memoryFreshness(memory, now));
+        List<Memory> indexOrder = search.indexOrder().stream()
+            .filter(memory -> !summaries.placed().contains(memory.id()))
+            .toList();
         builder.limit(maxChars);
-        appendIndex(builder, search, sameNameDocuments(search.indexOrder()), now);
+        appendIndex(builder, indexOrder, search, summaries.overBudget(), sameNameDocuments(indexOrder), now);
         return withSelections(builder.build());
     }
 
@@ -235,7 +248,7 @@ public class ContextAssembler implements OmittedMemories {
         List<ContextItem> items = context.bundle().items().stream().map(item -> {
             String selector = SELECTORS.get(item.source());
             int rank = ranks.merge(item.source(), 1, Integer::sum);
-            // 개인 사실 구역과 질문으로 고른 항목은 고른 규칙과 순위가 항목마다 달라 담을 때 이미 근거를 붙였다
+            // 요약 구역과 질문으로 고른 항목은 고른 규칙과 순위가 항목마다 달라 담을 때 이미 근거를 붙였다
             if (selector == null || item.selection() != null) {
                 return item;
             }
@@ -247,18 +260,19 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * 개인 사실 구역을 담고 실은 항목의 번호를 돌려준다.
+     * 요약 구역을 담고 실은 항목과 예산을 넘겨 빠진 항목의 번호를 돌려준다.
      *
-     * <p>예산은 항상 층 뒤에 남은 자리와 {@code factsMaxChars} 가운데 작은 쪽이다. 고르기는 한 번만 하고, 고른 항목을 번호 순으로
+     * <p>예산은 항상 층 뒤에 남은 자리와 {@code summaryMaxChars} 가운데 작은 쪽이다. 고르기는 한 번만 하고, 고른 항목을 번호 순으로
      * 담는다. 고르기와 담기가 같은 길이 계산을 쓰므로 고른 항목은 모두 들어간다. 그래도 들어가지 않는 항목은 빠진 항목으로 세지 않고
-     * 색인으로 돌린다.
+     * 색인으로 돌린다. 고르지 못한 후보는 색인에 제목으로 남고 {@value ContextSelection#SUMMARY_OVER_BUDGET} 근거를 받는다.
      */
-    private Set<Long> appendFacts(ContextBudgetWriter builder, List<Memory> indexed, Instant now) {
-        long budget = Math.min(builder.room(), properties.factsMaxChars());
+    private SummaryPlacement appendFacts(ContextBudgetWriter builder, List<Memory> indexed, long summaryMaxChars, Instant now) {
+        List<Memory> candidates = indexed.stream().filter(ContextAssembler::factCandidate).toList();
+        long budget = Math.min(builder.room(), summaryMaxChars);
         if (budget <= 0) {
-            return Set.of();
+            return new SummaryPlacement(Set.of(), ids(candidates));
         }
-        List<Memory> chosen = chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
+        List<Memory> chosen = chooseFacts(candidates, budget, builder.isEmpty());
         Set<Long> placed = new HashSet<>();
         Map<Long, Integer> chosenRanks = new HashMap<>();
         chosen.forEach(memory -> chosenRanks.put(memory.id(), chosenRanks.size() + 1));
@@ -270,25 +284,32 @@ public class ContextAssembler implements OmittedMemories {
                 ContextBodyMode.INLINE,
                 List.of(),
                 memory.title(),
-                memory.content(),
+                memory.summary(),
                 memoryFreshness(memory, now))
                 .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
-            if (builder.appendIfFits(FACTS_HEADER, MemoryItems.inlineLine(memory), item)) {
+            if (builder.appendIfFits(FACTS_HEADER, MemoryItems.summaryLine(memory), item)) {
                 placed.add(memory.id());
             } else {
-                log.warn("memory facts returned an item to the index memoryId={}", memory.id());
+                log.warn("memory summary returned an item to the index memoryId={}", memory.id());
             }
         });
-        return placed;
+        Set<Long> overBudget = new HashSet<>(ids(candidates));
+        overBudget.removeAll(placed);
+        return new SummaryPlacement(placed, overBudget);
     }
 
 
-    /** 색인에 오를 항목 가운데 본문이 짧은 개인 평문 항목만 개인 사실 구역의 후보다. */
-    private boolean factCandidate(Memory memory) {
+    private static Set<Long> ids(List<Memory> memories) {
+        return memories.stream().map(Memory::id).collect(Collectors.toSet());
+    }
+
+
+    /** 색인에 오를 항목 가운데 요약 줄이 있는 개인 사실만 요약 구역의 후보다. */
+    private static boolean factCandidate(Memory memory) {
         return memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.readable()
-            && memory.content().length() <= properties.factsItemMaxChars();
+            && !memory.summary().isEmpty();
     }
 
 
@@ -306,7 +327,7 @@ public class ContextAssembler implements OmittedMemories {
         long used = 0;
         for (Memory memory : candidates.stream().sorted(recentFirst).toList()) {
             boolean first = chosen.isEmpty();
-            long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, MemoryItems.inlineLine(memory))
+            long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, MemoryItems.summaryLine(memory))
                 .length();
             if (used + cost <= budget) {
                 chosen.add(memory);
@@ -314,6 +335,11 @@ public class ContextAssembler implements OmittedMemories {
             }
         }
         return chosen;
+    }
+
+
+    /** 요약 구역의 결과다. {@code overBudget} 은 요약이 있지만 예산을 넘겨 들지 못한 항목 번호다. */
+    private record SummaryPlacement(Set<Long> placed, Set<Long> overBudget) {
     }
 
 
@@ -383,14 +409,26 @@ public class ContextAssembler implements OmittedMemories {
     }
 
 
-    /** 색인 층을 {@code search} 가 정한 차례로 담는다. 질문으로 점수를 받은 항목에는 그 근거를 붙인다. */
+    /**
+     * 색인 층을 {@code order} 차례로 담는다. 요약 예산을 넘겨 빠진 항목에는 그 근거를, 질문으로 점수를 받은 항목에는 점수 근거를 붙인다.
+     * 요약 예산 근거가 앞선다. 넘친 요약 수를 실행 기록에서 세게 하려는 것이다.
+     */
     private void appendIndex(
-        ContextBudgetWriter builder, MemorySearchPlacement search, Map<Long, List<Memory>> sameNames, Instant now) {
-        search.indexOrder().forEach(memory -> {
+        ContextBudgetWriter builder,
+        List<Memory> order,
+        MemorySearchPlacement search,
+        Set<Long> overBudget,
+        Map<Long, List<Memory>> sameNames,
+        Instant now) {
+        int[] overBudgetRank = {0};
+        order.forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
             ContextItem item = indexItem(memory, others, now);
             ContextSelection scored = search.indexSelections().get(memory.id());
-            if (scored != null) {
+            if (overBudget.contains(memory.id())) {
+                overBudgetRank[0]++;
+                item = item.withSelection(ContextSelection.ranked(ContextSelection.SUMMARY_OVER_BUDGET, overBudgetRank[0]));
+            } else if (scored != null) {
                 item = item.withSelection(scored);
             }
             builder.append(memory.id(), INDEX_HEADER, indexLine(memory.id(), item.title(), others), item);

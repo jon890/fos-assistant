@@ -1,5 +1,6 @@
 package com.bifos.assistant.context;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.context.application.MemorySearchSection;
@@ -179,7 +180,7 @@ class ContextAssemblerHybridTest {
             new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(embeddings, embedding, texts));
         MemorySearchSection section = new MemorySearchSection(
             relevance, MemorySearchSectionProperties.defaults(), new QueryEmbedder(embedding, client));
-        return new ContextAssembler(memories, properties, clock, section);
+        return new ContextAssembler(memories, properties, groupId -> MemoryContextBudget.DEFAULTS, clock, section);
     }
 
 

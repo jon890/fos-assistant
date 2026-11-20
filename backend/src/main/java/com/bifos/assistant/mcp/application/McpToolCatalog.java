@@ -21,6 +21,7 @@ public class McpToolCatalog {
     private final McpFinancialLimitTools financialLimits;
     private final McpApprovalResumeTool approvalResume;
     private final McpFileSpaceTools fileSpace;
+    private final McpConnectorListTool connectorList;
 
 
     public List<Map<String, Object>> tools() {
@@ -29,7 +30,7 @@ public class McpToolCatalog {
                 "name",
                 "memory_read",
                 "description",
-                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인, memory_search 결과에 있다.",
+                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 요약 구역이나 색인, memory_search 결과에 있다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -163,6 +164,7 @@ public class McpToolCatalog {
             financialLimits.changeDefinition(),
             approvalResume.definition(),
             fileSpace.definition(),
+            connectorList.definition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",
