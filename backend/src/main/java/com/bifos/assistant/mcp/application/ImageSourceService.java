@@ -23,6 +23,8 @@ import tools.jackson.databind.JsonNode;
  * <p><b>요청 본문이 사용자나 대화를 정하지 못한다.</b> 서명한 호출 맥락에서 origin 실행을 찾고 그 실행의 사용자와 대화 안에서만 찾는다.
  * origin 판정은 만든 그림 올리기와 같다. 끝난 origin 도 받고 중지한 실행과 중지한 트리는 거절한다.
  *
+ * <p>사진은 원본 조회의 개요와 같은 판정과 읽기({@link AttachmentService#inspectOverview})로 원본 바이트를 그대로 받는다.
+ *
  * <p>찾지 못한 까닭은 {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 과 {@link ErrorCode#IMAGE_SOURCE_GONE} 둘로만 나눈다. 404 는 내지 않는다.
  */
 @Service
@@ -56,7 +58,7 @@ public class ImageSourceService {
         ImageSourceRef ref = ImageSourceRef.parse(body.get("source"));
         try {
             if (ref.attachmentId() != null) {
-                return attachments.readSentOriginal(caller.user(), origin.conversationId(), ref.attachmentId());
+                return attachments.inspectOverview(caller.user(), origin.conversationId(), ref.attachmentId());
             }
             access.requireOwn(caller.user(), origin.conversationId());
             GeneratedImageSource image = images.readByTitle(origin.conversationId(), ref.title());
