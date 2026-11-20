@@ -1,0 +1,65 @@
+{
+  "name": "pr1-cycle",
+  "description": "값과 정의가 바뀐 바인딩을 그 서버만 껐다 켜서 재시작 없이 반영하고 자동 반영 실패를 표시한다",
+  "pr_scope": "대시보드 plugin 의 껐다 켜기와 Control Plane 의 껐다 켜기 단계, 실패 표시(apply_failed_at)를 완성한다. 스펙, 설계, ADR 을 함께 담는다.",
+  "deferred": [
+    {
+      "what": "PR2: gateway 기동 시각 조회와 재시작 감지, 재시작 대기 줄 다시 확인의 재시작 확인(REQ3, REQ4, REQ7 일부)",
+      "why": "스펙 DECISION9 의 PR 순서",
+      "after": "PR1 머지"
+    },
+    {
+      "what": "PR3: 운영 조회, 24시간 알림과 실패 알림 문구, 연결 응답의 applyFailed, 화면과 관리자 문구, fos-home-infra 요청 본문(REQ5, REQ6, REQ7, REQ8, REQ9)",
+      "why": "스펙 DECISION9 의 PR 순서",
+      "after": "PR2 머지"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/connector/spec.md",
+  "design": "docs/features/connector/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ10"
+  ],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ10"
+      ]
+    }
+  ]
+}
