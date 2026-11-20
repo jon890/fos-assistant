@@ -21,6 +21,10 @@ const SERVICE_CONCEPTS = new URL(
   "../../../backend/src/main/java/com/bifos/assistant/context/application/ServiceConceptsInstructions.java",
   import.meta.url,
 );
+const ANSWER_FORMAT = new URL(
+  "../../../backend/src/main/java/com/bifos/assistant/context/application/AnswerFormatInstructions.java",
+  import.meta.url,
+);
 const CONTEXT_ASSEMBLER = new URL(
   "../../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
   import.meta.url,
@@ -34,8 +38,8 @@ test("답변 형식 뒤의 도구 호출과 승인 카드, 서비스 개념 목�
 
 test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상수의 제목과 순서가 같다", () => {
   // ContextAssembler 는 답변 형식, 도구 호출, 최신 정보와 출처, 기억 상수를 이 순서로 잇는다. 상수 안의 절 제목을 모두 모은다.
-  // 서비스 개념 목록은 ServiceConceptsInstructions 의 SECTION 이고 도구 호출 지침 바로 뒤에 붙는다.
-  const source = readFileSync(CONTEXT_ASSEMBLER, "utf8") + readFileSync(SERVICE_CONCEPTS, "utf8");
+  // 답변 형식은 AnswerFormatInstructions 에, 서비스 개념 목록은 ServiceConceptsInstructions 의 SECTION 에 있고 도구 호출 지침 바로 뒤에 붙는다.
+  const source = readFileSync(ANSWER_FORMAT, "utf8") + readFileSync(CONTEXT_ASSEMBLER, "utf8") + readFileSync(SERVICE_CONCEPTS, "utf8");
   const headers = ["RESPONSE_INSTRUCTIONS", "TOOL_CALL_INSTRUCTIONS", "SECTION", "SEARCH_INSTRUCTIONS", "MEMORY_INSTRUCTIONS"].flatMap((name) => {
     const block = new RegExp(`${name} = """([\\s\\S]*?)"""`).exec(source);
     assert.ok(block, `${name} 상수를 찾지 못했다`);

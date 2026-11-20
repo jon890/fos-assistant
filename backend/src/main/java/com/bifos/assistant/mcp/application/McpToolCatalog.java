@@ -6,6 +6,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,10 +23,11 @@ public class McpToolCatalog {
     private final McpApprovalResumeTool approvalResume;
     private final McpFileSpaceTools fileSpace;
     private final McpConnectorListTool connectorList;
+    private final McpTaskTools taskTools;
 
 
     public List<Map<String, Object>> tools() {
-        return List.<Map<String, Object>>of(
+        return Stream.concat(List.<Map<String, Object>>of(
             Map.of(
                 "name",
                 "memory_read",
@@ -186,7 +188,8 @@ public class McpToolCatalog {
                         "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
                     List.of("query"))))
-            .stream().map(McpToolCatalog::allowRuntimeContext).toList();
+            .stream(), taskTools.definitions().stream())
+            .map(McpToolCatalog::allowRuntimeContext).toList();
     }
 
 
