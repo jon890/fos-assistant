@@ -21,9 +21,10 @@ test.describe("넓은 화면", () => {
     test.skip(testInfo.project.name === "mobile", "넓은 화면 사례다");
     await page.goto("/settings");
     const menu = settingsMenu(page);
-    await expect(menu.getByRole("group")).toHaveCount(4);
+    await expect(menu.getByRole("group")).toHaveCount(5);
     for (const [group, links] of [
       ["비서", ["에이전트"]],
+      ["알림", ["알림"]],
       ["연결", ["외부 서비스 연결", "내 브라우저"]],
       ["내 데이터", ["파일 공간"]],
       ["도움말", ["개발 문서", "데이터 보관 안내"]],
