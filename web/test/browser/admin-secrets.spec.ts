@@ -50,7 +50,7 @@ test("관리자는 서버 비밀값 메뉴에서 입력됨과 앞부분을 보�
   const dialog = page.getByRole("alertdialog");
   await expect(
     dialog.getByText(
-      "브라우저 플러그인 바인딩 2개를 다시 설치합니다. Hermes 를 다시 띄우기(반영 완료) 전까지 그 플러그인은 동작하지 않습니다.",
+      "브라우저 플러그인 바인딩 2개를 다시 설치합니다. 자동으로 반영될 때까지 그 플러그인은 동작하지 않습니다.",
     ),
   ).toBeVisible();
   await clickAndWaitForResponse(
@@ -59,7 +59,7 @@ test("관리자는 서버 비밀값 메뉴에서 입력됨과 앞부분을 보�
     "POST",
     /^\/api\/admin\/secrets\/browser-gateway\/regenerate$/,
   );
-  await expect(page.getByText("2개를 다시 설치했어요. 반영 완료 전까지 브라우저 플러그인은 동작하지 않습니다.")).toBeVisible();
+  await expect(page.getByText("2개를 다시 설치했어요. 자동으로 반영될 때까지 브라우저 플러그인은 동작하지 않습니다.")).toBeVisible();
 });
 
 test("값이 비어 있으면 확인 창 없이 만들고 플러그인 목록을 못 읽은 결과를 알린다", async ({ page }) => {

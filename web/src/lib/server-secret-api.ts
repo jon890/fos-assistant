@@ -48,7 +48,7 @@ export function regenerateConfirmText(bindingCount: number | null): string {
     bindingCount === null
       ? "붙은 브라우저 플러그인 바인딩을"
       : `브라우저 플러그인 바인딩 ${bindingCount}개를`;
-  return `${target} 다시 설치합니다. Hermes 를 다시 띄우기(반영 완료) 전까지 그 플러그인은 동작하지 않습니다.`;
+  return `${target} 다시 설치합니다. 자동으로 반영될 때까지 그 플러그인은 동작하지 않습니다.`;
 }
 
 /** 다시 만들기 결과를 관리자에게 보일 문장들이다. */
@@ -59,7 +59,7 @@ export function reinstallSummary(result: BindingReinstall): string[] {
     ];
   if (result.total === 0) return ["새 비밀을 만들었어요."];
   const lines = [
-    `${result.total - result.failed}개를 다시 설치했어요. 반영 완료 전까지 브라우저 플러그인은 동작하지 않습니다.`,
+    `${result.total - result.failed}개를 다시 설치했어요. 자동으로 반영될 때까지 브라우저 플러그인은 동작하지 않습니다.`,
   ];
   if (result.failed > 0)
     lines.push(
