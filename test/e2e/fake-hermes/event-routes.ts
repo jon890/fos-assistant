@@ -273,6 +273,11 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
           // 사용자 중지가 아니라 끊긴 실행으로 판정한다.
           while (state.heldRunId === runId && run.status === "running" && !response.destroyed) await wait(20);
           if (response.destroyed) return;
+          // 재기동으로 잃은 실행(`unknown`)에는 끝 사건이 없다. 실제 Hermes 처럼 연결만 끊는다.
+          if (run.status === "unknown") {
+            response.destroy();
+            return;
+          }
           event({ event: run.status === "cancelled" ? "run.cancelled" : "run.completed" });
           response.end();
           return;
