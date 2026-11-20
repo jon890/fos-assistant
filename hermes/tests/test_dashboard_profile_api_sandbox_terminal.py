@@ -213,6 +213,8 @@ class ProfileApiSandboxTerminalTest(support.ProfileApiRouteTest):
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.body["code"], "sandbox_unavailable")
+        # 디렉터리를 준비하지 못한 거절은 정책 밖이 아니다. Control Plane 이 셸을 끄지 않게 reason 을 넣지 않는다.
+        self.assertNotIn("reason", response.body)
         self.assertEqual(path.read_bytes(), original)
 
     def test_sandbox_terminal_mounts_profile_entries_only_on_that_profile(self):

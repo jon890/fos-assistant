@@ -2,6 +2,7 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -10,9 +11,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentSandboxSweep;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -27,6 +30,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,21 +66,27 @@ class AgentSandboxSweepTest {
     HermesToolsetClient toolsets;
 
     @Autowired
+    AgentConnectorBindings connectorBindings;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     private AppUser owner;
     private Agent groupAgent;
+    private Agent unlisted;
 
 
     @BeforeEach
     void setUp() {
-        reset(toolsets);
+        reset(toolsets, connectorBindings);
+        when(connectorBindings.connectorServers(any())).thenReturn(Set.of());
         jdbc.update("DELETE FROM agent WHERE hermes_profile LIKE 'sweep-%'");
         jdbc.update("DELETE FROM app_user WHERE group_id = ?", GROUP);
         owner = users.save(AppUser.of("sweep-owner@example.com", "지윤", GROUP, UserRole.MEMBER));
-        for (String profile : List.of(LISTED, UNLISTED, BROKEN, SHELL_OFF)) {
+        for (String profile : List.of(LISTED, BROKEN, SHELL_OFF)) {
             agents.save(agent(profile, AgentVisibility.PRIVATE, owner.id()));
         }
+        unlisted = agents.save(agent(UNLISTED, AgentVisibility.PRIVATE, owner.id()));
         groupAgent = agents.save(agent(GROUP_AGENT, AgentVisibility.GROUP, null));
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
         when(toolsets.readEnabled(anyString(), eq(LISTED))).thenReturn(List.of("web", "terminal", "fos-attachments"));
@@ -99,6 +109,28 @@ class AgentSandboxSweepTest {
         verify(toolsets).writeApiServer(UNLISTED, List.of("web", "fos-assistant"), "u" + owner.id());
         verify(toolsets, never()).writeApiServerInSandbox(eq(SHELL_OFF), anyList(), anyString());
         verify(toolsets, never()).writeApiServer(eq(SHELL_OFF), anyList(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("셸을 끌 때 붙은 플러그인 서버 이름과 Control Plane MCP 는 남긴다")
+    void keepsBoundConnectorServersWhenRemovingShell() {
+        when(connectorBindings.connectorServers(unlisted.id())).thenReturn(Set.of("naver-blog"));
+
+        sweep.sweepAll();
+
+        verify(toolsets).writeApiServer(UNLISTED, List.of("web", "fos-assistant", "naver-blog"), "u" + owner.id());
+    }
+
+
+    @Test
+    @DisplayName("설정이 꺼져 있으면 기동 이벤트에서 Hermes 를 부르지 않는다")
+    void doesNothingOnReadyWhenDisabled() {
+        reset(toolsets);
+
+        sweep.onReady();
+
+        verifyNoInteractions(toolsets);
     }
 
 
