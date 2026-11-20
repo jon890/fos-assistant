@@ -468,7 +468,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     }
 
 
-    /** 카탈로그에서 빠진 커넥터는 이름 대신 번호를 쓰고 도구와 스킬을 모른다. */
+    /** 카탈로그에서 빠진 커넥터는 이름 대신 번호를 쓰고 도구와 스킬을 모른다. 빠진 스킬은 바인딩의 기록이라 카탈로그와 상관없다. */
     private static AgentConnectionView view(
         ConnectorConnection connection, ConnectorBinding binding, ConnectorManifest manifest) {
         return new AgentConnectionView(
@@ -479,7 +479,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             binding == null ? null : binding.status(),
             binding != null && binding.restartRequired(),
             manifest == null ? 0 : manifest.tools().size(),
-            manifest == null ? List.of() : manifest.skills());
+            manifest == null ? List.of() : manifest.skills(),
+            binding == null ? List.of() : binding.skippedSkills());
     }
 
 

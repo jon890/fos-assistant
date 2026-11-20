@@ -1,4 +1,4 @@
-"""플러그인 MCP 서버를 띄우는 실행기다(docs/features/connector/design.md 의 「실행기(`connector_launcher.py`)」).
+"""플러그인 MCP 서버를 띄우는 실행기다(hermes/plugins/dashboard-profile-api/README.md 의 「실행기(`connector_launcher.py`)」).
 
 Hermes 가 바인딩의 서버 정의대로 `python -I connector_launcher.py <보관 파일 id> <플러그인 id> <칸 key>=<env>... -- <command> <args>...`
 로 연다. 보관 파일을 풀어 칸 값을 자식 env 에만 넣고 `execve` 로 실제 서버가 된다. 칸 값은 profile `.env` 와 서버 정의에 없다.

@@ -228,6 +228,70 @@ for (const restartRequired of [false, true]) {
   });
 }
 
+test("설치되지 않은 에이전트용 스킬은 연결 아래에 이름과 고치는 방법이 보이고 떼면 사라진다", async ({
+  page,
+}) => {
+  const code = await createAgent(page);
+  // 가짜 대시보드는 에이전트용 스킬을 내지 않는다. Control Plane 응답에 빠진 스킬을 더해 화면이 그리는 것만 본다.
+  const skills = ["demo-runner", "demo-report", "demo-tool"];
+  const skippedSkills = [
+    { name: "demo-runner", reasons: ["terminal_off"] },
+    { name: "demo-report", reasons: ["name_taken", "sandbox_env_missing"] },
+    { name: "demo-tool", reasons: ["terminal_off", "sandbox_unregistered"] },
+  ];
+  const withSkipped = (view: { bound: boolean }) =>
+    view.bound ? { ...view, skills, skippedSkills } : { ...view, skills };
+  await page.route(
+    `**/api/agents/${code}/connections/demo-notes`,
+    async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback();
+        return;
+      }
+      const response = await route.fetch();
+      await route.fulfill({ response, json: withSkipped(await response.json()) });
+    },
+  );
+  await page.route(`**/api/agents/${code}/connections`, async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { connections: { bound: boolean }[] };
+    await route.fulfill({
+      response,
+      json: { ...body, connections: body.connections.map(withSkipped) },
+    });
+  });
+  await page.goto(`/agents/${code}`);
+
+  const row = section(page).getByTestId("agent-connection");
+  await expect(row.getByTestId("agent-connection-skipped-skill")).toHaveCount(0);
+  await row.getByRole("button", { name: "붙이기" }).click();
+  await page
+    .getByRole("alertdialog", { name: `${TITLE} 연결을 붙일까요?` })
+    .getByRole("button", { name: "붙이기" })
+    .click();
+
+  const skipped = row.getByTestId("agent-connection-skipped-skill");
+  await expect(skipped).toHaveCount(3);
+  await expect(skipped.nth(0)).toContainText("demo-runner 스킬은 함께 설치되지 않았어요.");
+  await expect(skipped.nth(0)).toContainText("터미널을 켜면 잠시 뒤 함께 설치돼요.");
+  await expect(skipped.nth(1)).toContainText(
+    "같은 이름의 스킬이 이미 있어요. 그 스킬의 이름을 바꾸거나 지우면 함께 설치돼요.",
+  );
+  await expect(skipped.nth(1)).toContainText(
+    "이 에이전트에는 이 스킬을 돌릴 실행 환경이 없어요. 관리자에게 문의해 주세요.",
+  );
+  await expect(skipped.nth(2)).toContainText(
+    "이 에이전트에는 이 스킬을 돌릴 실행 환경이 없어요. 관리자에게 문의해 주세요.",
+  );
+  await expect(skipped.nth(2)).not.toContainText("터미널을 켜면");
+  // 설치될 스킬이 하나도 없으니 스킬 도구를 켜라는 안내는 없다.
+  await expect(row).not.toContainText("지침을 쓰려면 스킬 도구를 켜세요.");
+
+  await section(page).getByRole("button", { name: "떼기" }).click();
+  await expect(row.getByTestId("agent-connection-state")).toHaveText("붙지 않음");
+  await expect(row.getByTestId("agent-connection-skipped-skill")).toHaveCount(0);
+});
+
 test("도구 조회 실패에는 붙이기 위험을 알리고 다시 읽어 꺼짐을 확인하면 경고를 거둔다", async ({
   page,
   hermes,
