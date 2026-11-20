@@ -192,7 +192,15 @@ public class ProactiveCheckService {
             backgroundTasks.start(
                 "proactive-check-" + conversation.id(), () -> runCheck(user, conversation.id(), handle, run));
         } catch (RuntimeException | Error ex) {
-            log.warn("살펴보기를 시작하지 못했다 conversationId={}", conversation.id(), ex);
+            boolean cancelled = ex instanceof ApiException api && api.code() == ErrorCode.EVENT_WATCH_DISABLED;
+            if (cancelled) {
+                log.info("사건 감지가 꺼져 살펴보기 예약을 취소했다 conversationId={}", conversation.id());
+                if (opened.created()) {
+                    checkConversations.deleteCreated(conversation.id());
+                }
+            } else {
+                log.warn("살펴보기를 시작하지 못했다 conversationId={}", conversation.id(), ex);
+            }
             if (check != null) {
                 markFailed(check, ErrorCode.INTERNAL_ERROR.name());
             }
