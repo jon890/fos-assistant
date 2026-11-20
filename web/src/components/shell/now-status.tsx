@@ -40,6 +40,12 @@ export function NowStatusProvider({
 }) {
   const pathname = usePathname();
   const [nowCount, setNowCount] = useState(0);
+  // 꺼진 동안(설정 틀, 관리자 영역)의 옛 수가 돌아왔을 때 잠깐 보이지 않게 비운다.
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (wasEnabled !== enabled) {
+    setWasEnabled(enabled);
+    if (!enabled) setNowCount(0);
+  }
   useEffect(() => {
     if (!enabled) return;
     // 읽기마다 차례 번호를 붙여, 늦게 온 앞선 답이 나중 답을 덮지 않게 한다.

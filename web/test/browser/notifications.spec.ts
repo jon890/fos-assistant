@@ -125,7 +125,6 @@ test("할 것이 없고 새 알림만 있으면 점이 붙고, 「알림」 탭�
 });
 
 test("「알림」 탭에서 「지금 볼 것」 으로 다시 오면 「할 것」 이 열리고, 「할 것」 만 열 때는 알림 목록을 읽지 않는다", async ({ page }, testInfo) => {
-  await routeNowCount(page, () => 0);
   await routeNotifications(page, { items: [item(UNTARGETED_ID, "파일 지우기", null)], unread: 1 }, null);
   const listReads: string[] = [];
   page.on("request", (request) => {
@@ -134,8 +133,11 @@ test("「알림」 탭에서 「지금 볼 것」 으로 다시 오면 「할 �
     if (url.pathname === "/api/notifications" && url.searchParams.get("limit") !== "1") listReads.push(url.search);
   });
 
+  const summary = await routeNowCount(page, () => 0);
   await page.goto("/now");
   await expect(page.getByRole("tab", { name: /^할 것/ })).toHaveAttribute("aria-selected", "true");
+  // 서버가 그린 첫 그림만으로는 통과하므로, 브라우저가 화면을 살린 뒤에만 나가는 수 읽기를 먼저 기다린다.
+  await expect.poll(() => summary.reads).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("notification-item")).toHaveCount(0);
   expect(listReads, "「할 것」 탭만 열었는데 알림 목록을 읽었다").toEqual([]);
 
