@@ -50,7 +50,7 @@ test("실제 1,002건 목록의 끝에 도달하고 이전 목록과 경로 이�
   workspace,
 }) => {
   await preparePages(workspace.ownerDir);
-  await page.goto("/files?path=pages");
+  await page.goto("/files/workspace?path=pages");
   await expect(rows(page)).toHaveCount(1_000);
   await expect(previous(page)).toBeDisabled();
   const response = await turn(page, next(page));
@@ -69,7 +69,7 @@ test("실제 1,002건 목록의 끝에 도달하고 이전 목록과 경로 이�
   await expect(rows(page).first()).toContainText("f0000.txt");
   await turn(page, next(page));
   await crumb(page)
-    .getByRole("link", { name: "파일 공간", exact: true })
+    .getByRole("link", { name: "작업 폴더", exact: true })
     .click();
   await expect(rows(page)).toHaveCount(1);
   await rows(page).getByRole("link", { name: "pages", exact: true }).click();
@@ -83,7 +83,7 @@ test("선택 파일의 주소와 미리보기는 다음 이전 빈 페이지에�
   workspace,
 }) => {
   const directory = await preparePages(workspace.ownerDir);
-  await page.goto("/files?path=pages&file=pages%2Ff0000.txt");
+  await page.goto("/files/workspace?path=pages&file=pages%2Ff0000.txt");
   const preview = page.getByTestId("workspace-preview");
   await expect(preview.getByTestId("workspace-text")).toHaveText("합성 파일 0");
   // 모바일 시트가 목록을 덮어도 페이지 상태와 선택 상태의 독립성을 검사한다. 실제 페이지 요청과 같은 클릭 핸들러를 실행한다.
@@ -126,7 +126,7 @@ test("잘못된 cursor도 실제 서버가 400으로 거절하고 실패 뒤 페
   workspace,
 }) => {
   await preparePages(workspace.ownerDir);
-  await page.goto("/files?path=pages");
+  await page.goto("/files/workspace?path=pages");
   await expect(rows(page)).toHaveCount(1_000);
   const matches = (url: URL) =>
     url.pathname === "/api/workspace/entries" && url.searchParams.has("cursor");
@@ -161,7 +161,7 @@ test("빠른 중복 클릭과 늦은 이전 경로 응답이 현재 목록을 �
   workspace,
 }) => {
   await preparePages(workspace.ownerDir);
-  await page.goto("/files?path=pages");
+  await page.goto("/files/workspace?path=pages");
   await expect(rows(page)).toHaveCount(1_000);
   let release = () => {};
   const gate = new Promise<void>((resolve) => {
@@ -187,7 +187,7 @@ test("빠른 중복 클릭과 늦은 이전 경로 응답이 현재 목록을 �
   expect(requests).toBe(1);
   try {
     await crumb(page)
-      .getByRole("link", { name: "파일 공간", exact: true })
+      .getByRole("link", { name: "작업 폴더", exact: true })
       .click();
     await expect(rows(page)).toHaveCount(1);
   } finally {

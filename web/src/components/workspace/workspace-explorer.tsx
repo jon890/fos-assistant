@@ -112,7 +112,7 @@ function Failure({ status, onRetry }: { status: number; onRetry(): void }) {
             : "불러오지 못했어요"}
       </p>
       {lost ? (
-        <Link href="/files" prefetch={false} className="underline">
+        <Link href="/files/workspace" prefetch={false} className="underline">
           맨 위로 가기
         </Link>
       ) : (

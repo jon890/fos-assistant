@@ -1,6 +1,6 @@
 # 비서가 만든 이미지
 
-사용자가 대화로 부탁한 그림을 비서가 만들어 답 안에 보이고 「보관한 결과물」 에 남기는 기능이다.
+사용자가 대화로 부탁한 그림을 비서가 만들어 답 안에 보이고 「내 파일」 에 남기는 기능이다.
 
 covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/mcp/**/ImageSource*`, `hermes/plugins/fos-ctx/generated_image.py`, `hermes/plugins/fos-ctx/image_source.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
 
@@ -13,7 +13,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets
 
 - 비서가 만든 그림은 그 답 안에 그림으로 보인다. 답 글에 파일 경로나 `MEDIA:` 글자가 보이지 않는다.
 - 그림을 누르면 화면 가득 크게 보이고 원본을 내려받는다. 그림 아래의 접힌 칸에서 비서가 이미지 도구에 넘긴 지시문을 본다.
-- 그림은 요청자의 「보관한 결과물」 에 원본 그대로 자동 보관된다. 대화 쪽 원본이 보관 기간 정리로 지워지면 대화에는 안내와 「보관함에서 보기」 가 남는다.
+- 그림은 요청자의 「내 파일」 에 원본 그대로 자동 보관된다. 대화 쪽 원본이 보관 기간 정리로 지워지면 대화에는 안내와 「내 파일에서 보기」 가 남는다.
 - 그림과 지시문은 그 대화의 주인만 본다.
 - 모든 사용자의 기본 비서에 「그림 만들기」 가 켜져 있다. 켜고 끄는 것은 관리자만 한다. 켜면 이미지 서비스 설정이 함께 들어간다.
 - 예약 작업과 먼저 살펴보기처럼 사람이 없는 실행에서는 그림을 만들지 않는다.
@@ -124,11 +124,11 @@ sequenceDiagram
 | 그림이 있다 | 그림과 제목, 보관 상태(「보관 중」, 「보관 완료」, 「보관 실패」 와 「다시 보관」), 접힌 「그림 지시문 보기」 |
 | 그림을 누른다 | 화면 가득 크게 보인다. 제목과 「내려받기」, 지시문이 있다. 내려받는 파일 이름은 제목이다 |
 | 보관본이 없다 | 크게 보기에 「보관」 단추가 보인다. 자동 보관을 껐을 때, 중지한 답일 때, 보관이 실패했을 때, 보관본을 지웠을 때다 |
-| 보관본이 있다 | 크게 보기에 「보관함에서 보기」 가 보인다 |
-| 대화 쪽 원본이 보관 기간 정리로 지워졌다 | 그림 대신 제목과 안내가 보인다. 보관본이 있으면 「보관함에서 보기」 가 그 보관본을 펼친 채 「보관한 결과물」 을 연다. 지시문은 남는다 |
+| 보관본이 있다 | 크게 보기에 「내 파일에서 보기」 가 보인다 |
+| 대화 쪽 원본이 보관 기간 정리로 지워졌다 | 그림 대신 제목과 안내가 보인다. 보관본이 있으면 「내 파일에서 보기」 가 그 보관본을 펼친 채 「내 파일」 을 연다. 지시문은 남는다 |
 | 이미지 도구가 실패했다 | 그림 자리가 없다. 비서가 답 글로 까닭을 알린다 |
 
-「보관한 결과물」 목록의 그림 줄은 [`workspace.md`](workspace.md) 의 「보관한 결과물」 이 갖는다.
+「내 파일」 목록의 그림 줄은 [`workspace.md`](workspace.md) 의 「보관한 결과물」 이 갖는다.
 
 ## 답 글의 경로 가리기
 
@@ -146,6 +146,6 @@ Control Plane 은 메시지 응답에서, 화면은 흐르는 답을 그릴 때 
 - 관리자가 아닌 사용자의 기본 비서에 「그림 만들기」 가 켜져 있고 그림이 만들어진다. 그 profile 에 ChatGPT 구독 로그인이 없으면 설정이 있어도 도구가 보이지 않는다
 - 답에 그림이 보이고 경로 글자가 없다
 - 제목이 비서가 붙인 것이고 지시문이 사용자의 부탁보다 자세하다
-- 「보관한 결과물」 에 그림이 남는다. 가로나 세로가 긴 그림에서 「보관 실패」 가 나오는지 본다(설계의 「검증 전략」)
+- 「내 파일」 에 그림이 남는다. 가로나 세로가 긴 그림에서 「보관 실패」 가 나오는지 본다(설계의 「검증 전략」)
 - 휴대폰에서 그림을 크게 보고 두 손가락으로 확대한다
 - 사진 한 장을 올리고 일부만 바꿔 달라고 하면 고친 새 그림이 보이고 올린 사진은 그대로다. fos-ctx 를 Control Plane 보다 먼저 배포한다. 옛 fos-ctx 는 가리킴을 파일 경로로 읽다 실패한다
