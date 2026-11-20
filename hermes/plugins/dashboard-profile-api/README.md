@@ -286,7 +286,7 @@ plugin 이 올라올 때 보관 파일 이관 뒤에 옛 정의의 로컬 바인
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
 최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜면 `sandbox_owner` 가 필수다.
-정책이 적용되지 않는 profile 에서 이 도구를 켜는 저장은 local 로 두지 않고 409 `sandbox_unavailable`, `reason: unlisted` 로 거절한다. local 셸은 Hermes 프로세스의 사용자로 돌아 다른 profile 의 `.env`, 플러그인 값 파일, 다른 사용자의 첨부에 닿는다(ADR-20261120 / no-local-shell).
+정책이 적용되지 않는 profile 에서 이 도구를 켜는 저장은 local 로 두지 않고 409 `sandbox_unavailable`, `reason: unlisted` 로 거절한다. local 셸은 Hermes 프로세스의 사용자로 돌아 다른 profile 의 `.env`, 플러그인 값 파일, 다른 사용자의 첨부에 닿는다([ADR-20261120 / no-local-shell](../../../docs/adr/ADR-20261120-no-local-shell.md)).
 `terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
 
