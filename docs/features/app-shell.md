@@ -2,10 +2,10 @@
 
 대화에 집중하도록 사이드바, 이름 메뉴, 「설정」 화면, 입력창, 작업 과정 표시를 다시 배치하는 기능이다.
 
-covers: `web/src/components/shell/sidebar.tsx`, `web/src/components/shell/main-nav.tsx`, `web/src/components/shell/app-shell.tsx`
+covers: `web/src/components/shell/sidebar.tsx`, `web/src/components/shell/main-nav.tsx`, `web/src/components/shell/app-shell.tsx`, `web/src/components/chat/composer.tsx`, `web/src/components/chat/agent-switcher.tsx`
 
 요구와 결정은 스펙 [`app-shell/spec.md`](app-shell/spec.md), 구조와 실패 처리는 설계 [`app-shell/design.md`](app-shell/design.md) 가 갖는다.
-스펙의 PR1(사이드바, 이름 메뉴, 로그아웃, 설정 틀)이 들어왔다. 입구 줄, 작업 과정 표시, 알림 합치기, 화면 머리 맞추기는 뒤 PR 이 더한다.
+스펙의 PR1(사이드바, 이름 메뉴, 로그아웃, 설정 틀)과 PR2(입력창 안 아래 줄, 새 대화 화면의 이름표)가 들어왔다. 작업 과정 표시, 알림 합치기, 화면 머리 맞추기는 뒤 PR 이 더한다.
 
 ## 화면 틀의 흐름
 
@@ -42,6 +42,8 @@ flowchart LR
 - 설정 틀의 묶음과 좁은 화면의 목록·본문 나눔은 같은 문서의 「설정 틀」 이 갖는다.
 - 로그아웃이 실패하면 이름 줄 위에 안내가 보이고 로그인은 그대로다. 다른 기기와 다른 브라우저의 로그인은 그대로다.
 - Google 로그인은 늘 계정 고르기 화면을 먼저 보인다.
+- 입력창은 두 줄이다. 위 줄은 글 칸, 아래 줄은 왼쪽에 「＋」(사진 첨부)와 모델 단계 단추, 오른쪽에 중지와 보내기다. 입력창 밖에 따로 떠 있는 줄은 없다.
+- 새 대화 화면에는 에이전트 카드가 없다. 넓은 화면은 대화 영역 맨 위 머리 줄, 휴대폰은 위 막대 가운데의 이름표 단추를 눌러 목록에서 고른다. 사진이나 모델 단계를 먼저 골라 대화가 만들어졌으면 이름표가 잠기고, 누르면 바꿀 수 없는 까닭이 보인다.
 
 이 기능이 기대는 기존 규칙은 아래 문서가 갖는다.
 

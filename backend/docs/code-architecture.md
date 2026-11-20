@@ -666,12 +666,10 @@ MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션�
 | 중간 조각이 디렉터리가 아니거나 심볼릭 링크다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
 | 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
 
-중간 조각은 링크를 따라가지 않고 연다. glibc 위의 JDK 는 `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다.
-그 기능이 없으면 대체 경로를 탄다. 운영 이미지(`eclipse-temurin:21-jre-alpine`)는 musl 이라 이쪽이고, 개발 기계(macOS)도 그렇다. 대체 경로는 경고를 한 번 남긴다.
-대체 경로는 조각마다 링크인지 본 뒤 경로로 열고, 연 뒤에 다시 본다. 중간 조각이 모두 링크가 아닌 디렉터리인지, 실제 경로가 사용자 디렉터리 아래인지, 마지막 조각을 열기 전에 본 파일과 연 뒤 다시 본 파일이 같은지 확인하고 어긋나면 404 다.
-하드 링크 수와 읽기 권한은 두 경로 모두 경로로 다시 본다. 본문은 위 방법으로 연 것만 준다.
+중간 조각은 링크를 따라가지 않고 연다. `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어(`openat` + `O_NOFOLLOW`), 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다. 핸들로 따라오므로 확인과 열기 사이에 중간 조각이 링크로 바뀌어도 열려 있는 핸들이 가리키는 파일은 바뀌지 않아 링크 바꿔치기 경쟁(#359)이 막힌다. 운영 이미지(`eclipse-temurin:21-jre`)와 CI(Linux)가 glibc 라 이 경로를 탄다.
+`SecureDirectoryStream` 을 쓸 수 없는 운영체제(musl)에서는 파일 공간을 끈다(fail-closed). 그 경우 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 로 실패해 다른 사용자의 목록이나 본문이 새지 않는다. 개발 기계(macOS)도 `SecureDirectoryStream` 을 주므로 핸들 경로를 탄다.
+하드 링크 수와 읽기 권한은 경로로 다시 본다. 본문은 위 방법으로 연 것만 준다.
 하드 링크 수(`unix:nlink`)를 읽지 못하는 파일 시스템이면 1 로 본다.
-이 사후 확인은 확인과 열기 사이의 틈을 줄일 뿐 없애지 못한다. glibc 이미지로 옮겨 대체 경로 없이 꺼지게(fail-closed) 하는 일은 이슈 #359 가 갖는다([ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md) 의 「결과」).
 
 목록의 한 줄은 아래 종류 가운데 하나다.
 

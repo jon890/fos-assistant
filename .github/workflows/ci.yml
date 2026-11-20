@@ -124,6 +124,12 @@ jobs:
         if: matrix.suite == 'unit'
         working-directory: backend
         run: ./gradlew test
+      # 링크 바꿔치기 경쟁(#359) 재현 테스트는 스레드 경쟁이라 결과가 확률적이고 시간이 든다. PR 마다 돌리지 않고
+      # 정기 실행과 수동 실행에서만 짧게 돌려 핸들 경로가 유출 0 을 지키는지 본다. Linux 라 MOVE 와 EXCHANGE 모두 돈다.
+      - name: 링크 경쟁 재현 테스트 (#359)
+        if: matrix.suite == 'unit' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        working-directory: backend
+        run: ./gradlew linkRaceTest -PlinkRace.seconds=2
       # 캐시를 놓친 실행만 runner 가 빌드한 image 를 파일로 남긴다. cache 액션이 job 이 성공했을 때 이 파일을 저장한다.
       - name: 합성 loopback image 저장
         if: matrix.suite == 'unit' && steps.loopback-image.outputs.cache-hit != 'true'

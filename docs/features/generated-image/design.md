@@ -1,6 +1,6 @@
 # 비서가 만든 이미지 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지), PR3(REQ15 부터 REQ17 까지)을 설계한다. PR2 의 설계는 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이, PR3 의 설계는 「PR3: 지금 대화의 사진과 그림을 바탕으로 고치기」 절이 갖는다. PR4 의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지), PR3(REQ15 부터 REQ17 까지), PR4(REQ18, REQ19)를 설계한다. PR2 의 설계는 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이, PR3 의 설계는 「PR3: 지금 대화의 사진과 그림을 바탕으로 고치기」 절이, PR4 의 설계는 「PR4: 만든 그림을 블로그 원고에 넣기」 절이 갖는다.
 
 ## 요구사항 연결
 
@@ -23,8 +23,8 @@
 | REQ15 | 모델이 `image_url` 과 `reference_image_urls` 에 `attachment:<첨부 번호>` 나 `generated:<제목>` 을 적는다. fos-ctx 의 `pre_tool_call` 이 하나씩 Control Plane 에서 받아 profile 의 media cache 에 사본으로 쓰고 인자를 그 경로로 바꾼다. 원본은 읽기만 한다 |
 | REQ16 | Control Plane 이 origin 실행의 사용자와 대화에서만 찾는다. 요청자가 보낸 그 대화의 사진과 그 대화의 그림 행만 내준다. 하나라도 받지 못하거나 가리킴이 아닌 값(경로, 주소, data URL)이 있으면 fos-ctx 가 호출을 막고 어느 것이 왜 안 되는지 적은 글을 모델에게 준다 |
 | REQ17 | 실행 입력의 그림 규칙에 고치기 규칙과 그 대화의 그림 제목 목록을 더한다 |
-| REQ18 | PR4 가 설계한다. 방향은 원고의 사진 자리가 첨부 번호와 함께 그 대화의 그림 행도 가리키게 하는 것이다 |
-| REQ19 | REQ18 과 같은 PR 이 함께 설계한다 |
+| REQ18 | 모델이 `content_draft_image` 에 그림 제목을 주면 Control Plane 이 그 그림의 사진 첨부 사본을 같은 대화에 만들고 첨부 번호와 파일 이름을 돌려준다. 모델은 그 값을 원고의 사진 자리에 쓰고, 미리보기와 원고 저장, 네이버 임시저장은 사진과 같은 길로 그 사본을 쓴다 |
+| REQ19 | 그림 파일이 보관 기간 정리로 지워졌으면 사본을 만들지 않고 `IMAGE_SOURCE_GONE` 과 고정 안내를 돌려준다. 이미 만든 사본은 사진 첨부라 사진의 보관 기간과 삭제 규칙을 그대로 따른다 |
 
 ## 책임과 경계
 
@@ -325,6 +325,74 @@ Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 �
 | 결과 hook 이 돌지 못했다 | 사본이 media cache 에 남는다. 다음 받기가 1시간이 지난 사본을 지운다 |
 | 이미지 서비스가 입력 그림을 거절한다 | Hermes 의 오류 결과가 모델에게 가고 PR1 처럼 모델이 까닭을 답한다 |
 
+## PR4: 만든 그림을 블로그 원고에 넣기
+
+근거와 기각한 대안은 [ADR-20261120 / generated-image-draft](../../adr/ADR-20261120-generated-image-draft.md) 가 갖는다.
+
+### 원고가 사진을 쓰는 길
+
+원고의 사진 자리는 사진 첨부(`chat_attachment`) 번호만 가리킨다. 그 번호로 아래가 모두 돈다([`content-draft.md`](../content-draft.md)).
+
+| 단계 | 사진을 쓰는 방법 |
+| --- | --- |
+| 초안 미리보기(`render_draft`) | 대화의 사진 폴더(`photo_dir`)에서 `<첨부 번호>.<확장자>` 파일을 확인하고, HTML 이 대화의 첨부 주소로 그 사진을 부른다 |
+| 원고 저장(`content_draft_write`) | 그 대화에 요청자가 올린 첨부인지, 지우지 않았고 보관 기간 안인지 보고 원본 지문을 고정한다. 원고의 기한은 첨부 기한 가운데 가장 이른 것이다 |
+| 승인 카드 | 첨부 주소로 사진을 그린다 |
+| 네이버 임시저장 worker | 사진 폴더 하나에서 첨부 파일을 읽고 지문을 맞춘 뒤 올린다. 모든 사진이 같은 폴더여야 한다 |
+
+만든 그림은 대화의 결과물 폴더에 있고 `chat_artifact` 행이다. 이 길에 그림을 따로 넣으면 원고 스키마와 두 지문, Java 재계산, worker 의 사진 폴더 규칙을 함께 바꿔야 한다.
+
+### 사진 첨부 사본
+
+**그림을 원고에 넣을 때 Control Plane 이 그 그림의 사진 첨부 사본을 같은 대화에 만든다.** 사본은 보통 사진 첨부와 같은 폴더와 같은 파일 이름 규칙을 쓰므로 위 네 단계가 고칠 것 없이 쓴다.
+
+- 사본 행은 `chat_attachment.source_artifact_id` 에 그 그림 행 번호를 적는다. 이 칸이 있으면 원고용 사본이다
+- 올린 사람은 대화 주인이고 `message_id` 는 비어 있다. 보관 기간은 사진을 올릴 때와 같이 만든 때부터 센다(`assistant.attachment.retention-days`)
+- 사본은 메시지에 묶이지 않으므로 대화 화면, 사진 순번, 실행 입력의 사진 참조 목록, 원고 미리보기의 「빠진 사진」 에 나오지 않는다. 사용자가 「3번 사진」 이라고 부르는 번호가 바뀌지 않는다
+- 보내지 않은 사진의 장수 상한과 메시지에 묶기에서 사본을 뺀다. 사용자가 사진을 올리는 데 영향이 없고 사본이 사용자 메시지에 붙지 않는다
+- 원고의 사진 판정(`ContentDraftReferences`)은 「메시지에 묶였거나 원고용 사본이다」 로 넓힌다. 나머지 판정(대화, 올린 사람, 삭제, 보관 기간)은 같다
+- 원고 snapshot 의 `ordinal` 은 보낸 사진 뒤에 첨부 번호 순서로 이어 붙인다. compiler 의 스키마가 요구하는 값이고 지문과 화면에 쓰지 않는다
+- 원본 조회 도구(`attachment_inspect`)는 사본을 받지 않는다. 모델은 그림을 이미 안다
+
+사본은 원고용으로만 만든다. 그림 행을 처음부터 사진 첨부로 두면 대화 화면의 사진 순번과 사진 참조 목록에 섞인다.
+
+### 도구
+
+`content_draft_image` 를 Control Plane MCP 에 더한다. 원고 도구와 같은 사전·사후 검사(`McpContentDraftTools.guarded`)와 오류 변환을 쓴다. 살펴보기 대화와 메시지 없는 자동 작업 대화에는 원고 도구처럼 쓸 수 없다.
+
+| 인자 | 뜻 |
+| --- | --- |
+| `title` | 그 대화에서 만든 그림의 제목. 1~200자. 실행 입력의 「이 대화에서 만든 그림」 줄과 같은 글자다 |
+
+| 결과 | 응답 |
+| --- | --- |
+| 넣을 수 있다 | `{"assetId": "<첨부 번호>", "fileName": "<첨부 번호>.<확장자>", "photoDir": "<사진 폴더>", "title": "<제목>"}`. 원고의 `assetId` 와 초안의 `[사진 N: <fileName>]`, `photo_dir` 에 쓴다. 사진 폴더는 사진 참조 목록 위에 적는 폴더와 같다. 사진을 올리지 않은 대화에는 그 목록이 없어 여기서 준다 |
+| 그 제목의 그림이 없다 | `IMAGE_SOURCE_UNKNOWN` 과 고정 안내 |
+| 그림 파일이 보관 기간 정리로 지워졌다 | `IMAGE_SOURCE_GONE` 과 고정 안내. 사본이 있어도 돌려주지 않는다(REQ19) |
+
+- 그 대화의 같은 그림으로 만든 사본이 아직 쓸 수 있으면(지우지 않았고 보관 기간 안이고 파일이 있다) 새로 만들지 않고 그 사본을 돌려준다. 원고를 고쳐 다시 넣어도 사본이 늘지 않는다. 그림 파일이 지워졌으면 사본이 있어도 거절한다(REQ19). 이미 넣은 원고는 사본 번호를 그대로 쓰므로 고쳐 저장할 수 있다
+- 찾기부터 사본 행과 파일 쓰기까지 `ChatContentMutationCoordinator` 의 사용자와 대화 잠금 안에서 한다. 같은 그림을 동시에 넣어도 사본이 하나다
+- 파일은 행 번호를 받은 뒤 쓰고, 트랜잭션이 되돌려지면 쓴 파일을 지운다
+- 그림 행은 보관 사본이 아닌 행을 제목으로 찾는다(PR3 의 `GeneratedImageService.readByTitle` 과 같은 판정). 크기 상한도 같다. 그림 바이트는 사본을 새로 만들 때만 읽는다
+- 사람이 없는 실행에서 막지 않는다. 이 도구는 이미 만든 그림을 복사할 뿐 구독 한도를 쓰지 않는다
+
+### 실행 입력과 스킬
+
+- 네이버 블로그 스킬의 「초안」 과 「새 글 저장」 에 만든 그림을 넣는 법을 더한다. 사용자가 그림을 글에 넣어 달라고 하면 `content_draft_image` 로 받은 `fileName` 과 `photoDir` 을 초안에, `assetId` 를 원고의 사진 자리에 쓴다
+- 실행 입력의 그림 규칙은 바꾸지 않는다. 그림 제목 목록(PR3)이 이미 매 turn 들어간다
+
+### 실패와 일관성(PR4)
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 사본을 만든 뒤 원고를 저장하지 않았다 | 사본은 화면에 보이지 않은 채 보관 기간이 지나면 사진 정리가 지운다 |
+| 사본을 넣은 원고의 그림 파일이 보관 기간 정리로 지워졌다 | 원고는 사본만 보므로 그대로다. 사본의 보관 기간이 끝나면 사진과 같이 원고가 STALE 이 된다(REQ19) |
+| 사용자가 대화를 지웠다 | 기존 대화 정리가 사본도 함께 지운다 |
+| 새 Control Plane 에 옛 fos-ctx | fos-ctx 는 Control Plane 의 모든 MCP 도구에 맥락을 서명하므로 도구가 돈다. 서명하지 못했을 때 막는 목록에만 빠져 있다 |
+| 옛 Control Plane 에 새 스킬 | 도구가 없어 모델이 그림을 넣지 못한다고 답한다. Control Plane 을 먼저 배포한다 |
+
+마이그레이션은 칸 하나를 더하기만 한다. 옛 행은 모두 NULL 이라 지금과 같다.
+
 ## 실패와 일관성
 
 | 무엇 | 어떻게 되나 |
@@ -338,7 +406,7 @@ Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 �
 | 보관 기간 정리 | 그림 행도 기존 규칙을 따른다. 파일을 지우면 `deleted_at` 을 적고 지시문 칸은 남긴다(REQ9) |
 | 대화 정리 | 기존 `deleteAllOf` 가 그림 행과 지시문을 함께 지운다. 보관본은 남는다 |
 
-PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경로를 아무도 부르지 않고, fos-ctx 를 먼저 올리면 404 를 받아 결과를 바꾸지 않는다. 마이그레이션은 칸을 더하기만 한다. PR3 은 fos-ctx(대시보드 plugin 이 profile 에 설치한다)를 먼저 배포한다. 「실패와 일관성(PR3)」 을 본다.
+PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경로를 아무도 부르지 않고, fos-ctx 를 먼저 올리면 404 를 받아 결과를 바꾸지 않는다. 마이그레이션은 칸을 더하기만 한다. PR3 은 fos-ctx(대시보드 plugin 이 profile 에 설치한다)를 먼저 배포한다. 「실패와 일관성(PR3)」 을 본다. PR4 는 Control Plane 을 먼저 배포한다. 「실패와 일관성(PR4)」 을 본다.
 
 ## 검증 전략
 
@@ -359,6 +427,8 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | REQ15, REQ16 의 hook | `hermes/tests/test_image_source.py`. 가짜 Control Plane 으로 세 장을 받아 인자를 사본 경로로 바꾸는지, 하나라도 못 받으면 막고 사본을 지우는지, 가리킴이 아닌 값과 16장 초과, 옛 Control Plane 을 막는지, 결과 hook 이 사본을 지우는지 본다 |
 | REQ15 의 Hermes 쪽 | `hermes/tests/test_generated_image_contract.py`. 두 인자의 이름과 media cache 의 호스트 읽기, 16장 상한을 Hermes 소스에서 본다 |
 | REQ17 | 실행 입력을 만드는 기존 테스트에서 고치기 규칙과 그림 제목 줄을 본다 |
+| REQ18 | `ContentDraftImagesTest` 가 사본이 그림과 바이트가 같고 그 번호로 원고를 저장하는지, 같은 그림을 두 번 넣어도 사본이 하나인지, 사본이 사진 순번과 사진 참조 목록, 보내지 않은 사진 수, 메시지 묶기에 나오지 않는지 본다. `ContentDraftSnapshotsTest` 가 snapshot 입력에서 사본이 사진과 같은 폴더의 파일이고 그 파일이 그림과 같은지, `ContentDraftImageToolTest` 가 MCP 결과를 본다. `ContentDraftJobLoopbackTest` 가 사본을 넣은 원고를 승인해 합성 worker 가 가짜 네이버에 올린 바이트의 지문이 그림과 같은지 본다 |
+| REQ19 | `ContentDraftImagesTest` 가 보관 기간 정리로 파일을 지운 그림은 사본이 있어도 `IMAGE_SOURCE_GONE` 이고 사본을 만들지 않는지, 이미 넣은 원고는 그림 파일을 지운 뒤에도 남아 사본 번호로 고쳐 저장되고 사진의 보관 기간이 지나면 쓸 수 없는지 본다. `ContentDraftImageToolTest` 가 모델이 받는 고정 안내를 본다 |
 
 실제 이미지 서비스로 한 장을 만드는 왕복은 배포 뒤 운영에서 확인한다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」).
 
@@ -383,6 +453,9 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | DECISION12 | 사본을 넘기는 모양 | data URL 이 아니라 파일 경로 | 작성자 | 고친 인자는 Hermes 의 도구 사건과 결과 hook 에 그대로 간다. 수 MB 의 base64 가 실행 사건으로 Control Plane 까지 흐르지 않게 한다 |
 | DECISION13 | 사진을 가리키는 번호 | 도구 인자는 첨부 번호(`attachment_id`), 지시문과 답은 대화 안의 순번 | 작성자 | 모델은 매 turn 사진 참조 목록에서 둘을 함께 받는다. 첨부 번호는 원본 조회 도구가 이미 쓰는 값이고 사람이 보는 글에는 순번을 쓴다(스펙 DECISION28) |
 | DECISION14 | 옛 Control Plane(404)에서 | 가리킴이 든 호출을 막는다 | 작성자 | 경로를 받던 동작으로 돌아가면 다른 대화의 사진을 읽을 수 있다. 막아도 가리킴 없는 그림 만들기는 그대로다 |
+| DECISION15 | 그림을 원고에 넣는 길 | 원고에 넣을 때 그 그림의 사진 첨부 사본을 같은 대화에 만든다 | 작성자 | [ADR-20261120 / generated-image-draft](../../adr/ADR-20261120-generated-image-draft.md). 원고의 사진 판정, 두 지문, worker 의 사진 폴더 규칙을 바꾸지 않는다 |
+| DECISION16 | 사본을 만드는 때 | 모델이 부르는 도구 `content_draft_image` 가 만든다 | 작성자 | 초안 미리보기(`render_draft`)가 원고 저장보다 먼저 돌아 파일 이름이 그때 필요하다. 원고 저장의 `assetId` 에 제목을 받으면 미리보기에서 그림을 보이지 못한다 |
+| DECISION17 | 사본을 사진 목록에서 빼는 방법 | `chat_attachment` 의 새 칸 `source_artifact_id` 하나와 비운 `message_id` | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 메시지에 묶지 않으면 사진 순번과 화면, 사진 참조 목록이 이미 빼므로 고칠 곳이 적다 |
 
 ## 결정 기록 연결
 
@@ -393,3 +466,4 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | DECISION7, DECISION8, DECISION9, DECISION10 | architecture | [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md) | 이 설계의 「PR2」, [`agent-skill.md`](../agent-skill.md) 의 「에이전트 도구」 |
 | DECISION11, DECISION12, DECISION14 | architecture | [ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md) | 이 설계의 「PR3」, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
 | DECISION13 | architecture | 필요 없음. 기존 첨부 번호와 순번 규칙([`attachment.md`](../attachment.md))을 따른다 | 이 설계의 「PR3」 |
+| DECISION15, DECISION16, DECISION17 | architecture | [ADR-20261120 / generated-image-draft](../../adr/ADR-20261120-generated-image-draft.md) | 이 설계의 「PR4」, [`content-draft.md`](../content-draft.md) |
