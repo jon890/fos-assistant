@@ -15,7 +15,8 @@ import {
   type SetStateAction,
 } from "react";
 import { Menu, PanelLeft, SquarePen } from "lucide-react";
-import { AdminShell, LAST_CONVERSATION_KEY } from "./admin-shell";
+import { AdminShell } from "./admin-shell";
+import { LAST_CONVERSATION_KEY } from "./back-to-chat";
 import {
   ConversationsProvider,
   useConversations,
