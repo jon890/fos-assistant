@@ -79,7 +79,7 @@ public class AttachmentService {
     }
 
 
-    /** 명시적으로 요청한 개요는 원본을 그대로 넘겨 Pillow에서 표시 방향으로 줄인다. */
+    /** 명시적으로 요청한 개요와 그림을 고칠 바탕(ADR-20261120 / image-source)은 보낸 원본을 바이트 그대로 받는다. */
     public InspectedImage inspectOverview(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
         InspectedImage result = inspection.readRaw(attachment);

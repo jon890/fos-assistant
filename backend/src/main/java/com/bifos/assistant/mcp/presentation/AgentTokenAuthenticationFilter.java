@@ -41,7 +41,8 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
         "/internal/hermes/tool-guard",
         "/internal/hermes/attachment-inspect",
         "/internal/hermes/attachment-inspect/validate",
-        "/internal/hermes/generated-image");
+        "/internal/hermes/generated-image",
+        "/internal/hermes/image-source");
 
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";
