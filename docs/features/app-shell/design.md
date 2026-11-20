@@ -192,7 +192,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 - 탭은 `radix-ui` 의 Tabs 로 그린다. 키보드의 좌우 이동과 `tablist` 역할을 새로 만들지 않는다. 감싸는 부품은 `components/ui/tabs.tsx` 다.
 - **열린 탭은 주소가 정한다.** `NowTabs` 가 `useSearchParams()` 의 `tab` 이 `notifications` 이면 「알림」 을 연다. 탭을 바꾸면 `window.history.replaceState` 로 주소만 바꾸고 Next 가 그 값을 `useSearchParams` 에 반영한다. 서버를 다시 부르지 않고, 새로 고치거나 다른 화면에서 `/now` 로 와도 주소대로 열린다. page 는 `searchParams` 를 읽지 않고 서버 부품 `NowScreen` 을 `todo` prop 으로 넘긴다.
 - 「알림」 탭의 목록은 그 탭을 처음 열 때 올라오고 그 뒤에는 내려가지 않는다. `/now` 를 열 때마다 알림 첫 쪽을 읽지 않으면서, 탭을 오가도 목록과 이어 읽은 자리가 남는다. 「할 것」 은 서버가 이미 그렸으므로 늘 올라와 있고 감춰지기만 한다. 두 탭 내용은 Radix 의 `forceMount` 로 올려 두므로 `hidden` 이 붙지 않는다. 감추는 것은 `tabs.tsx` 의 `data-[state=inactive]:hidden` 이 맡는다.
-- 수는 낭독기가 탭 이름과 함께 읽는다. 숫자 배지는 `aria-hidden` 이고 옆의 `sr-only` 글(「3건」, 「읽지 않은 알림 2개」)이 읽힌다.
+- 수는 낭독기가 탭 이름과 함께 읽는다. 숫자 배지는 `aria-hidden` 이고 옆의 `sr-only` 글(「3건」, 「읽지 않음 2개」)이 읽힌다.
 - `/notifications` page 는 그리지 않고 `redirect("/now?tab=notifications")` 다. 로그인 확인은 `/now` page 가 한다. 웹 푸시의 열기 주소(`/n/<id>`)는 attention 기능이 따로 갖는다.
 
 ### 지금 볼 것 수와 점

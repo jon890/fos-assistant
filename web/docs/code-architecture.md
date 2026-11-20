@@ -71,7 +71,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 └────────────┴────────────────────────────┴──────────────────┘
 ```
 
-사이드바는 대화 쪽 화면(`/`, `/new`, `/chat/{id}`, `/now`, `/tasks`, `/memory`, `/notifications`)에 있다.
+사이드바는 대화 쪽 화면(`/`, `/new`, `/chat/{id}`, `/now`, `/tasks`, `/memory`)에 있다. `/notifications` 는 `/now?tab=notifications` 로 넘기기만 한다.
 관리자 영역의 틀은 아래 「관리자 영역의 틀」, 설정 화면들의 틀은 「설정 틀」 절이 갖는다.
 무엇을 남기고 무엇을 뒤로 보냈는지와 그 까닭은 [`docs/features/app-shell/spec.md`](../../docs/features/app-shell/spec.md) 가 갖는다.
 
