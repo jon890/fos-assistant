@@ -149,7 +149,7 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | --- | --- |
 | `task_list` | 읽기라 늘 받는다 |
 | `task_delete` | 카드만 띄우므로 늘 받는다(DECISION32) |
-| `task_create`, `task_update`, `task_set_state` | 그 살펴보기의 `writes_allowed` 가 참일 때만 받는다. 점검 대화로 묶지 않는다 |
+| `task_create`, `task_update`, `task_set_state` | 그 살펴보기의 `writes_allowed` 가 참일 때만 받는다. 받는 조건에 점검 대화를 보지 않는다. 만든 작업의 결과는 위 「만들 때 정하는 값」 대로 그 실행의 대화(점검 대화)에 쌓인다 |
 
 예약 작업의 실행과 맡긴 실행은 사람이 보낸 실행과 같다(DECISION10). 맡긴 실행이 만든 작업은 맡겨진 에이전트로 돌고 매번 새 대화다.
 
@@ -191,3 +191,4 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | DECISION10 | 하루 발화 수를 넘는 cron | 만들 때와 고칠 때 거절한다 | 작성자 | 스펙 REQ7 의 「넘으면 만들지 않고 까닭을 알린다」. 화면은 발화할 때 건너뛰지만, 에이전트가 만든 작업이 매일 반을 건너뛰면 사용자가 모른다. 화면의 검사는 바꾸지 않는다 |
 | DECISION11 | 대상을 찾는 인자 | `task` 하나에 번호나 이름을 받는다 | 작성자 | 모델이 목록을 먼저 읽지 않아도 이름으로 부를 수 있다. 이름이 겹치면 후보만 돌려줘 REQ8 의 되묻기를 지킨다 |
 | DECISION12 | 멈추기와 다시 켜기의 도구 | `task_set_state` 하나에 `state` 를 받는다 | 작성자 | 도구 정의는 매 실행 입력에 들어 글이 준다. 둘은 같은 대상과 같은 결과 모양이다 |
+| DECISION13 | 바로 하는 쓰기와 승인 카드의 범위, 사람이 없는 실행 | [ADR-20261120 / agent-service-writes](../../../backend/docs/adr/ADR-20261120-agent-service-writes.md) 에 남긴다 | 작성자 | 스펙 「결정 기록 연결」 이 이 선택을 ADR 로 남기라고 정했다 |
