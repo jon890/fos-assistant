@@ -46,9 +46,23 @@ const LABELS: Record<string, Label> = {
     running: "기억을 서로 잇고 있어요",
     done: "기억을 서로 이었어요",
   },
+  // 사용자가 시킨 것은 바로 적고 스스로 판단한 것은 제안한다. 둘 다 맞게 읽히도록 쓴다.
   follow_up_propose: {
-    running: "할 일을 제안하고 있어요",
-    done: "할 일을 제안했어요",
+    running: "할 일을 남기고 있어요",
+    done: "할 일을 남겼어요",
+  },
+  follow_up_list: {
+    running: "할 일을 보고 있어요",
+    done: "할 일을 봤어요",
+  },
+  follow_up_done: {
+    running: "할 일을 끝내고 있어요",
+    done: "할 일을 끝냈어요",
+  },
+  // 지우기는 승인 카드만 만든다. 지운 것처럼 읽히지 않게 쓴다.
+  memory_forget: {
+    running: "기억 삭제 승인을 요청하고 있어요",
+    done: "기억 삭제 승인을 요청했어요",
   },
   content_draft_preview: {
     running: "원고 미리보기를 만들고 있어요",
