@@ -64,12 +64,12 @@ export const RULES = [
   [/^test\/model-eval\/(?:[^/]+\/)*[^/]*\.test\.ts$/, NONE],
   // 브라우저 검사가 E2E 의 가짜 Hermes 를, backend 와 hermes 테스트가 E2E 의 Python plugin 을 쓴다.
   [/^test\/e2e\//, ["e2e", "browser", "backend", "hermes"]],
-  [/^test\/spotless-jdt\.test\.py$/, ["quality"]],
+  [/^test\/spotless-jdt\.test\.ts$/, ["quality"]],
   // 합성 커넥터 catalog 는 backend 와 hermes 계약 검사가 읽고 브라우저 대역은 읽지 않는다.
   [/^test\/resources\/connector-argument-(?:masked-)?catalog\.json$/, ["backend", "hermes"]],
 
   [/^scripts\/checks\/check-mysql-migration\.sh$/, ["backend"]],
-  [/^scripts\/checks\/(check-connectors\.sh|check-hermes-contract\.sh|run-hermes-python-tests\.py)$/, ["hermes"]],
+  [/^scripts\/checks\/(check-connectors\.sh|check-hermes-contract\.sh|run-hermes-python-tests\.ts)$/, ["hermes"]],
   [/^scripts\/ci\/check-connector-package\.sh$/, ["hermes"]],
   [/^scripts\/checks\/(quality\.sh|quality-report\.mjs|format-connectors\.mjs|check-file-length\.mjs|file-length-baseline\.json)$/, ["quality"]],
   [/^scripts\/(?:ci\/)?browser-[^/]+\.mjs$/, ["browser"]],

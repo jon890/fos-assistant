@@ -124,6 +124,12 @@ jobs:
         if: matrix.suite == 'unit'
         working-directory: backend
         run: ./gradlew test
+      # 링크 바꿔치기 경쟁(#359) 재현 테스트는 스레드 경쟁이라 결과가 확률적이고 시간이 든다. PR 마다 돌리지 않고
+      # 정기 실행과 수동 실행에서만 짧게 돌려 핸들 경로가 유출 0 을 지키는지 본다. Linux 라 MOVE 와 EXCHANGE 모두 돈다.
+      - name: 링크 경쟁 재현 테스트 (#359)
+        if: matrix.suite == 'unit' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        working-directory: backend
+        run: ./gradlew linkRaceTest -PlinkRace.seconds=2
       # 캐시를 놓친 실행만 runner 가 빌드한 image 를 파일로 남긴다. cache 액션이 job 이 성공했을 때 이 파일을 저장한다.
       - name: 합성 loopback image 저장
         if: matrix.suite == 'unit' && steps.loopback-image.outputs.cache-hit != 'true'
@@ -469,7 +475,7 @@ jobs:
           package-manager-cache: false
       - run: node --test 'test/**/*.test.ts' 'scripts/**/*.test.ts'
       - name: 로컬 검사 스크립트 회귀 테스트
-        run: python3 -I test/e2e/financial/test_local_check.py
+        run: node --test test/e2e/financial/test_local_check.ts
       - name: 마이그레이션 버전 검사
         env:
           # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
@@ -535,7 +541,7 @@ jobs:
             bun run --cwd "$connector" build
           done
       # 테스트 모듈마다 프로세스를 나눠 동시에 돌린다. 모듈 목록은 unittest discover 와 같다.
-      - run: python scripts/checks/run-hermes-python-tests.py -j 4
+      - run: bun scripts/checks/run-hermes-python-tests.ts -j 4
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 버전 소스에서 확인한다(ADR-088).
       - run: bash scripts/checks/check-hermes-contract.sh
 
@@ -593,8 +599,6 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
         if: needs.changes.outputs.quality == 'true'
-      - run: python3 test/spotless-jdt.test.py
-        if: needs.changes.outputs.quality == 'true'
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
         with:
@@ -606,6 +610,8 @@ jobs:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
+      - run: node test/spotless-jdt.test.ts
+        if: needs.changes.outputs.quality == 'true'
       - run: cd web && pnpm install --frozen-lockfile
         id: install
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
