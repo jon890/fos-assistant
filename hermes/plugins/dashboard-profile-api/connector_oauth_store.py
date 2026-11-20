@@ -152,22 +152,34 @@ def _fill_pending(vault: str, nonce: str, data: dict) -> None:
     _write_oauth(vault, connector, {**pending, **data, "nonce": nonce}, pending=True)
 
 
-def _commit(vault: str, nonce: str, token_url: str | None = None) -> None:
+def _commit(vault: str, nonce: str, token_url: str) -> None:
     """대기 파일 둘을 본 자리로 옮긴다. 보관 파일은 `_write_vault` 로 다시 써 값이 같으면 파일과 리비전이 그대로다.
 
-    `token_url` 을 주면 본 자리 OAuth 파일의 통로 주소를 그것으로 둔다. 대기 파일의 주소는 대기 표식(`p...`)이라
-    본 연결 표식(`k...`)으로 바꿔야 한다(docs/features/connector-oauth/design.md 의 「Control Plane API」).
+    본 자리 OAuth 파일의 통로 주소는 `token_url`(본 연결 표식 `k...`)이다. 대기 파일의 주소는 대기 표식(`p...`)이라
+    그대로 옮기면 흐름이 끝난 뒤 토큰을 받지 못한다(docs/features/connector-oauth/design.md 의 「Control Plane API」).
+    OAuth 파일을 먼저 쓰고 보관 파일을 쓴다. 보관 파일 쓰기가 실패하면 OAuth 파일을 앞 상태로 되돌려
+    붙여 넣기로 쓰던 연결의 칸 값과 OAuth 파일이 함께 사라지지 않게 한다.
     """
+    if not token_url:
+        raise ValueError("본 연결 통로 주소가 없다")
     pending = _pending_with(vault, nonce)
     values = _read_pending_values(vault)
     if not pending["refresh_token"] or values is None or values["connector"] != pending["connector"]:
         raise NonceMismatch()
     connector = pending.pop("connector")
     pending.pop("nonce")
-    if token_url is not None:
-        pending["token_url"] = token_url
-    _write_vault(vault, connector, values["values"])
+    pending["token_url"] = token_url
+    path = _side_path(vault, OAUTH_SUFFIX)
+    previous = path.read_bytes() if path.exists() else None
     _write_oauth(vault, connector, pending)
+    try:
+        _write_vault(vault, connector, values["values"])
+    except BaseException:
+        if previous is None:
+            path.unlink(missing_ok=True)
+        else:
+            _durable_private_write(path, previous)
+        raise
     _discard_files(vault)
 
 

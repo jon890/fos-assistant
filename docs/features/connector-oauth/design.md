@@ -121,13 +121,13 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | `POST /api/connector-oauth/authorize-url` | 플러그인 id, `mode`(`install`·`authorize`), client ID, App 이름, 돌아오는 주소, 상태 값, PKCE challenge | 로그인 주소. GitHub `install` 은 App 설치 화면, `authorize` 는 일반 허락 화면. Google 은 동의 화면(`access_type=offline`, `prompt=consent`) |
 | `POST /api/connector-oauth/begin` | 보관 파일 id, 단추 밖 칸 값 | 대기 보관 파일을 쓰고 `nonce` 를 답한다 |
 | `POST /api/connector-oauth/exchange` | 보관 파일 id, `nonce`, client ID·secret, 코드, PKCE verifier(있을 때), 돌아오는 주소, 통로 주소 | `outcome`. 성공하면 대기 OAuth 파일을 쓰고 access token 과 만료 시각을 답한다. Google 은 받은 scope 가 요청과 다르면 `scope_denied` |
-| `POST /api/connector-oauth/commit` | 보관 파일 id, `nonce`, 본 연결 통로 주소 | 대기 파일 둘을 본 자리로 옮긴다. 대기 파일의 통로 주소는 대기 표식이라 본 자리 OAuth 파일에는 받은 본 연결 주소를 쓴다. `nonce` 가 다르면 409 |
+| `POST /api/connector-oauth/commit` | 보관 파일 id, `nonce`, 본 연결 통로 주소 | 대기 파일 둘을 본 자리로 옮긴다. 대기 파일의 통로 주소는 대기 표식이라 본 자리 OAuth 파일에는 받은 본 연결 주소를 쓴다. 주소가 비면 400 이다. OAuth 파일을 먼저 쓰고, 보관 파일 쓰기가 실패하면 OAuth 파일을 앞 상태로 되돌린다. `nonce` 가 다르면 409 |
 | `POST /api/connector-oauth/discard` | 보관 파일 id, `nonce`, client ID·secret, access token | 대기 파일을 지운다. GitHub 은 그 access token 하나만 취소한다. Google 은 취소하지 않는다(아래 「취소 범위」) |
 | `POST /api/connector-oauth/refresh` | 보관 파일 id, client ID·secret | `outcome`, access token, 만료 시각. 바뀐 refresh token 은 답하기 전에 OAuth 파일에 쓴다 |
 | `POST /api/connector-oauth/revoke` | 보관 파일 id, client ID·secret, access token(있으면) | `outcome`. GitHub 은 access token 이 없으면 먼저 갱신해 받는다. 파일은 지우지 않는다. 지금 해제 경로의 보관 파일 `DELETE` 가 보관 파일과 OAuth 파일, 대기 파일 둘을 함께 지운다. 취소를 건너뛰거나 실패해도 refresh token 이 남지 않는다 |
 | `POST /api/connector-oauth/token-url` | 보관 파일 id, 새 통로 주소 | OAuth 파일의 `token_url` 만 바꾼다(서명 비밀 교체) |
 
-`outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable`, `missing`(갱신할 OAuth 파일이 없음) 가운데 하나다. 교환 응답에 refresh token 이 없으면 앱 설정(GitHub App 의 토큰 만료 끄기 등) 문제로 보고 `app_rejected` 다. 서비스 응답 원문과 토큰은 로그에 쓰지 않는다. 카탈로그 응답은 플러그인마다 정규화한 `oauth` 와 제공자의 설정 화면 주소를 함께 낸다.
+`outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable`, `missing`(갱신할 OAuth 파일이 없음) 가운데 하나다. 교환 응답에 refresh token 이 없으면 앱 설정(GitHub App 의 토큰 만료 끄기 등) 문제로 보고 `app_rejected` 다. 연결 실패와 5xx 는 본문에 오류 낱말이 있어도 `unavailable` 이다. 일시 장애를 「다시 연결 필요」 로 잘못 보지 않게 한다. 서비스 응답 원문과 토큰은 로그에 쓰지 않는다. 카탈로그 응답은 플러그인마다 정규화한 `oauth` 와 제공자의 설정 화면 주소를 함께 낸다.
 
 ### Control Plane API
 

@@ -47,7 +47,7 @@ BODIES = {
     "begin": ({"vault", "connector", "values"}, set()),
     "exchange": ({"vault", "connector", "nonce", "client_id", "client_secret", "code", "redirect_uri", "token_url"},
                  {"code_verifier"}),
-    "commit": ({"vault", "nonce"}, {"token_url"}),
+    "commit": ({"vault", "nonce", "token_url"}, set()),
     "discard": ({"vault", "connector", "nonce", "client_id", "client_secret"}, {"access_token"}),
     "refresh": ({"vault", "connector", "client_id", "client_secret"}, set()),
     "revoke": ({"vault", "connector", "client_id", "client_secret"}, {"access_token"}),
@@ -69,7 +69,7 @@ def _body_problem(action: str, body) -> str | None:
     for key, value in body.items():
         if key == "values":
             continue
-        if key in ("access_token", "code_verifier", "code_challenge", "app_slug", "token_url") and value in (None, ""):
+        if key in ("access_token", "code_verifier", "code_challenge", "app_slug") and value in (None, ""):
             continue
         if not _text(value):
             return "%s 가 올바르지 않다" % key
@@ -111,7 +111,13 @@ def _http(method: str, url: str, form: dict | None = None, json_body: dict | Non
 
 
 def _outcome(provider: dict, status: int | None, body: dict | None) -> str:
-    """서비스 응답을 `outcome` 낱말로 바꾼다. GitHub 은 오류도 200 본문으로 오므로 본문의 `error` 를 먼저 본다."""
+    """서비스 응답을 `outcome` 낱말로 바꾼다.
+
+    연결 실패와 5xx 는 본문과 상관없이 `unavailable` 이다. 일시 장애를 「다시 연결 필요」 로 잘못 보지 않게 한다.
+    그 밖에는 GitHub 이 오류도 200 본문으로 보내므로 상태 코드보다 본문의 `error` 를 먼저 본다.
+    """
+    if status is None or status >= 500:
+        return "unavailable"
     error = body.get("error") if isinstance(body, dict) else None
     if isinstance(error, str):
         if error in provider["grant_errors"]:
@@ -310,7 +316,7 @@ async def _connector_oauth_request(request, action: str, write_lock: asyncio.Loc
         if action == "commit":
             # 본 보관 파일을 쓰므로 보관 파일 잠금 다음 전역 잠금을 잡는다. 서비스를 부르지 않아 짧다.
             async with vault_lock(vault), write_lock:
-                await asyncio.to_thread(_commit, vault, body["nonce"], body.get("token_url"))
+                await asyncio.to_thread(_commit, vault, body["nonce"], body["token_url"])
             _log("commit", vault, "ok")
             return JSONResponse({"ok": True}, status_code=200)
         async with vault_lock(vault):

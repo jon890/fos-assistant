@@ -8,7 +8,7 @@ import json
 import types
 
 from plugin_loading import patch_plugin
-from dashboard_profile_api_support import DEMO, DEMO_VALUE
+from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE
 import test_connector_launcher as launcher_tests
 from test_connector_vault_encryption import VaultKeyTest
 
@@ -114,6 +114,15 @@ class ConnectorOAuthLaunchTest(VaultKeyTest):
         definition = self.bound(oauth={"provider": "gitlab", "fields": ["token"], "token_env": TOKEN_ENV})
         self.assertEqual(definition["env"][TOKEN_ENV], "")
         self.assertFalse(any(arg.startswith("@oauth=") for arg in definition["args"]))
+
+    def test_token_env_taken_by_operator_env_keeps_the_operator_value(self):
+        """`token_env` 가 운영자 env 와 겹치는 틀린 선언은 그 운영자 값을 비우지 않는다. 정의와 확인 도구 env 모두 그대로다."""
+        definition = self.bound(oauth={"provider": "github", "fields": ["token"], "token_env": "DEMO_BASE"})
+        self.assertEqual(definition["env"]["DEMO_BASE"], DEMO_BASE)
+        self.assertFalse(any(arg.startswith("@oauth=") for arg in definition["args"]))
+        _, env = self.call_with(vault="c1")
+        self.assertEqual(env["DEMO_BASE"], DEMO_BASE)
+        self.assertEqual(self.child_env(definition)["DEMO_BASE"], DEMO_BASE)
 
     def test_call_rejects_oauth_with_values_or_without_declaration(self):
         """`call` 에 `oauth` 와 `values` 를 함께 주면 400 이다. 선언 없는 플러그인의 `oauth` 도 400 이다."""

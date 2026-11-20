@@ -157,8 +157,19 @@ class ConnectorOAuthRoutesTest(VaultKeyTest):
                          ("authorization_code", "verifier-1", CLIENT_SECRET))
         pending = self.store._read_oauth("c1", pending=True)
         self.assertEqual((pending["refresh_token"], pending["token_url"]), (REFRESH, TOKEN_URL))
-        self.assertEqual(self.oauth("commit", vault="c1", nonce=nonce)[0], 200)
+        self.assertEqual(self.oauth("commit", vault="c1", nonce=nonce, token_url=TOKEN_URL)[0], 200)
         self.assertEqual(self.store._read_oauth("c1")["refresh_token"], REFRESH)
+
+    def test_commit_needs_the_current_token_url(self):
+        """commit 은 비지 않은 본 연결 통로 주소가 있어야 하고, 없으면 대기 파일이 그대로다."""
+        self.fake.responses[("POST", "/github/token")] = (200, {"access_token": ACCESS, "refresh_token": REFRESH})
+        nonce = self.begin()
+        self.exchange(nonce)
+        for body in ({}, {"token_url": ""}):
+            status, _ = self.oauth("commit", vault="c1", nonce=nonce, **body)
+            self.assertEqual(status, 400)
+        self.assertFalse((self.hermes_root / "connector-vault/c1.oauth").exists())
+        self.assertTrue((self.hermes_root / "connector-vault/c1.oauth.pending").exists())
 
     def test_exchange_without_refresh_token_is_an_app_problem(self):
         """refresh token 없는 응답은 `app_rejected` 이고 대기 OAuth 파일에 토큰이 없다."""
@@ -197,6 +208,9 @@ class ConnectorOAuthRoutesTest(VaultKeyTest):
             self.fake.responses[("POST", "/github/token")] = (200, {"error": error})
             self.assertEqual(self.oauth("refresh", **refresh)[1], {"outcome": outcome})
         self.fake.responses[("POST", "/github/token")] = (503, {})
+        self.assertEqual(self.oauth("refresh", **refresh)[1], {"outcome": "unavailable"})
+        # 5xx 는 본문에 허락 오류 낱말이 있어도 일시 장애다.
+        self.fake.responses[("POST", "/github/token")] = (503, {"error": "bad_refresh_token"})
         self.assertEqual(self.oauth("refresh", **refresh)[1], {"outcome": "unavailable"})
         self.use_google()
         self.connected(provider="google")
@@ -311,7 +325,7 @@ class ConnectorOAuthRoutesTest(VaultKeyTest):
         refreshed = self.oauth("refresh", vault="c1", connector=DEMO, client_id=CLIENT_ID,
                                client_secret=CLIENT_SECRET)[1]
         self.assertEqual(read("refresh-missing-response.json"), refreshed)
-        self.oauth("commit", vault="c1", nonce=nonce)
+        self.oauth("commit", vault="c1", nonce=nonce, token_url=TOKEN_URL)
         refreshed = self.oauth("refresh", vault="c1", connector=DEMO, client_id=CLIENT_ID,
                                client_secret=CLIENT_SECRET)[1]
         self.assertEqual(set(read("refresh-response.json")), set(refreshed))
@@ -330,7 +344,7 @@ class ConnectorOAuthRoutesTest(VaultKeyTest):
         with self.captured() as logs:
             nonce = self.begin()
             self.exchange(nonce)
-            self.oauth("commit", vault="c1", nonce=nonce)
+            self.oauth("commit", vault="c1", nonce=nonce, token_url=TOKEN_URL)
             self.oauth("refresh", vault="c1", connector=DEMO, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
         text = "\n".join(logs)
         self.assertIn("connector-oauth exchange", text)

@@ -186,7 +186,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     # `oauth.token_env` 는 다른 칸이 틀려도 이름만 맞으면 env 합에 넣는다. 그래야 `oauth` 만 버리고 붙여 넣기 연결이 남는다.
     declared_oauth = declared.get("oauth")
     oauth_env = declared_oauth.get("token_env") if isinstance(declared_oauth, dict) else None
-    oauth_env = {oauth_env} if isinstance(oauth_env, str) and ENV_NAME_RE.match(oauth_env) else set()
+    # 칸, 운영자, 주인, 실행기 env 와 겹치는 이름은 통로 주소 자리로 보지 않는다. 비우면 그 값이 사라진다.
+    oauth_env = ({oauth_env} if isinstance(oauth_env, str) and ENV_NAME_RE.match(oauth_env)
+                 and oauth_env not in field_env | set(operator_env) | owner_env | BASE_ENV_KEYS
+                 and not oauth_env.startswith("FOS_ASSISTANT_CONNECTOR_VAULT_") else set())
     if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env | oauth_env:
         raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env, "
                          "owner_browser_env, oauth.token_env 의 합과 다르다")

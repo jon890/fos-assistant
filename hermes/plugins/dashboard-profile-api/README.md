@@ -28,7 +28,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connector-oauth/authorize-url` | 단추 연결의 제공자 로그인 주소를 만든다 | `{connector, mode, client_id, redirect_uri, state}` 와 선택 키 `app_slug`, `code_challenge`. GitHub `install` 은 `app_slug` 로 App 설치 화면 주소에 `state` 만 붙인다. `authorize` 는 PKCE challenge(`S256`)를 붙이고, Google 은 선언 scope, `access_type=offline`, `prompt=consent`, `include_granted_scopes=false` 를 더한다 | `{url}` | 400 형식, 제공자와 맞지 않는 `mode`. 404 `oauth` 를 선언하지 않은 플러그인 |
 | `POST /api/connector-oauth/begin` | 단추 흐름을 시작한다 | `{vault, connector, values}`. `values` 는 단추 밖 칸 값이다 | `{nonce}`. 앞 흐름의 대기 파일은 덮는다 | 400 칸 값, 단추로 채우는 칸(`oauth.fields`)의 값. 409 다른 플러그인의 보관 파일 |
 | `POST /api/connector-oauth/exchange` | 받은 코드를 토큰으로 바꾼다 | `{vault, connector, nonce, client_id, client_secret, code, redirect_uri, token_url}` 와 선택 키 `code_verifier` | `{outcome}`. `ok` 면 `access_token`, `expires_at`(epoch 초나 null)을 더하고 대기 OAuth 파일에 refresh token 과 `token_url` 을 쓴다. refresh token 이 없는 응답은 `app_rejected`, Google 이 선언 scope 를 다 주지 않으면 `scope_denied` 이고 파일을 쓰지 않는다 | 409 `nonce` 가 다르다 |
-| `POST /api/connector-oauth/commit` | 대기 파일 둘을 본 자리로 옮긴다 | `{vault, nonce}` 와 선택 키 `token_url`. 주면 본 자리 OAuth 파일의 통로 주소를 그것(본 연결 표식 주소)으로 둔다 | `{ok: true}` | 409 `nonce` 가 다르거나 교환 전이다 |
+| `POST /api/connector-oauth/commit` | 대기 파일 둘을 본 자리로 옮긴다 | `{vault, nonce, token_url}`. `token_url` 은 본 연결 표식 주소이고 본 자리 OAuth 파일에 쓴다. OAuth 파일을 먼저 쓰고, 보관 파일 쓰기가 실패하면 OAuth 파일을 앞 상태로 되돌린다 | `{ok: true}` | 409 `nonce` 가 다르거나 교환 전이다 |
 | `POST /api/connector-oauth/discard` | 실패한 흐름을 접는다 | `{vault, connector, nonce, client_id, client_secret}` 와 선택 키 `access_token`. GitHub 은 그 access token 하나를 취소하고 Google 은 취소하지 않는다 | `{ok: true}` | 409 다른 흐름의 대기 파일 |
 | `POST /api/connector-oauth/refresh` | access token 을 새로 받는다 | `{vault, connector, client_id, client_secret}` | `{outcome}`. `ok` 면 `access_token`, `expires_at`. 바뀐 refresh token 은 답하기 전에 OAuth 파일에 쓰고, 쓰지 못하면 `unavailable` 이다. OAuth 파일이 없으면 `missing` | |
 | `POST /api/connector-oauth/revoke` | 해제 때 제공자의 허락을 취소한다 | `{vault, connector, client_id, client_secret}` 와 선택 키 `access_token`. GitHub 은 access token 이 없으면 먼저 갱신해 받아 허락(grant) 전체를 취소하고, Google 은 refresh token 을 취소한다 | `{outcome}`. 파일은 지우지 않는다. 보관 파일 `DELETE` 가 지운다 | |
@@ -251,7 +251,7 @@ plugin 이 올라올 때 평문 파일과 옛 key 의 파일을 활성 key 로 �
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 넣지 않는다. 쓰기와 지우기는 그 보관 파일의 잠금 다음 profile 쓰기 잠금 안에서 하고, 바인딩 설치는 profile 쓰기 잠금만 잡고 보관 파일을 읽는다.
 
 **`connector-oauth` 경로의 `outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable`, `missing` 가운데 하나다.**
-서비스 응답 본문의 `error` 낱말을 제공자 표(`connector_oauth_providers.py`)의 허락 오류와 앱 오류에 대조한다. GitHub 은 오류도 HTTP 200 본문으로 오므로 상태 코드보다 본문을 먼저 본다. 표에 없는 낱말, 연결 실패, 10초 시간 초과, 5xx 는 `unavailable` 이다.
+연결 실패, 10초 시간 초과, 5xx 는 본문과 상관없이 `unavailable` 이다. 그 밖에는 서비스 응답 본문의 `error` 낱말을 제공자 표(`connector_oauth_providers.py`)의 허락 오류와 앱 오류에 대조한다. GitHub 은 오류도 HTTP 200 본문으로 오므로 상태 코드보다 본문을 먼저 본다. 표에 없는 낱말은 `unavailable` 이다.
 모든 경로는 보관 파일 잠금 안에서 파일을 읽고 쓰며, 본 보관 파일을 쓰는 commit 만 그 다음 profile 쓰기 잠금을 잡는다. client secret, refresh token, access token, 서비스 응답 원문은 파일(OAuth 파일의 refresh token 빼고)과 로그에 쓰지 않는다.
 
 **단추로 연결한 연결은 보관 파일 옆에 OAuth 파일과 대기 파일을 둔다**([ADR-20261120 / connector-oauth](../../../docs/adr/ADR-20261120-connector-oauth.md)).

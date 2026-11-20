@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 import unittest
+from unittest import mock
 
 from dashboard_profile_api_support import DEMO
 from test_connector_vault_encryption import VaultKeyTest
@@ -27,7 +28,7 @@ class ConnectorOAuthStoreTest(VaultKeyTest):
         nonce = self.store._begin(vault, DEMO, values if values is not None else {}, "github")
         self.store._fill_pending(vault, nonce, {"refresh_token": refresh, "granted_scopes": [],
                                                 "token_url": TOKEN_URL})
-        self.store._commit(vault, nonce)
+        self.store._commit(vault, nonce, TOKEN_URL)
 
     def test_commit_moves_pending_files_and_keeps_the_vault_revision(self):
         """commit 뒤 OAuth 파일이 있고 대기 파일 둘이 없다. 같은 칸 값이면 보관 파일의 inode·수정 시각이 그대로다."""
@@ -51,7 +52,7 @@ class ConnectorOAuthStoreTest(VaultKeyTest):
         with self.assertRaises(self.store.NonceMismatch):
             self.store._fill_pending("c1", "wrong", {"refresh_token": "x", "granted_scopes": [], "token_url": ""})
         with self.assertRaises(self.store.NonceMismatch):
-            self.store._commit("c1", "wrong")
+            self.store._commit("c1", "wrong", TOKEN_URL)
         with self.assertRaises(self.store.NonceMismatch):
             self.store._discard("c1", "wrong")
         self.assertEqual((self.directory() / "c1.oauth").read_bytes(), before)
@@ -60,7 +61,35 @@ class ConnectorOAuthStoreTest(VaultKeyTest):
         """교환이 채우지 않은 대기 파일은 commit 하지 않는다."""
         nonce = self.store._begin("c1", DEMO, {}, "github")
         with self.assertRaises(self.store.NonceMismatch):
-            self.store._commit("c1", nonce)
+            self.store._commit("c1", nonce, TOKEN_URL)
+
+    def test_failed_oauth_write_keeps_the_pasted_values(self):
+        """붙여 넣기 연결을 단추로 바꾸는 commit 에서 OAuth 파일 쓰기가 실패하면 보관 파일의 칸 값이 그대로다."""
+        before = (self.directory() / "c1.json").read_bytes()
+        nonce = self.store._begin("c1", DEMO, {}, "github")
+        self.store._fill_pending("c1", nonce, {"refresh_token": REFRESH, "granted_scopes": [], "token_url": TOKEN_URL})
+        with mock.patch.object(self.store, "_durable_private_write", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store._commit("c1", nonce, TOKEN_URL)
+        self.assertEqual((self.directory() / "c1.json").read_bytes(), before)
+        self.assertFalse((self.directory() / "c1.oauth").exists())
+
+    def test_failed_vault_write_restores_the_previous_oauth_file(self):
+        """보관 파일 쓰기가 실패하면 OAuth 파일이 앞 상태(없음, 또는 앞 내용)로 돌아간다."""
+        nonce = self.store._begin("c1", DEMO, {}, "github")
+        self.store._fill_pending("c1", nonce, {"refresh_token": REFRESH, "granted_scopes": [], "token_url": TOKEN_URL})
+        with mock.patch.object(self.store, "_write_vault", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store._commit("c1", nonce, TOKEN_URL)
+        self.assertFalse((self.directory() / "c1.oauth").exists())
+        self.connect()
+        before = (self.directory() / "c1.oauth").read_bytes()
+        nonce = self.store._begin("c1", DEMO, {}, "github")
+        self.store._fill_pending("c1", nonce, {"refresh_token": "other", "granted_scopes": [], "token_url": TOKEN_URL})
+        with mock.patch.object(self.store, "_write_vault", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.store._commit("c1", nonce, TOKEN_URL)
+        self.assertEqual((self.directory() / "c1.oauth").read_bytes(), before)
 
     def test_vault_delete_removes_oauth_and_pending_files(self):
         """보관 파일 `DELETE` 가 OAuth 파일과 대기 파일까지 지운다."""
