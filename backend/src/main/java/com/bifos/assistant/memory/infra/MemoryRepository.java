@@ -114,4 +114,36 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     @Modifying(flushAutomatically = true)
     @Query(value = "update memory set superseded_by_memory_id = null where superseded_by_memory_id = :newerId", nativeQuery = true)
     int clearSupersededBy(@Param("newerId") Long newerId);
+
+
+    /**
+     * 합치기에서 새 항목이 옛 항목을 대신했다고 적는다. 판정과 쓰기를 한 문장에 두어 남의 줄을 잠그지 않고 경쟁도 없다(docs/features/memory/design.md
+     * 의 설계 DECISION9). 요청자의 승인된 개인 {@code MEMORY} 항목이고 아직 대체되지 않았으며 새 항목 자신이 아닌 줄만 바뀐다. 제안을 받아들이는 경로가
+     * 쓴다. 그 경로에는 에이전트의 collection 범위가 없다.
+     *
+     * @return 바뀐 줄 수
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update memory set superseded_by_memory_id = :newerId"
+        + " where id in (:ids) and scope = 'USER' and owner_user_id = :userId and entry_type = 'MEMORY'"
+        + " and status = 'ACCEPTED' and superseded_by_memory_id is null and id <> :newerId", nativeQuery = true)
+    int supersede(@Param("newerId") Long newerId, @Param("ids") Collection<Long> ids, @Param("userId") Long userId);
+
+
+    /** {@link #supersede} 에 그 에이전트가 받는 collection 조건을 더한 것이다. {@code memory_remember} 의 바로 저장이 쓴다. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update memory set superseded_by_memory_id = :newerId"
+        + " where id in (:ids) and scope = 'USER' and owner_user_id = :userId and entry_type = 'MEMORY'"
+        + " and status = 'ACCEPTED' and superseded_by_memory_id is null and id <> :newerId"
+        + " and collection in (:collections)", nativeQuery = true)
+    int supersedeWithin(
+        @Param("newerId") Long newerId,
+        @Param("ids") Collection<Long> ids,
+        @Param("userId") Long userId,
+        @Param("collections") Collection<String> collections);
+
+
+    /** 번호들 가운데 그 새 항목이 대신한 줄의 번호다. 대체를 쓴 같은 트랜잭션에서 실제로 대신한 번호를 다시 읽는다. */
+    @Query(value = "select id from memory where id in (:ids) and superseded_by_memory_id = :newerId order by id", nativeQuery = true)
+    List<Long> findIdsSupersededBy(@Param("newerId") Long newerId, @Param("ids") Collection<Long> ids);
 }

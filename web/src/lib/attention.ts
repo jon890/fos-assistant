@@ -258,9 +258,25 @@ export function ratioText(part: number, whole: number): string {
   return whole === 0 ? "-" : `${Math.round((part * 100) / whole)}%`;
 }
 
-/** 사이드바 「지금 볼 것」 링크의 접근성 이름이다 */
-export function nowLinkLabel(nowCount: number): string {
-  return nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";
+/**
+ * 「지금 볼 것」 링크의 접근성 이름이다. 할 것의 수와 새 알림이 있는지를 함께 읽는다.
+ * 두 수를 더하지 않는다(docs/features/app-shell/design.md 의 「지금 볼 것 수와 점」).
+ */
+export function nowLinkLabel(nowCount: number, hasUnread = false): string {
+  const base = nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";
+  return hasUnread ? `${base}, 새 알림 있음` : base;
+}
+
+/** 「지금 볼 것」 줄과 단추에 붙는 표시다. 할 것이 있으면 그 수, 없고 읽지 않은 알림만 있으면 점이다 */
+export type NowIndicator = { kind: "count"; text: string } | { kind: "dot" };
+
+export function nowIndicator(
+  nowCount: number,
+  unreadCount: number,
+): NowIndicator | null {
+  if (nowCount > 0) return { kind: "count", text: String(nowCount) };
+  if (unreadCount > 0) return { kind: "dot" };
+  return null;
 }
 
 /**
