@@ -71,6 +71,7 @@ from .connector_run import (
 )
 from .connector_snapshot import _connector_snapshot_request
 from .connector_events import _connector_events_request
+from .gateway_status import GATEWAY_PATH, _gateway_response
 
 from .connector_vault import (
     VAULT_ROUTES,
@@ -293,6 +294,13 @@ def _install_gate() -> bool:
         snapshot = SNAPSHOT_ROUTE_RE.fullmatch(path) if method == "POST" else None
         if snapshot is not None:
             return await _connector_snapshot_request(request, snapshot.group(1))
+
+        if path == GATEWAY_PATH and method == "GET":
+            # 공유 gateway 의 기동 시각이다. 파일을 쓰지 않으므로 profile 쓰기 잠금을 잡지 않는다.
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(_gateway_response)
 
         defaults_match = MODEL_DEFAULTS_RE.match(path) if method == "GET" else None
         if defaults_match is not None:

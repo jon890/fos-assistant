@@ -59,6 +59,7 @@ public class MemoryService {
     private final MemoryTexts texts;
     private final MemoryRevisionWriter revisionWriter;
     private final MemoryRelevanceSearch relevanceSearch;
+    private final MemoryReplacements replacements;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -263,6 +264,8 @@ public class MemoryService {
         memory.accept(user.id(), now);
         Memory accepted = memories.save(memory);
         if (proposal) {
+            // 합치기 제안이면 받아들이는 지금 옛 기억을 대신한다(docs/features/memory/spec.md 의 REQ6)
+            replacements.onProposalAccepted(user, accepted.id());
             feedback.record(
                 MemoryProposalFeedback.of(user, accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now));
         }

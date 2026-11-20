@@ -120,6 +120,10 @@ class ProfileApiRouteTest(unittest.TestCase):
         gateway = types.ModuleType("gateway")
         control = types.ModuleType("gateway.control_socket")
         gateway.control_socket = control
+        cls.gateway_status = types.ModuleType("gateway.status")
+        gateway.status = cls.gateway_status
+        # 공유 gateway 가 떠 있지 않다. 기동 시각 검사는 이 함수를 바꿔 끼운다.
+        cls.gateway_status.get_running_pid = lambda pid_path=None, cleanup_stale=True: None
         responses = types.ModuleType("starlette.responses")
         hermes = types.ModuleType("hermes_cli")
         hermes.dashboard_auth = auth
@@ -140,6 +144,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             "starlette.responses": responses,
             "gateway": gateway,
             "gateway.control_socket": control,
+            "gateway.status": cls.gateway_status,
         }
         # 실패 분기는 예외를 로그로 남긴다. 검사 출력에는 결과만 둔다.
         logging.disable(logging.CRITICAL)
