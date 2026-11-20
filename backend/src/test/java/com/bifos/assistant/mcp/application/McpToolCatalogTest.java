@@ -66,7 +66,7 @@ class McpToolCatalogTest {
         var catalog = new McpToolCatalog(properties,
             new McpMemoryRemember(null, null, null, null),
             new McpMediaObservationTools(null, null, null, null, null),
-            new McpContentDraftTools(null, null, null, null),
+            new McpContentDraftTools(null, null, null, null, null),
             new McpContentDraftSnapshots(null, null, null, null),
             new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
