@@ -286,6 +286,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 붙이려는 연결이 값이 확인돼 쓸 수 있는 상태가 아니거나 보관 파일에 값이 없다(ADR-083). */
     CONNECTOR_NOT_CONNECTED(HttpStatus.CONFLICT),
+    /** 그 플러그인의 OAuth 앱 값이나 토큰 통로 주소가 없어 단추 연결을 시작할 수 없다(ADR-20261120 / connector-oauth). */
+    CONNECTOR_OAUTH_NOT_CONFIGURED(HttpStatus.CONFLICT),
     /** 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌해 붙이기를 거절했다. 아무것도 바뀌지 않았다. */
     CONNECTOR_BIND_CONFLICT(HttpStatus.CONFLICT),
     /** 커넥터가 연결 하나를 에이전트 하나에만 붙이라고 선언했고 그 연결이 이미 다른 에이전트에 붙어 있다. 먼저 뗀다. */

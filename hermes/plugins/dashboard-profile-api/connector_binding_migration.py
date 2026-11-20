@@ -41,6 +41,12 @@ def _migrate_connectors() -> None:
     except Exception as error:
         logger.warning("dashboard-profile-api: 보관 파일 이관이 멈췄다: %s", type(error).__name__)
     try:
+        from .connector_oauth_store import _sweep_pending
+
+        _sweep_pending()
+    except Exception as error:
+        logger.warning("dashboard-profile-api: 대기 파일 정리가 멈췄다: %s", type(error).__name__)
+    try:
         _migrate_bindings()
     except Exception as error:
         logger.warning("dashboard-profile-api: 바인딩 이관이 멈췄다: %s", type(error).__name__)

@@ -229,7 +229,7 @@ class McpFollowUpToolTest {
 
         for (JsonNode result : List.of(blank, tooLong)) {
             assertThat(result.path("isError").asBoolean()).as("결과: %s", result).isTrue();
-            assertThat(text(result)).isEqualTo("title 은 1자부터 200자까지다.");
+            assertThat(text(result)).isEqualTo("title 은 1자부터 200자까지다.\n다음 방법: 길이에 맞게 고쳐 다시 부른다");
         }
         assertThat(rows()).isEmpty();
     }
@@ -267,7 +267,7 @@ class McpFollowUpToolTest {
                 .path("result");
 
         assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).isEqualTo("대화 밖의 실행에서는 할 일을 제안할 수 없다.");
+        assertThat(text(result)).isEqualTo("대화 밖의 실행에서는 할 일을 제안할 수 없다.\n사용자에게 바로 알린다.");
         assertThat(rows()).isEmpty();
     }
 

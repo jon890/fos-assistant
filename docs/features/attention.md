@@ -330,12 +330,13 @@ sequenceDiagram
 ### 제안 도구
 
 Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 트리에서도 이 도구를 받는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)).
-관리자의 쓰기 도구 허용 설정과 관계없이 `PROPOSED` 만 만든다.
-판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 도구 정의와 결과 글은 `McpToolService.tools` 와 `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
+**사용자가 직접 시킨 할 일만 바로 챙기는 `OPEN` 으로 만들고, 그 밖에는 `PROPOSED` 만 만든다**([ADR-20261120 / agent-service-writes](../../backend/docs/adr/ADR-20261120-agent-service-writes.md)). 바로 만드는 것은 모델이 `requested` 를 주었고, 사람이 보낸 메시지의 실행(그 대화가 바깥 글을 읽지 않음)이거나 예약 작업의 실행일 때다. 스스로 판단한 할 일, 먼저 살펴보기와 맡긴 실행, 바깥 글을 읽은 대화의 할 일은 관리자의 쓰기 도구 허용 설정과 관계없이 제안이다.
+챙기는 할 일을 읽는 `follow_up_list` 와 끝내는 `follow_up_done` 도 같은 서버에 있다. 끝내기는 바로 만드는 조건과 같은 실행에서만 상태를 바꾼다.
+판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 실행 출처의 판정과 대상 찾기는 [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」 가, 도구 정의와 결과 글은 `McpToolCatalog`, `McpFollowUpTools`, `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다. 대화가 없는 실행에서 부르면 거절한다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/hooks.py` 의 `REQUIRED_TOOLS` 에 넣는다
-- **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
+- **실행 사건에 할 일 도구(제안, 목록, 끝내기)의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
 - 값이 틀린 인자에는 `isError` 와 무엇이 틀렸는지 한 줄로 답한다. 모델이 고쳐 다시 부를 수 있게 하려는 것이다
 
 ### 제안 억제
@@ -348,6 +349,8 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 | 같은 대화에서 `REJECTED_COOLDOWN` 안에 `REJECTED` 된 같은 `title_key` 가 있다 | 거절한다 |
 | 같은 대화의 `PROPOSED` 가 `MAX_OPEN_PROPOSALS_PER_CONVERSATION` 에 닿았다 | 거절한다. 점검 대화는 `CHECK_PROPOSAL_WINDOW` 안에 만든 제안만 센다 |
 | 한 실행이 `MAX_PROPOSALS_PER_EXECUTION` 만큼 이미 제안했다 | 거절한다 |
+
+바로 챙기는 줄은 위 표의 억제 규칙을 쓰지 않는다. 같은 제목의 제안이 있으면 받아들이고, 한 실행의 상한은 `FollowUpAgentRequests` 가 따로 갖는다.
 
 「한 실행」 은 호출의 origin 실행이다. 그 실행이 부른 하위 에이전트의 호출도 함께 센다.
 두 상한은 세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 한두 개 넘을 수 있다.
@@ -382,6 +385,8 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 | 예약 작업의 발화가 끝났다 | 작업 주인 | [예약 작업](schedule.md) 의 「알림(예약 작업)」 이 갖는다 |
 | 사건 감지가 연 살펴보기가 알릴 항목을 골랐다. 조용한 시간에 미룬 것은 아침에 한 건으로 묶는다 | 그 바인딩의 연결 주인 | 그 점검 대화. 언제 만들고 무엇을 싣는지는 [먼저 살펴보기](proactive.md) 의 「사건 감지」 가 갖는다 |
 | 사건 감지의 목록 조회가 연결 문제로 정한 횟수만큼 연달아 실패했다 | 그 바인딩의 연결 주인 | 외부 서비스 연결(`/connections`). 목록이라 공개 식별자가 없다 |
+| 단추로 만든 연결의 갱신을 서비스가 거절했다. 같은 끊김에 한 건이고 다시 연결하거나 해제하면 읽음이 된다 | 그 연결의 주인 | 외부 서비스 연결(`/connections`). 끊김의 판정은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 의 「끊김과 알림」 이 갖는다 |
+| 서비스가 OAuth 앱 자격을 거절했다. 같은 앱의 읽지 않은 알림이 있으면 더 만들지 않고, 관리자가 그 앱 설정을 저장하면 읽음이 된다 | 연결 주인 그룹의 차단되지 않은 관리자들 | 관리자 「서버 비밀값」. 목록이라 공개 식별자가 없다 |
 | 관리자가 웹 푸시 VAPID 키를 새로 만들어 이 사용자의 등록 기기가 모두 해제됐다. 기기가 있던 사용자마다 한 건이고 푸시로는 보내지 않는다(`PUSH_DEVICES_RESET`) | 기기가 해제된 사용자 | 설정의 「알림」(`/settings/notifications`). 목록이라 공개 식별자가 없다. 서버 비밀값 스펙 REQ6 |
 | Control Plane 이 기본 비서에 스스로 켜려던 기본 도구(「그림 만들기」)를 켜지 못했다. 에이전트와 까닭마다 한 건이고 켜지면 읽음이 된다 | 비서 주인 그룹의 차단되지 않은 관리자들 | 갈 곳이 없다. 본문에 사용자와 까닭이 있다([비서가 만든 이미지](generated-image.md) 의 「기본 비서에 켜기」) |
 

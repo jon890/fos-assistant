@@ -213,9 +213,11 @@ caller.originExecution().conversationId()만 쓰며 모델 본문을 서명된 �
 | 없는 대화·남의 대화·다른 대화 첨부/cursor | 404 CONVERSATION_NOT_FOUND | isError와 같은 공개 오류 코드 |
 | 없는 cursor·미전송 cursor | 400 VALIDATION_FAILED | -32602 |
 | 삭제·만료·미전송 첨부에 쓰기 | 기존 서비스의 410 ATTACHMENT_GONE | isError와 같은 코드 |
-| revision·UUID 내용 충돌·USER 이후 MODEL | 409 MEDIA_OBSERVATION_CONFLICT, message는 revision=N | isError와 코드 및 currentRevision만 포함 |
+| revision·UUID 내용 충돌·USER 이후 MODEL | 409 MEDIA_OBSERVATION_CONFLICT, message는 revision=N | isError와 코드, currentRevision, `next` 만 포함 |
 | 암호화 불가 | 503 MEDIA_ENCRYPTION_UNAVAILABLE | isError와 같은 코드 |
 | 서명·origin·session·취소·현재 권한 불일치 | 해당 없음 | 기존 MCP_CALL_CONTEXT_INVALID와 같은 고정 결과 |
+
+MCP 의 `isError` JSON 은 `next` 칸에 「다음 방법: …」 이나 「사용자에게 바로 알린다.」 한 줄을 둔다. 충돌은 다시 읽고 고치기, 내부 오류는 다른 도구나 잠시 뒤 다시가 다음 방법이고 나머지는 바로 알림이다. 기준은 [도구 실패 뒤 다른 방법 설계](tool-fallback/design.md) 의 「바꾸는 실패 글」 이다.
 
 저장은 기존 사용자·대화·첨부 잠금 안에서 선형화된다.
 실행 취소·접근 철회는 그 잠금과 함께 커밋되는 계약이 아니다.

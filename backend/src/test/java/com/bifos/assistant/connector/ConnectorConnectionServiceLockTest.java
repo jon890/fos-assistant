@@ -19,6 +19,8 @@ import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
+import com.bifos.assistant.connector.connection.application.ConnectorVerifier;
+import com.bifos.assistant.connector.connection.application.port.ConnectionOAuth;
 import com.bifos.assistant.connector.connection.config.ConnectorProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingInstalls;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
@@ -75,6 +77,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionException;
@@ -136,7 +139,8 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     @BeforeEach
     void configureConcurrentRequests() {
         requests = new ConnectorConnectionService(connections, bindings, users, service, connector,
-            transactionManager, new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
+            transactionManager, new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, new ConnectorVerifier(connector, tokens),
+            Mockito.mock(ConnectionOAuth.class), clock);
     }
 
 

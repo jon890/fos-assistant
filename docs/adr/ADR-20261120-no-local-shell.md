@@ -9,7 +9,8 @@
 
 ### 결정
 
-**대시보드 plugin 은 정책에 없는 profile 이 셸, 파일, 코드 실행, 사진 도구를 켜는 저장을 언제나 409 로 거절한다. 거절 본문에 `reason: unlisted` 를 넣는다.**
+**대시보드 plugin 은 실행 공간 정책이 적용되지 않는 profile 이 셸, 파일, 코드 실행, 사진 도구를 켜는 저장을 언제나 409 로 거절한다. 거절 본문에 `reason: unlisted` 를 넣는다.**
+목록 밖 named profile 에도 [기본 실행 공간 정책](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)을 적용할 수 있다.
 `require_sandbox` 는 옛 Control Plane 과의 호환으로 계속 받지만 도구 저장의 판정을 바꾸지 않는다.
 
 **Control Plane 은 기동할 때마다 실행 공간 도구가 켜진 에이전트의 도구를 지금 목록 그대로 다시 저장한다.**

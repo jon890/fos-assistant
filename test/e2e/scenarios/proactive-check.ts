@@ -40,12 +40,12 @@ const TOOL_LIMIT = 3;
 const START_NOTICE = "먼저 살펴보기를 시작했어요";
 const NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
 const TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
-const READ_ONLY_RUN = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
+const READ_ONLY_RUN = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.\n사용자에게 바로 알린다.";
 /** 승인 줄을 만든 플러그인 호출에 Control Plane 이 답하는 글의 앞부분이다. 뒤에 승인 요청 번호가 온다. */
 const APPROVAL_PREFIX = "[승인 대기] 오류가 아니다. 이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
-const NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.";
+const NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.\n사용자에게 바로 알린다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
-const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
+const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.\n사용자에게 바로 알린다.";
 /** 붙은 연결이 있는 살펴보기와 없는 살펴보기의 지시 줄이다. `ProactiveCheckRun` 과 같아야 한다. */
 const DIRECT_RULE = "- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.";
 /** 웹 결과에 섞여 온 지시를 흉내 낸 글이다. 이 글이 쓰기 호출의 인자에 들어가도 판정이 같아야 한다. */

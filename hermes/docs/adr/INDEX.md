@@ -26,6 +26,7 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 | [ADR-20261110 / korail-ktx-connector](ADR-20261110-korail-ktx-connector.md) | 코레일 KTX 는 내 브라우저의 코레일 화면을 고정 단계로 눌러 한 번 조회하고, 약관 위험은 사용자가 감수한다 | Accepted. [ADR-20261110 / naver-shopping-connector](../../../docs/adr/ADR-20261110-naver-shopping-connector.md) 의 `attended_only` 경계를 쓴다 |
 | [ADR-20261118 / web-search-backend](ADR-20261118-web-search-backend.md) | 웹 검색 서비스는 값을 정하지 않고 Hermes 자동 선택을 유지하며 OpenAI 내장 검색은 쓰지 않는다 | Accepted |
 | [ADR-20261120 / plugin-agent-skills](ADR-20261120-plugin-agent-skills.md) | 플러그인의 에이전트용 스킬은 붙이기로 설치하고, 실행기가 필요한 스킬은 운영이 셸 env 를 준 profile 에만 둔다 | Accepted. ADR-086 의 비밀 경계를 바꾸지 않고, 그 「감당할 것」 의 커리어 실행 공간을 쓴다 |
+| [ADR-20261121 / sandbox-default-policy](ADR-20261121-sandbox-default-policy.md) | 실행 공간 정책에 목록 밖 named profile 을 위한 기본 설정을 둔다 | Accepted. 운영이 켜면 목록 밖 named profile 도 공통 Docker 설정으로 격리한다 |
 
 ## 보관
 

@@ -14,6 +14,7 @@ import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -39,19 +40,19 @@ class ConnectorFinancialIntake {
      * 금융 준비를 거절한 답이다. 어느 검사에 걸렸는지 밝히지 않는다. 같은 주문의 요청이 있을 수 있다고 짐작하게 하지 않는다.
      * 그 짐작이 대화 기록에 남아 뒤의 다시 요청까지 막았다(2026-11-02 운영). 같은 의도의 줄이 있으면 아래 답들이 따로 밝힌다.
      */
-    static final String FINANCIAL_UNAVAILABLE_MESSAGE = "금융 요청을 준비하지 못했다. 승인 카드를 만들지 않았고 실행하지도 않았다. "
-        + "이 turn 에서는 다시 부르지 않고 사용자에게 준비하지 못했다고 알린다. 사용자가 다시 요청하면 다시 불러도 된다.";
+    static final ToolFailureText FINANCIAL_UNAVAILABLE_MESSAGE = ToolFailureText.askUser("금융 요청을 준비하지 못했다. 승인 카드를 만들지 않았고 실행하지도 않았다. "
+        + "이 turn 에서는 다시 부르지 않고 사용자에게 준비하지 못했다고 알린다. 사용자가 다시 요청하면 다시 불러도 된다.");
     /** 같은 의도의 승인 줄이 이 대화에서 승인을 기다린다. Control Plane 이 확인한 상태다. */
     static final String INTENT_PENDING_MESSAGE = ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 같은 주문의 승인 카드가 이 대화에 이미 떠 있고 "
         + "사용자의 승인을 기다린다. 새 카드는 만들지 않았다. 사용자에게 그 카드에서 내용을 확인하고 승인하거나 거절해 달라고 알린다. "
         + "같은 요청을 다시 부르지 않는다.";
     /** 같은 의도의 승인 줄이 다른 대화에서 승인을 기다린다. 이 대화에는 카드가 없으므로 승인 대기 표시를 붙이지 않는다. */
-    static final String INTENT_PENDING_ELSEWHERE_MESSAGE = "같은 주문의 승인 카드가 다른 대화에 이미 떠 있고 사용자의 승인을 기다린다. "
+    static final ToolFailureText INTENT_PENDING_ELSEWHERE_MESSAGE = ToolFailureText.askUser("같은 주문의 승인 카드가 다른 대화에 이미 떠 있고 사용자의 승인을 기다린다. "
         + "이 대화에는 새 카드를 만들지 않았다. 사용자에게 알림에서 그 카드를 찾아 승인하거나 거절해 달라고 알린다. "
-        + "그 카드를 거절하거나 기한이 지나면 다시 요청할 수 있다.";
+        + "그 카드를 거절하거나 기한이 지나면 다시 요청할 수 있다.");
     /** 같은 의도의 줄이 실행 중이거나 결과를 모른다. 다시 보내면 두 번 나갈 수 있어 새로 준비하지 않는다. */
-    static final String INTENT_BUSY_MESSAGE = "같은 주문이 이미 실행 중이거나 결과를 확인하는 중이라 새로 준비하지 않았다. 승인 카드를 만들지 않았다. "
-        + "다시 부르지 말고 사용자에게 그 서비스의 주문 내역에서 주문 상태를 확인해 달라고 안내한다.";
+    static final ToolFailureText INTENT_BUSY_MESSAGE = ToolFailureText.askUser("같은 주문이 이미 실행 중이거나 결과를 확인하는 중이라 새로 준비하지 않았다. 승인 카드를 만들지 않았다. "
+        + "다시 부르지 말고 사용자에게 그 서비스의 주문 내역에서 주문 상태를 확인해 달라고 안내한다.");
     /** 지금 여는 금융 동작이다. 정정과 조건주문은 열지 않는다. */
     private static final Set<String> OPEN_OPERATIONS = Set.of("CREATE", "CANCEL");
     /** 준비 도구 인자를 읽는다. 중복 키와 뒤에 붙은 값은 거절한다. 서명한 글과 다른 값으로 읽히지 않게 한다. */
@@ -137,16 +138,16 @@ class ConnectorFinancialIntake {
             if (operation == null || !OPEN_OPERATIONS.contains(operation)
                 || !Set.of(ConnectorExecutionSnapshot.ORDER, ConnectorExecutionSnapshot.CHECKOUT).contains(contract.kind(tool))) {
                 log.warn("금융 준비를 거절했다 stage=input kind=-");
-                return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
+                return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE.text(), null);
             }
             return producer.request(profileName, rootSessionId, sessionId, toolCallId,
                 HermesToolName.of(binding.mcpServer(), tool), tool, JSON.writeValueAsString(input.get("args")));
         } catch (FinancialLimitExceeded ex) {
             log.info("금융 준비가 상한에 걸렸다 limit={}", ex.kind());
-            return new ConnectorPolicyAnswer(false, limitMessage(ex), null);
+            return new ConnectorPolicyAnswer(false, limitMessage(ex).text(), null);
         } catch (PurchaseLimitExceeded ex) {
             log.info("주문서 준비가 구매 상한에 걸렸다 limit={} unset={}", ex.kind(), ex.unset());
-            return new ConnectorPolicyAnswer(false, purchaseLimitMessage(ex), null);
+            return new ConnectorPolicyAnswer(false, purchaseLimitMessage(ex).text(), null);
         } catch (RuntimeException ex) {
             // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 단계 코드와 종류만 남긴다.
             log.warn("금융 준비를 거절했다 stage={} kind={}", stageOf(ex), ex.getClass().getSimpleName());
@@ -160,13 +161,13 @@ class ConnectorFinancialIntake {
      */
     static String rejectedMessage(RuntimeException ex) {
         if (!(ex instanceof FinancialPrepareRejected rejected)) {
-            return FINANCIAL_UNAVAILABLE_MESSAGE;
+            return FINANCIAL_UNAVAILABLE_MESSAGE.text();
         }
         return switch (rejected.stage()) {
             case CONFLICT_PENDING -> INTENT_PENDING_MESSAGE;
-            case CONFLICT_PENDING_ELSEWHERE -> INTENT_PENDING_ELSEWHERE_MESSAGE;
-            case CONFLICT -> INTENT_BUSY_MESSAGE;
-            default -> FINANCIAL_UNAVAILABLE_MESSAGE;
+            case CONFLICT_PENDING_ELSEWHERE -> INTENT_PENDING_ELSEWHERE_MESSAGE.text();
+            case CONFLICT -> INTENT_BUSY_MESSAGE.text();
+            default -> FINANCIAL_UNAVAILABLE_MESSAGE.text();
         };
     }
 
@@ -181,15 +182,15 @@ class ConnectorFinancialIntake {
      * 상한에 걸린 준비의 답이다. 상한은 사용자가 정한 값이라 걸린 상한과 오늘 남은 한도를 밝힌다(ADR-20261015 / financial-user-limits).
      * 수량 상한은 남은 한도가 없다.
      */
-    static String limitMessage(FinancialLimitExceeded ex) {
+    static ToolFailureText limitMessage(FinancialLimitExceeded ex) {
         String unit = ex.kind().currency() == null ? "" : " " + ex.kind().currency();
         var message = new StringBuilder("주문이 상한에 걸려 실행하지 않았다. 걸린 상한: ")
             .append(ex.kind().label()).append(' ').append(FinancialOrderLimits.plain(ex.limit())).append(unit).append('.');
         if (ex.remainingToday() != null) {
             message.append(" 오늘 남은 한도: ").append(FinancialOrderLimits.plain(ex.remainingToday())).append(unit).append('.');
         }
-        return message.append(" 사용자에게 알린다. 상한을 바꾸려면 order_limit_change 로 요청한다. 올리기는 사용자의 승인이 있어야 반영된다.")
-            .toString();
+        return ToolFailureText.askUser(
+            message.append(" 사용자에게 알린다. 상한을 바꾸려면 order_limit_change 로 요청한다. 올리기는 사용자의 승인이 있어야 반영된다.").toString());
     }
 
 
@@ -197,13 +198,13 @@ class ConnectorFinancialIntake {
      * 구매 상한에 걸린 주문서 준비의 답이다. 카드를 만들지 않았다. 상한이 0 이면 사용자가 아직 정하지 않은 것이다.
      * 에이전트가 상한을 바꾸는 길은 없고 사용자가 「외부 서비스 연결」 화면에서 정한다(spec DECISION15).
      */
-    static String purchaseLimitMessage(PurchaseLimitExceeded ex) {
+    static ToolFailureText purchaseLimitMessage(PurchaseLimitExceeded ex) {
         if (ex.unset()) {
-            return "구매 상한이 0 이라 주문서를 준비하지 않았다. 승인 카드를 만들지 않았다. "
-                + "사용자에게 「외부 서비스 연결」 화면에서 한 건과 하루 구매 상한을 정해 달라고 알린다. 상한을 정해 주세요.";
+            return ToolFailureText.askUser("구매 상한이 0 이라 주문서를 준비하지 않았다. 승인 카드를 만들지 않았다. "
+                + "사용자에게 「외부 서비스 연결」 화면에서 한 건과 하루 구매 상한을 정해 달라고 알린다. 상한을 정해 주세요.");
         }
-        return "주문서가 구매 상한에 걸려 준비하지 않았다. 승인 카드를 만들지 않았다. 걸린 상한: " + ex.kind().label() + " "
+        return ToolFailureText.askUser("주문서가 구매 상한에 걸려 준비하지 않았다. 승인 카드를 만들지 않았다. 걸린 상한: " + ex.kind().label() + " "
             + ex.limit() + " KRW. 오늘 남은 한도: " + ex.remainingToday() + " KRW. 사용자에게 알린다. "
-            + "상한은 사용자가 「외부 서비스 연결」 화면에서 바꾼다.";
+            + "상한은 사용자가 「외부 서비스 연결」 화면에서 바꾼다.");
     }
 }

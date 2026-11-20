@@ -21,6 +21,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingAlerts;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
@@ -100,6 +101,9 @@ class ConnectorBindingCycleTest {
     ConnectorBindingApplier applier;
 
     @Autowired
+    ConnectorBindingAlerts alerts;
+
+    @Autowired
     ConnectorConnectionService connectionService;
 
     @Autowired
@@ -166,18 +170,21 @@ class ConnectorBindingCycleTest {
 
 
     @Test
-    @DisplayName("껐다 켜기가 필요한 답이면 재시작 대기가 아니라 IDLE_WAIT 이고, 끄고 반영 예정 뒤 켜서 사람 없이 READY 가 된다")
+    @DisplayName("껐다 켜기가 필요한 답이면 재시작 대기가 아니라 IDLE_WAIT 이고, 끄고 반영 예정 뒤 켜서 사람 없이 READY 가 된다. 대기 시각은 단계가 바뀌어도 이어지고 READY 가 비운다")
     void cyclesWithoutRestartOrAdmin() {
         bindNeedingCycle();
         ConnectorBinding waiting = onlyBinding();
         assertThat(waiting.restartRequired()).as("재시작 대기가 아니다").isFalse();
         assertThat(waiting.cyclePhase()).isEqualTo(CyclePhase.IDLE_WAIT);
+        Instant waitingSince = waiting.waitingSince();
+        assertThat(waitingSince).as("24시간을 세는 대기 시각").isNotNull();
 
         applier.runScheduled();
         verify(connector, times(1)).bindConnector(
             eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class),
             nullable(JsonNode.class), eq(true));
         assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.OFF);
+        assertThat(onlyBinding().waitingSince()).as("단계가 바뀌어도 처음 대기 시각").isEqualTo(waitingSince);
 
         clearInvocations(connector);
         clock.advance(APPLY_DELAY.minusSeconds(10));
@@ -198,6 +205,8 @@ class ConnectorBindingCycleTest {
         ConnectorBinding ready = onlyBinding();
         assertThat(ready.status()).isEqualTo(BindingStatus.READY);
         assertThat(ready.applyFailedAt()).isNull();
+        assertThat(ready.waitingSince()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification", Long.class)).as("자동으로 끝난 대기").isZero();
     }
 
 
@@ -427,6 +436,7 @@ class ConnectorBindingCycleTest {
         stubInstall(NEEDS_CYCLE);
 
         applier.resyncDrifted();
+        alerts.notifyDue();
 
         assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.IDLE_WAIT);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE user_id = ?", Long.class, admin.id()))

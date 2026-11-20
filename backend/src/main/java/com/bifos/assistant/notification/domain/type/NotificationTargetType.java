@@ -10,12 +10,14 @@ public enum NotificationTargetType {
     ADMIN_CONNECTIONS,
     /** 사용자의 「외부 서비스 연결」 목록 화면이다. 목록이라 공개 식별자 없이 가리킨다. */
     CONNECTIONS,
+    /** 관리자의 「서버 비밀값」 화면이다. 목록이라 공개 식별자 없이 가리킨다. */
+    ADMIN_SECRETS,
     /** 사용자의 「알림」 설정 화면이다. 목록 화면이라 공개 식별자 없이 가리킨다. */
     PUSH_SETTINGS;
 
 
     /** 목록 화면이라 공개 식별자 없이 가리키는 갈 곳인가. */
     public boolean list() {
-        return this == ADMIN_CONNECTIONS || this == CONNECTIONS || this == PUSH_SETTINGS;
+        return this == ADMIN_CONNECTIONS || this == CONNECTIONS || this == ADMIN_SECRETS || this == PUSH_SETTINGS;
     }
 }

@@ -51,6 +51,7 @@ const UNBOUND = {
   bound: false,
   status: null,
   restartRequired: false,
+  applyFailed: false,
   skippedSkills: [],
 } satisfies Partial<AgentConnectionView>;
 

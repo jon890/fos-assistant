@@ -54,7 +54,7 @@ import tools.jackson.databind.node.ObjectNode;
 class McpPrincipalTest {
     private static final String SHARED = "shared-group";
     private static final String PRIVATE_A = "private-a";
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
     @LocalServerPort
     int port;
@@ -233,7 +233,7 @@ class McpPrincipalTest {
         JsonNode aReadsB = body(readMemory(sharedToken, rootA, memoryB.id())).path("result");
         JsonNode bReadsA = body(readMemory(sharedToken, rootB, memoryA.id())).path("result");
 
-        assertThat(missing.path("content").get(0).path("text").asString()).isEqualTo("Memory 항목을 읽을 수 없습니다.");
+        assertThat(missing.path("content").get(0).path("text").asString()).isEqualTo("Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다");
         assertThat(aReadsB).isEqualTo(missing);
         assertThat(bReadsA).isEqualTo(missing);
     }
@@ -253,7 +253,7 @@ class McpPrincipalTest {
         JsonNode other = body(writeArtifact(sharedToken, rootA, otherOfA, otherPath)).path("result");
 
         assertThat(forbidden.path("isError").asBoolean()).isTrue();
-        assertThat(forbidden.path("content").get(0).path("text").asString()).isEqualTo("결과물을 저장할 수 없습니다.");
+        assertThat(forbidden.path("content").get(0).path("text").asString()).isEqualTo("결과물을 저장할 수 없습니다.\n다음 방법: 다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다");
         assertThat(store.resolveInside(conversationB.id(), forbiddenPath)).isEmpty();
         assertThat(other.path("isError").asBoolean())
             .as("같은 사용자의 다른 대화: %s", other)
@@ -495,7 +495,7 @@ class McpPrincipalTest {
     private void assertHidden(HttpResponse<String> response) {
         JsonNode result = body(response).path("result");
         assertThat(result.path("isError").asBoolean()).as("숨긴 결과: %s", result).isTrue();
-        assertThat(result.path("content").get(0).path("text").asString()).isEqualTo("Memory 항목을 읽을 수 없습니다.");
+        assertThat(result.path("content").get(0).path("text").asString()).isEqualTo("Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다");
     }
 
 

@@ -101,7 +101,7 @@ public class SkillService {
 
 
     /**
-     * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
+     * 일반 화면에 보일 올린 스킬과 플러그인이 설치한 스킬 목록이다.
      *
      * <p>Hermes 목록에 올린 스킬 이름을 대조해 출처를 붙인다. 올린 스킬 이름은 지금 버전과, 게시가 timeout
      * 으로 끝나 표식 없이 남은 더 새 버전의 이름이다. Hermes 가 그 버전을 이미 반영했을 수 있기 때문이다.
@@ -118,7 +118,7 @@ public class SkillService {
         SkillList list = assemble(agent, editable, usages);
         return new SkillList(
             list.skills().stream()
-                .filter(item -> item.source() == SkillSource.UPLOADED)
+                .filter(item -> item.source() != SkillSource.HERMES)
                 .toList(),
             list.editable(),
             list.skillsToolsetEnabled(),
@@ -126,7 +126,7 @@ public class SkillService {
     }
 
 
-    /** 관리자 영역에서만 Hermes 번들과 커넥터 스킬을 함께 읽는다. */
+    /** 관리자 영역에서는 Hermes 기본 스킬까지 함께 읽는다. */
     public SkillList adminList(CurrentUser user, String code) {
         if (!user.isAdmin()) {
             throw forbidden();
@@ -156,15 +156,8 @@ public class SkillService {
         Set<String> uploadedNames = NewSkillRules.uploadedNames(uploaded, store.readPending(profile));
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
-            SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
-            items.put(
-                skill.name(),
-                new SkillListItem(
-                    skill.name(),
-                    skill.description(),
-                    source,
-                    skill.enabled(),
-                    usageOf(editable, usages, skill.name())));
+            items.put(skill.name(), SkillListItem.fromHermes(
+                skill, uploadedNames.contains(skill.name()), usageOf(editable, usages, skill.name())));
         }
         for (SkillBundle bundle : uploaded.values()) {
             items.putIfAbsent(

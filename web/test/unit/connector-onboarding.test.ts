@@ -75,10 +75,18 @@ test("붙인 직후 언제 쓸 수 있는지 알린다", () => {
   );
   assert.equal(
     boundReadiness({ status: "PENDING", restartRequired: false }),
-    "몇 분 안에 쓸 수 있어요.",
+    "몇 분 안에 자동으로 반영돼요.",
   );
   assert.equal(
     boundReadiness({ status: "PENDING", restartRequired: true }),
-    "관리자가 반영을 확인하면 쓸 수 있어요.",
+    "자동으로 반영하고 있어요. 대화가 없는 틈에 반영돼서 조금 걸릴 수 있어요.",
+  );
+  assert.equal(
+    boundReadiness({
+      status: "PENDING",
+      restartRequired: true,
+      applyFailed: true,
+    }),
+    "반영하지 못했어요. 관리자에게 알렸어요.",
   );
 });

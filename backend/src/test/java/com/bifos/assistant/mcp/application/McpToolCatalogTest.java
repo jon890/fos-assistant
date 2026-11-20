@@ -2,7 +2,9 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.port.ApprovalResumes;
 import com.bifos.assistant.mcp.application.port.FinancialLimitRequests;
+import com.bifos.assistant.mcp.application.port.ConnectorAttachRequests;
 import com.bifos.assistant.mcp.application.port.ConnectorListing;
+import com.bifos.assistant.mcp.application.port.MemoryForgetRequests;
 import com.bifos.assistant.mcp.application.port.TaskRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -43,7 +45,10 @@ class McpToolCatalogTest {
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
             new McpFileSpaceTools(null, null, null),
             new McpConnectorListTool(mock(ConnectorListing.class)),
-            new McpTaskTools(mock(TaskRequests.class)));
+            new McpTaskTools(mock(TaskRequests.class)),
+            new McpFollowUpTools(null, null, null, null, null, null, null),
+            new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
+            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
 
         var first = catalog.tools();
         assertThat(first).extracting(tool -> tool.get("name"))
@@ -53,7 +58,7 @@ class McpToolCatalogTest {
                 McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftTools.IMAGE, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
                 McpFinancialLimitTools.READ, McpFinancialLimitTools.CHANGE, McpApprovalResumeTool.NAME, McpFileSpaceTools.PUT, McpConnectorListTool.NAME, "memory_remember",
                 "memory_search", McpTaskTools.LIST, McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE,
-                McpTaskTools.DELETE);
+                McpTaskTools.DELETE, McpFollowUpTools.LIST, McpFollowUpTools.DONE, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);
         assertThat(first).contains(list, record, memory);
         assertThat(description(first))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
@@ -77,7 +82,10 @@ class McpToolCatalogTest {
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
             new McpFileSpaceTools(null, null, null),
             new McpConnectorListTool(mock(ConnectorListing.class)),
-            new McpTaskTools(mock(TaskRequests.class)));
+            new McpTaskTools(mock(TaskRequests.class)),
+            new McpFollowUpTools(null, null, null, null, null, null, null),
+            new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
+            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
 
         assertThat(catalog.tools()).allSatisfy(tool -> {
             assertThat(tool.get("inputSchema")).isInstanceOf(Map.class);

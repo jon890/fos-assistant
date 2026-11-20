@@ -26,6 +26,10 @@ public enum NotificationKind {
     HANDOFF_REQUESTED,
     /** Control Plane 이 기본 비서에 스스로 켜려던 기본 도구를 켜지 못했다. 관리자가 할 일이 남았다(ADR-20261119 / image-gen-defaults). */
     DEFAULT_TOOLS_PENDING,
+    /** 단추로 만든 연결의 갱신을 서비스가 거절했다. 다시 연결하면 읽음이 된다(ADR-20261120 / connector-oauth). */
+    CONNECTOR_RECONNECT_REQUIRED,
+    /** 서비스가 OAuth 앱 자격을 거절했다. 관리자가 그 앱 설정을 바꾸면 읽음이 된다(ADR-20261120 / connector-oauth). */
+    CONNECTOR_OAUTH_APP_REJECTED,
     /** 관리자가 VAPID 키를 새로 만들어 이 사용자의 웹 푸시 기기가 모두 해제됐다. 푸시로는 보내지 않는다(서버 비밀값 스펙 REQ6). */
     PUSH_DEVICES_RESET
 }

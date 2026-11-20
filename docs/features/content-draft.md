@@ -518,10 +518,12 @@ args, time과 nonce는 서명하지 않으며 현재 tool_call_id 중복 검사�
 | --- | --- |
 | 성공 | 안전한 ContentDraftView JSON을 ExternalData.wrap으로 감싼 기존 도구 result, isError=false |
 | 인자 모양·본문·예약 줄·크기의 VALIDATION_FAILED | HTTP 200의 JSON-RPC -32602와 기존 고정 INVALID_ARGUMENTS |
-| CONTENT_DRAFT_CONFLICT·CONTENT_DRAFT_STALE | isError=true, text JSON의 code와 typed currentRevision 정수 |
-| CONTENT_DRAFT_DUPLICATE_PHOTO | isError=true, text JSON의 code와 고정 안내 `message`. 안내는 예외 message가 아닌 상수다 |
-| CONTENT_DRAFT_GONE·CONTENT_DRAFT_UNAVAILABLE와 다른 domain 오류 | isError=true, text JSON의 code만 전달 |
+| CONTENT_DRAFT_CONFLICT·CONTENT_DRAFT_STALE | isError=true, text JSON의 code와 typed currentRevision 정수, `next` |
+| CONTENT_DRAFT_DUPLICATE_PHOTO | isError=true, text JSON의 code와 고정 안내 `message`, `next`. 안내는 예외 message가 아닌 상수다 |
+| CONTENT_DRAFT_GONE·CONTENT_DRAFT_UNAVAILABLE와 다른 domain 오류 | isError=true, text JSON의 code와 `next` |
 | 서명·현재 맥락 오류 | 기존 MCP_CALL_CONTEXT_INVALID 고정 결과, 본문·revision 없음 |
+
+`next` 는 「다음 방법: …」 이나 「사용자에게 바로 알린다.」 한 줄이다. 다음 방법이 있는 것은 충돌(다시 읽고 고치기), 중복 사진, 모르는 그림 제목, 내부 오류다. 기준은 [도구 실패 뒤 다른 방법 설계](tool-fallback/design.md) 의 「바꾸는 실패 글」 이다.
 
 예외 message와 cause를 결과로 보내거나 파싱하지 않으며 본문·revision을 로그 message에 넣지 않는다.
 catalog 등록 순서는 record_media_observation 뒤, memory_remember 앞에 write, read다.

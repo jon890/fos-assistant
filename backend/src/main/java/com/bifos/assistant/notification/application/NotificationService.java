@@ -123,6 +123,36 @@ public class NotificationService {
 
 
     /**
+     * 같은 원인의 같은 종류 알림이 그 사용자에게 읽지 않은 채로 없을 때만 저장한다. 읽은 뒤 같은 일이 다시 생기면 다시 알린다.
+     *
+     * @return 새로 만들었으면 참
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean notifyUnlessUnread(
+        Long userId,
+        NotificationKind kind,
+        String title,
+        String body,
+        NotificationTarget target,
+        UUID sourcePublicId) {
+        if (notifications.existsByUserIdAndKindAndSourcePublicIdAndReadAtIsNull(userId, kind, sourcePublicId)) {
+            return false;
+        }
+        notify(userId, kind, title, body, target, sourcePublicId);
+        return true;
+    }
+
+
+    /** 원인이 끝났다. 그 원인의 그 종류 알림을 받은 모든 사용자의 읽지 않은 줄을 읽음으로 바꾼다. 부르는 쪽의 트랜잭션에 참여한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resolveForAll(NotificationKind kind, UUID sourcePublicId) {
+        notifications.findByKindAndSourcePublicIdAndReadAtIsNull(kind, sourcePublicId).stream()
+            .map(Notification::userId).distinct().toList()
+            .forEach(userId -> resolve(userId, kind, sourcePublicId));
+    }
+
+
+    /**
      * 내 알림을 최근 것부터 한 쪽 읽는다.
      *
      * @param cursor 앞 쪽이 돌려준 다음 자리. 첫 쪽이면 null

@@ -2,9 +2,11 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
-import static com.bifos.assistant.mcp.application.McpToolService.result;
+import static com.bifos.assistant.mcp.application.McpToolService.failure;
+import static com.bifos.assistant.mcp.application.McpToolService.success;
 
 import com.bifos.assistant.chat.turn.application.TurnQuestions;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
@@ -44,14 +46,17 @@ public class McpMemoryRemember {
      *
      * <p>{@code agent_status} 와 {@code agent_stop} 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. 그 답에 바깥 글이 실릴 수 있다.
      * {@code skill_view} 도 넣지 않는다. 같은 toolset 의 {@code skill_manage} 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
-     * {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
+     * 할 일 제목을 돌려주는 {@code follow_up_list} 와 {@code follow_up_done} 도 넣지 않는다. 예약 작업의 실행이 바깥 글을 읽고 적은
+     * 제목일 수 있다. {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
      */
     static final Set<String> INTERNAL_TOOLS = Set.of(
         "mcp__fos_assistant__memory_read",
         "mcp__fos_assistant__memory_remember",
         "mcp__fos_assistant__follow_up_propose",
+        "mcp__fos_assistant__memory_forget",
         "mcp__fos_assistant__agent_list",
         "mcp__fos_assistant__connector_list",
+        "mcp__fos_assistant__connector_attach",
         "mcp__fos_assistant__task_list",
         "mcp__fos_assistant__task_create",
         "mcp__fos_assistant__task_update",
@@ -162,25 +167,25 @@ public class McpMemoryRemember {
         AgentExecution origin = caller.originExecution();
         MemoryAccess access = memories.accessOf(origin.agentId());
         if (access.isEmpty()) {
-            return result("이 에이전트는 기억을 남길 수 없다.", true);
+            return failure(ToolFailureText.askUser("이 에이전트는 기억을 남길 수 없다."));
         }
         String strippedTitle = title.strip();
         String strippedContent = content.strip();
         if (!within(strippedTitle, 1, MEMORY_TITLE_MAX)) {
-            return result("title 은 1자부터 200자까지다.", true);
+            return failure(ToolFailureText.alternative("title 은 1자부터 200자까지다.", "길이에 맞게 고쳐 다시 부른다"));
         }
         if (!within(strippedContent, 1, MEMORY_CONTENT_MAX)) {
-            return result("content 는 1자부터 2000자까지다.", true);
+            return failure(ToolFailureText.alternative("content 는 1자부터 2000자까지다.", "길이에 맞게 고쳐 다시 부른다"));
         }
         String strippedSummary = summary == null ? null : summary.strip();
         if (strippedSummary != null && !within(strippedSummary, 0, Memory.SUMMARY_MAX)) {
-            return result("summary 는 200자까지다.", true);
+            return failure(ToolFailureText.alternative("summary 는 200자까지다.", "길이에 맞게 고쳐 다시 부른다"));
         }
         if (evidence != null && !within(evidence, 0, MEMORY_EVIDENCE_MAX)) {
-            return result("evidence 는 500자까지다.", true);
+            return failure(ToolFailureText.alternative("evidence 는 500자까지다.", "길이에 맞게 고쳐 다시 부른다"));
         }
         if (collection != null && !MemoryPlacement.isCollectionKey(collection)) {
-            return result("collection 은 소문자로 시작하는 key 다.", true);
+            return failure(ToolFailureText.alternative("collection 은 소문자로 시작하는 key 다.", "collection 없이 다시 부른다"));
         }
         // 조건 4 는 따로 계산해 기록에도 남긴다. 승인 카드가 바깥 글을 읽은 대화의 제안인지 보인다
         boolean externalRead = origin.conversationId() != null
@@ -215,30 +220,26 @@ public class McpMemoryRemember {
     /** 결과마다의 글과 {@code isError} 다. */
     private static Map<String, Object> resultOf(MemoryRememberResult remembered) {
         return switch (remembered.outcome()) {
-            case REMEMBERED -> result(
+            case REMEMBERED -> success(
                 "기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다. 새 기억의 번호는 "
-                    + remembered.memoryId() + " 이다." + replacedText(remembered, "대신했다"),
-                false);
-            case UPDATED -> result("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.", false);
-            case PROPOSED -> result(
+                    + remembered.memoryId() + " 이다." + replacedText(remembered, "대신했다"));
+            case UPDATED -> success("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.");
+            case PROPOSED -> success(
                 "제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다."
-                    + replacedText(remembered, "받아들이면 대신한다"),
-                false);
-            case ALREADY_KNOWN -> result(
-                "이미 같은 내용을 기억하고 있다. 새로 남기지 않았다." + replacedText(remembered, "대신했다"), false);
-            case SUPERSEDED_BEFORE -> result(
-                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다."
-                    + replacedText(remembered, "대신했다"),
-                true);
-            case ALREADY_PROPOSED -> result(
-                "같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다." + replacedText(remembered, "받아들이면 대신한다"), false);
-            case REJECTED_BEFORE -> result(
-                "사용자가 이 내용을 거절했다. 다시 남기지 않는다." + replacedText(remembered, "대신했다"), true);
-            case TOO_MANY -> result("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.", true);
-            case COLLECTION_NOT_ALLOWED -> result("이 에이전트가 쓸 수 없는 collection 이다. collection 없이 다시 부른다.", true);
-            case UPDATE_TARGET_NOT_FOUND -> result("고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.", true);
-            case UPDATE_NEEDS_CONFIRMATION -> result("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.", true);
-            case ENCRYPTION_UNAVAILABLE -> result("민감한 내용을 저장할 수 없다.", true);
+                    + replacedText(remembered, "받아들이면 대신한다"));
+            case ALREADY_KNOWN -> success("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다." + replacedText(remembered, "대신했다"));
+            case SUPERSEDED_BEFORE -> failure(ToolFailureText.askUser(
+                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다." + replacedText(remembered, "대신했다")));
+            case ALREADY_PROPOSED -> success(
+                "같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다." + replacedText(remembered, "받아들이면 대신한다"));
+            case REJECTED_BEFORE -> failure(ToolFailureText.askUser(
+                "사용자가 이 내용을 거절했다. 다시 남기지 않는다." + replacedText(remembered, "대신했다")));
+            case TOO_MANY -> failure(ToolFailureText.askUser("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다."));
+            case COLLECTION_NOT_ALLOWED -> failure(ToolFailureText.alternative("이 에이전트가 쓸 수 없는 collection 이다.", "collection 없이 다시 부른다"));
+            case UPDATE_TARGET_NOT_FOUND -> failure(ToolFailureText.alternative(
+                "고칠 기억을 찾지 못했다.", "memory_id 없이 새로 남기고, 고치지 못해 새로 남겼다고 답에 한 줄 알린다"));
+            case UPDATE_NEEDS_CONFIRMATION -> failure(ToolFailureText.askUser("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다."));
+            case ENCRYPTION_UNAVAILABLE -> failure(ToolFailureText.askUser("민감한 내용을 저장할 수 없다."));
         };
     }
 

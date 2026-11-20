@@ -143,6 +143,35 @@ class SkillServiceTest {
     PlatformTransactionManager transactionManager;
 
 
+    @Test
+    @DisplayName("일반 스킬 목록은 플러그인 이름과 꺼진 상태를 보여 주고 기본 스킬은 숨긴다")
+    void listsPluginSkillsWithTheirInstallationSource() {
+        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(
+            new HermesSkill("hermes-help", "기본 스킬", true),
+            new HermesSkill("note-review", "메모를 검토한다", false, "검사용 메모")));
+        assertThat(skills.list(OWNER, OWNED).skills()).containsExactly(
+            new SkillListItem("note-review", "메모를 검토한다", SkillSource.CONNECTOR, false,
+                new SkillUsageSummary(0, null), "검사용 메모"));
+        assertCode(() -> skills.toggle(OWNER, OWNED, "note-review", true), ErrorCode.SKILL_NOT_FOUND);
+    }
+
+
+    @Test
+    @DisplayName("플러그인과 이름이 겹쳐도 올린 스킬은 설정에서 관리할 수 있다")
+    void keepsUploadedSkillManageableOnNameCollision() {
+        String name = "weekly-plan";
+        skills.save(OWNER, OWNED, name, skillMd(name), List.of());
+        when(skillClient.list(OWNED_PROFILE))
+            .thenReturn(List.of(new HermesSkill(name, "겹치는 스킬", true, "검사용 메모")));
+
+        assertThat(skills.list(OWNER, OWNED).skills()).singleElement().satisfies(item -> {
+            assertThat(item.source()).isEqualTo(SkillSource.UPLOADED);
+            assertThat(item.connectorTitle()).isNull();
+        });
+        assertThat(skills.read(OWNER, OWNED, name).body()).isEqualTo(skillMd(name));
+    }
+
+
     @BeforeEach
     void setUp() {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {
