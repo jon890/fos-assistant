@@ -21,7 +21,6 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.chat.artifact.application.ArtifactWriteService;
-import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
@@ -69,7 +68,7 @@ class McpToolServiceTest {
         mock(ExecutionContextSourceWriter.class),
         mock(AgentRepository.class),
         mock(AgentConnectorBindings.class),
-        mock(FollowUpService.class),
+        mock(McpFollowUpTools.class),
         mock(McpMemoryRemember.class),
         mock(McpToolCatalog.class),
         Clock.systemUTC());
@@ -150,7 +149,7 @@ class McpToolServiceTest {
         McpToolService service = new McpToolService(
             memories, QueryEmbedder.disabled(), artifacts, delegations, capabilities,
             mock(ExecutionDeliveryWriter.class), mock(ExecutionOutputs.class), mock(ExecutionContextSourceWriter.class),
-            mock(AgentRepository.class), mock(AgentConnectorBindings.class), mock(FollowUpService.class),
+            mock(AgentRepository.class), mock(AgentConnectorBindings.class), mock(McpFollowUpTools.class),
             mock(McpMemoryRemember.class), mock(McpToolCatalog.class), Clock.systemUTC());
 
         String text = resultText(service.listAgents(caller));
@@ -191,7 +190,7 @@ class McpToolServiceTest {
             mock(ExecutionContextSourceWriter.class),
             mock(AgentRepository.class),
             mock(AgentConnectorBindings.class),
-            mock(FollowUpService.class),
+            mock(McpFollowUpTools.class),
             mock(McpMemoryRemember.class),
             mock(McpToolCatalog.class),
             Clock.systemUTC());
