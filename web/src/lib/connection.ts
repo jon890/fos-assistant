@@ -131,6 +131,7 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   SKILL_NAME_TAKEN: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
   CONNECTOR_RESTART_AGAIN:
     "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
+  CONNECTOR_RESTART_NOT_DONE: "아직 공유 gateway 가 재시작되지 않았어요.",
   CONNECTOR_INSTALL_MISMATCH:
     "설치 상태가 맞지 않아요. 서버 로그에서 까닭을 확인해 주세요.",
   CONNECTOR_TOOLS_UNVERIFIED:

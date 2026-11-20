@@ -8,6 +8,7 @@ import {
   itemActions,
   itemHref,
   moreText,
+  nowIndicator,
   nowLinkLabel,
   originText,
   pruneControls,
@@ -145,6 +146,19 @@ test("더 있는 항목이 없으면 안내가 없다", () => {
 test("「지금 볼 것」 링크의 이름은 0 이면 수를 싣지 않는다", () => {
   assert.equal(nowLinkLabel(0), "지금 볼 것");
   assert.equal(nowLinkLabel(3), "지금 볼 것 3건");
+});
+
+test("「지금 볼 것」 링크의 이름은 새 알림이 있는지를 수와 따로 읽는다", () => {
+  assert.equal(nowLinkLabel(0, true), "지금 볼 것, 새 알림 있음");
+  assert.equal(nowLinkLabel(3, true), "지금 볼 것 3건, 새 알림 있음");
+  assert.equal(nowLinkLabel(3, false), "지금 볼 것 3건");
+});
+
+test("「지금 볼 것」 표시는 할 것이 있으면 수, 알림만 있으면 점, 둘 다 없으면 없다", () => {
+  assert.deepEqual(nowIndicator(3, 0), { kind: "count", text: "3" });
+  assert.deepEqual(nowIndicator(3, 5), { kind: "count", text: "3" });
+  assert.deepEqual(nowIndicator(0, 2), { kind: "dot" });
+  assert.equal(nowIndicator(0, 0), null);
 });
 
 test("카드 머리의 수는 지금 그리는 NOW 항목 가운데 제어한 것만큼 뺀다", () => {
