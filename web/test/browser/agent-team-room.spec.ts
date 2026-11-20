@@ -53,6 +53,11 @@ test("로그인 뒤 `/` 가 기본 비서의 대화방을 열고 사이드바 �
   const roomId = new URL(roomUrl).pathname.split("/").at(-1);
   // 배포 뒤 처음 열면 빈 방이다.
   await expect(page.getByTestId("user-message")).toHaveCount(0);
+  // 대화방은 메시지가 없어도 머리 줄에 기본 비서의 이름표만 있고 고르는 목록이 없다(app-shell 스펙의 REQ10).
+  await expect(
+    page.getByRole("main").getByTestId("agent-badge").first(),
+  ).toBeVisible();
+  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
 
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("대화방에 처음 보내는 글");

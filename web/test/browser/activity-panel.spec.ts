@@ -1,4 +1,5 @@
 import { CONVERSATION_ID, conversationIdOf, expect, test } from "./fixtures.ts";
+import { pickAgent } from "./helpers.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 const PNG_1X1 = Buffer.from(
@@ -8,7 +9,7 @@ const PNG_1X1 = Buffer.from(
 
 async function send(page: Page, text: string, agent = "브라우저 비서") {
   await page.goto("/new");
-  await page.getByRole("radio", { name: agent }).click();
+  await pickAgent(page, agent);
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }

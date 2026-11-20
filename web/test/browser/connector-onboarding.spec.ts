@@ -5,7 +5,11 @@ import {
   setSession,
   test,
 } from "./fixtures.ts";
-import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
+import {
+  clickAndWaitForResponse,
+  expectPickedAgent,
+  isolatedUser,
+} from "./helpers.ts";
 import { DEMO_TOKEN_OK } from "../../../test/e2e/fake-hermes.ts";
 import type {
   Page,
@@ -153,16 +157,10 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
 
   await page.getByRole("link", { name: `${PRIVATE_NAME}와 대화하기` }).click();
   await expect(page).toHaveURL(new RegExp(`/new\\?agent=${code}$`));
-  await expect(page.getByRole("radio", { name: PRIVATE_NAME })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
+  await expectPickedAgent(page, PRIVATE_NAME);
   // 목록의 첫 에이전트라서 골라진 것이 아니라 주소가 고른 것임을 다른 에이전트로도 본다.
   await page.goto(`/new?agent=${groupCode}`);
-  await expect(page.getByRole("radio", { name: GROUP_NAME })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
+  await expectPickedAgent(page, GROUP_NAME);
 });
 
 test("에이전트 화면에서 외부 서비스 연결하기로 가면 연결 뒤 그 에이전트를 먼저 권한다", async ({

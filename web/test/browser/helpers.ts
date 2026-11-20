@@ -139,6 +139,28 @@ export async function openAccountMenu(page: Page, testInfo: TestInfo) {
   await expect(page.getByRole("menu")).toBeVisible();
 }
 
+/**
+ * 새 대화 화면의 이름표 단추다. 넓은 화면은 대화 영역 머리 줄, 좁은 폭은 위 막대 가운데에 있어 보이는 쪽을 쓴다
+ * (docs/features/app-shell/spec.md 의 REQ9).
+ */
+export function agentSwitcher(page: Page): Locator {
+  return page.locator('[data-testid="agent-switcher"]:visible');
+}
+
+/** 이름표를 눌러 목록을 열고 그 이름의 에이전트를 고른다. 고르면 목록이 닫힌다 */
+export async function pickAgent(page: Page, name: string) {
+  await agentSwitcher(page).click();
+  await page.getByRole("menuitemradio", { name, exact: true }).click();
+  await expect(page.getByTestId("agent-switcher-list")).toHaveCount(0);
+  await expectPickedAgent(page, name);
+}
+
+/** 이름표가 그 에이전트를 고른 채 보이는지 본다 */
+export async function expectPickedAgent(page: Page, name: string) {
+  await expect(agentSwitcher(page)).toHaveAccessibleName(
+    `에이전트 고르기, 지금 ${name}`,
+  );
+}
 
 /**
  * 관리자 메뉴를 찾는다. 휴대폰 프로젝트에서는 메뉴가 서랍 안에 있어 머리의 단추로 먼저 연다.
