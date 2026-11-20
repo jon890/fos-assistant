@@ -588,3 +588,14 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 플러그인이 카탈로그에서 빠진 뒤에도 이미 저장한 플러그인별 GitHub 앱은 같은 `connectorId` 로 비울 수 있다.
 
 응답은 client ID와 App 이름, 비밀값의 입력 여부와 앞부분, 마지막 변경을 준다. 저장 위치와 연결 흐름은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
+
+### 관리자 단추 연결 서명 비밀
+
+상태 값과 토큰 통로 표식을 서명하는 비밀은 서버가 만들고 사람이 넣지 않는다. `ADMIN` 만 부른다.
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/admin/secrets/connector-oauth/signing` | 저장소를 쓸 수 있는지(`storeAvailable`), 비밀이 만들어졌는지(`set`), 마지막으로 새로 만든 사람과 시각(`updatedBy`, `updatedAt`), 통로 주소를 만들 설정이 있는지(`passageConfigured`), 해제되지 않은 단추 연결 수(`connectionCount`)를 준다 |
+| `POST /api/v1/admin/secrets/connector-oauth/signing/regenerate` | 비밀을 새로 만들고 단추 연결마다 새 통로 주소를 다시 쓴다. 바뀐 상태(`signing`)와 다시 쓴 결과(`rewrite.total`, `rewrite.failed`)를 준다 |
+
+새로 만들면 옛 표식은 바로 401 이다. 바인딩을 다시 설치하지 않으며, 떠 있는 플러그인 프로세스는 다음 프로세스부터 새 주소를 받는다. 응답에 원문과 통로 주소는 없다.
