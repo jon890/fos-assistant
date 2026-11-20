@@ -1,6 +1,6 @@
 # 도구 실패 뒤 다른 방법 기술 설계
 
-스펙: [`spec.md`](spec.md). PR1(REQ1, REQ2, REQ3, REQ5, REQ6 의 PR1 몫)과 PR2(REQ4, REQ6 의 PR2 몫)의 구조를 정한다.
+스펙: [`spec.md`](spec.md). PR1(REQ1, REQ2, REQ3, REQ5, REQ7, REQ6 의 PR1 몫)과 PR2(REQ4, REQ6 의 PR2 몫)의 구조를 정한다.
 
 ## 요구사항 연결
 
@@ -12,6 +12,7 @@
 | REQ4 | PR2. `LinkPageParts` 가 대표 사진 하나 대신 후보 목록(`og:image`, `og:image:secure_url`, `twitter:image`, JSON-LD `Product.image`)을 차례대로 돌려주고, `LinkImageFetcher.fetchLink` 가 후보마다 지금의 `follow` 와 사진 판정을 거쳐 처음 받아진 사진을 쓴다. 넘기는 때는 스펙 DECISION7 이 갖는다 |
 | REQ5 | 지침 글이 「다 해 보고도 못 했으면 해 본 것을 한 줄 적고 묻는다」 와 「결과가 처음 뜻과 달라졌으면 한 줄 알린다」 를 말한다. PR2 에서 대표 사진이 아닌 후보를 쓰면 모델이 그것을 알 수 있게 Control Plane 이 받기 응답에 쓴 후보를 알리고 fos-ctx 가 `image_generate` 결과에 한 줄 덧붙인다(아래 「링크 사진 후보」). 화면은 바꾸지 않는다. 작업 과정 블록은 지금 도구 사건으로 실패를 보인다 |
 | REQ6 | 배포 뒤 확인은 아래 「검증 전략」 의 배포 뒤 항목이다. 결과는 기능 파일 [`tool-fallback.md`](../tool-fallback.md) 에 적는다 |
+| REQ7 | 지침 글에 「그림의 참고 사진을 받지 못했으면 설명만으로 비슷하게 그려 넣지 않고 먼저 알린다」 를 더한다. fos-ctx 의 `image_source.py` 에서 참고 사진을 쓰지 못하는 글(링크 받기 실패, 맨 주소와 경로, 이 대화에 없는 가리킴, 받지 못함)의 다음 방법이 같은 뜻을 준다. 답변 품질 평가에 이 사례 문항과 그 문항을 보는 방식 `photo-request`(답이 사진이나 링크를 보내 달라고 하는가)를 더한다 |
 
 ## 책임과 경계
 
@@ -46,6 +47,7 @@ mcp__fos_assistant__ 로 시작하는 도구가 연달아 두 번 실패했으�
 보안이나 정책으로 막힌 주소와 도구는 다른 도구로 같은 대상을 다시 노리지 않는다. 막히지 않은 다른 대상으로 같은 일을 하는 것은 된다.
 다 해 보고도 못 했으면 답에 무엇을 해 봤는지 한 줄 적고 사용자에게 묻거나 부탁한다.
 다른 방법으로 해냈는데 결과가 처음 뜻과 달라졌으면(예: 기억을 고치지 못해 새로 남겼다) 답에 한 줄 알린다.
+그림의 참고 사진을 받지 못했으면 설명만으로 비슷하게 그려 넣지 않는다. 먼저 그 사진을 쓰지 못한다는 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 알린다.
 ```
 
 `<external-data>` 의 구분은 승인 카드 지침이 `[승인 대기]` 를 읽는 규칙과 같다. 플러그인 서버의 글이 지시가 되지 않게 한다([`hermes-contract.md`](../../../hermes/docs/hermes-contract.md)).
@@ -73,18 +75,18 @@ Control Plane 판정 글은 Control Plane 이 이미 끝 줄을 붙여 보내므
 
 | 자리 | 글 | 꼴과 다음 방법 |
 | --- | --- | --- |
-| `image_source.py` | `IMAGE_SOURCE_LINK_NO_IMAGE`, `IMAGE_SOURCE_LINK_FAILED` | 다음 방법: 다른 방법이 없으니 해 본 것을 알리고 사진을 올려 달라고 묻는다. 서버가 이미 페이지 안의 후보를 다 봤기 때문이다(PR2) |
+| `image_source.py` | `IMAGE_SOURCE_LINK_NO_IMAGE`, `IMAGE_SOURCE_LINK_FAILED` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 사진을 올리거나 다른 링크를 보내면 된다는 것을 먼저 알린다(스펙 REQ7). 서버가 이미 페이지 안의 후보를 다 봤기 때문이다(PR2) |
 | `image_source.py` | `IMAGE_SOURCE_LINK_BLOCKED` | 바로 알림(DECISION9) |
-| `image_source.py` | `IMAGE_SOURCE_LINK_TOO_LARGE` | 다음 방법: 다른 방법이 없으니 해 본 것을 알리고 더 작은 사진을 올려 달라고 묻는다 |
-| `image_source.py` | `FAILED` | 다음 방법: 다른 방법이 없으니 잠시 뒤 다시 해 달라고 알린다(DECISION10) |
-| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 가리킴으로 고쳐 다시 부르기, `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴 찾기, `TOO_MANY` 는 장수를 줄여 다시 부르기, `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. 「그림을 만들지 않았다」 는 `TAIL` 대신 `HEAD` 로 옮기고 `TAIL` 을 없앤다. 그래야 문제가 여럿인 글도 마지막 문제의 끝 줄로 끝난다(스펙 REQ3) |
-| `attachment_inspect.py` | `FAILURE` | 바로 알림. 재업로드를 요구하지 않는 지금 뜻을 지킨다(DECISION8). `region_required` 와 한도 초과의 다시 조회 안내는 이미 다음 방법이라 꼴만 맞춘다 |
+| `image_source.py` | `IMAGE_SOURCE_LINK_TOO_LARGE` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 더 작은 사진을 올려 달라고 먼저 알린다 |
+| `image_source.py` | `FAILED` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 잠시 뒤 다시 해 달라고 알린다(DECISION10, 스펙 REQ7) |
+| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 사용자가 보낸 주소면 `link:` 로 고쳐 다시 부르고 넘길 수 없는 주소(비서가 찾은 주소)면 그려 넣지 말고 먼저 알리기, `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴을 찾고 없으면 그려 넣지 말고 먼저 알리기(스펙 REQ7), `TOO_MANY` 는 바로 알림(어느 사진을 뺄지는 사용자가 정한다, generated-image 스펙 DECISION25), `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. 「그림을 만들지 않았다」 는 `TAIL` 대신 `HEAD` 로 옮기고 `TAIL` 을 없앤다. 그래야 문제가 여럿인 글도 마지막 문제의 끝 줄로 끝난다(스펙 REQ3) |
+| `attachment_inspect.py` | `FAILURE` | 바로 알림. 재업로드를 요구하지 않는 지금 뜻을 지킨다(DECISION8). `region_required` 와 한도 초과의 다시 조회 안내는 이미 다음 방법이라 꼴만 맞춘다. 인자가 틀린 호출은 다음 방법: 인자를 고쳐 다시 부른다 |
 | `generated_image.py` | `FAILED_MESSAGE` | 바로 알림 |
 | `approval_guard.py` | `DANGEROUS_COMMAND_MESSAGE`, `COMPUTER_USE_MESSAGE` | 다음 방법: 막히지 않은 다른 명령이나 도구로 같은 일을 한다(DECISION9) |
-| `approval_guard.py` | `APPROVAL_WRITE_MESSAGE` | 바로 알림 |
+| `approval_guard.py` | `APPROVAL_WRITE_MESSAGE` | 다음 방법: 승인이 필요 없는 다른 경로로 같은 일을 한다(DECISION9). 같은 경로를 셸이나 코드 실행으로 우회하지 않는다 |
 | `connector_policy.py`, `tool_guard.py` | `POLICY_BLOCK_MESSAGE`, `GUARD_BLOCK_MESSAGE` | 다음 방법: 다른 도구가 있으면 그것으로, 없으면 잠시 뒤 다시 해 달라고 알린다(DECISION10) |
 | `hooks.py` | `DELEGATE_IMAGE_MESSAGE` | 다음 방법: HTTP(S) 주소나 이미지 data URL 로 바꿔 넘긴다(지금 글의 뜻) |
-| `connector_policy.py`, `hooks.py` | `CONTEXT_BLOCK_MESSAGE`, `UNKNOWN_SERVER_MESSAGE`, `CODE_EXECUTION_MESSAGE`, `SKILL_MANAGE_MESSAGE`, `BLOCK_MESSAGE` | 바로 알림. `CODE_EXECUTION_MESSAGE` 는 다음 방법: 코드 실행 밖에서 그 도구를 직접 부른다 |
+| `connector_policy.py`, `hooks.py` | `CONTEXT_BLOCK_MESSAGE`, `UNKNOWN_SERVER_MESSAGE`, `CODE_EXECUTION_MESSAGE`, `SKILL_MANAGE_MESSAGE`, `BLOCK_MESSAGE` | 바로 알림. `CODE_EXECUTION_MESSAGE` 도 스펙 REQ2 의 「코드 실행으로 플러그인 부르기」 라 바로 알림이다 |
 | `connector_policy.py` | `ARGS_TOO_LARGE_MESSAGE` | 다음 방법: 나눠서 부른다 |
 | `ConnectorPolicyService` | 정책 확인 실패, 연결 준비 안 됨, 바인딩 반영 대기, 허락 안 된 도구, 읽기 전용 실행, 사람이 연 대화 전용 | 정책 확인 실패는 다음 방법(DECISION10). 인자 크기는 다음 방법. 나머지는 바로 알림 |
 | `ConnectorFinancialIntake`, `ConnectorFinancialProducer` | 금융 준비 실패와 상한, 다른 대화에서 승인 대기, 같은 주문 실행 중, 이미 처리된 승인 카드, 대화 없는 실행의 승인 필요 | 모두 바로 알림(승인 대기, 결제와 구매 상한, 결과를 알 수 없는 실행) |
@@ -92,7 +94,8 @@ Control Plane 판정 글은 Control Plane 이 이미 끝 줄을 붙여 보내므
 | `ToolGuardController`, `EventToolGuard` | 판정 실패, 사건 살펴보기와 사람 없는 실행의 막힘 | 판정 실패는 다음 방법(DECISION10). 사건 살펴보기는 지금 글대로 다음 방법: 붙은 플러그인의 읽기 도구로 살펴본다. 나머지는 바로 알림 |
 | `McpMemoryRemember` | 거절, 개수, collection, 고칠 기억 없음, 확인 필요, 암호화 불가, 입력 길이 | 고칠 기억 없음은 다음 방법: memory_id 없이 새로 남기고 답에 알린다(DECISION11). collection 은 collection 없이 다시. 입력 길이는 줄여 다시. 거절, 개수, 확인 필요, 암호화 불가는 바로 알림 |
 | `McpRpc` 를 부르는 `mcp.presentation` 경로(`McpController`, `McpArtifactCalls`, `McpFileSpaceCalls`, 원고 입력 읽기) | 인자, 확장자, 경로, 크기 오류와 검색 다시 시작 | 인자 오류는 다음 방법: 인자를 고쳐 다시. 검색 다시 시작은 지금 글의 안내를 다음 방법으로 |
-| `McpToolService` 와 나머지 `mcp.application` 도구 | 기억 읽기, 결과물 저장, 할 일 제안, 원고, 파일 공간, 금융 상한 | 입력 형식의 실패는 다음 방법: 인자를 고쳐 다시. 권한·없는 대상·거절·개수 상한은 바로 알림. 저장 실패처럼 서버 쪽 실패는 다음 방법(DECISION10) |
+| `McpFinancialLimitTools`, `ConnectorApprovalResume` | 금융 상한 변경의 실패 상태(`unavailable`, `above_maximum`, `no_financial_connection`, `closed`), 승인 이어 가기의 이어 가지 못한 글 | 모두 바로 알림(결제 상한, 승인, 사람 손이 필요한 화면). 상한 변경은 결과 JSON 에 `next` 칸을 더하고 `isError` 는 그대로 둔다. 이어 가기의 「이미 이어 가는 중」 은 실패가 아니라 그대로 둔다 |
+| `McpToolService` 와 나머지 `mcp.application` 도구 | 기억 읽기, 결과물 저장, 할 일 제안, 원고, 파일 공간, 예약 작업 | 입력 형식의 실패는 다음 방법: 인자를 고쳐 다시. 권한·없는 대상·거절·개수 상한은 바로 알림. 저장 실패처럼 서버 쪽 실패는 다음 방법(DECISION10) |
 
 `[승인 대기]` 로 시작하는 판정 글(`ConnectorApprovalReply.APPROVAL_MESSAGE`, `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE`, `ConnectorFinancialIntake.INTENT_PENDING_MESSAGE`)은 실패가 아니라 그대로 둔다. 지금 승인 카드 지침이 그 글을 읽는다.
 
@@ -131,6 +134,7 @@ PR2 는 같은 `fetchLink` 를 고치는 「종류를 잘못 적은 사진도 �
 | REQ3 | fos-ctx 단위 테스트 | fos-ctx 모듈의 실패 글 상수와 `LINK_REASONS` 값을 모아 두 끝 줄 가운데 하나로 끝나는지 보는 테스트 하나. 사용자에게 넘기라고만 하는 글이 없다 |
 | REQ4 | `LinkPageParts`, `LinkImageFetcher` 단위 테스트 | 후보 목록의 차례와 JSON-LD 의 세 꼴(글, 배열, 객체). 첫 후보가 사진이 아니고 둘째가 사진인 페이지에서 둘째를 받는다. 막힌 후보 뒤의 후보를 받는다. 넘기기 횟수를 넘으면 남은 후보를 보지 않는다 |
 | REQ5(PR2) | 받기 경로 통합 테스트와 fos-ctx 단위 테스트 | 둘째 후보로 받으면 후보 이름 머리가 오고, fos-ctx 가 결과에 한 줄을 덧붙인다. `og` 면 덧붙이지 않는다 |
+| REQ7 | `context` 단위 테스트, fos-ctx 단위 테스트, 답변 품질 평가 | 지침에 참고 사진 문장이 든다. 참고 사진 실패 글이 「비슷하게 그려 넣지 말고」 와 사진이나 링크를 보내 달라는 다음 방법을 준다. 평가 세트의 사례 문항이 `photo-request` 로 판정된다(평가는 운영에서 사람이 돌린다) |
 | REQ6 | 배포 뒤 운영 | PR1: 기억 고치기 실패 하나를 왕복시켜 묻기 전에 다른 방법을 부른 것이 실행 사건에 남는다. PR2: `og:image` 로 사진을 받지 못하는 공개 상품 페이지 링크로 그림 한 장을 만든다 |
 
 모델이 실제로 다른 방법을 고르는지는 단위 테스트로 증명하지 못한다. 배포 뒤 왕복이 그 근거다(스펙 DECISION4).
