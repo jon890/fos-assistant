@@ -45,6 +45,18 @@ class ProfileApiConnectorBindingCycleTest(support.ProfileApiRouteTest):
         self.assertIs(rebound.body["cycle_available"], True)
         self.assertIs(rebound.body["cycle_off"], False)
 
+    def test_reattaching_a_detached_name_answers_cycle_available(self):
+        """뗀 기록에 남은 이름을 다시 붙이면 재시작이 필요하고 껐다 켜기로 풀 수 있다고 답한다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        self.assertEqual(self.bind(enabled=False).status_code, 200)
+
+        reattached = self.bind()
+
+        self.assertEqual(reattached.status_code, 200, reattached.body)
+        self.assertIs(reattached.body["restart_required"], True)
+        self.assertIs(reattached.body["cycle_available"], True)
+
     def test_plugin_file_change_is_not_cycle_available(self):
         """`fos-ctx` 파일이 바뀌면 재시작만 풀 수 있어 cycle_available 이 거짓이다."""
         self.bound_and_changed()

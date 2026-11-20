@@ -282,7 +282,7 @@ class ConnectorBindingCycleTest {
 
 
     @Test
-    @DisplayName("연결 확인은 껐다 켜기 단계의 바인딩에 설치를 보내지 않는다")
+    @DisplayName("연결 확인은 IDLE_WAIT 와 OFF 바인딩 모두에 설치를 보내지 않는다")
     void connectionCheckDoesNotInstallDuringCycle() {
         bindNeedingCycle();
         clearInvocations(connector);
@@ -291,6 +291,17 @@ class ConnectorBindingCycleTest {
 
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.IDLE_WAIT);
+
+        applier.runScheduled();
+        assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.OFF);
+        clearInvocations(connector);
+
+        connectionService.check(owner, DEMO);
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        verify(connector, never()).bindConnector(
+            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true));
+        assertThat(onlyBinding().cyclePhase()).as("꺼진 채 남는다").isEqualTo(CyclePhase.OFF);
     }
 
 

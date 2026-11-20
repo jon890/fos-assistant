@@ -313,7 +313,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 | --- | --- |
 | 설치 상태를 읽지 못한다 | 경고 로그를 남기고 건너뛴다 |
 | 「바인딩의 반영 맞추기」 의 설치 판정을 통과한다 | 어긋나지 않았다. 연속으로 센 값을 지운다 |
-| 어긋났다 | 플러그인 id 와 어긋난 조건 이름을 로그에 남기고, 반영 예정 확인과 같은 차례로 잠근 뒤 다시 맞춘다. 서버 정의가 바뀌므로 대개 재시작 대기가 된다 |
+| 어긋났다 | 플러그인 id 와 어긋난 조건 이름을 로그에 남기고, 반영 예정 확인과 같은 차례로 잠근 뒤 다시 맞춘다. 서버 정의가 바뀌므로 대개 껐다 켜기 단계가 되고, `fos-ctx` 가 바뀌었으면 재시작 대기가 된다 |
 | 잠근 뒤 다시 읽으니 지워졌거나 `READY` 가 아니다 | 건너뛴다 |
 | 다시 맞춰 `READY` 가 된 뒤 또 어긋나기를 연속 상한만큼 되풀이했다 | 설치를 보내지 않고 `PENDING` 과 실패 표시로 두고 알린다. 상한은 `ConnectorBindingApplier` 가 갖는다 |
 | 다시 맞춘 바인딩이 재시작 대기나 `PENDING` 으로 남았다 | 연결 주인의 그룹 관리자마다 `CONNECTOR_REINSTALLED` 알림 한 건. 재시작 대기가 있으면 재시작 뒤 반영 완료를, 아니면 반영 완료로 다시 확인하라고 쓴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이, 껐다 켜기 단계가 된 바인딩은 「껐다 켜기」 가 맡으므로 세지 않는다 |
@@ -432,6 +432,7 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 설치는 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치** 하나다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 `PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
+- `bind.cycle` 은 `"off"` 만 받는다. 답의 `cycle_available`, `cycle_off` 가 없는 옛 응답은 거짓으로 읽는다([ADR-20261120 / connector-auto-apply](../adr/ADR-20261120-connector-auto-apply.md)). 뜻은 위 「껐다 켜기」 와 plugin README 가 갖는다
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
 - `call` 과 `tools` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [플러그인 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
