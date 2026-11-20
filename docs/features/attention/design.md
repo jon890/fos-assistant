@@ -65,7 +65,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | --- | --- | --- |
 | `GET /api/v1/push/config` | `{enabled, publicKey}`. 서버에 키가 없으면 `enabled: false` 이고 화면은 「이 서버는 아직 알림을 보낼 수 없어요」 를 보인다 | PR1 |
 | `GET /api/v1/push/devices` | 기기 목록(`id`, `name`, `registeredAt`, `endpointHash`), 최근 등록 순 | PR1 |
-| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`. 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
+| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`, `publicKey`(구독을 만들 때 쓴 VAPID 공개 키). 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 공개 키가 지금 키와 다르면 409 `PUSH_KEY_CHANGED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
 | `DELETE /api/v1/push/devices/current` | 본문의 `endpoint` 와 같은 내 기기를 지운다. 없어도 204 | PR1 |
 | `PATCH /api/v1/push/devices/{id}`, `DELETE /api/v1/push/devices/{id}` | 이름 고치기와 지우기. 남의 기기와 없는 기기는 같은 404 `PUSH_DEVICE_NOT_FOUND` | PR2 |
 | `GET /api/v1/push/settings`, `PUT /api/v1/push/settings` | 끈 묶음과 조용한 시간. 관리자 아닌 사용자가 `ADMIN` 묶음을 보내면 무시한다 | PR2 |
@@ -109,8 +109,8 @@ Hermes 는 이 기능에 닿지 않는다.
 
 ### 설정
 
-`assistant.push` 의 `vapid-public-key`(base64url), `vapid-private-key-file`(비밀 키 base64url 한 줄을 담은 파일 경로), `subject`, `allowed-endpoint-hosts`, `connect-timeout`(5s), `request-timeout`(10s), `retry-delays`(1s, 4s), `retry-after-max`(30s), `max-devices`(10) 이다. `@Validated` 로 공개 키, 비밀 키 파일, `subject` 셋이 함께 있거나 함께 없는지 보고 어긋나면 기동을 멈춘다(rule-24). 파일을 읽어 P-256 키로 해석하고 공개 키와 한 쌍인지 보는 일은 KEK 처럼 `notification.infra` 의 빈이 기동 때 하고, 실패하면 기동을 멈춘다.
-값은 환경 변수로 넣고 저장소에 적지 않는다. 비밀 키를 파일로 받는 것은 데이터 암호화 KEK(`kek-file`)와 같은 관례다. 어디에 두는지는 운영 저장소가 갖는다.
+`assistant.push` 의 `allowed-endpoint-hosts`, `connect-timeout`(5s), `request-timeout`(10s), `retry-delays`(1s, 4s), `retry-after-max`(30s), `max-devices`(10) 이다.
+VAPID 키와 연락처는 설정이 아니라 서버 비밀값 `vapid` 에 있다. `notification.infra.VapidKeys` 가 부를 때마다 읽고, 값이 없거나 한 쌍이 아니면 푸시를 끈 채 돈다. 관리자 화면의 만들기와 지우기는 [서버 비밀값 설계](../secret-store/design.md) 의 REQ6, REQ7 이 갖는다.
 
 ### 웹
 
