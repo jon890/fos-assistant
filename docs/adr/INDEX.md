@@ -137,6 +137,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261120 / image-source](ADR-20261120-image-source.md) | 그림을 고칠 바탕 사진은 모델이 가리키고 fos-ctx 가 Control Plane 에서 받아 넘긴다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 hook 에 받기를 더하고 ADR-091 의 사진 권한은 넓히지 않는다 |
 | [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) | 사용자가 보낸 링크의 사진은 Control Plane 이 대화에 있는지 확인하고 허용 목록 없이 공개 주소에서만 받는다 | backend, hermes | Accepted. [ADR-20261120 / image-source](ADR-20261120-image-source.md) 의 받기 길에 `link:` 가리킴을 더한다 |
 | [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) | 셸 계열 도구는 local 로 켜지 않고, 정책 밖 profile 의 셸은 끈다 | backend, hermes | Accepted. ADR-086 의 「정책에 없는 profile 은 local 로 둔다」 를 대체한다 |
+| [ADR-20261120 / server-secret](ADR-20261120-server-secret.md) | 서버 비밀값은 KEK 로 감싸 데이터베이스에 두고 관리자 화면에서 바꾼다 | backend, frontend, hermes | Accepted. [ADR-20261008 / data-encryption](../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 KEK 교체 대상에 `server_secret` 을 더한다 |
 | [ADR-20261120 / web-push](ADR-20261120-web-push.md) | 알림을 그대로 웹 푸시로 보내고 기기는 사용자 줄의 JSON 칸에 두며 암호화는 JDK 로 한다 | backend, frontend | Accepted. ADR-070 의 알림 원장에 바깥 채널을 더하고 ADR-072 의 열린 질문 셋에 답한다 |
 
 ## 보관

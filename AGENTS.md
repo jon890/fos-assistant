@@ -54,7 +54,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - **이 저장소는 공개 저장소다. 홈서버의 운영 정보를 적지 않는다.** 아래 「공개 저장소」 를 본다.
 - Hermes core 를 고치지 않는다. profile, API server, plugin hook 만 쓴다.
   고쳐야 할 것 같으면 ADR-001 의 검토 순서를 따른다.
-- 비밀값을 데이터베이스에 넣지 않는다. profile key 는 홈서버 파일에 둔다.
+- 비밀값을 데이터베이스에 원문으로 넣지 않는다. 서버 비밀값은 KEK 로 감싸 `server_secret` 에 두고, KEK 는 홈서버 파일에 둔다([ADR-20261120 / server-secret](docs/adr/ADR-20261120-server-secret.md)). 값마다 지금 두는 곳은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「비밀값을 두는 곳」 이 갖는다.
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
   제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
