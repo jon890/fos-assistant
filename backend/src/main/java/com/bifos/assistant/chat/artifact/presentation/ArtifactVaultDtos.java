@@ -65,10 +65,10 @@ public final class ArtifactVaultDtos {
     public record VaultListView(
         List<VaultItemView> items, Long nextCursor, long usedBytes, long quotaBytes, boolean full) {
 
+
         private static final int DEFAULT_LIMIT = 30;
         private static final int MAX_LIMIT = 100;
         private static final int MAX_QUERY_CHARS = 100;
-
 
         static VaultListView of(ArtifactVaultPage page) {
             return new VaultListView(

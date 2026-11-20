@@ -90,7 +90,6 @@ public class ArtifactVaultFinder {
     private record ConversationRef(UUID publicId, String title) {
     }
 
-
     /** 한 요청 안에서 푼 제목과 대화를 다시 풀지 않게 모아 둔다. */
     private final class Lookup {
 

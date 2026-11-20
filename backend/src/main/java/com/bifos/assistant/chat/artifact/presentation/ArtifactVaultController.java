@@ -89,7 +89,6 @@ public class ArtifactVaultController {
     }
 
 
-
     /** 자동 보관이 실패한 결과물을 지금 다시 보관한다. 대화가 내 것이 아니면 없는 대화와 같은 응답이다. */
     @PostMapping("/auto/retry")
     public AutoVaultStatusView retryAutoVault(@Valid @RequestBody AutoVaultRetryRequest request) {
