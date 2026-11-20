@@ -44,11 +44,13 @@ public class ContentDraftImages {
         requireWritable(user, conversationId);
         return mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
             requireWritable(user, conversationId);
-            Long artifactId = images.idByTitle(conversationId, title);
             // 그림 파일이 지워졌으면 사본이 있어도 새로 넣지 못한다(스펙 REQ19). 이미 넣은 원고는 사본 번호를 그대로 쓴다.
-            GeneratedImageSource source = images.readByTitle(conversationId, title);
-            ChatAttachment copy = copies.findUsable(user.id(), conversationId, artifactId)
-                .orElseGet(() -> copies.create(user.id(), conversationId, artifactId, title, source.contentType(), source.bytes()));
+            Long artifactId = images.liveIdByTitle(conversationId, title);
+            // 바이트는 사본을 새로 만들 때만 읽는다. 잠근 트랜잭션 안에서 큰 그림을 매번 읽지 않는다.
+            ChatAttachment copy = copies.findUsable(user.id(), conversationId, artifactId).orElseGet(() -> {
+                GeneratedImageSource source = images.readByTitle(conversationId, title);
+                return copies.create(user.id(), conversationId, artifactId, title, source.contentType(), source.bytes());
+            });
             return new ContentDraftImageView(copy.id().toString(), copy.storedName(),
                 copies.agentDirectory(user.id(), conversationId), title);
         });

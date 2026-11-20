@@ -373,7 +373,7 @@ Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 �
 - 그 대화의 같은 그림으로 만든 사본이 아직 쓸 수 있으면(지우지 않았고 보관 기간 안이고 파일이 있다) 새로 만들지 않고 그 사본을 돌려준다. 원고를 고쳐 다시 넣어도 사본이 늘지 않는다. 그림 파일이 지워졌으면 사본이 있어도 거절한다(REQ19). 이미 넣은 원고는 사본 번호를 그대로 쓰므로 고쳐 저장할 수 있다
 - 찾기부터 사본 행과 파일 쓰기까지 `ChatContentMutationCoordinator` 의 사용자와 대화 잠금 안에서 한다. 같은 그림을 동시에 넣어도 사본이 하나다
 - 파일은 행 번호를 받은 뒤 쓰고, 트랜잭션이 되돌려지면 쓴 파일을 지운다
-- 그림 행은 보관 사본이 아닌 행을 제목으로 찾는다(PR3 의 `GeneratedImageService.readByTitle` 과 같은 판정). 크기 상한도 같다
+- 그림 행은 보관 사본이 아닌 행을 제목으로 찾는다(PR3 의 `GeneratedImageService.readByTitle` 과 같은 판정). 크기 상한도 같다. 그림 바이트는 사본을 새로 만들 때만 읽는다
 - 사람이 없는 실행에서 막지 않는다. 이 도구는 이미 만든 그림을 복사할 뿐 구독 한도를 쓰지 않는다
 
 ### 실행 입력과 스킬
@@ -427,7 +427,7 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | REQ15, REQ16 의 hook | `hermes/tests/test_image_source.py`. 가짜 Control Plane 으로 세 장을 받아 인자를 사본 경로로 바꾸는지, 하나라도 못 받으면 막고 사본을 지우는지, 가리킴이 아닌 값과 16장 초과, 옛 Control Plane 을 막는지, 결과 hook 이 사본을 지우는지 본다 |
 | REQ15 의 Hermes 쪽 | `hermes/tests/test_generated_image_contract.py`. 두 인자의 이름과 media cache 의 호스트 읽기, 16장 상한을 Hermes 소스에서 본다 |
 | REQ17 | 실행 입력을 만드는 기존 테스트에서 고치기 규칙과 그림 제목 줄을 본다 |
-| REQ18 | `ContentDraftImagesTest` 가 사본이 그림과 바이트가 같고 그 번호로 원고를 저장하는지, 같은 그림을 두 번 넣어도 사본이 하나인지, 사본이 사진 순번과 사진 참조 목록, 보내지 않은 사진 수, 메시지 묶기에 나오지 않는지 본다. `ContentDraftSnapshotsTest` 가 snapshot 입력에서 사본이 사진과 같은 폴더의 파일이고 그 파일이 그림과 같은지, `ContentDraftImageToolTest` 가 MCP 결과를 본다. 사진 파일을 네이버에 올리는 길은 기존 `ContentDraftJobLoopbackTest` 가 본다 |
+| REQ18 | `ContentDraftImagesTest` 가 사본이 그림과 바이트가 같고 그 번호로 원고를 저장하는지, 같은 그림을 두 번 넣어도 사본이 하나인지, 사본이 사진 순번과 사진 참조 목록, 보내지 않은 사진 수, 메시지 묶기에 나오지 않는지 본다. `ContentDraftSnapshotsTest` 가 snapshot 입력에서 사본이 사진과 같은 폴더의 파일이고 그 파일이 그림과 같은지, `ContentDraftImageToolTest` 가 MCP 결과를 본다. `ContentDraftJobLoopbackTest` 가 사본을 넣은 원고를 승인해 합성 worker 가 가짜 네이버에 올린 바이트의 지문이 그림과 같은지 본다 |
 | REQ19 | `ContentDraftImagesTest` 가 보관 기간 정리로 파일을 지운 그림은 사본이 있어도 `IMAGE_SOURCE_GONE` 이고 사본을 만들지 않는지, 이미 넣은 원고는 그림 파일을 지운 뒤에도 남아 사본 번호로 고쳐 저장되고 사진의 보관 기간이 지나면 쓸 수 없는지 본다. `ContentDraftImageToolTest` 가 모델이 받는 고정 안내를 본다 |
 
 실제 이미지 서비스로 한 장을 만드는 왕복은 배포 뒤 운영에서 확인한다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」).
