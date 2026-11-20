@@ -85,5 +85,7 @@ test -z "$(grep -n local_execution hermes/plugins/dashboard-profile-api/toolconf
 | `hermes/README.md` | 수정 (「셸 실행 공간」) |
 | `hermes/tests/test_dashboard_profile_api_sandbox_policy.py` | 수정 |
 | `hermes/docs/adr/ADR-20261008-execute-code-unattended.md` | 수정 (대체된 부분 줄) |
+| `hermes/docs/hermes-contract.md` | 수정 (「profile 별 적용」) |
+| `hermes/plugins/dashboard-profile-api/sandbox_approvals.py` | 수정 (주석. docker 가 아닌 분기는 옛 설정을 다루던 경로로 남긴다) |
 | `docs/adr/ADR-20261008-default-toolsets.md` | 수정 (대체된 부분 줄) |
 | `docs/adr/ADR-20261009-skill-package.md` | 수정 (대체된 부분 줄) |

@@ -16,9 +16,9 @@
 
 - 409 해석은 `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesCallFailure.java` 의 `sandboxRejection` 이다. 본문의 `code` 가 `sandbox_unavailable` 이면 `HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, …)` 를 돌려준다.
 - `HermesRequestRejected` 는 `backend/src/main/java/com/bifos/assistant/hermes/application/port/HermesRequestRejected.java` 이고 `status()` 만 더 갖는다.
-- 목록 계산은 `agent/application/AgentDefaultToolsets.java` 의 private static `desired()` 를 쓴다. 지금 켜진 `AgentToolPolicy::isKnown` 이름, `CONTROL_PLANE_MCP`, `connectorBindings.connectorServers(agent.id())`, 켜져 있으면 `ATTACHMENT_INSPECTION`. `enablePending` 은 그룹 공개, 주인 없음, 비밀값 요청 스킬로 멈추므로 부르지 않는다.
+- 목록 계산은 `agent/application/AgentDefaultToolsets.java` 의 private static `desired(current, wanted, connectorServers)` 를 쓴다. `readEnabled` 결과에서 `AgentToolPolicy::isKnown` 으로 남긴 목록을 `desired(…, List.of(), connectorServers)` 에 넣고, 원래 목록에 `ATTACHMENT_INSPECTION` 이 있으면 더한다(`desired()` 는 그 이름을 더하지 않는다). 실행 공간 도구가 켜졌는지는 `readEnabled` 결과 그대로에 `AgentToolPolicy.hasSandboxToolset` 으로 본다. `enablePending` 은 그룹 공개, 주인 없음, 비밀값 요청 스킬로 멈추므로 부르지 않는다.
 - 에이전트 순회와 행 잠금은 `agent/application/AgentPendingToolsets.java` 의 `attemptAll`, `attempt`, `attemptLocked`(쪽 단위 번호 읽기, `TransactionTemplate`, `findByIdForUpdate`)를 따른다.
-- 기동 때 도는 작업의 예는 `chat/attachment/application/AttachmentCleaner.java` 의 `@EventListener(ApplicationReadyEvent.class)` 다.
+- 기동 때 도는 작업의 예는 `chat/attachment/application/AttachmentCleaner.java` 의 `@EventListener(ApplicationReadyEvent.class)` 다. 이 작업은 Hermes 를 부르므로 기동 스레드를 묶지 않게 `shared/concurrent/BackgroundTasks.start` 로 띄운다(`people/application/FirstAgentCreator.java` 와 같은 방식).
 - 설정은 `agent/config/AgentProperties.java`(rule-23, rule-24)다. 테스트 설정 `backend/src/test/resources/application-test.yml` 은 같은 이유로 `pending-toolsets-cron: "-"` 를 둔다.
 
 ## 의도 메모
@@ -54,7 +54,8 @@
 
 ### 5. `agent/application/AgentSandboxSweep.java` 신규
 
-- `@Component`, `@EventListener(ApplicationReadyEvent.class)` 의 `onReady()` 가 `properties.sandboxSweepOnStart()` 일 때 `sweepAll()` 을 부른다.
+- `@Component`, `@EventListener(ApplicationReadyEvent.class)` 의 `onReady()` 가 `properties.sandboxSweepOnStart()` 일 때 `backgroundTasks.start("agent-sandbox-sweep", this::sweepAll)` 로 띄운다.
+- `public int unfinishedCount()` 로 끝내지 못한 수를 낸다. 검사와 로그가 쓴다.
 - `sweepAll()` 은 `AgentPendingToolsets.attemptAll` 처럼 50 개씩 쪽을 넘기며 `sweep(agentId)` 를 부르고, 끝에 결과별 수를 info 로그로 남긴다.
 - `sweep(agentId)` 는 `TransactionTemplate` 안에서 `findByIdForUpdate` 로 잠그고, 행이 없거나 지웠으면 건너뛰고, `defaults.reapplySandbox(agent)` 를 부른다. 예외는 잡아 경고 로그를 남기고 끝내지 못한 목록(`Set<Long>`, 메모리)에 둔다. 성공하면 목록에서 뺀다.
 - `@Scheduled(cron = "${assistant.agents.pending-toolsets-cron}")` 의 `retryUnfinished()` 가 끝내지 못한 목록만 다시 `sweep` 하고 남은 수를 로그로 남긴다. 목록이 비면 아무것도 하지 않는다.
@@ -69,7 +70,8 @@
 ### 7. 테스트
 
 - `backend/src/test/java/com/bifos/assistant/agent/AgentSandboxSweepTest.java`(mock): 에이전트 셋(정책 안 → 같은 목록 실행 공간 쓰기, `profileUnlisted` 거절 → 실행 공간 도구 뺀 목록 `writeApiServer`, 표시 없는 409 → 다시 쓰지 않음)과 셸이 꺼진 에이전트(쓰기 없음), 한 에이전트가 예외를 던져도 다음 에이전트를 보는지. 실패한 에이전트가 `retryUnfinished()` 에서 다시 시도되고, 성공하면 다음 차례에 다시 보지 않는지. 그룹 공개이거나 주인이 없는 에이전트도 다시 쓰는지. `reapplySandbox` 를 직접 보는 경우는 `AgentDefaultToolsetsTest` 에 더해도 된다.
-- `HermesCallFailure` 의 테스트 파일(`grep -rln "sandboxRejection" backend/src/test/java` 로 찾고, 없으면 `backend/src/test/java/com/bifos/assistant/hermes/HermesCallFailureTest.java`): `reason: unlisted` 있음과 없음.
+- `HermesCallFailure` 는 `hermes.infra` 의 package-private 클래스라 직접 부르지 않는다. 실제 HTTP 로 409 해석을 보는 `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java` 에 `reason: unlisted` 있음과 다른 값을 더하고, 기존 409 사례에 `profileUnlisted()` 거짓을 더한다.
+- `backend/src/test/java/com/bifos/assistant/agent/AgentPropertiesTest.java` 의 생성자 호출을 세 인자로 고친다.
 
 ### 8. 기능 문서
 
@@ -78,7 +80,7 @@
 ## 검증
 
 ```bash
-cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*AgentSandboxSweepTest' --tests '*AgentDefaultToolsetsTest' --tests '*HermesCallFailure*' --tests '*AgentPendingToolsets*'
+cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*AgentSandboxSweepTest' --tests '*AgentDefaultToolsetsTest' --tests '*HermesToolsetRequestTest' --tests '*AgentPendingToolsetsTest' --tests '*AgentPropertiesTest'
 cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew archTest
 ```
@@ -97,6 +99,9 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew archTest
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentSandboxSweepTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/hermes/HermesCallFailureTest.java` | 신규 또는 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentPropertiesTest.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/application/port/HermesToolsetClient.java` | 수정 (Javadoc) |
+| `docs/features/users.md` | 수정 (「정책에 없는데 셸 계열이 이미 켜져 있다」 줄) |
 | `docs/features/agent-skill.md` | 수정 |
 | `docs/features/connector-policy.md` | 수정 |
