@@ -168,15 +168,16 @@ fos-ctx 는 Hermes 의 `image_generate` 가 만든 그림을 `POST /internal/her
 
 ### Control Plane MCP
 
-Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기, 플러그인 목록 읽기, 예약 작업 다루기를 Control Plane 의 MCP 서버 하나가 맡는다.
+Memory 제목 검색과 본문 읽기, 기억 남기기와 지우기 청하기, 결과물 쓰기, 할 일 남기기와 끝내기, 다른 에이전트에게 맡기기, 플러그인 목록 읽기, 예약 작업 다루기를 Control Plane 의 MCP 서버 하나가 맡는다.
 서버 이름, 경로, 프로토콜 버전, 도구 목록은 `McpController` 와 `McpToolService` 가 갖는다. Hermes 는 이 서버의 도구를 `mcp__fos_assistant__<도구>` 로 보인다.
 
-**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_TASK_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
+**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_DIRECT_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
 
 - 제목 검색을 포함한 읽기와 위임 도구는 받는다. 플러그인 목록 읽기(`connector_list`)도 읽기라 받는다
 - 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 와 `file_space_put` 을 더 받는다. `file_space_put` 은 대화 인자가 없어 origin 실행의 대화가 점검 대화인지로 본다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
 - 예약 작업 목록(`task_list`)과, 지우지 않고 승인 카드만 띄우는 `task_delete` 는 늘 받는다. 바로 바꾸는 `task_create`, `task_update`, `task_set_state` 는 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(서비스 개념 스펙 DECISION32)
-- `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
+- `follow_up_propose` 와 챙기는 할 일을 읽는 `follow_up_list` 는 쓰기 도구 허용과 관계없이 받는다. 살펴보기의 할 일은 제안만 하고 사람이 받아들여야 챙긴다. 할 일을 끝내는 `follow_up_done` 은 쓰기 도구를 허용한 살펴보기만 받고, 받더라도 살펴보기 트리에서는 상태를 바꾸지 않는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
+- 지우지 않고 승인 카드만 띄우는 `memory_forget` 은 늘 받는다
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`docs/features/proactive.md`](proactive.md) 의 「읽기 경계」).
@@ -187,7 +188,8 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `memory_search` | [`docs/features/memory.md`](memory.md) 의 「기억 검색의 구현 계약」. 현재 origin의 권한으로 제목과 일반 본문을 관련도 순으로 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`docs/features/agent-skill.md`](agent-skill.md) 의 「다른 에이전트에게 맡기기」 |
-| `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |
+| `follow_up_propose`, `follow_up_list`, `follow_up_done` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 와 [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」. 사용자가 직접 시킨 할 일만 바로 만들고 끝낸다 |
+| `memory_forget` | [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」. 기억 지우기 승인 카드만 띄운다. 결과에 기억의 글이 없다 |
 | `content_draft_write`, `content_draft_read` | [원고 저장 계약](content-draft.md#mcp와-배치) |
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
 | `content_draft_image` | [만든 그림을 원고에 넣기](content-draft.md#만든-그림을-원고에-넣기) |

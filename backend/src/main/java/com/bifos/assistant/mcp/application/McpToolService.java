@@ -93,7 +93,7 @@ public class McpToolService {
 
     private final AgentRepository agents;
     private final AgentConnectorBindings bindings;
-    private final FollowUpService followUps;
+    private final McpFollowUpTools followUpTools;
     private final McpMemoryRemember memoryRemember;
     private final McpToolCatalog catalog;
     private final Clock clock;
@@ -283,12 +283,15 @@ public class McpToolService {
 
 
     /**
-     * 할 일을 {@code PROPOSED} 로 제안하고 그 결과를 한 줄 글로 돌려준다. 결과마다의 글과 {@code isError} 는 이 메서드가 갖는다.
+     * 할 일을 남기고 그 결과를 한 줄 글로 돌려준다. 결과마다의 글과 {@code isError} 는 이 메서드가 갖는다.
+     * <p>모델이 사용자가 시켰다고 했고({@code requested}) 실행의 출처가 맞으면 바로 챙기는 {@code OPEN} 이고, 아니면 {@code PROPOSED}
+     * 제안이다(스펙 service-concepts REQ11). 출처 판정은 {@link McpFollowUpTools#userDirected} 가 갖는다.
      * <p>주인과 대화는 origin 실행에서 정한다. 인자로 받지 않는다(ADR-032). 값이 틀린 인자는 모델이 고쳐 다시 부를 수 있게
      * {@code isError} 와 무엇이 틀렸는지 한 줄로 답한다.
      * @param dueAt 모델이 준 기한 글. 없으면 null
+     * @param requested 모델이 사용자가 직접 시킨 할 일이라고 했는가
      */
-    public Map<String, Object> proposeFollowUp(McpCaller caller, String title, String dueAt, boolean waiting) {
+    public Map<String, Object> proposeFollowUp(McpCaller caller, String title, String dueAt, boolean waiting, boolean requested) {
         AgentExecution origin = caller.originExecution();
         Long conversationId = origin.conversationId();
         if (conversationId == null) {
@@ -307,13 +310,18 @@ public class McpToolService {
             }
             due = parsed.get();
         }
-        FollowUpProposalOutcome outcome = followUps.propose(caller.user(), conversationId, origin.id(), stripped, due, waiting);
+        boolean direct = requested && followUpTools.userDirected(caller);
+        FollowUpProposalOutcome outcome = followUpTools.save(caller, stripped, due, waiting, direct);
         return switch (outcome) {
+            case OPENED -> success("할 일로 적었다. 바로 챙긴다. 답에 /now 링크를 붙인다.");
             case CREATED -> success("할 일로 제안했다. 사용자가 지금 화면에서 받아들이면 챙긴다.");
             case DUPLICATE -> success("같은 할 일이 이미 있다. 새로 만들지 않았다.");
             case DECLINED_BEFORE -> failure(ToolFailureText.askUser("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다."));
-            case TOO_MANY_PROPOSALS, TOO_MANY_IN_RUN -> failure(
+            case TOO_MANY_PROPOSALS -> failure(
                 ToolFailureText.askUser("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다."));
+            case TOO_MANY_IN_RUN -> failure(ToolFailureText.askUser(direct
+                ? "이번 답에서 이미 할 일을 많이 적었다. 더 적지 않았다. 남은 것은 사용자에게 알린다."
+                : "이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다."));
         };
     }
 
@@ -449,9 +457,16 @@ public class McpToolService {
 
     /** 실패를 JSON 글로 돌려주는 도구의 결과다. 글 끝에 줄을 붙이면 JSON 이 깨지므로 같은 끝 줄을 {@code next} 칸에 넣는다. */
     static Map<String, Object> jsonFailure(Map<String, ?> fields, ToolFailureText next) {
+        return jsonFailure(fields, next, false);
+    }
+
+
+    /** @param external 외부 서비스에서 온 글이 들어 있어 {@code <external-data>} 로 감싸야 하는가 */
+    static Map<String, Object> jsonFailure(Map<String, ?> fields, ToolFailureText next, boolean external) {
         Map<String, Object> body = new LinkedHashMap<>(fields);
         body.put("next", next.endLine());
-        return toolResult(JSON.writeValueAsString(body), true);
+        String json = JSON.writeValueAsString(body);
+        return toolResult(external ? ExternalData.wrap(json) : json, true);
     }
 
 

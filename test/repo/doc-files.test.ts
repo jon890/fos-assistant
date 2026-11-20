@@ -165,7 +165,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
 });
 
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
-  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
+  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
 });

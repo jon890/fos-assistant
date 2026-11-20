@@ -18,7 +18,13 @@ const pretendard = localFont({
 // 앱 이름은 실행할 때의 환경에서 읽는다. 빌드할 때 굳지 않게 요청마다 만든다.
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
-  return { title: appName(), description: "함께 쓰는 AI 비서" };
+  const name = appName();
+  // iOS 가 홈 화면 앱을 주소창 없이 연다(docs/features/attention/spec.md 의 REQ4).
+  return {
+    title: name,
+    description: "함께 쓰는 AI 비서",
+    appleWebApp: { capable: true, title: name },
+  };
 }
 
 // 가상 키보드가 올라오면 레이아웃 뷰포트(h-dvh)가 줄어 입력창이 키보드 위에 남는다. 지원하지 않는 브라우저는 기본 동작 그대로다.

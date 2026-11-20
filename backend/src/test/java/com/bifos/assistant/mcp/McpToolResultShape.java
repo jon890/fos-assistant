@@ -57,7 +57,11 @@ final class McpToolResultShape {
     /** 실패 글의 마지막 줄이 다음 방법이나 바로 알림이다. 글이 JSON 객체면 {@code next} 칸을 본다. */
     static void assertEndsWithStep(String tool, String text) {
         String endLine;
-        JsonNode parsed = text.startsWith("{") ? JSON.readTree(text) : null;
+        // 외부 글이 든 JSON 실패는 <external-data> 로 감싸여 온다. 안의 JSON 의 next 칸을 본다
+        int open = text.indexOf("<external-data>\n");
+        int close = text.lastIndexOf("\n</external-data>");
+        String json = open >= 0 && close > open ? text.substring(open + "<external-data>\n".length(), close) : text;
+        JsonNode parsed = json.startsWith("{") ? JSON.readTree(json) : null;
         if (parsed != null && parsed.isObject()) {
             endLine = parsed.path("next").asString("");
         } else {

@@ -355,13 +355,14 @@ public class FollowUpService {
 
 
     /**
-     * 같은 제목의 열린 줄을 찾아, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다.
+     * 같은 제목의 열린 줄을 잠가 읽고, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다. 잠가 읽어 그 사이 화면에서 커밋한
+     * 변경을 옛 값으로 덮지 않는다.
      *
      * <p>동작은 그 줄을 그대로 돌려줬으면 {@code reused}, 받아들였으면 {@code accepted} 다.
      */
     private Optional<Created> openTitle(CurrentUser user, String key, Instant now) {
         return followUps
-            .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
+            .findForUpdateByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
             .map(existing -> {
                 if (existing.status() != FollowUpStatus.PROPOSED) {
                     return new Created(existing, "reused");
@@ -372,6 +373,16 @@ public class FollowUpService {
                     .reason("DIRECT_CREATE"));
                 return new Created(accepted, "accepted");
             });
+    }
+
+
+    /**
+     * 같은 제목의 열린 줄이 있으면 제안은 받아들인다. 에이전트가 사용자가 시킨 할 일을 바로 만들 때 쓴다. 트랜잭션 안에서 부른다.
+     *
+     * @return 제안을 받아들였으면 참, 이미 챙기는 줄이면 거짓, 열린 줄이 없으면 빈 값
+     */
+    Optional<Boolean> acceptOpenTitle(CurrentUser user, String key, Instant now) {
+        return openTitle(user, key, now).map(found -> "accepted".equals(found.action()));
     }
 
 
@@ -423,7 +434,7 @@ public class FollowUpService {
 
 
     /** 앞뒤 공백을 지운 제목이다. 비었거나 {@link #TITLE_MAX} 자를 넘으면 400 이다. */
-    private static String requireTitle(String title) {
+    static String requireTitle(String title) {
         String stripped = title == null ? "" : title.strip();
         int length = stripped.codePointCount(0, stripped.length());
         if (length < 1 || length > TITLE_MAX) {
