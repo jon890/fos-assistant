@@ -85,11 +85,11 @@
 
 | 요청 | 응답 |
 | --- | --- |
-| `POST /api/v1/admin/quality/checks` | 202 와 `{publicId, status}`. 도는 `DEPLOY_CHECK` 가 있으면 새로 만들지 않고 그 줄을 `200` 으로 돌려준다(같은 배포에서 두 번 불러도 하나). 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING` |
+| `POST /api/v1/admin/quality/checks` | 202 와 확인 한 줄(`trigger` `PIPELINE`). 도는 `DEPLOY_CHECK` 가 있으면 새로 만들지 않고 그 줄을 `200` 으로 돌려준다(같은 배포에서 두 번 불러도 하나). 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING` |
 | `GET /api/v1/admin/quality/checks/{publicId}` | 한 줄과 기능별 결과. 파이프라인이 이 `status` 를 읽는다 |
 | `GET /api/v1/admin/quality/checks?cursor=` | 최근 순 목록. 품질 화면 첫 칸 |
 | `POST /api/v1/admin/quality/checks/{publicId}/retry` | 같은 기능 묶음으로 새 확인을 시작한다(`trigger_type` `ADMIN`). 도는 확인이 있으면 첫 줄처럼 그 줄을 돌려주고, 화면은 「이미 확인이 돌고 있다」 를 보인다 |
-| `GET /api/v1/admin/quality/executions/{executionId}/tree` | 평가 사용자의 실행 트리만 연다. 다른 사용자의 실행은 404 다. 지금 실행 트리 조회(`ExecutionTreeService`)는 주인만 열어 관리자가 평가 사용자의 실패를 볼 길이 없다(ADR-063 의 관리자 영역 규칙대로 `admin.quality` 에 둔다) |
+| `GET /api/v1/admin/quality/executions/{executionId}/tree` | 평가 사용자의 실행 트리만 연다. 응답은 `/api/v1/usage/executions/{id}/tree` 와 같은 모양이고, 내부 값은 보는 관리자 기준으로 싣는다(`ExecutionTreeService.ofOwner`). 다른 사용자의 실행은 404 다. 지금 실행 트리 조회(`ExecutionTreeService`)는 주인만 열어 관리자가 평가 사용자의 실패를 볼 길이 없다(ADR-063 의 관리자 영역 규칙대로 `admin.quality` 에 둔다) |
 | `POST /api/v1/admin/quality/evaluation-user` | 평가 전용 사용자를 준비하고 상태를 돌려준다 |
 | `GET /api/v1/admin/quality/evaluation-user` | 준비됐는지, 빠진 것 |
 
@@ -147,7 +147,7 @@ sequenceDiagram
 | 예약 작업 발화 | 문항을 보내지 않는다. 실행기가 `TaskService` 로 평가 전용 사용자의 `TURN` 작업을 한 번(`ONCE`, 지금 뒤 1분. `ONCE` 는 지금보다 뒤여야 한다)으로 만들어 발화기에 맡긴다. 끝남 조건은 그 작업의 `task_run` 이 끝난 상태가 된 것이다. 지시는 짧은 고정 글이다 | 그 작업의 `task_run` 이 `SUCCEEDED` 로 끝나고 `execution_id` 가 찬다 | 예약 작업과 그 대화 |
 | 원본 사진 조회 | 앞 메시지에 합성 사진(심은 글자)을 올리고 다음 메시지에서 글자를 묻는다 | 답에 심은 글자가 들고, 둘째 turn 트리에 `attachment_inspect` 의 `TOOL_COMPLETED` 가 실패 없이 있다. `inspected` 단계 사건은 로그에만 남아 Control Plane 이 읽지 못한다(`MediaPipelineEvents`) | 첨부, 대화 |
 
-합성 사진은 `test/model-eval/blog/make_photos.py` 와 같은 방식으로 만든 파일 하나를 `backend` 리소스로 둔다.
+합성 사진은 표지판에 심은 글자를 그린 단순한 그림 하나를 `backend/src/main/resources/quality/deploy-check-photo.png` 에 둔다.
 확인 시작 뒤 평가 사용자에게 생긴 기억 가운데 미리 넣은 한 줄이 아닌 것은 확인이 끝날 때 기능의 통과와 상관없이 지운다(문항이 돌다 `memory_remember` 로 생길 수 있다). 「정리」 는 통과한 기능에만 바로 한다. 실패한 기능의 대화와 만든 것은 30일 뒤 정리 작업이 지운다(스펙 DECISION16, DECISION19). 정리 작업은 하루 한 번 돌고, 대화를 지운 뒤 `quality_run.result_json` 의 `conversationPublicId` 와 `executionIds` 를 비운다. 그래서 30일 뒤에는 화면에 링크가 없다. 줄과 숫자는 남는다. 실행 기록 줄 자체는 기존 실행 기록 보존(rule-49)을 따른다.
 
 ### 실패 알림
@@ -176,6 +176,9 @@ sequenceDiagram
 - **e2e 시나리오는 `test/e2e/run.ts` 의 맨 끝에 등록한다.** 사용자를 하나 더 만들어 앞 시나리오의 사람 수 세기를 깨지 않게 한다.
 - **화면 PR 전까지 알림의 이동 대상 `/admin/quality` 는 없는 화면이다.** 실행기 PR 과 화면 PR 을 같은 배포에 묶거나, 화면 PR 이 먼저 머지되게 한다.
 - 까닭 코드에는 기능 규칙의 코드와 함께 `BUSY`, `INTERRUPTED`, `RUN_FAILED`, `TIMED_OUT` 을 둔다.
+- **문항을 보내기 전에 빈 평가 대화를 먼저 만든다(`ChatService.startEmpty`).** 마감이 지났을 때 실행기 스레드가 그 대화의 도는 turn 을 찾아 멈추려면 `send` 가 돌아오기 전에 대화 번호를 알아야 한다. 사진 조회도 이 대화에 사진을 먼저 올린다.
+- **실행 줄이 생기기 전의 거절은 `USER_BUSY`, `CONVERSATION_BUSY` 만 `BUSY` 로 적는다.** 그 밖의 거절과 실행기 쪽 예외는 `RUN_FAILED` 다. 실행이 실패한 것은 실행 줄에 남아 판정이 읽는다.
+- **30일 정리는 `assistant.quality.cleanup-cron`(기본 매일 05:15) 에 돈다.** 보관 기간은 `assistant.quality.link-retention`(기본 30일)이다.
 
 ## 실패와 일관성
 
@@ -204,7 +207,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | PR | 범위 | 남은 확인 |
 | --- | --- | --- |
 | 기반 | `app_user.evaluation`, `quality_run`, 평가 전용 사용자 준비와 관리자 API, 숨기는 곳, 기능별 규칙 판정(REQ1 의 판정, 사용량 「평가」 한 줄을 뺀 REQ2) | 배포하고 아래 요청 5 를 마친 뒤 관리자가 평가 사용자를 준비해 상태에 빠진 것이 없고, 관리자 사용자 목록에 「평가용」 줄이 하나인지 본다 |
-| 실행기 | 확인 시작·조회 API, 기능 차례 실행과 10분 마감, 실패 알림, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3) | 배포 뒤 운영에서 확인 한 번을 돌려 본다 |
+| 실행기 | 확인 시작·조회 API, 평가 사용자 실행 트리 조회, 기능 차례 실행과 10분 마감, 실패 알림과 그 알림의 웹 이동, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3) | 배포 뒤 관리자가 평가 사용자를 준비하고 확인 한 번을 돌려 본다 |
 | 화면 | `/admin/quality` 첫 칸과 사용량 「평가」 한 줄(REQ4, REQ2 의 나머지). 실행기 PR 과 같은 배포에 묶는다 | 브라우저 테스트 |
 
 ## 운영 저장소에 넘길 요청

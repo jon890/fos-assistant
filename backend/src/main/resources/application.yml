@@ -403,6 +403,12 @@ assistant:
     retention: 365d
     # 보관 기간이 지난 판단 피드백 사건을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 45 4 * * *"
+  quality:
+    # 배포 뒤 확인의 기능 하나 마감. 넘으면 그 기능만 TIMED_OUT 이다(docs/features/agent-quality/design.md)
+    feature-timeout: ${ASSISTANT_QUALITY_FEATURE_TIMEOUT:10m}
+    # 실패한 기능의 평가 대화를 남기는 기간과, 지난 대화를 지우는 시각
+    link-retention: 30d
+    cleanup-cron: "0 15 5 * * *"
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

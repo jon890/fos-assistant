@@ -369,6 +369,10 @@ public enum ErrorCode {
     PUSH_NOT_CONFIGURED(HttpStatus.CONFLICT),
     /** KEK 가 설정되지 않아 서버 비밀값을 저장할 수 없다. 원문으로 두는 길은 없다(ADR-20261120 / server-secret). */
     SECRET_STORE_UNAVAILABLE(HttpStatus.CONFLICT),
+    /** 그룹에 평가 전용 사용자가 없어 배포 뒤 확인을 시작하지 못한다. 관리자가 품질 화면에서 먼저 준비한다. */
+    EVALUATION_USER_MISSING(HttpStatus.CONFLICT),
+    /** 그 배포 뒤 확인이 없거나 다른 그룹의 것이다. */
+    QUALITY_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 

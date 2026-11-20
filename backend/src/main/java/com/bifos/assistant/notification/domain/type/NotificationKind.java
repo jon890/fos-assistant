@@ -29,5 +29,7 @@ public enum NotificationKind {
     /** 단추로 만든 연결의 갱신을 서비스가 거절했다. 다시 연결하면 읽음이 된다(ADR-20261120 / connector-oauth). */
     CONNECTOR_RECONNECT_REQUIRED,
     /** 서비스가 OAuth 앱 자격을 거절했다. 관리자가 그 앱 설정을 바꾸면 읽음이 된다(ADR-20261120 / connector-oauth). */
-    CONNECTOR_OAUTH_APP_REJECTED
+    CONNECTOR_OAUTH_APP_REJECTED,
+    /** 배포 뒤 확인에서 기능이 하나라도 실패했다. 다음 확인이 통과해도 읽음으로 바꾸지 않는다(docs/features/agent-quality/design.md). */
+    QUALITY_CHECK_FAILED
 }

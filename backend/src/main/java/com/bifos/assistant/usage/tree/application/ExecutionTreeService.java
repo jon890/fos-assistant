@@ -74,13 +74,25 @@ public class ExecutionTreeService {
      */
     @Transactional(readOnly = true)
     public ExecutionTree of(CurrentUser user, Long executionId) {
+        return ofOwner(user.id(), user, executionId);
+    }
+
+
+    /**
+     * 주인이 아닌 사람이 그 주인의 트리를 본다. 관리자가 평가 전용 사용자의 실행을 열 때만 쓴다(docs/features/agent-quality/design.md 의
+     * 「관리자 API」). 주인을 고르는 판정은 부르는 쪽이 한다. 내부 값을 보일지는 보는 사람 {@code user} 로 정한다.
+     *
+     * @param ownerUserId 트리의 주인. 실행이 이 사용자의 것이 아니면 없는 것과 같다
+     */
+    @Transactional(readOnly = true)
+    public ExecutionTree ofOwner(Long ownerUserId, CurrentUser user, Long executionId) {
         AgentExecution asked = executions.findById(executionId).orElseThrow(ExecutionTreeService::notFound);
-        requireOwner(user, asked);
+        requireOwner(ownerUserId, asked);
 
         Ascent ascent = climbToRoot(asked);
         AgentExecution root = ascent.root();
         // 자식이 남의 것일 수 없지만, 루트를 찾아 올라간 뒤에도 주인을 확인한다.
-        requireOwner(user, root);
+        requireOwner(ownerUserId, root);
 
         List<AgentExecution> descendants = executions.findByRootExecutionId(root.id());
         Map<Long, List<AgentExecution>> byParent = byParent(descendants);
@@ -318,8 +330,8 @@ public class ExecutionTreeService {
 
 
     /** 없는 실행과 남의 실행을 같은 응답으로 숨긴다. */
-    private static void requireOwner(CurrentUser user, AgentExecution execution) {
-        if (!Objects.equals(execution.userId(), user.id())) {
+    private static void requireOwner(Long ownerUserId, AgentExecution execution) {
+        if (!Objects.equals(execution.userId(), ownerUserId)) {
             throw notFound();
         }
     }
