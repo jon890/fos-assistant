@@ -367,6 +367,7 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 - `toolCount` 는 시작과 끝 사건 수 가운데 큰 값이다. 한쪽이 빠져 와도 줄지 않게 한다.
 - `subagentCount` 는 하위 에이전트 사건 수와 자식 실행 수를 더한다. 둘 다 남긴 하위 에이전트는 두 번 센다. 과거 Memory 제안 실행은 세지 않는다.
 - `durationMs` 는 루트가 시작한 때부터 트리에서 가장 늦게 끝난 실행까지다.
+- `uses` 는 트리가 쓴 도구와 도우미를 처음 쓴 차례로 한 번씩 담는다. 차례와 플러그인 이름(`connector`)을 붙이는 규칙은 [`app-shell/design.md`](app-shell/design.md) 의 「작업 과정의 이름」 이 갖는다.
 - 예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도의 사건을 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 이런 줄이 새로 생기지 않는다.
 
 ### 화면으로 보내는 사건

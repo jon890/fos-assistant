@@ -22,6 +22,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.turn.application.AskFormat;
+import com.bifos.assistant.chat.turn.application.dto.ActivityUse;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
@@ -1031,6 +1032,9 @@ class ChatServiceTest {
         assertThat(summary.toolCount()).isEqualTo(1);
         assertThat(summary.subagentCount()).isEqualTo(1);
         assertThat(summary.durationMs()).isNotNull();
+        assertThat(summary.uses())
+            .extracting(ActivityUse::kind, ActivityUse::toolName)
+            .containsExactly(tuple(ActivityUse.TOOL, "web_search"), tuple(ActivityUse.SUBAGENT, null));
     }
 
 

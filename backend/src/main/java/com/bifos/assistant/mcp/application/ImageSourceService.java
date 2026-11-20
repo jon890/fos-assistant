@@ -1,16 +1,22 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
+import com.bifos.assistant.chat.artifact.application.LinkImageService;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationLinks;
+import com.bifos.assistant.mcp.application.dto.GeneratedImageRequest;
 import com.bifos.assistant.mcp.application.dto.ImageSourceRef;
+import com.bifos.assistant.mcp.application.dto.ImageSourceResult;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import java.net.URI;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +32,9 @@ import tools.jackson.databind.JsonNode;
  * <p>사진은 원본 조회의 개요와 같은 판정과 읽기({@link AttachmentService#inspectOverview})로 원본 바이트를 그대로 받는다.
  *
  * <p>찾지 못한 까닭은 {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 과 {@link ErrorCode#IMAGE_SOURCE_GONE} 둘로만 나눈다. 404 는 내지 않는다.
+ *
+ * <p>링크({@code link:})는 요청자가 그 대화에 보낸 메시지에 있는 주소일 때만 바깥에서 받는다(ADR-20261120 / link-image-source).
+ * 대화에 없는 주소로는 바깥 요청을 한 번도 보내지 않는다. 받지 못한 까닭은 {@code IMAGE_SOURCE_LINK_*} 로 그대로 낸다.
  */
 @Service
 @Slf4j
@@ -33,11 +42,21 @@ import tools.jackson.databind.JsonNode;
 public class ImageSourceService {
     /** 호출 맥락을 서명할 때 넣는 도구 이름이다. fos-ctx 가 이 이름으로 맥락을 만든다. */
     public static final String TOOL = "image_generate";
+    /** 바꾸지 않고 그대로 내는 코드다. 링크의 까닭은 모델이 사용자에게 알릴 수 있게 나눠 둔다. */
+    private static final Set<ErrorCode> PASS_THROUGH = Set.of(
+        ErrorCode.IMAGE_SOURCE_UNKNOWN,
+        ErrorCode.IMAGE_SOURCE_GONE,
+        ErrorCode.IMAGE_SOURCE_LINK_BLOCKED,
+        ErrorCode.IMAGE_SOURCE_LINK_NO_IMAGE,
+        ErrorCode.IMAGE_SOURCE_LINK_TOO_LARGE,
+        ErrorCode.IMAGE_SOURCE_LINK_FAILED);
 
     private final McpCallerResolver callers;
     private final AttachmentService attachments;
     private final GeneratedImageService images;
     private final ConversationAccess access;
+    private final ConversationLinks links;
+    private final LinkImageService linkImages;
 
 
     /**
@@ -45,7 +64,7 @@ public class ImageSourceService {
      * {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 은 그 대화에 없는 것을 가리켰을 때, {@link ErrorCode#IMAGE_SOURCE_GONE} 은 지웠거나 보관
      * 기간이 지났을 때다
      */
-    public InspectedImage read(McpPrincipal principal, JsonNode body) {
+    public ImageSourceResult read(McpPrincipal principal, JsonNode body) {
         if (body == null || !body.isObject()) {
             throw new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
         }
@@ -58,11 +77,21 @@ public class ImageSourceService {
         ImageSourceRef ref = ImageSourceRef.parse(body.get("source"));
         try {
             if (ref.attachmentId() != null) {
-                return attachments.inspectOverview(caller.user(), origin.conversationId(), ref.attachmentId());
+                return new ImageSourceResult(
+                    attachments.inspectOverview(caller.user(), origin.conversationId(), ref.attachmentId()), null);
             }
             access.requireOwn(caller.user(), origin.conversationId());
+            if (ref.link() != null) {
+                URI link = links.findSentLink(caller.user(), origin.conversationId(), ref.link())
+                    .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "this link is not in the conversation"));
+                if (link.toASCIIString().length() > GeneratedImageRequest.MAX_LINK_CHARS) {
+                    // 받은 주소는 그림 올리기의 source_links 로 돌아온다. 그 상한을 넘으면 받아도 그림을 남기지 못하므로 받기 전에 막는다.
+                    throw new ApiException(ErrorCode.IMAGE_SOURCE_LINK_BLOCKED, "this link is too long");
+                }
+                return new ImageSourceResult(linkImages.read(link), link.toASCIIString());
+            }
             GeneratedImageSource image = images.readByTitle(origin.conversationId(), ref.title());
-            return new InspectedImage(image.contentType(), image.bytes());
+            return new ImageSourceResult(new InspectedImage(image.contentType(), image.bytes()), null);
         } catch (ApiException ex) {
             throw translate(ex);
         }
@@ -72,7 +101,7 @@ public class ImageSourceService {
     /** 저장 쪽의 예외를 두 까닭으로 줄인다. 남의 번호와 없는 번호가 같은 응답이어야 번호를 훑어 남의 것을 알아내지 못한다. */
     private static ApiException translate(ApiException ex) {
         ErrorCode code = ex.code();
-        if (code == ErrorCode.IMAGE_SOURCE_UNKNOWN || code == ErrorCode.IMAGE_SOURCE_GONE) {
+        if (PASS_THROUGH.contains(code)) {
             return ex;
         }
         if (code.status() == HttpStatus.GONE) {

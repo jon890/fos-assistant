@@ -1,18 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  Check,
-  CircleAlert,
-  CircleHelp,
-  LoaderCircle,
-  MessageCircle,
-  Square,
-} from "lucide-react";
+import { CircleAlert, CircleHelp, LoaderCircle, Square } from "lucide-react";
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
 import { Markdown } from "@/components/chat/markdown";
+import { ActivityKindIcon } from "./activity-icon";
 import {
   activityLabel,
   type ActivityItem,
@@ -21,14 +15,14 @@ import {
 
 const ICON_CLASS = "size-3.5";
 
-const MARKS: Record<ActivityItemState, ReactNode> = {
+/** 끝난 줄은 종류 아이콘을 보이고, 그 밖의 상태는 상태 아이콘으로 구분한다. */
+const MARKS: Record<Exclude<ActivityItemState, "done">, ReactNode> = {
   running: (
     <LoaderCircle
       aria-hidden="true"
       className={`${ICON_CLASS} animate-spin motion-reduce:animate-none`}
     />
   ),
-  done: <Check aria-hidden="true" className={ICON_CLASS} />,
   failed: <CircleAlert aria-hidden="true" className={ICON_CLASS} />,
   stopped: (
     <Square aria-hidden="true" className={`${ICON_CLASS} fill-current`} />
@@ -47,11 +41,7 @@ const SPOKEN: Partial<Record<ActivityItemState, string>> = {
 };
 
 function markColor(state: ActivityItemState): string {
-  return state === "done"
-    ? "text-success"
-    : state === "failed"
-      ? "text-destructive"
-      : "text-muted-foreground";
+  return state === "failed" ? "text-destructive" : "text-muted-foreground";
 }
 
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
@@ -74,6 +64,11 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
           >
             <span
               aria-hidden="true"
+              data-mark={
+                item.kind === "interim" || item.state === "done"
+                  ? "kind"
+                  : item.state
+              }
               className={cn(
                 "flex h-5 w-4 shrink-0 items-center justify-center",
                 item.kind === "interim"
@@ -81,8 +76,8 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
                   : markColor(item.state),
               )}
             >
-              {item.kind === "interim" ? (
-                <MessageCircle className={ICON_CLASS} />
+              {item.kind === "interim" || item.state === "done" ? (
+                <ActivityKindIcon item={item} className={ICON_CLASS} />
               ) : (
                 MARKS[item.state]
               )}
