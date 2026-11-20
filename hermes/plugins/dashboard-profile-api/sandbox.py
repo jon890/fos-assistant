@@ -38,7 +38,7 @@ SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 # hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
 SANDBOX_POLICY_KEYS = frozenset({
     "image", "workspace_root", "attachment_root", "attachment_agent_root", "connector_output_root", "skill_root",
-    "network", "cpu", "memory_mb", "read_only_mounts", "profiles",
+    "network", "cpu", "memory_mb", "read_only_mounts", "profiles", "isolate_unlisted",
 })
 SANDBOX_PROFILE_KEYS = frozenset({"read_only_mounts", "env", "network"})
 # 비밀값은 넣지 않는다. 운영 정책이 경로와 Backend 주소만 명시한다.
@@ -97,7 +97,7 @@ def _sandbox_env_ok(value) -> bool:
 def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachment_agent_root: str,
                       default_network, connector_output_root: Optional[str] = None,
                       skill_root: Optional[str] = None) -> Optional[dict]:
-    """정책에 등록된 profile 만 검증한다. 빈 목록은 모두 기존 실행을 유지한다."""
+    """정책에 명시한 profile 별 설정을 검증한다."""
     if not isinstance(value, dict):
         return None
     profiles = {}
@@ -126,7 +126,7 @@ def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachme
 def _sandbox_policy() -> Optional[dict]:
     """`SANDBOX_ENV` 의 JSON 을 읽어 검증한다. 없거나 하나라도 틀리면 None 이다.
 
-    None 이면 셸과 파일 도구 저장을 거절한다. 유효한 정책의 profiles 에 없는 profile 은 기존 실행을 유지한다(ADR-086).
+    None 이면 셸과 파일 도구 저장을 거절한다.
     """
     raw = os.environ.get(SANDBOX_ENV, "").strip()
     if not raw:
@@ -202,6 +202,9 @@ def _sandbox_policy() -> Optional[dict]:
            or _sandbox_skill_mount_overlaps(mount, skill_root)
            for mount in read_only_mounts):
         return invalid("read_only_mounts")
+    isolate_unlisted = value.get("isolate_unlisted", False)
+    if not isinstance(isolate_unlisted, bool):
+        return invalid("isolate_unlisted")
     profiles = _sandbox_profiles(value.get("profiles"), workspace_root, attachment_root,
                                  attachment_agent_root, network, connector_output_root, skill_root)
     if profiles is None:
@@ -218,7 +221,19 @@ def _sandbox_policy() -> Optional[dict]:
         "memory_mb": memory_mb,
         "read_only_mounts": list(read_only_mounts),
         "profiles": profiles,
+        "isolate_unlisted": isolate_unlisted,
     }
+
+
+def _sandbox_profile_settings(policy: dict, profile: str) -> Optional[dict]:
+    if profile == "default" or not PROFILE_NAME_RE.fullmatch(profile):
+        return None
+    settings = policy["profiles"].get(profile)
+    if settings is not None:
+        return settings
+    if policy["isolate_unlisted"]:
+        return {"read_only_mounts": [], "env": {}, "network": policy["network"]}
+    return None
 
 
 def _sandbox_workspace(policy: dict, owner: str) -> str:
@@ -327,7 +342,9 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
     if attachment_snapshot is None:
         attachment_snapshot = _sandbox_verify_attachment_directories(policy, owner)
     _sandbox_validate_attachment_snapshot(policy, owner, attachment_snapshot)
-    settings = policy["profiles"][profile]
+    settings = _sandbox_profile_settings(policy, profile)
+    if settings is None:
+        raise ValueError("실행 공간 정책이 이 profile 에 적용되지 않는다")
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
     # 플러그인이 Hermes 쪽에서 쓴 경로를 스크립트가 그대로 열도록 같은 경로에 읽기 전용으로 붙인다.
     # 실행 공간이 쓰지 못하므로 링크를 바꿔 끼워 플러그인의 쓰기를 다른 곳으로 돌릴 수 없다(ADR-20261008 connector-output-files).

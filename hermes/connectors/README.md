@@ -389,7 +389,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `owner_browser_env` | 선택. 사용자 브라우저를 쓰는 플러그인이 중계 주소를 받을 env 이름 하나. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구와 선택지 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
 | `owner_browser_login_url` | 선택. `owner_browser_env` 가 있을 때만 받는다. 사용자가 브라우저에서 먼저 로그인할 곳이고 화면이 안내에만 쓴다. `https://` 로 시작하고 512자 이하이며 빈칸과 제어 문자가 없다 |
 | `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
-| `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
+| `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책이 적용되는 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
 | `event_watch` | 선택. 사건 감지 선언이다. Control Plane 이 모델 없이 새 항목이 있는지 볼 때 대시보드의 `POST /api/connectors/<id>/events` 가 이 선언대로 조회 도구를 부른다. 칸과 검증은 아래 「사건 감지 선언」 이 갖는다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)) |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 플러그인을 카탈로그에 내지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |

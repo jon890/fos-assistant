@@ -97,6 +97,9 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
             ("profile mount target under hermes skill root",
              self.sandbox_policy(skill_root=self.skill_host_root,
                                  profiles={"owner": {"read_only_mounts": ["/srv/x:%s/alice" % self.skill_root]}})),
+            ("string isolate_unlisted", self.sandbox_policy(isolate_unlisted="true")),
+            ("number isolate_unlisted", self.sandbox_policy(isolate_unlisted=1)),
+            ("null isolate_unlisted", dict(self.sandbox_policy(), isolate_unlisted=None)),
             ("unknown top-level key", dict(self.sandbox_policy(), docker_extra_args=["--privileged"])),
         ]
         path = self.root / "owner/config.yaml"
@@ -199,6 +202,33 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         self.assertEqual(response.body["reason"], "unlisted")
         self.assertEqual(path.read_bytes(), original)
         self.assertFalse((self.sandbox_root / "user-1").exists())
+
+    def test_unlisted_profile_uses_common_docker_settings(self):
+        """목록에 없는 profile 은 공통 설정과 자기 주인의 디렉터리를 쓴다."""
+        policy = self.sandbox_policy(isolate_unlisted=True, profiles={
+            "alice": {"network": "alice-net", "read_only_mounts": ["/srv/alice-skills:/opt/alice-skills"],
+                      "env": {"CLAUDE_PLUGIN_ROOT": "/opt/alice-skills"}},
+        })
+        self.set_sandbox_policy(policy)
+
+        self.save_sandbox_key()
+
+        self.assertEqual(self.saved_config()["terminal"],
+                         self.expected_terminal("user-1", policy["read_only_mounts"]))
+
+    def test_default_profile_is_rejected_even_with_isolate_unlisted(self):
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=True, profiles={}))
+        body = self.file_body()
+        body["profile"] = "default"
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+
+    def test_false_isolate_unlisted_rejects_unlisted_profile(self):
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=False, profiles={}))
+
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["reason"], "unlisted")
 
     def test_missing_policy_rejects_shell_save_without_reason(self):
         """정책이 없으면 정책 밖과 구분하도록 reason 없이 409 로 거절한다."""
@@ -328,13 +358,15 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
             "CAREER_WORKSPACE_ROOT": "/workspace/career",
             "CAREER_DART_API_KEY_FILE": "/run/secrets/dart-key",
         }
-        self.set_sandbox_policy(self.sandbox_policy(profiles={
-            "owner": {"env": env, "network": "backend-test-net"},
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=True, profiles={
+            "owner": {"env": env, "network": "backend-test-net",
+                      "read_only_mounts": ["/srv/owner-skills:/opt/owner-skills"]},
             "alice": {},
         }))
         self.save_sandbox_key()
         terminal = self.saved_config()["terminal"]
         self.assertEqual(terminal["docker_env"], env)
+        self.assertIn("/srv/owner-skills:/opt/owner-skills:ro", terminal["docker_volumes"])
         self.assertEqual(terminal["docker_extra_args"], ["--network=backend-test-net", "--label=fos-sandbox-profile=owner"])
         self.assertEqual(terminal["docker_forward_env"], [])
         self.assertEqual(terminal["credential_files"], [])
