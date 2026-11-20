@@ -48,6 +48,9 @@ assistant:
     purge-cron: "40 * * * * *"
     # 기본 비서에 켜지 못한 기본 도구(「그림 만들기」)를 다시 켜 보는 시각(ADR-20261119 / image-gen-defaults)
     pending-toolsets-cron: "20 */5 * * * *"
+    # 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 실행 공간 정책 밖이면 그 도구를 끈다(ADR-20261120 / no-local-shell).
+    # 끝내지 못한 에이전트는 pending-toolsets-cron 주기에 다시 본다
+    sandbox-sweep-on-start: true
   people:
     # 첫 로그인에 만든 기본 에이전트에 켜는 도구다. 셸 계열은 실행 공간 정책에 등록된 profile 에서만 켜고,
     # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets).

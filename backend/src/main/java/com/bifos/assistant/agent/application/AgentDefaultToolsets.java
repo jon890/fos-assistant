@@ -1,11 +1,13 @@
 package com.bifos.assistant.agent.application;
 
 import com.bifos.assistant.agent.application.dto.PendingToolsetOutcome;
+import com.bifos.assistant.agent.application.dto.SandboxReapplyOutcome;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.hermes.application.port.HermesRequestRejected;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -20,8 +22,8 @@ import org.springframework.stereotype.Service;
  * 첫 로그인에 만든 기본 에이전트에 운영이 정한 기본 도구를 켠다(ADR-20261008-default-toolsets).
  *
  * <p>사람이 고르지 않은 도구라 등급 판정 대신 운영 설정을 허락으로 본다. 대신 셸·파일·사진 도구는 실행 공간 정책에 등록된
- * profile 에서만 켠다. 등록되지 않았으면 그 도구를 빼고 나머지만 켜며 경고를 남긴다. 사람의 도구 저장처럼 local 로 켜면
- * 그 셸이 다른 profile 의 {@code .env} 와 커넥터 값 파일에 닿는다(ADR-086).
+ * profile 에서만 켠다. 등록되지 않았으면 그 도구를 빼고 나머지만 켜며 경고를 남긴다. local 로 켜면 그 셸이 다른 profile 의
+ * {@code .env} 와 커넥터 값 파일에 닿는다(ADR-086, ADR-20261120 / no-local-shell).
  *
  * <p>실패해도 예외를 올리지 않는다. 로그인은 이미 끝났고, 도구는 관리자가 에이전트 도구 화면에서 다시 켤 수 있다.
  */
@@ -103,6 +105,46 @@ public class AgentDefaultToolsets {
     }
 
 
+    /**
+     * 실행 공간 도구가 켜져 있으면 지금 목록 그대로 실행 공간 쓰기로 다시 저장한다(ADR-20261120 / no-local-shell).
+     *
+     * <p>이미 local 로 켜진 셸을 바로잡는 기동 작업이 부른다. 공개 범위와 올린 스킬로 제외하지 않는다. 그런 에이전트도 이미 셸이
+     * 켜져 있다면 local 로 남아서는 안 되기 때문이다. plugin 이 정책에 없는 profile 이라 거절했을 때만 실행 공간 도구를 빼고
+     * 다시 쓴다. 정책이 없거나 틀린 거절과 Hermes 실패는 그대로 올려 부르는 쪽이 다음에 다시 보게 한다.
+     *
+     * @throws ApiException 정책 밖 거절이 아닌 실패. 아무것도 바꾸지 않았다
+     */
+    public SandboxReapplyOutcome reapplySandbox(Agent agent) {
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+        if (!AgentToolPolicy.hasSandboxToolset(enabled)) {
+            return SandboxReapplyOutcome.NOT_NEEDED;
+        }
+        LinkedHashSet<String> desired = new LinkedHashSet<>(
+            desired(
+                enabled.stream().filter(AgentToolPolicy::isKnown).toList(),
+                List.of(),
+                connectorBindings.connectorServers(agent.id())));
+        if (enabled.contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
+            desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
+        }
+        try {
+            toolsets.writeApiServerInSandbox(agent.hermesProfile(), List.copyOf(desired), agent.sandboxOwner());
+            return SandboxReapplyOutcome.REWRITTEN;
+        } catch (HermesRequestRejected rejected) {
+            if (!rejected.profileUnlisted()) {
+                throw rejected;
+            }
+        }
+        toolsets.writeApiServer(
+            agent.hermesProfile(), AgentToolPolicy.withoutSandboxToolsets(List.copyOf(desired)), agent.sandboxOwner());
+        log.warn(
+            "실행 공간 정책에 없는 profile 이라 셸·파일·코드 실행·사진 도구를 껐다 agent={} profile={}",
+            agent.code(),
+            agent.hermesProfile());
+        return SandboxReapplyOutcome.SHELL_REMOVED;
+    }
+
+
     private List<String> write(Agent agent, List<String> defaults) {
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
             .filter(AgentToolPolicy::isKnown)
@@ -133,7 +175,7 @@ public class AgentDefaultToolsets {
         if (current.containsAll(fallbackWanted)) {
             return List.of();
         }
-        // 지금 켜진 것은 그대로 둔다. 그 안에 셸 계열이 있으면 이 쓰기가 미등록 profile 의 셸을 local 로 바꾸므로 쓰지 않는다.
+        // 지금 켜진 것은 그대로 둔다. 그 안에 셸 계열이 있으면 plugin 이 정책 밖 저장을 거절하므로 쓰지 않는다(ADR-20261120 / no-local-shell).
         List<String> fallback = desired(current, fallbackWanted, connectorServers);
         if (AgentToolPolicy.hasSandboxToolset(fallback)) {
             log.warn(

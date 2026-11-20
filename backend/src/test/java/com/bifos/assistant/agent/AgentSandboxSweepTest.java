@@ -1,0 +1,152 @@
+package com.bifos.assistant.agent;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.bifos.assistant.agent.application.AgentSandboxSweep;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.hermes.application.port.HermesRequestRejected;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
+import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+
+/**
+ * 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이라고 답한 profile 만 그 도구를 끄는지 본다
+ * (ADR-20261120 / no-local-shell, 스펙 agent-tools REQ1).
+ */
+@BackendIntegrationTest
+class AgentSandboxSweepTest {
+
+    private static final long GROUP = 7_401L;
+    private static final String LISTED = "sweep-listed";
+    private static final String UNLISTED = "sweep-unlisted";
+    private static final String BROKEN = "sweep-broken";
+    private static final String SHELL_OFF = "sweep-off";
+    private static final String GROUP_AGENT = "sweep-group";
+
+    @Autowired
+    AgentSandboxSweep sweep;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesToolsetClient toolsets;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    private AppUser owner;
+    private Agent groupAgent;
+
+
+    @BeforeEach
+    void setUp() {
+        reset(toolsets);
+        jdbc.update("DELETE FROM agent WHERE hermes_profile LIKE 'sweep-%'");
+        jdbc.update("DELETE FROM app_user WHERE group_id = ?", GROUP);
+        owner = users.save(AppUser.of("sweep-owner@example.com", "지윤", GROUP, UserRole.MEMBER));
+        for (String profile : List.of(LISTED, UNLISTED, BROKEN, SHELL_OFF)) {
+            agents.save(agent(profile, AgentVisibility.PRIVATE, owner.id()));
+        }
+        groupAgent = agents.save(agent(GROUP_AGENT, AgentVisibility.GROUP, null));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
+        when(toolsets.readEnabled(anyString(), eq(LISTED))).thenReturn(List.of("web", "terminal", "fos-attachments"));
+        when(toolsets.readEnabled(anyString(), eq(UNLISTED))).thenReturn(List.of("web", "terminal", "file"));
+        when(toolsets.readEnabled(anyString(), eq(BROKEN))).thenReturn(List.of("code_execution"));
+        when(toolsets.readEnabled(anyString(), eq(SHELL_OFF))).thenReturn(List.of("web"));
+        when(toolsets.readEnabled(anyString(), eq(GROUP_AGENT))).thenReturn(List.of("terminal"));
+        doThrow(rejected(true)).when(toolsets).writeApiServerInSandbox(eq(UNLISTED), anyList(), anyString());
+        doThrow(rejected(false)).when(toolsets).writeApiServerInSandbox(eq(BROKEN), anyList(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("정책 안은 같은 목록을 실행 공간 쓰기로, 정책 밖은 실행 공간 도구를 뺀 목록으로 다시 쓰고 셸이 꺼진 에이전트는 쓰지 않는다")
+    void rewritesListedAndRemovesShellOnlyForUnlisted() {
+        sweep.sweepAll();
+
+        verify(toolsets)
+            .writeApiServerInSandbox(LISTED, List.of("web", "terminal", "fos-assistant", "fos-attachments"), "u" + owner.id());
+        verify(toolsets).writeApiServer(UNLISTED, List.of("web", "fos-assistant"), "u" + owner.id());
+        verify(toolsets, never()).writeApiServerInSandbox(eq(SHELL_OFF), anyList(), anyString());
+        verify(toolsets, never()).writeApiServer(eq(SHELL_OFF), anyList(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("정책 밖 표시가 없는 거절은 아무것도 끄지 않고 다음 차례에 다시 본다")
+    void keepsShellAndRetriesWhenTheRejectionIsNotUnlisted() {
+        sweep.sweepAll();
+
+        verify(toolsets, never()).writeApiServer(eq(BROKEN), anyList(), anyString());
+        assertThat(sweep.unfinishedCount()).isEqualTo(1);
+
+        doNothing().when(toolsets).writeApiServerInSandbox(eq(BROKEN), anyList(), anyString());
+        sweep.retryUnfinished();
+
+        // 첫 차례의 거절된 시도와 다시 시도가 같은 쓰기다.
+        verify(toolsets, times(2))
+            .writeApiServerInSandbox(BROKEN, List.of("code_execution", "fos-assistant"), "u" + owner.id());
+        assertThat(sweep.unfinishedCount()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("한 에이전트의 Hermes 실패가 다음 에이전트를 막지 않고, 그룹 공개이거나 주인이 없어도 다시 쓴다")
+    void continuesAfterAFailureAndDoesNotSkipGroupAgents() {
+        when(toolsets.readEnabled(anyString(), eq(LISTED))).thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        sweep.sweepAll();
+
+        verify(toolsets).writeApiServerInSandbox(GROUP_AGENT, List.of("terminal", "fos-assistant"), "a" + groupAgent.id());
+        verify(toolsets).writeApiServer(UNLISTED, List.of("web", "fos-assistant"), "u" + owner.id());
+    }
+
+
+    private static HermesRequestRejected rejected(boolean unlisted) {
+        return new HermesRequestRejected(
+            ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "no sandbox", new HttpClientErrorException(HttpStatus.CONFLICT), unlisted);
+    }
+
+
+    private static Agent agent(String profile, AgentVisibility visibility, Long ownerId) {
+        return Agent.of(
+            profile,
+            "비서",
+            profile,
+            "http://listener.test/p/" + profile,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            ownerId);
+    }
+}
