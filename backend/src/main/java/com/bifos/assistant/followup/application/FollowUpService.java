@@ -355,13 +355,14 @@ public class FollowUpService {
 
 
     /**
-     * 같은 제목의 열린 줄을 찾아, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다.
+     * 같은 제목의 열린 줄을 잠가 읽고, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다. 잠가 읽어 그 사이 화면에서 커밋한
+     * 변경을 옛 값으로 덮지 않는다.
      *
      * <p>동작은 그 줄을 그대로 돌려줬으면 {@code reused}, 받아들였으면 {@code accepted} 다.
      */
     private Optional<Created> openTitle(CurrentUser user, String key, Instant now) {
         return followUps
-            .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
+            .findForUpdateByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
             .map(existing -> {
                 if (existing.status() != FollowUpStatus.PROPOSED) {
                     return new Created(existing, "reused");

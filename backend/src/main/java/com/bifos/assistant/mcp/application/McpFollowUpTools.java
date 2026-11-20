@@ -125,9 +125,11 @@ public class McpFollowUpTools {
                 case DONE -> {
                     Map<String, Object> body = new LinkedHashMap<>();
                     body.put("status", "done");
-                    body.put("message", "할 일을 끝냈다. /now 화면에서 되돌릴 수 있다.");
+                    body.put("message", "할 일을 끝냈다. 화면에는 끝낸 할 일을 되돌리는 단추가 없다. 사용자가 잘못 끝냈다고 하면 "
+                        + "follow_up_propose 에 이 title 과 due_at 을 그대로, requested 를 true 로 주어 다시 적는다.");
+                    body.put("follow_up", item(finished.matches().getFirst()));
                     body.put("link", "/now");
-                    yield McpToolService.result(JSON.writeValueAsString(body), false);
+                    yield McpToolService.result(ExternalData.wrap(JSON.writeValueAsString(body)), false);
                 }
                 case AMBIGUOUS -> failed("ambiguous", "맞는 할 일이 여럿이라 바꾸지 않았다. 어느 것인지 사용자에게 되묻고 그 id 로 다시 부른다.",
                     finished.matches());
@@ -150,7 +152,8 @@ public class McpFollowUpTools {
             definition(DONE,
                 "사용자가 할 일을 끝냈다고 말하면(「그거 끝냈어」, 「병원 예약했어」) 그 할 일을 바로 끝낸다. 사용자가 끝냈다고 하지 않았는데 "
                     + "스스로 판단해 부르지 않는다. follow_up 에는 follow_up_list 의 id 나 제목을 준다. 맞는 할 일이 여럿이면 status ambiguous 와 "
-                    + "후보만 돌려주고 바꾸지 않으므로 사용자에게 어느 것인지 되묻는다. 끝낸 뒤 답에 /now 링크를 붙인다. "
+                    + "후보만 돌려주고 바꾸지 않으므로 사용자에게 어느 것인지 되묻는다. 끝낸 뒤 답에 무엇을 끝냈는지 적고 /now 링크를 붙인다. "
+                    + "끝낸 할 일은 화면에서 되돌리지 못한다. 잘못 끝냈다고 하면 결과의 제목과 기한으로 다시 적는다. "
                     + "isError 면 끝내지 못한 것이다. 끝냈다고 말하지 않고 message 대로 한다.",
                 Map.of("follow_up", Map.of("type", "string", "minLength", 1)), List.of("follow_up")));
     }

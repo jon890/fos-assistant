@@ -40,6 +40,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +53,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -106,6 +112,9 @@ class McpFollowUpDirectToolTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -274,7 +283,7 @@ class McpFollowUpDirectToolTest {
         JsonNode result = call(DONE, json.createObjectNode().put("follow_up", "병원 예약"));
 
         assertThat(isError(result)).as(text(result)).isFalse();
-        assertThat(text(result)).contains("\"status\":\"done\"", "/now");
+        assertThat(text(result)).contains("\"status\":\"done\"", "/now", TITLE, "다시 적는다").doesNotContain("되돌릴 수 있다");
         assertThat(onlyRow().status()).isEqualTo(FollowUpStatus.DONE);
         assertThat(followUpService.list(current(dad))).isEmpty();
         assertThat(text(call("follow_up_list", json.createObjectNode()))).doesNotContain(TITLE);
@@ -366,6 +375,65 @@ class McpFollowUpDirectToolTest {
         } finally {
             checks.delete(saved);
         }
+    }
+
+
+    @Test
+    @DisplayName("한 자리만 남았을 때 다른 제목 둘을 나란히 적으면 하나만 적힌다")
+    void capHoldsUnderConcurrentCalls() throws Exception {
+        askedByHuman();
+        for (int i = 0; i < 9; i++) {
+            call(PROPOSE, requested(TITLE + " " + i));
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            List<Future<JsonNode>> calls = new ArrayList<>();
+            for (String name : List.of("가", "나")) {
+                calls.add(pool.submit(() -> {
+                    start.await();
+                    return call(PROPOSE, requested(TITLE + " 동시 " + name));
+                }));
+            }
+            start.countDown();
+            List<Boolean> errors = new ArrayList<>();
+            for (Future<JsonNode> each : calls) {
+                errors.add(isError(each.get()));
+            }
+            assertThat(errors).containsExactlyInAnyOrder(false, true);
+        }
+        assertThat(rows()).hasSize(10);
+    }
+
+
+    @Test
+    @DisplayName("제안을 받아들이려는 사이 화면에서 먼저 거절하면 그 거절을 덮지 않고 새 할 일로 적는다")
+    void doesNotOverwriteRejectionCommittedFirst() throws Exception {
+        askedByHuman();
+        call(PROPOSE, json.createObjectNode().put("title", TITLE));
+        UUID proposal = onlyRow().publicId();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<?> screen = pool.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                FollowUp row = followUps.findByPublicIdAndUserIdForUpdate(proposal, dad.id()).orElseThrow();
+                row.reject(Instant.now());
+                followUps.saveAndFlush(row);
+                locked.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            locked.await();
+            Future<JsonNode> agent = pool.submit(() -> call(PROPOSE, requested(TITLE)));
+            Thread.sleep(300);
+            release.countDown();
+            screen.get();
+
+            assertThat(text(agent.get())).isEqualTo(OPENED);
+        }
+        assertThat(rows()).extracting(FollowUp::status).containsExactly(FollowUpStatus.REJECTED, FollowUpStatus.OPEN);
     }
 
 

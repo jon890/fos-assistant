@@ -32,11 +32,11 @@ public final class ControlPlaneActions {
 
     private static final Map<String, ToolPolicy> POLICIES = Map.of(
         TASK_DELETE, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "예약 작업 지우기", false, Set.of("task_id", "task", "next_run")),
-        MEMORY_FORGET, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "기억 지우기", false, Set.of("memory_id")));
+        MEMORY_FORGET, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "기억 지우기", false, Set.of("memory_id", "revision")));
 
     private static final Map<String, Map<String, String>> LABELS = Map.of(
         TASK_DELETE, Map.of("task", "작업", "next_run", "다음 실행", "task_id", "작업 번호"),
-        MEMORY_FORGET, Map.of("memory", "기억", "content", "내용", "scope", "범위", "memory_id", "기억 번호"));
+        MEMORY_FORGET, Map.of("memory", "기억", "content", "내용", "scope", "범위", "memory_id", "기억 번호", "revision", "버전"));
 
 
     /** 그 동작의 등록 이름이다. */

@@ -12,6 +12,7 @@ import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +42,7 @@ public class FollowUpAgentRequests {
 
     private final FollowUpRepository followUps;
     private final FollowUpService service;
+    private final AppUserRepository users;
     private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -50,11 +52,13 @@ public class FollowUpAgentRequests {
     public FollowUpAgentRequests(
         FollowUpRepository followUps,
         FollowUpService service,
+        AppUserRepository users,
         DecisionFeedbackRecorder feedback,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.followUps = followUps;
         this.service = service;
+        this.users = users;
         this.feedback = feedback;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
@@ -64,7 +68,8 @@ public class FollowUpAgentRequests {
     /**
      * 바로 챙기는 {@code OPEN} 줄을 만든다. 같은 제목의 제안이 있으면 받아들이고, 이미 챙기는 줄이면 새로 만들지 않는다.
      *
-     * <p>제안의 억제 규칙(거절한 제목, 대화의 제안 상한)은 쓰지 않는다. 사용자가 직접 시킨 일이다. 같은 제목이 동시에 열려 유일 제약에
+     * <p>제안의 억제 규칙(거절한 제목, 대화의 제안 상한)은 쓰지 않는다. 사용자가 직접 시킨 일이다. 한 실행의 상한은 사용자 줄을 잠가
+     * 동시 호출에서도 지킨다. 같은 제목이 동시에 열려 유일 제약에
      * 걸리면 트랜잭션 밖에서 다시 읽는다.
      *
      * @param executionId 만든 origin 실행의 번호
@@ -76,23 +81,34 @@ public class FollowUpAgentRequests {
         Instant now = clock.instant();
         FollowUpProposalOutcome outcome;
         try {
-            outcome = transactions.execute(status -> existing(owner, key, now).orElseGet(() -> {
-                if (followUps.countByProposedByExecutionId(executionId) >= MAX_DIRECT_PER_EXECUTION) {
-                    return FollowUpProposalOutcome.TOO_MANY_IN_RUN;
-                }
-                FollowUp saved = followUps.saveAndFlush(
-                    FollowUp.openedByAgent(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
-                feedback.record(FollowUpService.feedbackOf(saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
-                feedback.record(FollowUpService.feedbackOf(saved, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now)
-                    .reason("USER_REQUESTED"));
-                return FollowUpProposalOutcome.OPENED;
-            }));
+            outcome = transactions.execute(status -> {
+                // 사용자 줄을 잠가 한 실행의 건수 확인과 삽입을 차례로 한다. 서로 다른 제목을 나란히 적어도 상한을 넘지 않는다.
+                users.findByIdForUpdate(owner.id());
+                return existing(owner, key, now)
+                    .orElseGet(() -> create(owner, conversationId, executionId, stripped, key, dueAt, waiting, now));
+            });
         } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
             // 같은 제목이 동시에 열렸다. 먼저 저장된 줄이 있을 때만 그 줄로 답한다.
             outcome = transactions.execute(status -> existing(owner, key, now).orElseThrow(() -> ex));
         }
         log.info("follow-up direct open userId={} executionId={} outcome={}", owner.id(), executionId, outcome);
         return outcome;
+    }
+
+
+    /** 상한 안이면 바로 챙기는 줄을 만든다. 사용자 줄을 잠근 트랜잭션 안에서 부른다. */
+    private FollowUpProposalOutcome create(
+        CurrentUser owner, Long conversationId, Long executionId, String title, String key, Instant dueAt, boolean waiting,
+        Instant now) {
+        if (followUps.countByProposedByExecutionId(executionId) >= MAX_DIRECT_PER_EXECUTION) {
+            return FollowUpProposalOutcome.TOO_MANY_IN_RUN;
+        }
+        FollowUp saved = followUps.saveAndFlush(
+            FollowUp.openedByAgent(owner.id(), conversationId, executionId, title, key, dueAt, waiting, now));
+        feedback.record(FollowUpService.feedbackOf(saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
+        feedback.record(
+            FollowUpService.feedbackOf(saved, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now).reason("USER_REQUESTED"));
+        return FollowUpProposalOutcome.OPENED;
     }
 
 

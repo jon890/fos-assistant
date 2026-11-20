@@ -49,7 +49,8 @@ class MemoryForgetRequester implements MemoryForgetRequests {
         args.put("content", readable ? preview(memory.content()) : "내용을 열 수 없어요");
         args.put("scope", memory.scope() == MemoryScope.GROUP ? "그룹 기억" : "내 기억");
         args.put("memory_id", memoryId.toString());
-        var request = approvals.request(user, originExecutionId, ControlPlaneActions.MEMORY_FORGET, memoryId.toString(), args);
+        args.put("revision", Integer.toString(memory.revision()));
+        var request = approvals.request(user, originExecutionId, ControlPlaneActions.MEMORY_FORGET, memoryId + ":" + memory.revision(), args);
         if (request.status() != ActionStatus.PENDING) {
             return result("closed", "같은 요청의 승인 카드가 이미 끝났다(" + request.status().name()
                 + "). 다시 지우려면 사용자에게 확인한 뒤 사용자의 다음 요청에서 부른다.");

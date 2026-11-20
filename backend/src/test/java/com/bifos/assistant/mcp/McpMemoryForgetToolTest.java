@@ -194,6 +194,32 @@ class McpMemoryForgetToolTest {
 
 
     @Test
+    @DisplayName("카드를 띄운 뒤 기억을 고치면 승인해도 지우지 않고 다시 요청하라고 알리며, 다시 부르면 새 카드가 뜬다")
+    void keepsMemoryRevisedAfterCard() throws Exception {
+        Memory memory = memories.create(current(dad), MemoryScope.USER, "회사 이야기", "틀린 본문", false);
+        call(memory.id());
+        ConnectorAction card = actions.findAll().getFirst();
+        memories.update(current(dad), memory.id(), "고친 본문", false, null);
+
+        var approved = actionService.approve(current(dad), card.publicId(), null, false);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(memoryRepository.findById(memory.id())).isPresent();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+            .filteredOn(message -> message.role() == MessageRole.SYSTEM)
+            .extracting(message -> message.content())
+            .containsExactly("「회사 이야기」 기억이 그 사이 바뀌어 지우지 않았어요. 지우려면 다시 요청해 주세요");
+
+        JsonNode again = call(memory.id());
+        assertThat(isError(again)).as(text(again)).isFalse();
+        assertThat(actionService.listForConversation(current(dad), conversation.id()))
+            .filteredOn(view -> view.status() == ActionStatus.PENDING)
+            .singleElement()
+            .satisfies(view -> assertThat(view.argsJson()).contains("고친 본문"));
+    }
+
+
+    @Test
     @DisplayName("카드를 띄운 뒤 관리자가 아니게 된 사용자가 승인하면 그룹 기억은 그대로이고 실패로 끝난다")
     void rechecksGroupPermissionAtApproval() throws Exception {
         Memory group = memories.create(current(admin), MemoryScope.GROUP, "그룹 규칙", "그룹 본문", false);

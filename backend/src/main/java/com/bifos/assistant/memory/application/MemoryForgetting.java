@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.application;
 
+import com.bifos.assistant.memory.application.dto.MemoryForgetOutcome;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -44,19 +45,24 @@ public class MemoryForgetting {
     /**
      * 승인한 지우기를 한다. 화면의 지우기처럼 마지막 값을 버전으로 남기고 줄을 지운다.
      *
-     * <p>승인 줄을 잠근 트랜잭션 안에서 돈다. 예외를 내면 그 트랜잭션이 되돌림으로 표시되므로, 그 사이 없어졌거나 권한이 바뀐 항목은
-     * 빈 값으로 답한다.
+     * <p>승인 줄을 잠근 트랜잭션 안에서 돈다. 예외를 내면 그 트랜잭션이 되돌림으로 표시되므로, 그 사이 없어졌거나 권한이 바뀐 항목과
+     * 카드를 띄운 뒤 고친 항목은 결과로 답한다.
      *
-     * @return 지운 항목. 지우지 못했으면 빈 값
+     * @param expectedRevision 카드에 보인 내용의 버전. 지금 버전과 다르면 사용자가 본 것과 지울 것이 달라 지우지 않는다
      */
     @Transactional
-    public Optional<Memory> forget(CurrentUser user, Long id) {
+    public MemoryForgetOutcome forget(CurrentUser user, Long id, int expectedRevision) {
         Optional<Memory> found = memories.findByIdForUpdate(id).filter(memory -> listed(user, memory) && writable(user, memory));
-        found.ifPresent(memory -> {
-            revisionWriter.beforeDelete(user, memory);
-            memories.delete(memory);
-        });
-        return found;
+        if (found.isEmpty()) {
+            return MemoryForgetOutcome.GONE;
+        }
+        Memory memory = found.get();
+        if (memory.revision() != expectedRevision) {
+            return MemoryForgetOutcome.CHANGED;
+        }
+        revisionWriter.beforeDelete(user, memory);
+        memories.delete(memory);
+        return MemoryForgetOutcome.FORGOTTEN;
     }
 
 
