@@ -47,6 +47,7 @@ export function useMyFiles(filter: FileListFilter) {
         if (current !== generation.current) return;
         if (!response.ok) {
           setFailure(await describeFailure(response, VAULT_ERRORS));
+          clear();
           return;
         }
         const page = (await response.json()) as VaultList;
@@ -58,9 +59,17 @@ export function useMyFiles(filter: FileListFilter) {
         setFailure(null);
         setMoreFailed(false);
       } catch {
-        if (current === generation.current) setFailure(LOAD_FAILED);
+        if (current !== generation.current) return;
+        setFailure(LOAD_FAILED);
+        clear();
       }
     })();
+
+    /** 새 조건의 첫 쪽을 읽지 못하면 옛 조건의 줄과 다음 쪽 커서를 지운다. 실패 안내 아래 옛 목록이 남지 않게 한다. */
+    function clear() {
+      setItems([]);
+      setNextCursor(null);
+    }
   }, [kind, q, conversation, attempt]);
 
   const loadMore = useCallback(async () => {
@@ -93,20 +102,16 @@ export function useMyFiles(filter: FileListFilter) {
   }, [kind, q, conversation, nextCursor, moreBusy]);
 
   /** 지운 줄을 빼고 용량만 다시 읽는다. 이미 읽은 쪽은 그대로 둔다. */
-  const removed = useCallback(
-    async (id: number) => {
-      setItems(
-        (previous) => previous?.filter((item) => item.id !== id) ?? null,
-      );
-      try {
-        const response = await fetchVaultItems({ kind, q, conversation });
-        if (response.ok) setUsage((await response.json()) as VaultList);
-      } catch {
-        // 용량 줄만 늦게 바뀐다. 다음에 읽을 때 맞춰진다.
-      }
-    },
-    [kind, q, conversation],
-  );
+  const removed = useCallback(async (id: number) => {
+    setItems((previous) => previous?.filter((item) => item.id !== id) ?? null);
+    try {
+      // 용량만 필요하므로 조건 없이 한 줄만 받는다. 낱말을 붙이면 서버가 제목을 모두 다시 푼다.
+      const response = await fetchVaultItems({ limit: 1 });
+      if (response.ok) setUsage((await response.json()) as VaultList);
+    } catch {
+      // 용량 줄만 늦게 바뀐다. 다음에 읽을 때 맞춰진다.
+    }
+  }, []);
 
   return {
     items,

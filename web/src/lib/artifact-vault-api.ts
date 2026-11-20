@@ -43,6 +43,8 @@ export type VaultQuery = {
   q?: string;
   conversation?: string | null;
   before?: number | null;
+  /** 한 쪽의 줄 수다. 비우면 Control Plane 의 기본값이다 */
+  limit?: number;
 };
 
 /** 이 화면에서만 뜻이 정해지는 오류 코드의 문구다. */
@@ -64,6 +66,7 @@ export function fetchVaultItems(query: VaultQuery = {}): Promise<Response> {
   if (query.q && query.q.trim() !== "") params.set("q", query.q.trim());
   if (query.conversation) params.set("conversation", query.conversation);
   if (query.before != null) params.set("before", String(query.before));
+  if (query.limit != null) params.set("limit", String(query.limit));
   const suffix = params.size > 0 ? `?${params}` : "";
   return fetch(`/api/artifact-vault${suffix}`, { cache: "no-store" });
 }

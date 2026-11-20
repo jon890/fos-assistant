@@ -72,9 +72,7 @@ public class ArtifactVaultFinder {
     @Transactional(readOnly = true)
     public ArtifactVaultEntry one(Long ownerUserId, Long id) {
         Lookup lookup = new Lookup(ownerUserId);
-        ArtifactVaultRow row = rows.listVaulted(ownerUserId).stream()
-            .filter(candidate -> candidate.getId().equals(id))
-            .findFirst()
+        ArtifactVaultRow row = rows.findVaulted(id, ownerUserId)
             .orElseThrow(() -> new ApiException(ErrorCode.ARTIFACT_NOT_FOUND, "this kept file does not exist"));
         lookup.loadConversations(List.of(row.getConversationId()));
         return lookup.entry(row);
