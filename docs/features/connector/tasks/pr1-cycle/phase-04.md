@@ -118,3 +118,4 @@ node scripts/checks/check-file-length.mjs
 | `docs/features/connector.md` | 수정 |
 | `docs/features/connector/design.md` | 수정 (「바쁜가」) |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingCycleTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingDriftTest.java` | 수정 (설정과 적용기 생성자의 새 인자) |

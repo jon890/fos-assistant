@@ -4,6 +4,8 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.connection.application.dto.CycleStep;
+import com.bifos.assistant.connector.connection.domain.type.CyclePhase;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorInstallResult;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
@@ -66,10 +68,28 @@ public class ConnectorInstallAttempts {
     }
 
 
-    /** 시작 트랜잭션 안에서 바인딩의 새 시도와 HTTP에 필요한 값을 함께 캡처한다. */
+    /** 사람이 시작한 보통 설치다. */
     public ConnectorBindingAttempt begin(
         ConnectorBinding binding, Optional<ConnectorManifest> manifest,
         boolean checkInstallation, boolean afterRestart, boolean replaceValues, Instant now) {
+        return begin(binding, manifest, checkInstallation, afterRestart, replaceValues, now, false, CycleStep.NONE);
+    }
+
+
+    /**
+     * 시작 트랜잭션 안에서 바인딩의 새 시도와 HTTP에 필요한 값을 함께 캡처한다.
+     *
+     * <p>껐다 켜기 단계의 바인딩은 걸음을 여기서 정한다(ADR-20261120 / connector-auto-apply). 등록은 꺼진 동안 끈 채로 새 값을 쓰고,
+     * 관리자 반영 완료는 실패 표시를 비우고 그 단계의 다음 걸음을 바로 보낸다. 연결 확인과 자동 경로의 보통 확인은 설치를 보내지 않는다.
+     * 사람이 시작한 설치가 실제로 나가면 실패 표시를 비운다.
+     *
+     * @param automatic 예약 작업이 시작했는가
+     * @param step 예약 작업이 정한 껐다 켜기 걸음. 사람의 요청은 {@link CycleStep#NONE} 이다
+     */
+    public ConnectorBindingAttempt begin(
+        ConnectorBinding binding, Optional<ConnectorManifest> manifest,
+        boolean checkInstallation, boolean afterRestart, boolean replaceValues, Instant now,
+        boolean automatic, CycleStep step) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("installation preparation requires a transaction");
         }
@@ -104,6 +124,24 @@ public class ConnectorInstallAttempts {
                 waiting = ResyncOutcome.APPLY_SCHEDULED;
             }
         }
+        CyclePhase phase = binding.cyclePhase();
+        CycleStep cycleStep = step;
+        if (phase != null && step == CycleStep.NONE) {
+            if (replaceValues) {
+                cycleStep = phase == CyclePhase.OFF ? CycleStep.OFF : CycleStep.NONE;
+            } else if (afterRestart && !automatic) {
+                binding.clearApplyFailed();
+                cycleStep = phase == CyclePhase.IDLE_WAIT ? CycleStep.OFF : CycleStep.ON;
+            } else if (checkInstallation && waiting == null) {
+                waiting = ResyncOutcome.CYCLE_PENDING;
+            }
+        }
+        if (cycleStep != CycleStep.NONE && waiting != ResyncOutcome.CATALOG_MISSING) {
+            waiting = null;
+        }
+        if (!automatic && waiting == null) {
+            binding.clearApplyFailed();
+        }
         UUID attemptId = UUID.randomUUID();
         if (waiting == null) {
             binding.beginInstall(attemptId, now);
@@ -119,7 +157,7 @@ public class ConnectorInstallAttempts {
             declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
             binding.restartRequired(), checkInstallation, replaceValues, waiting,
             declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
-            declared != null && ConnectorToolPolicies.partialAsk(declared));
+            declared != null && ConnectorToolPolicies.partialAsk(declared), automatic, cycleStep);
     }
 
 

@@ -44,7 +44,7 @@
 - **공유 gateway 재시작은 운영 정기 작업이 한다.** Control Plane 과 plugin 에 재시작 권한을 주지 않는다. 사용자 요청에서 재시작하지 않는다는 지금 원칙([플러그인 연결](../connector.md) 의 「재시작」)을 지키고, 재시작 수단(s6)은 운영이 소유한다.
 - Hermes core 는 바꾸지 않는다. plugin 이 새로 기대는 Hermes 내부 지점(`gateway.status.get_running_pid`)은 `hermes/tests/hermes_contract.py` 에 선언해 Hermes 를 올릴 때 계약 테스트가 확인하게 한다(ADR-088).
 - Control Plane 안의 배치는 지금 그대로다. 단계 전이는 `ConnectorBinding` 이, 예약 작업은 `ConnectorBindingApplier` 가, 설치 보내기와 결과 적용은 `ConnectorInstallAttempts` 와 `ConnectorBindingInstalls` 가 맡는다. 운영 조회는 `connector.connection` 의 presentation 에 둔다.
-- 「바쁜가」 는 `usage.execution` 이 답한다. `UserExecutionLimiter` 의 메모리 자리와 `agent_execution` 의 `RUNNING` 줄을 함께 보는 조회 하나를 그 패키지의 application 에 두고, connector 는 그것을 부른다. connector 가 usage 를 쓰는 방향은 지금도 있다.
+- 「바쁜가」 는 `usage.execution` 의 `UserExecutionLimiter.used(userId)` 가 답한다. connector 가 usage 를 쓰는 방향은 지금도 있다.
 
 ## 인터페이스와 데이터
 
@@ -148,12 +148,10 @@
 
 ### 바쁜가
 
-`usage.execution` 의 조회 하나가 두 값을 낸다.
+`UserExecutionLimiter.used(userId)` 가 두 값을 함께 낸다. turn 자리, 원격 종료 확인 자리, 대화 turn 의 루트가 아닌 `RUNNING` 줄의 합이다.
 
-- profile 하나가 바쁜가(스펙 DECISION18, REQ10): 그 `profile_name` 의 `RUNNING` 줄이 있거나, 그 profile 주인의 turn 자리나 원격 종료 확인 자리가 있다
-- 전체 진행 중 실행 수(스펙 DECISION5, REQ5): `RUNNING` 줄 수와 메모리의 turn 자리, 원격 종료 확인 자리의 합
-
-메모리 자리는 사용자 단위라 profile 을 알 수 없다. 그래서 그 사용자의 다른 profile 도 바쁜 것으로 본다. 기다림이 길어질 뿐 대화를 끊지 않는 쪽이다.
+- profile 하나가 바쁜가(스펙 DECISION18, REQ10): 그 profile 주인의 `used` 가 1 이상이다. 바인딩이 붙은 에이전트는 `PRIVATE` 라 그 profile 의 실행은 모두 주인의 실행이다. 주인의 다른 profile 실행도 바쁜 것으로 보지만 기다림이 길어질 뿐 대화를 끊지 않는 쪽이다. `agent_execution` 에 profile 단위 조회를 더하지 않은 것은 그 저장소 파일이 길이 상한에 닿았고 같은 판단을 이미 `used` 가 내기 때문이다
+- 전체 진행 중 실행 수(스펙 DECISION5, REQ5): PR3 이 정한다. 사용자마다의 메모리 자리와 `RUNNING` 줄을 함께 센다
 
 ### Control Plane: 운영 조회(PR3)
 

@@ -18,6 +18,8 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingCycles;
+import com.bifos.assistant.connector.connection.application.ConnectorInstallAttempts;
 import com.bifos.assistant.connector.connection.config.ConnectorBindingProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
@@ -128,6 +130,12 @@ class ConnectorBindingDriftTest {
 
     @Autowired
     NotificationRepository notificationRows;
+
+    @Autowired
+    ConnectorInstallAttempts attempts;
+
+    @Autowired
+    ConnectorBindingCycles cycles;
 
     @Autowired
     NotificationService notifications;
@@ -404,7 +412,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("한 주기에 읽는 수가 1 이면 READY 바인딩을 번호 순으로 하나씩 보고 끝까지 읽은 뒤 처음으로 돌아간다")
     void readsOneBindingPerRunWhenBatchIsOne() {
-        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1));
+        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1, Duration.ofMinutes(10)));
 
         // 바인딩 번호는 DEMO 가 앞이다. 준비에서 단언했다.
         for (String expected : List.of(DEMO, PLAIN)) {
@@ -425,7 +433,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("drift-batch 가 1 미만이면 설정을 만들지 못해 기동이 멈춘다")
     void rejectsDriftBatchBelowOne() {
-        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0))
+        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0, Duration.ofMinutes(10)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("drift-batch");
     }
@@ -433,7 +441,7 @@ class ConnectorBindingDriftTest {
 
     private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
         return new ConnectorBindingApplier(
-            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings);
+            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings, attempts, cycles);
     }
 
 
