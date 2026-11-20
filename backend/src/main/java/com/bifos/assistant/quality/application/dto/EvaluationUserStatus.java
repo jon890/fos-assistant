@@ -24,13 +24,22 @@ public record EvaluationUserStatus(String hermesProfile, List<String> missing) {
     public enum Missing {
         /** 평가 사용자가 없다. */
         USER,
-        /** 기본 에이전트가 없다. */
+        /**
+         * 기본 에이전트가 없다. 기본 비서는 지울 수 없어(PRIMARY_AGENT_PROTECTED) 첫 로그인이 허용 목록 행을 찾지 못했을 때만 생긴다.
+         * 다시 준비해도 채우지 않는다. 사람이 허용 목록 행과 평가 사용자를 확인해 조치한다.
+         */
         PRIMARY_AGENT,
         /** 위임 대상 에이전트가 없다. */
         DELEGATE_AGENT,
         /** 미리 넣는 기억이 없다. */
         MEMORY,
-        /** 그림·사진 도구가 실행 공간 안에서 켜지지 않았다. 운영이 평가 profile 을 실행 공간과 첨부 정책에 등록해야 한다. */
-        POLICY_REGISTRATION_REQUIRED
+        /**
+         * 기본 비서의 도구(첫 로그인 기본 도구와 그림·사진 도구)가 다 켜지지 않았다. 대개 운영이 평가 profile 을 실행 공간과 첨부
+         * 정책에 아직 등록하지 않은 것이다. 처음 준비한 직후에는 도구 켜기가 요청 밖에서 도는 중일 수 있어 잠시 뒤 다시 읽는다. 등록한
+         * 뒤에도 남으면 다시 준비한다.
+         */
+        POLICY_REGISTRATION_REQUIRED,
+        /** Hermes 가 기본 비서의 도구 목록을 돌려주지 않았다. 도구가 켜졌는지 모른다. */
+        TOOLS_UNREADABLE
     }
 }

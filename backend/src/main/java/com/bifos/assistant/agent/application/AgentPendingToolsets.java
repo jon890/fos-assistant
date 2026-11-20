@@ -11,6 +11,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -88,6 +89,21 @@ public class AgentPendingToolsets {
             return;
         }
         transactions.executeWithoutResult(status -> agents.writePendingDefaultToolsets(agentId, String.join(",", names)));
+    }
+
+
+    /**
+     * 이미 기다리는 이름은 두고 새 이름을 더한다. 행을 잠그고 읽어 {@link #attempt} 가 목록을 비우는 쓰기와 겹치지 않는다.
+     * 부르는 쪽의 트랜잭션이 있으면 거기에 참여한다.
+     */
+    public void add(Long agentId, List<String> names) {
+        transactions.executeWithoutResult(status -> agents.findByIdForUpdate(agentId).ifPresent(agent -> {
+            LinkedHashSet<String> merged = new LinkedHashSet<>(agent.pendingToolsets());
+            merged.addAll(names);
+            if (!merged.isEmpty()) {
+                agents.writePendingDefaultToolsets(agentId, String.join(",", merged));
+            }
+        }));
     }
 
 

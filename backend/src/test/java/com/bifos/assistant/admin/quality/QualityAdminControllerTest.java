@@ -17,6 +17,7 @@ import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
@@ -26,11 +27,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.SecretKey;
@@ -74,6 +75,9 @@ class QualityAdminControllerTest {
     @Autowired
     HermesProfileKeyStore keyStore;
 
+    @Autowired
+    TrackingBackgroundTasks backgroundTasks;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     /** 대역이 기억하는 profile 마다 켜진 도구다. 실행 공간 쓰기만 그림·사진 도구를 켠다. */
@@ -91,18 +95,16 @@ class QualityAdminControllerTest {
         doNothing().when(profiles).provision(any());
         when(toolsets.readCatalog()).thenReturn(List.of(
             new ToolsetCatalogEntry("web", "웹", ""),
+            new ToolsetCatalogEntry("terminal", "셸", ""),
+            new ToolsetCatalogEntry("file", "파일", ""),
+            new ToolsetCatalogEntry("code_execution", "코드 실행", ""),
             new ToolsetCatalogEntry("image_gen", "그림 만들기", ""),
             new ToolsetCatalogEntry("vision", "사진 보기", "")));
         when(toolsets.readEnabled(anyString(), anyString()))
             .thenAnswer(invocation -> enabled.getOrDefault(invocation.<String>getArgument(1), List.of("web")));
+        // 실제 대시보드처럼 목록을 통째로 바꾼다. 나중에 쓴 쪽이 이긴다.
         doAnswer(invocation -> {
-            // 첫 에이전트의 기본 도구 켜기가 요청 밖에서 겹쳐 돈다. 실제 Hermes 는 읽고 고쳐 쓰므로 겹치면 한쪽 이름이 빠질 수 있는데,
-            // 그 경쟁은 다시 준비하면 회복된다(설계 「평가 전용 사용자」). 이 검사는 준비 순서만 보도록 쓴 이름을 더해 둔다.
-            enabled.merge(invocation.getArgument(0), List.copyOf(invocation.<List<String>>getArgument(1)), (before, written) -> {
-                LinkedHashSet<String> union = new LinkedHashSet<>(before);
-                union.addAll(written);
-                return List.copyOf(union);
-            });
+            enabled.put(invocation.getArgument(0), List.copyOf(invocation.<List<String>>getArgument(1)));
             return null;
         }).when(toolsets).writeApiServerInSandbox(anyString(), anyList(), any());
         admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN));
@@ -129,9 +131,10 @@ class QualityAdminControllerTest {
     @DisplayName("관리자가 준비하면 준비됨이고 두 번 불러도 같은 평가 사용자다")
     void adminPreparesOnce() throws Exception {
         JsonNode first = json.readTree(api("POST", PATH, token(admin), "{\"hermesProfile\":\"" + PROFILE + "\"}").body());
+        // 처음 준비한 직후에는 기본 도구 켜기가 요청 밖에서 돈다.
+        backgroundTasks.awaitIdle(Duration.ofSeconds(20));
         JsonNode second = json.readTree(api("POST", PATH, token(admin), "{\"hermesProfile\":\"" + PROFILE + "\"}").body());
 
-        assertThat(first.path("ready").asBoolean()).isTrue();
         assertThat(first.path("hermesProfile").asString()).isEqualTo(PROFILE);
         assertThat(second.path("ready").asBoolean()).isTrue();
         assertThat(users.findAll()).filteredOn(AppUser::evaluation).hasSize(1);
