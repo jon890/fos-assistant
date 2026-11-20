@@ -36,7 +36,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | 그 트리의 맨 위 실행 | **루트 실행**, 줄여서 **루트** | 뿌리 |
 | 사용자가 해야 하거나 끝나기를 기다리는 일 한 줄 | **할 일**, 코드는 `follow_up` | 추적 목표, 챙길 일 |
 | #161 의 Living View | **지금 화면**, 주소는 `/now` | Living View |
-| `notification` 표의 줄. 알림 단추와 알림 화면에 보이는 것 | **알림** | 알림 줄 |
+| `notification` 표의 줄. 「지금 볼 것」 의 「알림」 탭과 「지금 볼 것」 의 점에 보이는 것 | **알림** | 알림 줄 |
 | 대화 안에 끼우는 안내 줄(`SYSTEM` 메시지) | **알림 줄** | |
 | 에이전트에게 쥐어 주는 도구 묶음. 플러그인 root 의 `assistant.json` 이 assistant 쪽 정보를 선언한다 | **플러그인**, 코드는 `connector` | 커넥터, 커넥터 에이전트 |
 | 사용자가 플러그인 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection`. 그 화면(`/connections`)과 메뉴는 「외부 서비스 연결」 | 화면 이름으로 「연결」 |
