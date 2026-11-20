@@ -194,6 +194,21 @@ class ConnectorOAuthRevokeTest {
 
 
     @Test
+    @DisplayName("앱 자격이 지워진 플러그인의 단추 연결은 취소를 부르지 않고 설정 화면 주소와 함께 실패로 답하며 해제된다")
+    void missingAppSkipsRevoke() {
+        ConnectorConnection connection = connection(PLUGIN, new ConnectionAuth("github", false));
+        apps.clear(PLUGIN, owner.id());
+
+        ConnectionSnapshot disconnected = service.disconnect(principal(), PLUGIN);
+
+        assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        assertThat(disconnected.oauthRevoke()).isEqualTo(new ConnectionOAuthRevoke(Status.FAILED, SETTINGS, INSTALL));
+        verify(oauth, never()).revoke(any(), any(), any(), any());
+        verify(hermes).deleteVault(connection.vault());
+    }
+
+
+    @Test
     @DisplayName("바인딩을 떼지 못하면 허락을 취소하지 않고 연결은 준비 안 됨으로 남는다")
     void detachFailureDoesNotRevoke() {
         ConnectorConnection connection = connection(PLUGIN, new ConnectionAuth("github", false));
