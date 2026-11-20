@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -296,6 +297,44 @@ class ConnectorBindingCycleTest {
 
 
     @Test
+    @DisplayName("켜기가 실패하면 다음 주기에 다시 보내 꺼진 채 남지 않고, 10번 연속 실패하면 실패 표시를 남긴다")
+    void turnOnRetriesUpToLimit() {
+        bindNeedingCycle();
+        applier.runScheduled();
+        clock.advance(APPLY_DELAY.plus(PAST));
+        doThrow(new IllegalStateException())
+            .when(connector).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+
+        for (int i = 0; i < 9; i++) {
+            applier.runScheduled();
+        }
+        ConnectorBinding retrying = onlyBinding();
+        assertThat(retrying.applyFailedAt()).as("상한 전에는 표시하지 않는다").isNull();
+        assertThat(retrying.cyclePhase()).isEqualTo(CyclePhase.OFF);
+
+        stubInstall(RELOAD);
+        applier.runScheduled();
+        assertThat(onlyBinding().cyclePhase()).as("다시 보낸 켜기로 켰다").isNull();
+
+        stubInstall(NEEDS_CYCLE);
+        connectionService.register(owner, DEMO, Map.of("token", "demo_ok_new_0123456789"));
+        applier.runScheduled();
+        assertThat(onlyBinding().cyclePhase()).isEqualTo(CyclePhase.OFF);
+        clock.advance(APPLY_DELAY.plus(PAST));
+        doThrow(new IllegalStateException())
+            .when(connector).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+
+        for (int i = 0; i < 10; i++) {
+            applier.runScheduled();
+        }
+
+        ConnectorBinding failed = onlyBinding();
+        assertThat(failed.applyFailedAt()).isNotNull();
+        assertThat(failed.cyclePhase()).isEqualTo(CyclePhase.OFF);
+    }
+
+
+    @Test
     @DisplayName("자동 끄기가 409 로 거절돼도 예외로 끝나지 않고 실패 표시를 남긴다")
     void conflictOnCycleOffMarksFailure() {
         bindNeedingCycle();
@@ -403,22 +442,20 @@ class ConnectorBindingCycleTest {
 
 
     private void stubInstall(InstallResult result) {
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-            .thenReturn(result);
+        doReturn(result)
+            .when(connector).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
 
     private void stubCycleOff(InstallResult result) {
-        when(connector.bindConnector(
-            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true)))
-                .thenReturn(result);
+        doReturn(result).when(connector).bindConnector(
+            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true));
     }
 
 
     private void stubCycleOffFailure(RuntimeException failure) {
-        when(connector.bindConnector(
-            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true)))
-                .thenThrow(failure);
+        doThrow(failure).when(connector).bindConnector(
+            anyString(), anyString(), anyString(), anyString(), nullable(String.class), nullable(JsonNode.class), eq(true));
     }
 
 
