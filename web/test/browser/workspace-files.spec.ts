@@ -196,7 +196,7 @@ function crumbNav(page: Page) {
   return page.getByRole("navigation", { name: "경로" });
 }
 
-test("사이드바의 「고급」 묶음에서 파일 공간을 열면 함께 쓰는 에이전트가 보인다", async ({
+test("사이드바의 「고급」 묶음에서 파일 공간을 열고 에이전트 작업 폴더로 들어가면 함께 쓰는 에이전트가 보인다", async ({
   page,
 }, testInfo) => {
   await fakeWorkspaceRoutes(page, { available: true });
@@ -216,6 +216,11 @@ test("사이드바의 「고급」 묶음에서 파일 공간을 열면 함께 �
   await expect(page).toHaveURL(/\/files$/);
   await expect(
     page.getByRole("heading", { name: "파일 공간", level: 1 }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "에이전트 작업 폴더" }).click();
+  await expect(page).toHaveURL(/\/files\/workspace$/);
+  await expect(
+    page.getByRole("heading", { name: "에이전트 작업 폴더", level: 1 }),
   ).toBeVisible();
   const agents = page.getByRole("list", { name: "함께 쓰는 에이전트" });
   await expect(agents).toContainText("글쓰기 도우미");
@@ -246,7 +251,7 @@ for (const failure of [undefined, 404, 502, 500, 409]) {
       listRequests,
       deleteRequests,
     });
-    await page.goto("/files");
+    await page.goto("/files/workspace");
     await expect(entryRow(page, "a.txt")).toBeVisible();
     await page.getByRole("button", { name: "다음 목록" }).click();
     await expect(entryRow(page, "tail.txt")).toBeVisible();
@@ -273,16 +278,16 @@ for (const failure of [undefined, 404, 502, 500, 409]) {
   });
 }
 
-test("디렉터리를 열고 경로 줄의 「파일 공간」 으로 돌아온다", async ({
+test("디렉터리를 열고 경로 줄의 「작업 폴더」 로 돌아온다", async ({
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: true });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await entryRow(page, "보고서")
     .getByRole("link", { name: "보고서", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/files\?path=%EB%B3%B4%EA%B3%A0%EC%84%9C$/);
+  await expect(page).toHaveURL(/\/files\/workspace\?path=%EB%B3%B4%EA%B3%A0%EC%84%9C$/);
   await expect(crumbNav(page).getByText("보고서")).toHaveAttribute(
     "aria-current",
     "page",
@@ -290,8 +295,8 @@ test("디렉터리를 열고 경로 줄의 「파일 공간」 으로 돌아온�
   await expect(entryRow(page, "1월.txt")).toBeVisible();
   await expect(entryRow(page, "a.txt")).toHaveCount(0);
 
-  await crumbNav(page).getByRole("link", { name: "파일 공간" }).click();
-  await expect(page).toHaveURL(/\/files$/);
+  await crumbNav(page).getByRole("link", { name: "작업 폴더" }).click();
+  await expect(page).toHaveURL(/\/files\/workspace$/);
   await expect(entryRow(page, "a.txt")).toBeVisible();
 });
 
@@ -299,7 +304,7 @@ test("글, 표, HTML 을 미리 보고 정하지 않은 것은 미리보기가 �
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: true });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
   const preview = page.getByTestId("workspace-preview");
 
   await entryRow(page, "a.txt")
@@ -346,7 +351,7 @@ test("내려받기는 download=1 이고 링크와 주소로 열 수 없는 이�
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: true });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await expect(
     entryRow(page, "a.txt").getByRole("link", { name: "a.txt 내려받기" }),
@@ -356,7 +361,7 @@ test("내려받기는 download=1 이고 링크와 주소로 열 수 없는 이�
   await expect(link).toContainText("링크");
   await expect(link.getByRole("link")).toHaveCount(0);
   await link.getByText("바로가기", { exact: true }).click();
-  await expect(page).toHaveURL(/\/files$/);
+  await expect(page).toHaveURL(/\/files\/workspace$/);
   await expect(page.getByTestId("workspace-preview")).toHaveCount(0);
 
   const unaddressable = entryRow(page, "50%.txt");
@@ -368,7 +373,7 @@ test("주소로 쓸 수 없는 이름의 디렉터리는 열리지만 그 안의
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: true });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await entryRow(page, "50%")
     .getByRole("link", { name: "50%", exact: true })
@@ -383,19 +388,20 @@ test("주소로 쓸 수 없는 이름의 디렉터리는 열리지만 그 안의
 
   // 주소에 파일을 직접 적어도 미리보기를 열지 않는다.
   await page.goto(
-    `/files?path=${encodeURIComponent("50%")}&file=${encodeURIComponent("50%/a.txt")}`,
+    `/files/workspace?path=${encodeURIComponent("50%")}&file=${encodeURIComponent("50%/a.txt")}`,
   );
   await expect(entryRow(page, "a.txt")).toContainText("주소로 열 수 없는 이름");
   await expect(page.getByTestId("workspace-preview")).toHaveCount(0);
 });
 
-test("목록이 400 이면 경로 안내와 맨 위로 가기가 보인다", async ({ page }) => {
+test("옛 실행 공간 주소는 작업 폴더의 그 자리로 넘어가고 목록이 400 이면 경로 안내와 맨 위로 가기가 보인다", async ({ page }) => {
   await fakeWorkspaceRoutes(page, { available: true, failures: { 잘못: 400 } });
   await page.goto(`/files?path=${encodeURIComponent("잘못")}`);
+  await expect(page).toHaveURL(/\/files\/workspace\?path=%EC%9E%98%EB%AA%BB$/);
 
   await expect(page.getByText("경로가 올바르지 않아요.")).toBeVisible();
   await page.getByRole("link", { name: "맨 위로 가기" }).click();
-  await expect(page).toHaveURL(/\/files$/);
+  await expect(page).toHaveURL(/\/files\/workspace$/);
   await expect(entryRow(page, "a.txt")).toBeVisible();
 });
 
@@ -403,21 +409,21 @@ test("목록이 404 이면 찾을 수 없다는 안내와 맨 위로 가기가 �
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: true, failures: { 없음: 404 } });
-  await page.goto(`/files?path=${encodeURIComponent("없음")}`);
+  await page.goto(`/files/workspace?path=${encodeURIComponent("없음")}`);
 
   await expect(
     page.getByText("찾을 수 없어요. 지워졌을 수 있어요."),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "맨 위로 가기" }),
-  ).toHaveAttribute("href", "/files");
+  ).toHaveAttribute("href", "/files/workspace");
 });
 
 test("파일 공간을 쓸 수 없으면 관리자에게 알리라는 안내만 보인다", async ({
   page,
 }) => {
   await fakeWorkspaceRoutes(page, { available: false });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await expect(
     page.getByText("파일 공간을 쓸 수 없어요. 관리자에게 알려 주세요."),
@@ -438,7 +444,7 @@ test("하위 디렉터리의 파일을 지우면 그 경로 하나로 DELETE 가
     deletable: true,
     deleteRequests,
   });
-  await page.goto(`/files?path=reports`);
+  await page.goto(`/files/workspace?path=reports`);
 
   await entryRow(page, "a.txt")
     .getByRole("button", { name: "a.txt 지우기" })
@@ -462,7 +468,7 @@ test("에이전트가 일하는 중이면 확인 창에 다시 생길 수 있다
     deletable: true,
     runningExecutions: 2,
   });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await entryRow(page, "a.txt")
     .getByRole("button", { name: "a.txt 지우기" })
@@ -481,7 +487,7 @@ test("디렉터리를 지우는 확인 창은 안의 파일까지 지운다고 �
     deletable: true,
     deleteRequests,
   });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await entryRow(page, "reports")
     .getByRole("button", { name: "reports 지우기" })
@@ -504,7 +510,7 @@ test("항목이 너무 많아 409 면 안내가 보이고 줄이 남는다", asy
     deleteFailure: 409,
     deleteRequests,
   });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
 
   await entryRow(page, "reports")
     .getByRole("button", { name: "reports 지우기" })
@@ -526,7 +532,7 @@ test("미리 보던 파일을 지우면 미리보기가 닫히고 주소의 file
   await page.setViewportSize({ width: 1280, height: 800 });
   await fakeWorkspaceRoutes(page, { available: true, deletable: true });
   await page.goto(
-    `/files?path=reports&file=${encodeURIComponent("reports/a.txt")}`,
+    `/files/workspace?path=reports&file=${encodeURIComponent("reports/a.txt")}`,
   );
   const preview = page.getByTestId("workspace-preview");
   await expect(preview.getByTestId("workspace-text")).toHaveText(
@@ -539,7 +545,7 @@ test("미리 보던 파일을 지우면 미리보기가 닫히고 주소의 file
   await deleteDialog(page).getByRole("button", { name: "지우기" }).click();
 
   await expect(preview).toHaveCount(0);
-  await expect(page).toHaveURL(/\/files\?path=reports$/);
+  await expect(page).toHaveURL(/\/files\/workspace\?path=reports$/);
   await expect(entryRow(page, "a.txt")).toHaveCount(0);
 });
 
@@ -552,7 +558,7 @@ test("상태 응답이 늦을 때 두 줄의 지우기를 연달아 누르면 �
     deletable: true,
     deleteRequests,
   });
-  await page.goto("/files");
+  await page.goto("/files/workspace");
   await expect(entryRow(page, "a.txt")).toBeVisible();
 
   // 이 뒤의 상태 요청은 풀어 줄 때까지 붙잡아 둔다. 나중에 등록한 route 가 먼저 받고, 풀면 가짜 상태로 넘긴다.
