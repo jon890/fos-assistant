@@ -109,7 +109,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 
 **이름 줄을 누르면 이름 메뉴가 열린다.** 맨 위에 이름, 그 아래 「설정」(`/settings`), 「관리자 화면」(`ADMIN` 만), 「화면 밝기」 라디오 셋, 「로그아웃」 이다.
 「화면 밝기」 는 하위 메뉴로 두지 않는다. 좁은 서랍에서 하위 메뉴가 부모 메뉴를 덮는다.
-로그아웃은 `POST /signout` 이 이 브라우저의 세션만 지운 뒤 `/signin` 을 문서째 연다. 뒤로 가기로 bfcache 에서 꺼낸 문서는 화면 틀이 다시 읽는다. 순서와 까닭은 [`docs/features/app-shell/design.md`](../../docs/features/app-shell/design.md) 의 「로그아웃」 이 갖는다.
+로그아웃은 `POST /signout` 이 이 브라우저의 세션만 지운 뒤 `/signin` 을 문서째 연다. 뒤로 가기로 bfcache 에서 꺼낸 문서는 화면 틀이 세션을 확인해 없을 때 다시 읽는다. 순서와 까닭은 [`docs/features/app-shell/design.md`](../../docs/features/app-shell/design.md) 의 「로그아웃」 이 갖는다.
 
 알림 단추는 앱 이름 바로 옆에 둔다. 서랍에서는 그 줄 오른쪽 끝이 서랍 닫기 단추 자리라 비워 둔다. 좁은 화면에서는 서랍을 열지 않아도 보이게 머리의 「새 대화」 옆에 하나 더 둔다.
 알림 단추의 동작은 [`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」 이 갖는다.

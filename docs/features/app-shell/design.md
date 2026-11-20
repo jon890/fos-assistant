@@ -103,7 +103,7 @@
 
 Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 다른 기기의 쿠키와 Control Plane 의 데이터는 그대로다.
 로그아웃한 뒤 주소로 연 화면은 page 가 `auth()` 로 세션을 확인하고 `/signin` 으로 보낸다.
-뒤로 가기는 브라우저가 bfcache 에서 문서를 그대로 꺼낼 수 있다. 브라우저마다 다르므로 기대지 않고, 화면 틀(`AppShell`)이 `pageshow` 의 `persisted` 가 참이면 `location.reload()` 한다. 다시 읽은 page 가 세션 없음을 보고 `/signin` 으로 보낸다. Playwright 는 bfcache 를 끈 채 Chromium 을 띄우므로, 테스트는 `persisted` 를 넣은 `pageshow` 를 직접 보내 다시 읽는지를 본다.
+뒤로 가기는 브라우저가 bfcache 에서 문서를 그대로 꺼낼 수 있다. 브라우저마다 다르므로 기대지 않고, 화면 틀(`AppShell`)이 `pageshow` 의 `persisted` 가 참이면 `/api/auth/session` 으로 세션을 확인하고, 없거나 읽지 못하면 `location.reload()` 한다. 다시 읽은 page 가 세션 없음을 보고 `/signin` 으로 보낸다. 세션이 있으면 다시 읽지 않아 쓰던 글과 스크롤이 남는다. Playwright 는 bfcache 를 끈 채 Chromium 을 띄우므로, 테스트는 `persisted` 를 넣은 `pageshow` 를 직접 보내 세션이 있을 때와 없을 때를 본다.
 같은 브라우저의 다른 탭은 다음 요청이나 이동에서 로그인 화면으로 간다. 열려 있는 다른 탭을 곧바로 닫거나 새로 고치는 일은 스펙 범위 밖이다.
 
 계정 고르기는 `Google({ authorization: { params: { prompt: "select_account" } } })` 로 모든 로그인에 붙인다. 로그아웃 뒤에만 붙이려면 상태를 따로 기억해야 하고, 로그인 화면은 로그아웃 뒤에 주로 오므로 늘 붙인다.
@@ -123,7 +123,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | REQ1, REQ2, REQ7 | 브라우저 테스트(넓은 화면, 360px, 낮은 높이 640×320) | 사이드바 줄의 차례와 없는 줄, 대화가 많을 때와 낮은 높이에서 이름 줄이 보이는지, 서랍의 같은 줄, 앱 이름 옆 알림 단추가 서랍 닫기 단추와 겹치지 않는지 |
 | REQ3 | 브라우저 테스트 | `ADMIN` 과 `MEMBER` 역할의 메뉴 줄, 360px 에서 손가락으로 밝기 값을 바꾸고 새로 고친 뒤 남는지, 역할 읽기 실패 때 메뉴와 로그아웃, 키보드로 열고 `Esc` 로 닫기 |
 | REQ4, REQ5 | 노드 테스트(`settings-area.ts` 의 경로 판정과 골라진 줄)와 브라우저 테스트 | `/settings` 의 두 폭, 저장한 `/connections` 주소, `/executions/{id}` 의 골라진 줄, 로그인한 `/privacy`, 「대화로」 가 보던 대화로 돌아가는지 |
-| REQ6 | 브라우저 테스트, 노드 테스트 | 로그아웃 뒤 `/signin`, 뒤로 가기와 `/chat/{id}` 가 로그인 화면으로 가는지, `persisted` 인 `pageshow` 에 다시 읽는지, `/signout` 이 500 이거나 끊겼을 때 안내. 계정 고르기 값은 `test/node/auth-signin.test.ts` 의 방식(provider 를 가짜로 바꿔 끼움)으로 provider 설정을 본다 |
+| REQ6 | 브라우저 테스트, 노드 테스트 | 로그아웃 뒤 `/signin`, 뒤로 가기와 `/chat/{id}` 가 로그인 화면으로 가는지, `persisted` 인 `pageshow` 에 세션이 없을 때만 다시 읽는지, `/signout` 이 500 이거나 끊겼을 때 안내. 계정 고르기 값은 `test/node/auth-signin.test.ts` 의 방식(provider 를 가짜로 바꿔 끼움)으로 provider 설정을 본다 |
 
 ### 함께 고칠 문서
 
