@@ -235,6 +235,27 @@ class McpFileSpacePutToolTest {
 
 
     @Test
+    @DisplayName("결과물 폴더 경로로 불러 파일이 없으면 /workspace/ 경로로 다시 부르라고 안내한다. 작업 폴더 경로의 실패에는 붙이지 않는다")
+    void folderMissHintsWorkspacePath() throws Exception {
+        // 실행 공간의 파일 도구는 결과물 폴더 경로에 써도 실행 공간 안에 쓴다. 작업 폴더에만 파일이 있는 운영의 실패를 재현한다
+        Files.write(sandbox.resolve("memo.md"), "# 메모\n".getBytes(StandardCharsets.UTF_8));
+        String hint = "/workspace/ 경로로 다시 부른다";
+
+        for (String path : List.of("memo.md", store.agentFolder(conversation.id()) + "/memo.md")) {
+            JsonNode result = put(path, "메모", null);
+            assertThat(isError(result)).as(path).isTrue();
+            assertThat(text(result)).as(path).startsWith("파일 공간에 넣지 못했다").contains("NOT_FOUND", hint, NOT_SAID)
+                .doesNotContain(artifactProperties.root(), sandbox.toString());
+        }
+        assertThat(text(put("/workspace/none.md", null, null))).contains("NOT_FOUND").doesNotContain(hint);
+
+        JsonNode retried = put("/workspace/memo.md", "메모", null);
+        assertThat(isError(retried)).as(text(retried)).isFalse();
+        assertThat(vault.list(dad.id())).extracting(ArtifactVaultItem::path).containsExactly("memo.md");
+    }
+
+
+    @Test
     @DisplayName("받지 않는 형식과 상한 초과와 용량 초과는 까닭을 알리고 내 파일에 생기지 않는다")
     void refusesUnsupportedLargeAndFullWithReason() throws Exception {
         Files.write(sandbox.resolve("bundle.zip"), new byte[] {'P', 'K', 3, 4});
