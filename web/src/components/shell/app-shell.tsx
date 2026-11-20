@@ -38,6 +38,7 @@ import {
 } from "./sidebar-collapsed";
 import { NotificationsProvider } from "@/components/notification/notifications-provider";
 import { MobileTopBar } from "./mobile-top-bar";
+import { TitleSlotContext, useTitleSlotState } from "./title-slot";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
 import { TooltipButton } from "@/components/ui/tooltip-button";
@@ -101,6 +102,7 @@ function ShellBody({
   );
   const appName = useAppName();
   const [title, setTitle] = useState<string | null>(null);
+  const titleSlot = useTitleSlotState();
   // 붙박이 사이드바와 서랍이 각자 검색칸을 가진다. 서랍이 닫히면 서랍 쪽 ref 는 null 이 된다.
   const pinnedSearchRef = useRef<HTMLInputElement>(null);
   const drawerSearchRef = useRef<HTMLInputElement>(null);
@@ -170,89 +172,93 @@ function ShellBody({
 
   return (
     <TitleContext.Provider value={setTitle}>
-      <div className="flex h-full min-h-0 min-w-0 flex-1">
-        {/* 좁은 폭에서는 CSS 가 숨긴다. 서랍이 열린 동안은 같은 사이드바가 두 벌 생기지 않게 그리지 않는다. */}
-        {wide === false && drawerShown ? null : (
-          <aside
-            aria-label="사이드바"
-            className={cn(
-              "hidden w-64 shrink-0 border-r border-border bg-muted",
-              !collapsed && "md:block",
-            )}
-          >
-            <Sidebar
-              onNavigate={closeIfSamePath}
-              searchRef={pinnedSearchRef}
-              onCollapse={() => updateCollapsed(true)}
-            />
-          </aside>
-        )}
-        <Sheet open={drawerShown} onOpenChange={setDrawerOpen}>
-          <SheetContent
-            side="left"
-            closeLabel="사이드바 닫기"
-            className="gap-0 bg-muted data-[side=left]:w-72 data-[side=left]:sm:max-w-72"
-            onOpenAutoFocus={(event) => {
-              if (!focusSearchOnOpen.current) return;
-              focusSearchOnOpen.current = false;
-              event.preventDefault();
-              drawerSearchRef.current?.focus();
-            }}
-            onEscapeKeyDown={(event) => {
-              // Radix 는 document 캡처 단계에서 Esc 를 먼저 받는다. 이름 입력칸은 Esc 로 편집만 취소하므로 서랍을 닫지 않는다.
-              if (
-                event.target instanceof Element &&
-                event.target.matches("[data-rename-input]")
-              )
-                event.preventDefault();
-            }}
-          >
-            <SheetTitle className="sr-only">사이드바</SheetTitle>
-            <aside aria-label="사이드바" className="h-full min-h-0">
-              {/* 닫히며 사라지는 동안에는 붙박이 쪽이 안내 영역을 갖는다. 안내 영역이 한 번에 하나만 있다. */}
+      <TitleSlotContext.Provider value={titleSlot.value}>
+        <div className="flex h-full min-h-0 min-w-0 flex-1">
+          {/* 좁은 폭에서는 CSS 가 숨긴다. 서랍이 열린 동안은 같은 사이드바가 두 벌 생기지 않게 그리지 않는다. */}
+          {wide === false && drawerShown ? null : (
+            <aside
+              aria-label="사이드바"
+              className={cn(
+                "hidden w-64 shrink-0 border-r border-border bg-muted",
+                !collapsed && "md:block",
+              )}
+            >
               <Sidebar
                 onNavigate={closeIfSamePath}
-                searchRef={drawerSearchRef}
+                searchRef={pinnedSearchRef}
                 onCollapse={() => updateCollapsed(true)}
-                showStatus={drawerOpen}
-                inDrawer
               />
             </aside>
-          </SheetContent>
-        </Sheet>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {collapsed ? (
-            <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
-              <TooltipButton
-                label="사이드바 펴기"
-                onClick={() => updateCollapsed(false)}
-              >
-                <PanelLeft aria-hidden="true" />
-              </TooltipButton>
-              <Link
-                href={NEW_CONVERSATION_PATH}
-                onClick={startNew}
-                className="rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-              >
-                새 대화
-              </Link>
-            </header>
-          ) : null}
-          <MobileTopBar
-            title={title ?? appName}
-            appName={appName}
-            onOpenDrawer={() => setDrawerOpen(true)}
-            onStartNew={startNew}
-          />
-          {/* 서버의 첫 그림에는 아직 동작이 붙지 않았다. 폭을 읽은 뒤 준비 상태를 낭독기에도 알린다. */}
-          <main
-            aria-busy={wide === null}
-            className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5"
-          >
-            <ScreenTransition>{children}</ScreenTransition>
-          </main>
+          )}
+          <Sheet open={drawerShown} onOpenChange={setDrawerOpen}>
+            <SheetContent
+              side="left"
+              closeLabel="사이드바 닫기"
+              className="gap-0 bg-muted data-[side=left]:w-72 data-[side=left]:sm:max-w-72"
+              onOpenAutoFocus={(event) => {
+                if (!focusSearchOnOpen.current) return;
+                focusSearchOnOpen.current = false;
+                event.preventDefault();
+                drawerSearchRef.current?.focus();
+              }}
+              onEscapeKeyDown={(event) => {
+                // Radix 는 document 캡처 단계에서 Esc 를 먼저 받는다. 이름 입력칸은 Esc 로 편집만 취소하므로 서랍을 닫지 않는다.
+                if (
+                  event.target instanceof Element &&
+                  event.target.matches("[data-rename-input]")
+                )
+                  event.preventDefault();
+              }}
+            >
+              <SheetTitle className="sr-only">사이드바</SheetTitle>
+              <aside aria-label="사이드바" className="h-full min-h-0">
+                {/* 닫히며 사라지는 동안에는 붙박이 쪽이 안내 영역을 갖는다. 안내 영역이 한 번에 하나만 있다. */}
+                <Sidebar
+                  onNavigate={closeIfSamePath}
+                  searchRef={drawerSearchRef}
+                  onCollapse={() => updateCollapsed(true)}
+                  showStatus={drawerOpen}
+                  inDrawer
+                />
+              </aside>
+            </SheetContent>
+          </Sheet>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {collapsed ? (
+              <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
+                <TooltipButton
+                  label="사이드바 펴기"
+                  onClick={() => updateCollapsed(false)}
+                >
+                  <PanelLeft aria-hidden="true" />
+                </TooltipButton>
+                <Link
+                  href={NEW_CONVERSATION_PATH}
+                  onClick={startNew}
+                  className="rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                >
+                  새 대화
+                </Link>
+              </header>
+            ) : null}
+            <MobileTopBar
+              title={title ?? appName}
+              appName={appName}
+              onOpenDrawer={() => setDrawerOpen(true)}
+              onStartNew={startNew}
+              slotRef={titleSlot.setElement}
+              slotClaimed={titleSlot.claimed}
+            />
+            {/* 서버의 첫 그림에는 아직 동작이 붙지 않았다. 폭을 읽은 뒤 준비 상태를 낭독기에도 알린다. */}
+            <main
+              aria-busy={wide === null}
+              className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5"
+            >
+              <ScreenTransition>{children}</ScreenTransition>
+            </main>
+          </div>
         </div>
-      </div>
+      </TitleSlotContext.Provider>
     </TitleContext.Provider>
   );
 }

@@ -1,4 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
+import { agentSwitcher, expectPickedAgent } from "./helpers.ts";
 import type {
   Locator,
   Page,
@@ -523,8 +524,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
     await route.fulfill({ response });
   });
   await page.goto("/new");
-  const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
-  await expect(browserCard).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
 
   await openList(page);
   await chooseAndWait(page, "Instant");
@@ -533,9 +533,11 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
   // 빈 대화가 생겨 에이전트가 정해졌다. 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(trigger(page)).toHaveText("Instant");
-  await expect(
-    page.getByRole("radio", { name: "성격 비서", exact: true }),
-  ).toBeDisabled();
+  // 대화가 만들어져 이름표가 잠긴다. 눌러도 목록 대신 바꿀 수 없는 까닭이 보인다(app-shell 스펙의 REQ9).
+  await agentSwitcher(page).click();
+  await expect(page.getByTestId("agent-switcher-locked")).toBeVisible();
+  await expect(page.getByRole("menuitemradio")).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   const uploaded = page.waitForResponse(
     (response) =>
