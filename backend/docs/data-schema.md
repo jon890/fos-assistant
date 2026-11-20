@@ -854,6 +854,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 사용자마다 플러그인 하나에 연결 하나를 둔다. 상태가 바뀌는 조건과 API 는 [플러그인 연결](../../docs/features/connector.md) 이 갖는다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). `(user_id, connector_id)` 가 유일하다.
 
 - `fields` 는 JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}` 다. 비밀 칸의 원문과 해시는 넣지 않는다. 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
+- 단추 연결의 `fields.auth` 에는 `method: "oauth"`, `provider`, `reconnectRequired` 를 저장할 수 있다. 수동 연결은 `auth` 가 없거나 `method: "manual"` 이다. 수동 연결을 다시 쓰면 이전 JSON 모양을 유지해 열의 길이 한도에 찬 행도 다시 쓸 수 있다. 토큰은 이 열에 두지 않는다
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다

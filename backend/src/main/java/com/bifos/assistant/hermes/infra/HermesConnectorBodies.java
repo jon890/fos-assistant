@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes.infra;
 
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.AccessLevel;
@@ -36,6 +37,17 @@ final class HermesConnectorBodies {
         }
         Map<String, Object> body = new LinkedHashMap<>(request);
         body.put(OWNER_BROWSER, ownerBrowser);
+        return body;
+    }
+
+
+    /** 수동 연결은 이전 본문 그대로 보내고, 단추 연결의 확인에만 대기 또는 본 모드를 싣는다. */
+    static Map<String, Object> withOAuth(Map<String, Object> request, VaultAccess oauth) {
+        if (oauth == null) {
+            return request;
+        }
+        Map<String, Object> body = new LinkedHashMap<>(request);
+        body.put("oauth", oauth.word());
         return body;
     }
 

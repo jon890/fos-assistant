@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.util.List;
 import java.util.Map;
@@ -152,7 +153,13 @@ public interface HermesConnectorClient {
      *
      * @param ownerBrowser {@link #call} 과 같다
      */
-    CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser);
+    default CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
+        return callWithVault(connectorId, tool, vault, ownerBrowser, null);
+    }
+
+
+    /** OAuth 확인은 대기 또는 본 연결의 토큰 통로 주소를 확인 도구의 환경에 함께 넣는다. */
+    CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser, VaultAccess oauth);
 
 
     /**
@@ -168,6 +175,12 @@ public interface HermesConnectorClient {
 
     /** 보관 파일의 값으로 {@link #listTools} 와 같은 것을 받는다. 값은 Control Plane 을 거치지 않는다. */
     default ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
+        return listToolsWithVault(connectorId, vault, null);
+    }
+
+
+    /** OAuth 확인의 호출 모드로 표준 플러그인의 도구 목록을 읽는다. */
+    default ConnectorToolListing listToolsWithVault(String connectorId, String vault, VaultAccess oauth) {
         return ConnectorToolListing.failure(ConnectorCallError.UNAVAILABLE);
     }
 

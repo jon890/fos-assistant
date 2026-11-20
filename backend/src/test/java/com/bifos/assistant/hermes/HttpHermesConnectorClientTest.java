@@ -27,6 +27,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration;
 import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration.AppScope;
 import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
@@ -1234,6 +1235,28 @@ class HttpHermesConnectorClientTest {
         assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).ok()).isTrue();
         assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).error())
             .isEqualTo(ConnectorCallError.CREDENTIAL_REJECTED);
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("OAuth 확인 호출은 대기와 본 연결의 보관 파일 모드를 구분한다")
+    void specifiesVaultAccessForOAuthVerification() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+            .andExpect(content().json("""
+                {"tool":"list_scopes","vault":"c7","oauth":"pending","owner_browser":"https://browser.example.test/call"}
+                """, JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"result\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/tools"))
+            .andExpect(content().json("{\"vault\":\"c7\",\"oauth\":\"current\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"tools\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/tools"))
+            .andExpect(content().json("{\"vault\":\"c7\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"tools\":[]}", MediaType.APPLICATION_JSON));
+
+        client.callWithVault(DEMO, "list_scopes", "c7", "https://browser.example.test/call", VaultAccess.PENDING);
+        client.listToolsWithVault(DEMO, "c7", VaultAccess.CURRENT);
+        client.listToolsWithVault(DEMO, "c7");
         server.verify();
     }
 

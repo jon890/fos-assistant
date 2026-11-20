@@ -553,4 +553,11 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
 - 카탈로그의 한 줄은 `singleBinding` 으로 연결 하나를 에이전트 하나에만 붙이는지 알린다. 전문 에이전트 만들기 화면이 떼기 칸을 잠그는 데 쓴다
+- 단추 연결을 선언한 플러그인의 카탈로그는 `oauth` 에 제공자, 단추가 대신하는 비밀 칸, 제공자의 설정 주소를 낸다. 계정 연결 API와 토큰 통로가 준비될 때까지 `ready` 는 거짓이다. 수동 연결에 쓰는 입력 칸은 같이 준다
 - `POST /api/v1/connections/{id}/specialist` 는 그 연결만 맡는 전문 에이전트를 만든다. 칸과 순서는 [에이전트 팀](agent-team.md) 의 「전문 에이전트 만들기」 가 갖는다
+
+### 관리자 OAuth 앱 설정
+
+`ADMIN` 은 `GET /api/v1/admin/secrets/connector-oauth/apps` 에서 카탈로그가 선언한 앱과 서버 비밀값 저장소 상태를 읽는다. 목록의 `connectorId` 를 경로 뒤에 붙여 `PUT` 으로 `clientId`, `clientSecret`, 플러그인별 앱의 `appSlug` 를 저장하고 `DELETE` 로 비운다. 공유 앱은 같은 제공자의 플러그인이 한 설정을 쓴다.
+
+응답은 client ID와 App 이름, 비밀값의 입력 여부와 앞부분, 마지막 변경을 준다. 저장 위치와 연결 흐름은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
