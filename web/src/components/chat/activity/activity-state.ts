@@ -4,7 +4,8 @@ import type {
   ExecutionTreeResponse,
 } from "@/components/execution/execution-tree";
 import { subagentLabel } from "../../../lib/format.ts";
-import { toolLabel } from "../../../lib/tool-label.ts";
+import { toolLabel, type ConnectorToolName } from "../../../lib/tool-label.ts";
+import type { ActivityOutcome, ActivityUse } from "../../../lib/tool-kind.ts";
 import { interimKey } from "../turn-stream-text.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "interim";
@@ -15,6 +16,8 @@ export type ActivityItem = {
   key: string;
   kind: ActivityItemKind;
   name: string;
+  /** 플러그인 도구의 서비스 이름과 도구 제목. 그 밖의 항목은 null */
+  connector: ConnectorToolName | null;
   detail: string | null;
   model: string | null;
   inputTokens: number | null;
@@ -33,28 +36,21 @@ export type ActivityState = {
 /** 항목이 화면에 보이는 문장이다. 도구는 그리는 때 정해 도는 중과 끝남의 말이 다르다. */
 export function activityLabel(item: ActivityItem): string {
   return item.kind === "tool"
-    ? toolLabel(item.name, item.state === "running")
+    ? toolLabel(item.name, item.state === "running", item.connector)
     : item.name;
 }
 
-export type ActivityOutcome = "done" | "stopped" | "failed";
+export type { ActivityOutcome };
 
-/**
- * 끝난 블록의 접힌 한 줄이다.
- *
- * <p>저장된 답은 도구와 도우미의 수만 알고 있어, 그 수로 고정 문장을 고른다. 수 자체는 그리지 않는다.
- */
-export function activitySummaryLabel(
-  counts: { toolCount: number; subagentCount: number },
-  outcome: ActivityOutcome,
-): string {
-  if (outcome === "stopped") return "하다가 멈췄어요";
-  if (outcome === "failed") return "끝까지 하지 못했어요";
-  if (counts.toolCount > 0 && counts.subagentCount > 0)
-    return "찾아보고 도우미와 함께 정리했어요";
-  if (counts.subagentCount > 0) return "도우미와 함께 정리했어요";
-  if (counts.toolCount > 0) return "필요한 것을 확인하고 답했어요";
-  return "차례로 정리했어요";
+/** 흘러온 항목을 접힌 줄이 잇는 「쓴 것」 으로 바꾼다. 비서 안내는 쓴 것이 아니다. */
+export function activityUses(items: ActivityItem[]): ActivityUse[] {
+  return items.flatMap((item): ActivityUse[] =>
+    item.kind === "tool"
+      ? [{ kind: "TOOL", toolName: item.name, connector: item.connector }]
+      : item.kind === "subagent"
+        ? [{ kind: "SUBAGENT" }]
+        : [],
+  );
 }
 
 /** 흘러온 사건으로 끝난 블록이 어떻게 끝났는지 고른다. 중지가 오류보다 먼저다. */
@@ -119,6 +115,7 @@ function finish(
         kind === "tool"
           ? (event.toolName ?? "도구")
           : subagentLabel(null, event.goal ?? event.detail),
+      connector: kind === "tool" ? (event.connector ?? null) : null,
       detail: kind === "tool" ? (event.detail ?? null) : null,
       model: event.model ?? null,
       inputTokens: event.inputTokens ?? null,
@@ -132,7 +129,9 @@ function finish(
     position === index
       ? {
           ...item,
-          detail: kind === "tool" ? (event.detail ?? item.detail) : item.detail,
+          connector: item.connector ?? event.connector ?? null,
+          // 끝 사건의 빈 `detail` 은 시작 사건의 대상(검색어)을 지우지 않는다.
+          detail: kind === "tool" ? event.detail || item.detail : item.detail,
           model: event.model ?? item.model,
           inputTokens: event.inputTokens ?? item.inputTokens,
           outputTokens: event.outputTokens ?? item.outputTokens,
@@ -175,6 +174,7 @@ export function applyChatEvent(
       items: append(items, {
         kind: "interim",
         name: event.text,
+        connector: null,
         detail: null,
         model: null,
         inputTokens: null,
@@ -193,6 +193,7 @@ export function applyChatEvent(
         items: append(items, {
           kind: "tool",
           name,
+          connector: event.connector ?? null,
           detail: event.detail ?? null,
           model: null,
           inputTokens: null,
@@ -212,6 +213,7 @@ export function applyChatEvent(
         items: append(items, {
           kind: "subagent",
           name: subagentLabel(null, event.goal ?? event.detail),
+          connector: null,
           detail: null,
           model: event.model ?? null,
           inputTokens: null,
@@ -255,6 +257,7 @@ export function fromTree(
         items: append(state.items, {
           kind: "subagent",
           name: subagentLabel(node.agentName ?? node.agentCode, null),
+          connector: null,
           detail: null,
           model: node.model,
           inputTokens: node.inputTokens,
@@ -278,6 +281,7 @@ export function fromTree(
           state = applyChatEvent(state, {
             type: "tool",
             toolName: event.toolName,
+            connector: event.connector ?? null,
             detail: event.detail,
             durationMs: event.durationMs,
             failed: event.failed,

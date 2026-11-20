@@ -15,6 +15,7 @@ import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.usage.execution.application.port.ConnectorToolNames;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
@@ -42,6 +43,7 @@ class ChatRunEvents {
 
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
+    private final ConnectorToolNames connectorToolNames;
     private final HermesRunsClient hermes;
     private final LostRunRelease lostRunRelease;
     private final HermesRunEventStream eventStream;
@@ -202,13 +204,15 @@ class ChatRunEvents {
                 }
             }
         } else if ("tool.started".equals(type)) {
-            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null));
+            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null,
+                connectorToolNames.nameOf(event.toolName())));
             if (check != null) {
                 check.toolStarted(pending.execution().id());
             }
         } else if ("tool.completed".equals(type)) {
             onEvent.accept(ChatEvent.tool(
-                event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed()));
+                event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed(),
+                connectorToolNames.nameOf(event.toolName())));
         } else if ("subagent.start".equals(type)) {
             onEvent.accept(ChatEvent.subagent(
                 event.subagentId(),

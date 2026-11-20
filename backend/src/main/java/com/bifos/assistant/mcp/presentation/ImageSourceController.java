@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.mcp.application.ImageSourceService;
+import com.bifos.assistant.mcp.application.dto.ImageSourceResult;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -24,6 +25,9 @@ import tools.jackson.databind.JsonNode;
 @RestController
 @RequiredArgsConstructor
 public class ImageSourceController {
+    /** 링크 가리킴으로 받은 주소를 fos-ctx 에 돌려주는 응답 머리다. */
+    public static final String LINK_HEADER = "X-Image-Source-Link";
+
     private final ImageSourceService sources;
 
 
@@ -32,9 +36,14 @@ public class ImageSourceController {
         if (!(principal instanceof McpPrincipal mcp)) {
             throw new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
         }
-        InspectedImage image = sources.read(mcp, body);
-        return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore())
+        ImageSourceResult result = sources.read(mcp, body);
+        InspectedImage image = result.image();
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok().cacheControl(CacheControl.noStore());
+        if (result.link() != null) {
+            // 받은 링크의 정해진 꼴이다. fos-ctx 가 그림 올리기의 source_links 로 남긴다(ADR-20261120 / link-image-source).
+            response.header(LINK_HEADER, result.link());
+        }
+        return response
             .contentType(MediaType.parseMediaType(image.contentType()))
             .contentLength(image.bytes().length)
             .body(image.bytes());

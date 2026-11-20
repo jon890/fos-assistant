@@ -91,6 +91,8 @@ from .common import (
     logger,
 )
 
+from .connector_agent_skills import _agent_skill_plan
+
 from .connector_install import (
     CONNECTOR_DETACHED,
     CONNECTOR_TOOL_MAP,

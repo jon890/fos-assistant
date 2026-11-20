@@ -129,3 +129,18 @@ test("에이전트 상세에는 추천 질문 편집 절이 없다", async ({ pa
   await expect(page.getByText("추천 질문")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "성격 비서 소개" })).toHaveCount(0);
 });
+
+test("긴 주소가 든 추천도 360px 에서 단추 안에서 줄을 바꾸고 오른쪽이 잘리지 않는다", async ({ page }) => {
+  const prompt = "https://smartstore.naver.com/example-store/products/1234567890?NaPm=ct%3Dabcdefgh%7Cci%3Dexample 이 상품 가격 알려줘";
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.route(STARTERS_PATTERN, (route) => route.fulfill({ json: startersBody("READY", [prompt]) }));
+  await page.goto("/new");
+
+  const chip = page.getByRole("button", { name: prompt, exact: true });
+  await expect(chip).toBeVisible();
+  const list = await page.getByRole("list", { name: "추천 질문" }).boundingBox();
+  const box = await chip.boundingBox();
+  expect(box!.x + box!.width, "추천 단추의 오른쪽 끝").toBeLessThanOrEqual(list!.x + list!.width + 0.5);
+  // 단추의 글이 단추 밖으로 넘치지 않는다.
+  expect(await chip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});

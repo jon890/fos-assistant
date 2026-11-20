@@ -1,4 +1,5 @@
 import { ExecutionNode } from "./execution-node";
+import type { ConnectorToolName } from "@/lib/tool-label";
 
 /** Hermes 사건을 우리 이름으로 옮겨 적은 값이다. 화면은 Hermes 의 원래 사건 이름을 읽지 않는다. */
 export type ExecutionEventType =
@@ -25,6 +26,8 @@ export type ExecutionEventView = {
   inputTokens: number | null;
   outputTokens: number | null;
   occurredAt: string;
+  /** 플러그인 도구 사건의 서비스 이름과 도구 제목이다. 다른 사건은 null 이다. */
+  connector?: ConnectorToolName | null;
   /** 비동기 하위 에이전트 사용량을 뒤늦게 읽는 상태다. 실행 성공 여부가 아니다. */
   subagentUsageStatus?: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
 };
