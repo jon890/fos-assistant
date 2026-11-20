@@ -315,7 +315,7 @@ test("Strict Mode의 이전 요청과 finally는 다음 요청의 읽는 중 상
   await page.evaluate(() => {
     (window as unknown as { agentReads: Array<(response: Response) => void> }).agentReads[2](Response.json([{ code: "browser", name: "최신 비서", acceptsAttachments: true }]));
   });
-  await expect(page.getByRole("main").getByText("최신 비서", { exact: true })).toBeVisible();
+  await expectPickedAgent(page, "최신 비서");
   await expect(composer(page)).toBeEnabled();
 });
 
