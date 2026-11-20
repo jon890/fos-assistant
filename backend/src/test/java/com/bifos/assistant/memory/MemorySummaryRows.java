@@ -13,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MemorySummaryRows {
 
-    /** 요약 기능 전의 예산이다. 기억 전체 8,000자, 개인 사실 구역 2,000자에 맞춰 쓴 테스트가 쓴다. */
+    /** 요약 기능 전의 예산이다. 기억 전체 8,000자, 옛 개인 사실 구역 2,000자에 맞춰 쓴 테스트가 쓴다. */
     public static final String LEGACY_BUDGET = "{\"version\":1,\"summaryMaxChars\":2000,\"maxChars\":8000}";
 
 

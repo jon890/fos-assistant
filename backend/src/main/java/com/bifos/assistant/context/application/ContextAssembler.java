@@ -41,7 +41,7 @@ import org.springframework.stereotype.Service;
  * <p>Memory 를 먼저 문맥 묶음의 항목으로 만들고, 그 항목을 지금과 같은 글로 옮긴다(ADR-071). 같은 이름의 개인 문서와 그룹
  * 문서에 붙는 충돌 표시를 빼면 글이 바뀌지 않아 {@code instructions_hash} 도 그대로다.
  *
- * <p>층은 그룹 항상 층, 개인 항상 층, 개인 사실 구역, 질문과 관련된 기억 구역, 색인 층 순서다. 개인 사실 구역은 색인에 오를 짧은 개인 항목을
+ * <p>층은 그룹 항상 층, 개인 항상 층, 요약 구역, 질문과 관련된 기억 구역, 색인 층 순서다. 요약 구역은 색인에 오를 짧은 개인 항목을
  * 본문까지 싣는다(ADR-20261008 / memory-facts). 질문과 관련된 기억 구역은 질문이 있을 때만 관련 있는 항목을 본문까지 싣는다
  * (ADR-20261015 / memory-hybrid-selection). 두 구역에 실은 항목은 색인에서 뺀다.
  */
@@ -164,9 +164,9 @@ public class ContextAssembler implements OmittedMemories {
     /**
      * 고르는 자리를 여기 하나로 모은다. 항목이 많아지면 이 클래스에서 검색으로 바꾼다.
      *
-     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 개인 사실 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
+     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 요약 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
      * 항목 하나가 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도 사라져 에이전트가
-     * 나머지 Memory 에 닿을 길이 없어진다. 개인 사실 구역은 떼어 둔 자리를 쓰지 않으므로, 색인 전체가 몫(상한의 1/4) 안에 들 때는
+     * 나머지 Memory 에 닿을 길이 없어진다. 요약 구역은 떼어 둔 자리를 쓰지 않으므로, 색인 전체가 몫(상한의 1/4) 안에 들 때는
      * 색인을 밀어내지 못한다. 몫보다 긴 색인은 몫까지만 떼어 두므로 남는 줄이 빠질 수 있다.
      *
      * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
@@ -245,7 +245,7 @@ public class ContextAssembler implements OmittedMemories {
         List<ContextItem> items = context.bundle().items().stream().map(item -> {
             String selector = SELECTORS.get(item.source());
             int rank = ranks.merge(item.source(), 1, Integer::sum);
-            // 개인 사실 구역과 질문으로 고른 항목은 고른 규칙과 순위가 항목마다 달라 담을 때 이미 근거를 붙였다
+            // 요약 구역과 질문으로 고른 항목은 고른 규칙과 순위가 항목마다 달라 담을 때 이미 근거를 붙였다
             if (selector == null || item.selection() != null) {
                 return item;
             }

@@ -155,7 +155,7 @@ class ContextAssemblerQuestionTest {
 
         AssembledContext result = assembler.assemble(ADMIN, agentId, PEANUT_QUESTION);
 
-        // 본문이 짧아 개인 사실 구역에 먼저 실릴 수 있다. 어느 구역이든 본문으로 실리는 것을 본다
+        // 본문이 짧아 요약 구역에 먼저 실릴 수 있다. 어느 구역이든 본문으로 실리는 것을 본다
         assertThat(result.bundle().items())
             .anyMatch(item -> item.ref().equals("memory:" + former.id()) && item.body() != null);
         assertThat(result.instructions()).contains("땅콩 들어간 음식은 먹으면 안 된다");
@@ -250,7 +250,7 @@ class ContextAssemblerQuestionTest {
     }
 
 
-    /** 그룹 항목은 개인 사실 구역의 후보가 아니어서 질문 구역만 본다. */
+    /** 그룹 항목은 요약 구역의 후보가 아니어서 질문 구역만 본다. */
     private Memory group(String title, String content) {
         return memories.create(ADMIN, MemoryScope.GROUP, title, content, false);
     }

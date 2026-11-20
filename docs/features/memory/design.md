@@ -68,7 +68,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 - 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 지금처럼 `MEMORY_FACTS` 줄을 읽는다
 - 요약 구역에 든 기억도 질문 관련 구역의 후보다. `MemorySearchSection.place` 에 「색인에 다시 놓지 않을 번호」(요약 구역에 든 번호)를 넘긴다. 요약 구역에 든 기억이 색인에 두 번 오르지 않게 한다
 - 요약 구역의 고른 규칙 이름은 `facts-recent-v2` 로 올린다(`ContextSelection` 의 「규칙을 바꾸면 버전을 올린다」)
-- 예산은 `MemoryContextSettings.forGroup(groupId)` 의 `summaryMaxChars` 와 `maxChars` 다. `assistant.context.max-chars`, `facts-max-chars`, `facts-item-max-chars` 설정은 지운다. 그룹이 없는 사용자는 기본값이다
+- 예산은 `MemoryContextSettings.budgetFor(groupId)` 의 `summaryMaxChars` 와 `maxChars` 다. `assistant.context.max-chars`, `facts-max-chars`, `facts-item-max-chars` 설정은 지운다. 그룹이 없는 사용자는 기본값이다
 - 요약 구역 예산이 0 이 되는 값은 받지 않는다(최솟값 1,000). 운영에서 구역을 끄는 길은 없다. 회수 측정의 `factsOff` 모드는 테스트가 예산을 0 으로 주는 seam(`MemoryContextSettings` 의 값을 테스트가 바꾸는 것)으로 유지한다
 - 요약 구역은 색인 몫을 떼어 둔 뒤의 자리에 담긴다. 그래서 저장 검사에 `summaryMaxChars ≤ maxChars - maxChars / index-budget-ratio` 를 더한다(기본 비율 4 에서 전체의 3/4). 스펙의 「요약은 전체를 넘지 못한다」 보다 좁고, 설정 값과 실제로 담기는 예산이 어긋나지 않게 한다
 - 넘친 요약은 색인 줄로 가고, 그 색인 항목의 선택 근거 이름을 `summary-over-budget-v1` 로 둔다. 질문 점수가 있어도 이 근거가 앞선다. 넘친 번호 집합을 `MemorySearchPlacement` 에 넘겨 `appendIndex` 가 점수 근거로 덮지 않게 한다. `execution_context_source` 에 그대로 남는다. `context_omitted_items` 는 지금처럼 색인에서도 빠진 항목만 센다

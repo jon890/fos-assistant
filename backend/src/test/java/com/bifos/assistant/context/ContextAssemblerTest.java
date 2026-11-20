@@ -59,7 +59,7 @@ class ContextAssemblerTest {
         + "진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.";
     private static final String INDEX_HEADER = "# 더 물어볼 수 있는 것";
 
-    /** 개인 사실 구역의 본문 길이 상한(200자)을 넘어 색인에만 남는 본문이다. */
+    /** 요약 이관의 본문 길이 상한(200자)을 넘어 색인에만 남는 본문이다. */
     private static final String LONG_BODY = "색".repeat(201);
 
     @Autowired
@@ -349,7 +349,7 @@ class ContextAssemblerTest {
     void shipsIndexAndRestEvenIfFirstItemExceedsLimit() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
-        // 본문이 개인 사실 구역의 상한을 넘어 색인에만 오른다
+        // 본문이 요약 이관의 본문 상한을 넘어 색인에만 오른다
         Memory indexed = create(ADMIN, MemoryScope.USER, "색인만 하는 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
@@ -367,7 +367,7 @@ class ContextAssemblerTest {
     @DisplayName("항상 층이 상한을 거의 채워도 색인 층을 싣는다")
     void shipsIndexLayerEvenWhenAlwaysLayerNearlyFillsLimit() {
         memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_960), true);
-        // 짧은 본문이면 항상 층이 빠진 자리를 개인 사실 구역이 쓴다. 색인에만 오르게 해 색인이 밀려나지 않는지 본다
+        // 짧은 본문이면 항상 층이 빠진 자리를 요약 구역이 쓴다. 색인에만 오르게 해 색인이 밀려나지 않는지 본다
         Memory indexed = create(ADMIN, MemoryScope.USER, "색인 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
@@ -598,7 +598,7 @@ class ContextAssemblerTest {
         Memory personal = create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
         Memory firstFact = create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
         Memory secondFact = create(ADMIN, MemoryScope.USER, "운동", "저녁에 걷는다", false);
-        // 개인 사실 구역은 번호 순으로 싣지만 순위는 최근에 고친 순으로 고른 차례다. 나중에 고친 secondFact 가 1 위다
+        // 요약 구역은 번호 순으로 싣지만 순위는 최근에 고친 순으로 고른 차례다. 나중에 고친 secondFact 가 1 위다
         touch(firstFact, Instant.now().minusSeconds(60));
         Memory firstIndexed = create(ADMIN, MemoryScope.USER, "긴 기록 하나", LONG_BODY, false);
         Memory secondIndexed = create(ADMIN, MemoryScope.USER, "긴 기록 둘", LONG_BODY, false);
@@ -634,7 +634,7 @@ class ContextAssemblerTest {
     void keepsOmittedItemInBundleAtItsPlace() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
-        // 본문이 개인 사실 구역의 상한을 넘어 색인에만 오른다
+        // 본문이 요약 이관의 본문 상한을 넘어 색인에만 오른다
         Memory indexed = create(ADMIN, MemoryScope.USER, "색인만 하는 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
@@ -698,7 +698,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("짧은 개인 색인 항목은 개인 사실 구역에 본문까지 한 줄로 싣고 색인에서 뺀다")
+    @DisplayName("요약이 본문과 같은 짧은 개인 색인 항목은 요약 구역에 한 줄로 싣고 색인에서 뺀다")
     void placesShortPersonalItemInFactsSectionInsteadOfIndex() {
         Memory always = create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
         Memory fact = create(ADMIN, MemoryScope.USER, "딸 이름", "홍지수\n둘째는\r\n아직\r없다", false);
@@ -742,7 +742,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("그룹 항목과 201자 본문과 문서는 개인 사실 구역에 없고 색인에 제목으로 있다")
+    @DisplayName("그룹 항목과 요약이 없는 201자 본문과 문서는 요약 구역에 없고 색인에 제목으로 있다")
     void leavesNonCandidatesInIndexByTitle() {
         Memory atLimit = create(ADMIN, MemoryScope.USER, "상한 본문", "나".repeat(200), false);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
@@ -775,7 +775,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("개인 사실 구역 예산을 넘으면 최근에 고친 것부터 담고 빠진 후보는 색인에 제목으로 남아 빠진 항목이 아니다")
+    @DisplayName("요약 구역 예산을 넘으면 최근에 고친 것부터 담고 빠진 후보는 색인에 제목으로 남아 빠진 항목이 아니다")
     void choosesRecentFactsWithinBudgetAndLeavesRestInIndex() {
         Memory newest = create(ADMIN, MemoryScope.USER, "가장 최근", "라".repeat(50), false);
         Memory longer = create(ADMIN, MemoryScope.USER, "두 번째", "마".repeat(200), false);
@@ -812,7 +812,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("항상 층이 색인 몫 밖의 자리를 거의 다 쓰면 개인 사실 구역이 비고 후보는 색인에 제목으로 남는다")
+    @DisplayName("항상 층이 색인 몫 밖의 자리를 거의 다 쓰면 요약 구역이 비고 후보는 색인에 제목으로 남는다")
     void leavesFactsEmptyWhenAlwaysLayerUsesNearlyAllRoom() {
         Memory always = memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_850), true);
         Memory candidate = create(ADMIN, MemoryScope.USER, "짧은 사실", "짧은 본문", false);
@@ -853,7 +853,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("개인 사실 구역 예산이 0 이면 구역 없이 짧은 개인 항목도 색인에 제목으로 싣는다")
+    @DisplayName("요약 구역 예산이 0 이면 구역 없이 짧은 개인 항목도 색인에 제목으로 싣는다")
     void rendersPreviousTextWhenFactsBudgetIsZero() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
         create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
@@ -877,7 +877,7 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("에이전트가 받지 않는 collection 의 짧은 개인 항목은 개인 사실 구역에도 없다")
+    @DisplayName("에이전트가 받지 않는 collection 의 짧은 개인 항목은 요약 구역에도 없다")
     void leavesOutFactsOfCollectionsTheAgentDoesNotReceive() {
         Memory core = create(ADMIN, MemoryScope.USER, "기본 사실", "기본 본문", false);
         Memory career = create(
@@ -1036,7 +1036,7 @@ class ContextAssemblerTest {
     }
 
 
-    /** 개인 사실 구역 머리부터 색인 머리 앞까지다. 구역이 없으면 빈 글이다. */
+    /** 요약 구역 머리부터 색인 머리 앞까지다. 구역이 없으면 빈 글이다. */
     private static String factsSection(AssembledContext result) {
         String text = result.instructions();
         int start = text.indexOf(FACTS_HEADER);

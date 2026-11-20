@@ -7,7 +7,7 @@ package com.bifos.assistant.context.application.dto;
  *
  * <ul>
  * <li>{@value #ALWAYS_BY_ID}: 항상 층. 그룹 항목 다음 개인 항목을 범위마다 번호 순으로 싣는다
- * <li>{@value #FACTS_RECENT}: 요약 구역. 요약 줄이 있는 개인 사실을 최근에 고친 순으로 고르고 번호 순으로 싣는다. v1 은 본문 200자 이하 사실의 본문을 싣던 개인 사실 구역이다
+ * <li>{@value #FACTS_RECENT}: 요약 구역. 요약 줄이 있는 개인 사실을 최근에 고친 순으로 고르고 번호 순으로 싣는다. v1 은 본문 200자 이하 사실의 본문을 싣던 옛 개인 사실 구역이다
  * <li>{@value #SUMMARY_OVER_BUDGET}: 색인 층 가운데 요약이 있지만 요약 구역 예산을 넘겨 빠진 항목. 질문 점수 근거보다 앞선다
  * <li>{@value #INDEX_BY_ID}: 색인 층. 번호 순으로 싣는다. 질문이 있으면 점수가 없는 항목에 붙고, 점수가 있는 항목 뒤에 번호 순으로 싣는다
  * <li>{@value #SEARCH_KEYWORD}: 질문과 관련된 기억 구역. 키워드 점수 순으로 고르고 그 차례로 싣는다. 순위는 관련 있는 항목 전체 안의 차례다
@@ -17,7 +17,7 @@ package com.bifos.assistant.context.application.dto;
  * </ul>
  *
  * @param selector 고른 규칙의 이름과 버전. 32자 이하다
- * @param rank 같은 실행의 같은 {@code source} 안에서 고른 순서. 1 부터 센다. 자리가 없어 빠진 항목도 받는다. 개인 사실 구역은 싣는 차례(번호 순)가
+ * @param rank 같은 실행의 같은 {@code source} 안에서 고른 순서. 1 부터 센다. 자리가 없어 빠진 항목도 받는다. 요약 구역은 싣는 차례(번호 순)가
  * 아니라 고른 차례(최근에 고친 순)다
  * @param keywordScore 키워드 점수. 점수 없이 고르는 규칙은 null
  * @param semanticScore 의미 점수. 점수 없이 고르는 규칙은 null

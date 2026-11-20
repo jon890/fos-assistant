@@ -21,7 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 요약 칸이 이관 전({@code NULL})인 기억에 요약을 처음 적는다({@code docs/features/memory/design.md} 의 「이관(PR1)」).
  *
  * <p>대상(개인 범위의 승인된 사실이고 꺼내는 방식이 {@code SEARCH} 이며 대체되지 않았고 본문이 {@link Memory#SUMMARY_MAX} 자 이하)은 본문을
- * 요약으로, 나머지는 빈 글을 적는다. 빈 글도 적어 다음 기동에 다시 보지 않는다. 배포 직전의 개인 사실 구역에 들던 기억이 요약 구역에 그대로 든다.
+ * 요약으로, 나머지는 빈 글을 적는다. 빈 글도 적어 다음 기동에 다시 보지 않는다. 배포 직전의 옛 개인 사실 구역에 들던 기억이 요약 구역에 그대로 든다.
  *
  * <p>암호화 이관({@link MemoryTextMigration}) 뒤에 돈다. 암호화가 켜진 설치는 데이터 key 로 옮긴 줄만 본다. 줄마다 새 트랜잭션에서 쓰기 잠금으로
  * 다시 읽고, revision 번호와 갱신 시각은 바꾸지 않는다. 풀지 못한 줄은 건너뛰고 번호만 남기며 기동은 잇는다. 로그에 글을 남기지 않는다.
@@ -103,7 +103,7 @@ public class MemorySummaryBackfill implements ApplicationRunner {
     }
 
 
-    /** 배포 직전 개인 사실 구역의 후보 조건과 같다. */
+    /** 배포 직전 옛 개인 사실 구역의 후보 조건과 같다. */
     static boolean target(Memory memory) {
         return memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
