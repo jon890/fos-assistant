@@ -189,7 +189,7 @@ public class LinkImageFetcher {
             throw reject(Reason.BLOCKED, "blocked_host", host, null);
         }
         List<InetAddress> addresses = publicAddresses(host);
-        LinkImageTransport.Request request = new LinkImageTransport.Request(
+        LinkImageRequest request = new LinkImageRequest(
             uri, HEADERS, properties.connectTimeout(), properties.readTimeout(), properties.maxHeaderBytes());
         IOException last = null;
         for (InetAddress address : addresses) {

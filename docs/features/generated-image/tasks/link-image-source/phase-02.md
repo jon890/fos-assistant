@@ -95,3 +95,9 @@ cd backend && ./gradlew archTest checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/FakeLinkImageWeb.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImageRequest.java` | 신규 (phase 01 의 중첩 요청 타입을 구조 규칙에 맞게 최상위로 옮김) |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImageTransport.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceSocketTransport.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImageFetcher.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/artifact/infra/LinkImageFetcherTest.java` | 수정 |

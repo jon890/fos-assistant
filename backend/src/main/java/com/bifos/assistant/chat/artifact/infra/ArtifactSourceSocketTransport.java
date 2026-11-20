@@ -69,7 +69,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
 
     @Override
     public ArtifactSourceResponse get(
-        InetAddress address, String host, LinkImageTransport.Request request, ArtifactSourceCancellation cancellation)
+        InetAddress address, String host, LinkImageRequest request, ArtifactSourceCancellation cancellation)
         throws IOException {
         SSLSocket ssl = open(address, host, request.connectTimeout(), request.readTimeout(), cancellation);
         try {

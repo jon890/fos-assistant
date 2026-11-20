@@ -251,7 +251,7 @@ class LinkImageFetcherTest {
     }
 
 
-    private ArtifactSourceResponse respond(String host, LinkImageTransport.Request request) throws IOException {
+    private ArtifactSourceResponse respond(String host, LinkImageRequest request) throws IOException {
         URI source = request.source();
         String key = host + source.getRawPath() + (source.getRawQuery() == null ? "" : "?" + source.getRawQuery());
         requested.add(key);
