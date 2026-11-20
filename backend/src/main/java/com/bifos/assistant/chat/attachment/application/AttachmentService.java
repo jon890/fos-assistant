@@ -294,8 +294,7 @@ public class AttachmentService {
         if (!sameOwnerAndConversation) {
             throw notAttachable();
         }
-        String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
-            + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
+        String directory = AttachmentStore.agentConversationDirectory(properties.agentRoot(), ownerUserId, conversationId);
         Map<Long, Integer> order = orderInConversation(conversationId);
         Set<Long> retained = sent.stream()
             .filter(this::inspectable)
@@ -442,15 +441,6 @@ public class AttachmentService {
             .findByIdAndConversationId(attachmentId, conversationId)
             .orElseThrow(
                 () -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
-    }
-
-
-    private static String stripTrailingSlash(String path) {
-        String stripped = path.strip();
-        while (stripped.length() > 1 && stripped.endsWith("/")) {
-            stripped = stripped.substring(0, stripped.length() - 1);
-        }
-        return stripped;
     }
 
 

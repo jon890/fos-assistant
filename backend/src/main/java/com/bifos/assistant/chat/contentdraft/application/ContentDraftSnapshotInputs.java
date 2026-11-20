@@ -192,8 +192,7 @@ public class ContentDraftSnapshotInputs {
         }
         var value = json.createObjectNode().put("assetId", link.attachmentId().toString())
             .put("sourceFingerprint", link.sourceFingerprint()).put("fileName", attachment.storedName())
-            .put("photoDir", properties.agentRoot().replaceAll("/+$", "") + "/users/"
-                + AttachmentStore.userDirectoryKey(user.id()) + "/" + conversationId)
+            .put("photoDir", AttachmentStore.agentConversationDirectory(properties.agentRoot(), user.id(), conversationId))
             .put("ordinal", order.get(link.attachmentId()));
         if (link.observationId() != null) {
             var observation = observations.findById(link.observationId()).orElseThrow(ContentDraftSnapshotInputs::stale);

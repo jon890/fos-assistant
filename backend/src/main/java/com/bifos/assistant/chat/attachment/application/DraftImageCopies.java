@@ -73,8 +73,7 @@ public class DraftImageCopies {
 
     /** Hermes 와 실행 공간에서 보이는 그 대화의 사진 폴더다. 실행 입력의 사진 참조 목록 위에 적는 폴더와 같다. */
     public String agentDirectory(Long ownerUserId, Long conversationId) {
-        return properties.agentRoot().replaceAll("/+$", "") + "/users/"
-            + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
+        return AttachmentStore.agentConversationDirectory(properties.agentRoot(), ownerUserId, conversationId);
     }
 
 
