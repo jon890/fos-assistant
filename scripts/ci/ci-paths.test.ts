@@ -364,7 +364,7 @@ test("필수 검사 이름 hermes 는 나눈 두 job 이 모두 있어야 하고
   assert.equal(jobs.has("hermes-tests"), false);
   const python = jobs.get("hermes-python") ?? assert.fail("hermes-python job 이 없다");
   // 새 checkout 에서 도는 Python 테스트는 커넥터의 dist 와 node_modules 를 읽으므로 설치와 빌드가 unittest 보다 앞서야 한다.
-  const unittest = python.indexOf("run-hermes-python-tests.py");
+  const unittest = python.indexOf("run-hermes-python-tests.ts");
   assert.ok(unittest >= 0, "Python 테스트 단계가 없다");
   for (const step of ["bun install --cwd", "bun run --cwd"]) {
     const index = python.indexOf(step);
