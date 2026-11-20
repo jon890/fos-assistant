@@ -52,6 +52,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -333,7 +334,7 @@ class McpConnectorAttachToolTest {
         connect();
         call(DEMO);
         ConnectorAction card = actions.findAll().getFirst();
-        jdbc.update("UPDATE connector_action SET status = 'EXECUTING', decided_at = ? WHERE id = ?", java.sql.Timestamp.from(Instant.now()), card.id());
+        jdbc.update("UPDATE connector_action SET status = 'EXECUTING', decided_at = ? WHERE id = ?", Timestamp.from(Instant.now()), card.id());
 
         assertThat(actionService.markInterrupted(Instant.now())).isEqualTo(1);
 
