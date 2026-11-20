@@ -5,7 +5,9 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
@@ -25,13 +27,22 @@ import tools.jackson.databind.JsonNode;
  */
 @Slf4j
 public record GeneratedImageRequest(
-    String rootSessionId, String sessionId, String toolCallId, String title, String prompt, String imageSha256) {
+    String rootSessionId,
+    String sessionId,
+    String toolCallId,
+    String title,
+    String prompt,
+    List<String> sourceLinks,
+    String imageSha256) {
 
 
     private static final String VERSION_LINE = "v1-generated-image";
     private static final int MAX_ID_CHARS = 128;
     private static final int MAX_TITLE_CHARS = 500;
     private static final int MAX_PROMPT_CHARS = 32_000;
+    /** 참고한 링크 하나의 길이 상한과 개수 상한이다. 개수는 이미지 서비스가 받는 입력 장수(16)를 넘지 않는다. */
+    private static final int MAX_LINK_CHARS = 2048;
+    private static final int MAX_LINKS = 16;
 
     /**
      * @param meta `meta` 조각을 읽은 JSON
@@ -54,6 +65,7 @@ public record GeneratedImageRequest(
         String toolCallId = requireId(meta, "tool_call_id");
         String title = text(meta, "title", MAX_TITLE_CHARS);
         String prompt = text(meta, "prompt", MAX_PROMPT_CHARS);
+        List<String> sourceLinks = links(meta.get("source_links"));
         String signature = requireId(meta, "sig");
         if (!McpCallContext.SIGNATURE.matcher(signature).matches()) {
             throw reject("서명이 소문자 16진수 64자가 아니다");
@@ -68,10 +80,14 @@ public record GeneratedImageRequest(
             imageSha256,
             sha256(title.getBytes(StandardCharsets.UTF_8)),
             sha256(prompt.getBytes(StandardCharsets.UTF_8)));
+        if (!sourceLinks.isEmpty()) {
+            // 링크가 있을 때만 여덟째 줄을 더한다. 링크 없는 올리기는 옛 fos-ctx 와 같은 일곱 줄 그대로다.
+            signed += "\n" + sha256(String.join("\n", sourceLinks).getBytes(StandardCharsets.UTF_8));
+        }
         if (!MessageDigest.isEqual(McpCallContext.hmac(tokenHash, signed), HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");
         }
-        return new GeneratedImageRequest(rootSessionId, sessionId, toolCallId, title, prompt, imageSha256);
+        return new GeneratedImageRequest(rootSessionId, sessionId, toolCallId, title, prompt, sourceLinks, imageSha256);
     }
 
 
@@ -102,6 +118,26 @@ public record GeneratedImageRequest(
             throw reject(key + " 가 문자열이 아니거나 받는 길이를 넘는다");
         }
         return value.asString();
+    }
+
+
+    /** {@code source_links} 는 없거나, {@code https://} 로 시작하는 줄바꿈 없는 주소의 배열이다(ADR-20261120 / link-image-source). */
+    private static List<String> links(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return List.of();
+        }
+        if (!value.isArray() || value.size() > MAX_LINKS) {
+            throw reject("source_links 가 배열이 아니거나 너무 많다");
+        }
+        List<String> links = new ArrayList<>(value.size());
+        for (JsonNode item : value) {
+            String link = item.isString() ? item.asString() : "";
+            if (!link.startsWith("https://") || link.length() > MAX_LINK_CHARS || link.chars().anyMatch(c -> c <= 0x20 || c == 0x7f)) {
+                throw reject("source_links 의 항목이 https 주소가 아니다");
+            }
+            links.add(link);
+        }
+        return List.copyOf(links);
     }
 
 

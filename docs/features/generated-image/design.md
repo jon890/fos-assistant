@@ -396,7 +396,7 @@ PR3 의 `POST /internal/hermes/image-source` 에 오류 코드를 더한다. 200
 
 - fos-ctx 는 `prepare` 에서 받은 `link:` 가리킴마다 응답 머리 `X-Image-Source-Link` 의 주소를 사본과 같은 `(session_id, tool_call_id)` 로 기억한다. 결과 hook 의 올리기 meta 에 `source_links`(주소 목록, 쓴 순서)를 넣는다
 - 서명은 `source_links` 가 있을 때만 메시지 끝에 줄 하나(주소를 줄바꿈으로 이은 글의 SHA-256)를 더한다. 없으면 지금 메시지 그대로라 링크 없는 그림은 옛 쪽과 새 쪽이 서로 통한다. 옛 Control Plane 은 줄이 더 붙은 서명을 거절한다. 옛 서버는 `link:` 받기부터 막으므로, 받기와 올리기 사이에 Control Plane 을 되돌린 경우만 그림이 저장되지 않는다. 이것은 감수한다
-- Control Plane 은 `chat_artifact` 에 새 칸 `generation_source_links`(LONGTEXT, JSON 배열)와 `generation_source_links_key_id` 를 더한다. 링크는 지시문과 같은 `OwnedTextCipher.seal` 로 따로 봉하고 그 key 번호를 자기 칸에 둔다. `seal` 은 key 를 고를 수 없어, 두 번 부르는 사이 key 가 바뀌어도 각자 자기 key 번호로 풀리게 한다. AAD 는 지시문의 AAD 에 `:links` 를 붙인다. 암호화가 꺼져 있으면 평문이고, `seal` 이 실패하면 지시문과 같이 평문으로 내려 저장하지 않는다. 링크가 없으면 두 칸 모두 비운다. 새 표를 만들지 않는다(사용자 결정 2026-11-01)
+- Control Plane 은 `chat_artifact` 에 새 칸 `generation_source_links`(LONGTEXT, 주소를 줄바꿈으로 이은 글)와 `generation_source_links_key_id` 를 더한다. 링크는 지시문과 같은 `OwnedTextCipher.seal` 로 따로 봉하고 그 key 번호를 자기 칸에 둔다. `seal` 은 key 를 고를 수 없어, 두 번 부르는 사이 key 가 바뀌어도 각자 자기 key 번호로 풀리게 한다. AAD 는 지시문의 AAD 에 `:links` 를 붙인다. 암호화가 꺼져 있으면 평문이고, `seal` 이 실패하면 지시문과 같이 평문으로 내려 저장하지 않는다. 링크가 없으면 두 칸 모두 비운다. 새 표를 만들지 않는다(사용자 결정 2026-11-01)
 - 메시지 응답의 그림 항목에 `sourceLinks`(문자열 배열, 없으면 빈 배열)를 더한다. 보관본에는 넣지 않는다(스펙 DECISION18 과 같은 까닭)
 - 대화를 지우면 행과 함께 지워진다
 

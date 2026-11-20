@@ -17,6 +17,7 @@ type Artifact = {
   kind: "IMAGE" | "HTML";
   prompt: string | null;
   vaultItemId: number | null;
+  sourceLinks?: string[];
 };
 
 function image(title: string, extra: Partial<Artifact> = {}): Artifact {
@@ -75,6 +76,29 @@ test("답 안에 그림 두 장이 만든 순서로 보이고 지시문은 눌�
   await prompt.getByText("그림 지시문 보기").click();
   await expect(prompt.getByText(PROMPT)).toBeVisible();
 });
+
+for (const width of [1280, 390]) {
+  test(`참고한 링크가 지시문 칸에 새 창 링크로 보이고 링크 없는 그림에는 없다 (폭 ${width})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const links = ["https://shop.example.com/goods/1", "https://img.example.com/p.png"];
+    await openWithImages(page, [image("양말 신은 아이", { sourceLinks: links }), image("그냥 고양이", { sourceLinks: [] })]);
+
+    const images = page.getByTestId("assistant-message").last().getByTestId("generated-image");
+    await images.nth(0).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+    const list = images.nth(0).getByTestId("generated-image-source-links");
+    await expect(list).toBeVisible();
+    const anchors = list.getByRole("link");
+    await expect(anchors).toHaveCount(2);
+    for (const [index, link] of links.entries()) {
+      await expect(anchors.nth(index)).toHaveText(link);
+      await expect(anchors.nth(index)).toHaveAttribute("href", link);
+      await expect(anchors.nth(index)).toHaveAttribute("target", "_blank");
+      await expect(anchors.nth(index)).toHaveAttribute("rel", "noopener noreferrer");
+    }
+    await images.nth(1).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+    await expect(images.nth(1).getByTestId("generated-image-source-links")).toHaveCount(0);
+  });
+}
 
 test("그림을 누르면 크게 보이고 내려받는 파일 이름이 제목이며 보관본이 없으면 보관할 수 있다", async ({ page }) => {
   const conversationId = await openWithImages(page, [image("수채화 고양이")]);

@@ -39,7 +39,7 @@
 
 ### 3. `GeneratedImageService` 와 `GeneratedImageUploadService`
 
-`save` 가 `sourceLinks` 를 받아 JSON 배열로 바꿔 봉해 두 칸에 쓴다. 비면 두 칸 모두 null. `seal` 이 실패하면 지시문처럼 평문으로 내려 저장하지 않는다(`GeneratedImageService.seal` 과 같은 처리). 지금 `save` 를 직접 부르는 테스트(`ArtifactTest`, `ImageSourceEndpointTest`)는 새 인자에 빈 목록을 넘기도록 고친다. 같은 호출의 되풀이 올리기는 지금처럼 처음 행을 돌려준다. `sourceLinksOf(ChatArtifact, Long ownerUserId)` 를 더해 풀고, 풀지 못하면 빈 목록이다. `GeneratedImageDetail` 에 `List<String> sourceLinks` 를 더하고 지금 지시문을 채우는 곳에서 함께 채운다.
+`save` 가 `sourceLinks` 를 받아 JSON 배열로 바꿔 봉해 두 칸에 쓴다. 비면 두 칸 모두 null. `seal` 이 실패하면 지시문처럼 평문으로 내려 저장하지 않는다(`GeneratedImageService.seal` 과 같은 처리). 지금 `save` 를 직접 부르는 테스트(`ArtifactTest`, `ImageSourceEndpointTest`)가 그대로 컴파일되게 인자 6개짜리 `save` 를 남겨 빈 목록으로 넘긴다. 링크는 JSON 대신 줄바꿈으로 이은 글로 둔다. 주소에는 줄바꿈이 없다(`GeneratedImageRequest` 가 거절한다). 같은 호출의 되풀이 올리기는 지금처럼 처음 행을 돌려준다. `sourceLinksOf(ChatArtifact, Long ownerUserId)` 를 더해 풀고, 풀지 못하면 빈 목록이다. `GeneratedImageDetail` 에 `List<String> sourceLinks` 를 더하고 지금 지시문을 채우는 곳에서 함께 채운다.
 
 ### 4. 메시지 응답
 
@@ -84,5 +84,4 @@ pnpm --dir web lint
 | `web/src/components/chat/message-types.ts` | 수정 |
 | `web/src/components/chat/artifact/generated-images.tsx` | 수정 |
 | `web/test/browser/generated-image.spec.ts` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` | 수정 (save 인자) |
-| `backend/src/test/java/com/bifos/assistant/mcp/ImageSourceEndpointTest.java` | 수정 (save 인자) |
+| `docs/features/generated-image/design.md` | 수정 (링크 칸을 줄바꿈으로 이은 글로 적음) |
