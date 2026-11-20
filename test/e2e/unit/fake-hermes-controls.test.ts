@@ -71,7 +71,7 @@ test("대역이 빼는 맡길 곳 구역의 제목과 안내 줄은 Control Plan
   assert.equal(truncated?.[1], DELEGATION_TARGETS_TRUNCATED);
 });
 
-test("대화 실행의 최신 정보와 출처 절과 오늘 날짜 줄을 빼고 그 사이의 글은 보존한다", () => {
+test("실측·공식 출처·기간과 한 메시지 답 지침을 포함한 검색 절과 날짜만 빼고 본문은 보존한다", () => {
   const source = readFileSync(CONTEXT_ASSEMBLER, "utf8");
   const block = /SEARCH_INSTRUCTIONS = """([\s\S]*?)"""/.exec(source);
   assert.ok(block, "검색 지침 상수를 찾지 못했다");
