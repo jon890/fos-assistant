@@ -12,6 +12,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,10 +21,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 
 /** 대시보드의 서비스 토큰 경계다. 원격 오류 본문은 응답 해석이나 예외 메시지에 쓰지 않는다. */
 @Component
+@Slf4j
 public class HttpHermesConnectorOAuthClient implements HermesConnectorOAuthClient {
     private static final String VAULT = "vault";
     private static final String CONNECTOR = "connector";
@@ -125,10 +128,19 @@ public class HttpHermesConnectorOAuthClient implements HermesConnectorOAuthClien
                 .retrieve()
                 .toEntity(JsonNode.class);
             JsonNode payload = response.getBody();
-            return response.getStatusCode().is2xxSuccessful() && payload != null && payload.isObject() ? payload : null;
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.warn("dashboard OAuth request failed action={} status={}", action, response.getStatusCode().value());
+                return null;
+            }
+            return payload != null && payload.isObject() ? payload : null;
         } catch (HttpClientErrorException.Conflict ex) {
             throw new ConnectorOAuthFlowConflict();
+        } catch (RestClientResponseException ex) {
+            log.warn("dashboard OAuth request failed action={} status={} exception={}",
+                action, ex.getStatusCode().value(), ex.getClass().getSimpleName());
+            return null;
         } catch (RestClientException ex) {
+            log.warn("dashboard OAuth request failed action={} exception={}", action, ex.getClass().getSimpleName());
             return null;
         }
     }

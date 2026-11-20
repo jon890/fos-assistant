@@ -26,6 +26,9 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -35,6 +38,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.ResponseActions;
 import org.springframework.web.client.RestClient;
 
+@ExtendWith(OutputCaptureExtension.class)
 class HttpHermesConnectorOAuthClientTest {
     private static final String BASE = "https://dashboard.example.test";
     private static final String DEMO = "demo-notes";
@@ -143,6 +147,23 @@ class HttpHermesConnectorOAuthClientTest {
         }
         assertThat(client.refresh(VAULT, DEMO, APP)).isEqualTo(new Token(Outcome.APP_REJECTED, null, null));
         assertThat(client.refresh(VAULT, DEMO, APP)).isEqualTo(new Token(Outcome.OK, "example", null));
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("HTTP 오류와 연결 실패의 종류를 로그에서 구분하고 원문은 남기지 않는다")
+    void logsOnlyOAuthFailureKind(CapturedOutput output) {
+        expect("refresh", APP_BODY).andRespond(withStatus(HttpStatus.UNAUTHORIZED).body("upstream-body-example"));
+        expect("refresh", APP_BODY).andRespond(request -> {
+            throw new IOException("connection-message-example");
+        });
+
+        assertThat(client.refresh(VAULT, DEMO, APP).outcome()).isEqualTo(Outcome.UNAVAILABLE);
+        assertThat(client.refresh(VAULT, DEMO, APP).outcome()).isEqualTo(Outcome.UNAVAILABLE);
+        assertThat(output.getAll())
+            .contains("action=refresh status=401 exception=Unauthorized", "action=refresh exception=ResourceAccessException")
+            .doesNotContain("upstream-body-example", "connection-message-example", APP.clientSecret());
         server.verify();
     }
 
