@@ -62,11 +62,12 @@
 
 ### 7. 브라우저 테스트
 
-- `web/test/browser/shell.spec.ts`: 사이드바 줄의 차례와 없는 줄(「에이전트」, 「사용량」, 「고급」), 앱 이름 옆 알림 단추가 서랍 닫기 단추와 겹치지 않는지, 대화를 많이 만든 뒤와 낮은 높이(640×320)에서 계정 메뉴 단추가 스크롤 없이 보이는지. 넓은 화면과 `mobile` 프로젝트(서랍) 모두.
-- `web/test/browser/account-menu.spec.ts`(신규): `ADMIN` 네 줄과 `MEMBER` 세 줄, 「관리자 화면」 이 `/admin` 으로 가는지, 밝기 어둡게(360px 에서는 탭) → 새로 고침 뒤 `html.dark` 유지, 키보드(`Enter` 로 열고 `Esc` 로 닫기), 역할 읽기 실패 때 안내와 메뉴의 로그아웃.
-- `web/test/browser/sign-out.spec.ts`(신규): 로그아웃 → `/signin`, `page.goBack()` 과 `/chat/{id}` 가 로그인 화면, `persisted: true` 인 `PageTransitionEvent('pageshow')` 를 보내면 문서를 다시 읽음, `/signout` 을 `page.route` 로 500 이나 `abort()` 로 만들면 안내와 화면 유지. 자기 context 의 세션만 지운다.
+- 공통: 360px 사례는 `page.setViewportSize({ width: 360, height: 780 })` 로 맞춘다(`mobile` 프로젝트는 390px). 사이드바를 보는 테스트는 사이드바 틀 경로(`/new`)에서 출발한다. phase-01 동안 `/settings` 는 아직 없으므로 사라진 링크로 가던 테스트는 주소로 바로 연다.
+- `web/test/browser/shell.spec.ts`: 사이드바 줄의 차례와 없는 줄(「에이전트」, 「사용량」, 「고급」), 「예약 작업」 → `/tasks` 와 「기억」 → `/memory`, 탭 막대가 없음, 대화가 많을 때 「기억」 줄도 보이는지, 알림 단추의 읽지 않은 수와 맨 아래 줄에 알림 단추가 없음, 휴대폰 위 막대의 알림 단추가 그대로인지, 앱 이름 옆 알림 단추가 서랍 닫기 단추와 겹치지 않는지, 대화를 많이 만든 뒤와 낮은 높이(640×320)에서 계정 메뉴 단추가 스크롤 없이 보이는지. 넓은 화면과 `mobile` 프로젝트(서랍) 모두.
+- `web/test/browser/account-menu.spec.ts`(신규): 메뉴 맨 위 이름, 그 아래 「설정」 → 「관리자 화면」 → 「화면 밝기」 → 「로그아웃」 차례(`MEMBER` 역할은 「관리자 화면」 없음), 지금 밝기의 라디오가 체크됨, 키보드로 열고 화살표로 「어둡게」 를 골라 `Enter`, 「관리자 화면」 이 `/admin` 으로 가는지, 밝기 어둡게(360px 에서는 탭) → 새로 고침 뒤 `html.dark` 유지, 키보드(`Enter` 로 열고 `Esc` 로 닫기), 360px 사례는 `test.use({ hasTouch: true })` 와 `tap()`. 역할 읽기 실패는 서버의 첫 읽기(`readMe`)를 브라우저 테스트에서 실패시킬 수단이 없어 테스트로 만들지 않는다. 상태 판정 `shellRoleState` 를 바꾸지 않고, 실패 상태의 배치는 verify 가 코드를 읽어 확인한다.
+- `web/test/browser/sign-out.spec.ts`(신규): 로그아웃 전에 `/new` → `/chat/{id}` 로 두 번 옮긴 뒤 로그아웃 → `/signin`, `page.goBack()` 이 앞 화면이 아니라 로그인 화면, `/chat/{id}` 를 열어도 로그인 화면, `setSession` 으로 같은 사용자를 다시 넣으면 로그아웃 전에 만든 대화가 목록에 있음, `persisted: true` 인 `PageTransitionEvent('pageshow')` 를 보내면 문서를 다시 읽음, `/signout` 을 `page.route` 로 500 이나 `abort()` 로 만들면 안내와 화면 유지. 자기 context 의 세션만 지운다.
 - `web/test/node/auth-signin.test.ts`: 기존 방식대로 provider 를 가짜로 바꿔 끼워 Google 설정에 `prompt: "select_account"` 가 있는지 본다.
-- 기존 테스트의 옛 자리 고치기: `admin-area.spec.ts`, `nav.spec.ts`, `people.spec.ts`(`admin-entry` 는 메뉴를 연 뒤 찾는다), `design-tokens.spec.ts`, `loading.spec.ts`, `motion.spec.ts`, `dev-docs.spec.ts`, `tasks.spec.ts`, `now.spec.ts`, `theme.spec.ts` 에서 「주요 화면」 의 사라진 링크와 밝기 단추를 찾는 곳. 사라진 링크로 가던 테스트는 주소로 바로 열거나 이름 메뉴 → 「설정」 을 거친다(phase-02 뒤).
+- 기존 테스트의 옛 자리 고치기: `admin-area.spec.ts`, `nav.spec.ts`, `people.spec.ts`(`admin-entry` 는 메뉴를 연 뒤 찾는다), `design-tokens.spec.ts`, `loading.spec.ts`, `motion.spec.ts`, `dev-docs.spec.ts`, `tasks.spec.ts`, `now.spec.ts`(「지금 볼 것」 이 대화 검색 아래로 바뀐 위치 단언), `theme.spec.ts`, `workspace-files.spec.ts`(「고급」 의 「파일 공간」), `shell.spec.ts` 의 `/usage` 에서 출발하던 사례에서 「주요 화면」 의 사라진 링크와 밝기 단추를 찾는 곳.
 
 ### 8. 문서
 
@@ -82,7 +83,7 @@
 ```bash
 cd web && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:node
 cd web && node --test test/node/auth-signin.test.ts
-cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/shell.spec.ts test/browser/account-menu.spec.ts test/browser/sign-out.spec.ts test/browser/theme.spec.ts test/browser/nav.spec.ts test/browser/admin-area.spec.ts test/browser/people.spec.ts test/browser/design-tokens.spec.ts test/browser/loading.spec.ts test/browser/motion.spec.ts test/browser/dev-docs.spec.ts test/browser/tasks.spec.ts test/browser/now.spec.ts
+cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/shell.spec.ts test/browser/account-menu.spec.ts test/browser/sign-out.spec.ts test/browser/theme.spec.ts test/browser/nav.spec.ts test/browser/admin-area.spec.ts test/browser/people.spec.ts test/browser/design-tokens.spec.ts test/browser/loading.spec.ts test/browser/motion.spec.ts test/browser/dev-docs.spec.ts test/browser/tasks.spec.ts test/browser/now.spec.ts test/browser/workspace-files.spec.ts
 ```
 
 ## 변경 파일
@@ -90,6 +91,10 @@ cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/shell.
 | 파일 | 변경 |
 |---|---|
 | `web/src/components/shell/main-nav.tsx` | 수정 |
+| `web/src/components/shell/now-link.tsx` | 수정 (여백과 주석) |
+| `web/src/lib/sign-out-client.ts` | 신규 (화면에서 `fetch` 를 직접 부르지 않는다) |
+| `web/test/browser/helpers.ts` | 수정 (`openAccountMenu`) |
+| `web/test/browser/workspace-files.spec.ts` | 수정 |
 | `web/src/components/shell/sidebar.tsx` | 수정 |
 | `web/src/components/shell/account-menu.tsx` | 신규 |
 | `web/src/app/signout/route.ts` | 신규 |

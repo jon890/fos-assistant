@@ -54,7 +54,8 @@
 ### 7. 테스트
 
 - `web/test/node/settings-area.test.ts`(신규): 경로 판정과 골라진 줄. `/settings`, `/agents/x`, `/executions/1`, `/privacy`(세션 있음과 없음), `/tasks`, `/admin/usage`.
-- `web/test/browser/settings.spec.ts`(신규): 넓은 화면 `/settings` 의 묶음 넷과 에이전트 제목, 360px `/settings` 의 목록만, 줄을 눌러 화면 열기와 뒤로 가기, `/connections` 를 바로 열면 그 줄이 골라짐, `/executions/{id}` 의 「사용량」, 로그인한 `/privacy` 가 설정 틀, 묶음 목록에 「예약 작업」 과 「기억」 없음, 대화 하나를 본 뒤 설정 → 「대화로」 가 그 대화, `/tasks` 와 `/memory` 에 사이드바.
+- `web/test/browser/settings.spec.ts`(신규): 넓은 화면 `/settings` 의 묶음 넷과 일곱 줄의 차례, 「에이전트」 줄의 골라진 표시(`data-selected` 속성)와 에이전트 제목, 로그인한 `/privacy` 에 「로그인 화면으로」 와 「로그인 전에」 가 없음, 보던 대화가 없을 때 「대화로」 가 `/`, `/now` 에 사이드바, 360px `/settings` 의 목록만, 줄을 눌러 화면 열기와 뒤로 가기, `/connections` 를 바로 열면 그 줄이 골라짐, `/executions/{id}` 의 「사용량」, 로그인한 `/privacy` 가 설정 틀, 묶음 목록에 「예약 작업」 과 「기억」 없음, 대화 하나를 본 뒤 설정 → 「대화로」 가 그 대화, `/tasks` 와 `/memory` 에 사이드바.
+- 묶음 목록 `nav` 는 `main` 밖에 둔다. 설정 목록의 링크에도 `NavPending` 을 붙인다.
 - phase-01 에서 주소로 바로 열게 바꾼 테스트 가운데 사이드바를 기대하던 설정 화면 테스트(`loading.spec.ts`, `motion.spec.ts`, `dev-docs.spec.ts`, `workspace-files.spec.ts`, `user-browser.spec.ts`)를 설정 틀 기준으로 고친다.
 
 ### 8. 문서
@@ -66,7 +67,7 @@
 ```bash
 cd web && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:node
 cd web && node --test test/node/settings-area.test.ts
-cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/settings.spec.ts test/browser/loading.spec.ts test/browser/motion.spec.ts test/browser/dev-docs.spec.ts test/browser/workspace-files.spec.ts test/browser/user-browser.spec.ts test/browser/admin-area.spec.ts
+cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/settings.spec.ts test/browser/loading.spec.ts test/browser/motion.spec.ts test/browser/dev-docs.spec.ts test/browser/workspace-files.spec.ts test/browser/user-browser.spec.ts test/browser/admin-area.spec.ts test/browser/privacy-page.spec.ts test/browser/shell.spec.ts test/browser/now.spec.ts
 ```
 
 ## 변경 파일
@@ -83,6 +84,8 @@ cd web && HEAVY_SLOTS=2 orch slot heavy -- pnpm test:browser test/browser/settin
 | `web/src/app/privacy/page.tsx` | 수정 |
 | `web/test/node/settings-area.test.ts` | 신규 |
 | `web/test/browser/settings.spec.ts` | 신규 |
+| `web/test/browser/shell.spec.ts` | 수정 |
+| `web/test/browser/now.spec.ts` | 수정 |
 | `web/test/browser/loading.spec.ts` | 수정 |
 | `web/test/browser/motion.spec.ts` | 수정 |
 | `web/test/browser/dev-docs.spec.ts` | 수정 |
