@@ -14,7 +14,7 @@
 | REQ6 | `test/model-eval/concepts/` 에 문항, 판정, 실행 명령을 둔다. Control Plane 클라이언트는 `test/model-eval/control-plane.ts` 를 함께 쓴다. 판정은 순수 함수이고 단위 테스트가 CI 의 저장소 테스트로 돈다 |
 | REQ7 | PR2. 아래 「PR2 예약 작업 도구」. `mcp` 의 `task_create` 가 port `TaskRequests` 로 부르고 `task` 의 `TaskAgentRequests` 가 `TaskService.create` 와 같은 검사로 만든다 |
 | REQ8 | PR2. `task_list`, `task_update`, `task_set_state` 가 같은 port 로 부른다. 대상은 `task` 인자 하나(번호나 이름)로 찾고, 여럿이면 후보만 돌려준다 |
-| REQ9 | PR2. `task_delete` 는 지우지 않고 `connector_action` 에 Control Plane 승인 줄을 만든다(`ControlPlaneApprovals`). 승인하면 port `ControlPlaneActionRunner` 를 `task` 가 구현해 지운다 |
+| REQ9 | PR2. `task_delete` 는 지우지 않고 `connector_action` 에 Control Plane 승인 줄을 만든다(`ControlPlaneApprovals`, `connector.action`). 승인하면 port `ControlPlaneActionRunner` 를 `task` 가 구현해 지운다 |
 | REQ10 | PR2. 먼저 살펴보기에서 받는 조건은 `McpController` 가 정한다. 맡긴 실행의 대화와 에이전트는 origin 실행에서 정한다 |
 | REQ11 | PR3. `follow_up_propose` 의 상태 판정에 「사용자가 시켰음」 과 실행 출처(사람 turn, 예약 작업, 살펴보기, 맡김)를 넣고 끝내기 도구를 더한다. 기억 지우기는 PR2 의 승인 카드 흐름을 쓴다. 판정 자리는 PR3 을 시작할 때 절을 더한다 |
 | REQ12 | REQ11 행의 PR3 자리와 같다 |
@@ -36,7 +36,7 @@
 | `test/repo` | 개념 목록의 화면 주소와 도구 이름이 실제 화면 경로와 도구 목록에 있는지 보는 저장소 테스트(DECISION18) |
 | `mcp`(PR2) | 예약 작업 도구의 인자 검사와 결과 글. port `TaskRequests` 로 부른다 |
 | `task`(PR2) | `TaskRequests` 와 `ControlPlaneActionRunner` 의 구현. 대상 찾기, 기본값, 하루 발화 수 검사, 지우기 실행 |
-| `connector.approval`(PR2) | Control Plane 승인 줄(`ControlPlaneApprovals`)의 저장, 카드 표시 값, 승인과 결과 알림 줄. 지금 승인 줄과 같은 표와 화면을 쓴다 |
+| `connector.action`(PR2) | Control Plane 승인 줄(`ControlPlaneActions`, `ControlPlaneApprovals`)의 저장, 카드 표시 값, 승인과 결과 알림 줄. 지금 승인 줄과 같은 표와 화면을 쓴다. `connector.approval` 의 공개 승인 API 가 이 줄을 먼저 가른다 |
 
 지시문은 실행 입력의 앞 단락(`ArtifactService.agentPreamble`)이 아니라 `instructions` 에 둔다.
 앞 단락은 대화 turn 만 지나고 맡긴 실행은 지나지 않는다. `instructions` 는 모든 실행이 지난다. 목록은 고정 지침(답변 형식, 도구 호출) 바로 뒤, 범위마다 다른 절과 사람마다 다른 기억 글 앞에 둔다. 그래야 실행마다 같은 앞부분이 길어져 모델 제공사의 프롬프트 캐시에 함께 든다.
@@ -86,6 +86,8 @@
 
 문항은 개념마다 둘 이상이고 개인 사정이 없는 일반 문장이다.
 
+PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 작업(`/tasks/<id>`)의 지시문에 항목마다 `|` 로 나눈 낱말 가운데 하나가 있어야 한다(스펙 DECISION28). `score` 는 판정 뒤 `send` 를 시작한 뒤 만든 예약 작업을 `--keep` 과 상관없이 지운다. 남기면 운영에서 발화해 비용이 든다. 그래서 평가 계정은 평가만 쓴다.
+
 운영에 따라 답이 달라지는 기대값은 문항에 적지 않고 실행할 때 받는다. 문항은 `{otherAgentName}`, `{otherAgentCode}`, `{connectorTitle}`, `{connectorId}` 같은 자리를 쓰고, `send` 와 `score` 가 환경 변수(`FOS_EVAL_OTHER_AGENT_CODE`, `FOS_EVAL_OTHER_AGENT_NAME`, `FOS_EVAL_CONNECTOR_ID`, `FOS_EVAL_CONNECTOR_TITLE`)로 채운다. 값이 비면 그 문항은 돌리지 않고 보고서에 「건너뜀」 으로 적는다.
 
 평가를 돌리는 계정과 에이전트의 전제는 이렇다. 평가 에이전트(`FOS_EVAL_AGENT_CODE`)는 그 계정이 주인인 비공개 에이전트다. 다른 에이전트는 그 계정이 쓸 수 있는 에이전트다. 플러그인은 카탈로그에 있고 그 계정이 아직 연결하지 않은 것이다. 연결 문항의 링크는 `/connections/{connectorId}` 로 시작하는지만 본다.
@@ -131,7 +133,7 @@
 | 칸 | 값 |
 | --- | --- |
 | `connector_id` | `fos-assistant`(Control Plane MCP 서버 이름). 카탈로그에 없어 플러그인 도구로 판정되지 않는다 |
-| `tool_name`, `hermes_tool` | `task_delete`, `fos_task_delete`. 줄이 Control Plane 승인 줄인지는 세 칸이 모두 맞는지로 본다(`ControlPlaneApprovals.owns`). Hermes 는 이 등록 이름을 쓰지 않는다 |
+| `tool_name`, `hermes_tool` | `task_delete`, `fos_task_delete`. 줄이 Control Plane 승인 줄인지는 세 칸이 모두 맞는지로 본다(`ControlPlaneActions.owns`). Hermes 는 이 등록 이름을 쓰지 않는다 |
 | 위험도, 승인 방식 | `WRITE`, `ALWAYS`. 상시 허락과 대화 허락이 없다(DECISION21) |
 | 인자 | `{"task_id","task","next_run"}`. 카드는 인자 이름표(`작업 번호`, `작업`, `다음 실행`)로 그린다. 화면은 바꾸지 않는다 |
 | `conversation_id` | origin 실행의 대화. 맡긴 실행은 루트의 대화를 그대로 가진다(DECISION27) |
