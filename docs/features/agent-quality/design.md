@@ -46,8 +46,8 @@
 | 무엇 | 정한 것 |
 | --- | --- |
 | 표시 | `app_user.evaluation` BOOLEAN NOT NULL DEFAULT FALSE. 사용자당 참/거짓 하나라 본체 컬럼에 둔다(data-schema 「테이블을 추가하는 기준」). 그룹마다 많아야 하나다 |
-| 만들기 | 관리자가 품질 화면에서 「평가 사용자 준비」 를 한 번 누른다(`POST /api/v1/admin/quality/evaluation-user`). 예약 주소(`evaluation@quality.invalid` 꼴, `.invalid` 는 메일이 가지 않는 예약 도메인)로 차례대로 만든다. (1) `PersonRegistrar.register` 가 허용 목록 행과 Hermes profile, key, MCP 토큰을 만든다. (2) `UserProvisioningService.resolve` 가 `app_user`(역할 `MEMBER`)를 만들고 첫 로그인 리스너(`FirstAgentCreator`)가 첫 에이전트를 만든다. (3) 같은 트랜잭션에서 전용 `UPDATE` 로 `evaluation` 을 켠다(data-schema 「테이블을 추가하는 기준」 의 전용 `UPDATE` 규칙). (4) `AgentLifecycleService.create` 로 위임 대상 에이전트를 만든다. (5) toolset 을 맞춘다. 이미 있으면 빠진 것만 채운다. 실행 공간과 첨부 정책에 평가 profile 을 등록하는 일은 운영 저장소가 먼저 한다(아래 「운영 저장소에 넘길 요청」). 등록 전에 준비하면 그림·사진 도구가 켜지지 않으므로, 준비 API 는 그 도구가 켜졌는지까지 보고 빠졌으면 「정책 등록 필요」 로 돌려준다 |
-| 에이전트 | 기본 에이전트 하나와 위임 대상 에이전트 하나. 기본 에이전트는 기본 도구 목록(`web`, `terminal`, `file`, `code_execution`)에 `image_gen` 과 `vision` 을 더해 켠다. Hermes 내장 위임(`delegation`, `delegate_task`)은 켜지 않는다. 켜면 모델이 자식 실행 줄이 남지 않는 내부 하위 작업을 써 위임 확인이 흔들린다. 위임 확인은 늘 켜진 Control Plane MCP 의 `agent_delegate` 로 위임 대상 에이전트의 code 를 지정해 맡긴다. 그 code 를 문항에 넣어 다른 사용자의 공개 에이전트로 가지 않게 한다. 평가 사용자의 에이전트는 기본 도구 대기 알림(`DEFAULT_TOOLS_PENDING`)에서 뺀다 |
+| 만들기 | 관리자가 품질 화면에서 「평가 사용자 준비」 를 한 번 누른다(`POST /api/v1/admin/quality/evaluation-user`). 예약 주소(`evaluation@quality.invalid` 꼴, `.invalid` 는 메일이 가지 않는 예약 도메인)로 차례대로 만든다. (1) `PersonRegistrar.register` 가 허용 목록 행과 Hermes profile, key, MCP 토큰을 만든다. (2) `UserProvisioningService.resolve` 가 `app_user`(역할 `MEMBER`)를 만들고 첫 로그인 리스너(`FirstAgentCreator`)가 첫 에이전트를 만든다. (3) 같은 트랜잭션에서 전용 `UPDATE` 로 `evaluation` 을 켠다(data-schema 「테이블을 추가하는 기준」 의 전용 `UPDATE` 규칙). (4) `AgentLifecycleService.create` 로 위임 대상 에이전트를 만든다. (5) 그림·사진 도구를 실행 공간 안에서만 켠다. 이미 있으면 빠진 것만 채운다. 실행 공간과 첨부 정책에 평가 profile 을 등록하는 일은 운영 저장소가 먼저 한다(아래 「운영 저장소에 넘길 요청」). 등록 전에 준비하면 그림·사진 도구가 켜지지 않으므로, 준비 API 는 그 도구가 켜졌는지까지 보고 빠졌으면 「정책 등록 필요」 로 돌려준다 |
+| 에이전트 | 기본 에이전트 하나와 위임 대상 에이전트 하나. 기본 에이전트의 기본 도구는 첫 에이전트를 만들 때처럼 실행 공간 여부를 보고 켜지고, `image_gen` 과 `vision` 은 `AgentDefaultToolsets.enablePending` 으로 실행 공간 안에서만 켠다. 셸·파일 도구를 실행 공간 밖으로 켜는 쓰기(`AgentToolService.writeAsAdmin`)는 쓰지 않는다. Hermes 내장 위임(`delegation`, `delegate_task`)은 켜지 않는다. 켜면 모델이 자식 실행 줄이 남지 않는 내부 하위 작업을 써 위임 확인이 흔들린다. 위임 확인은 늘 켜진 Control Plane MCP 의 `agent_delegate` 로 위임 대상 에이전트의 code 를 지정해 맡긴다. 그 code 를 문항에 넣어 다른 사용자의 공개 에이전트로 가지 않게 한다. 평가 사용자의 에이전트는 기본 도구 대기 알림(`DEFAULT_TOOLS_PENDING`)에서 뺀다 |
 | 미리 넣는 기억 | 기억 읽기 확인용 개인 기억 한 줄. 그날 바뀌지 않는 지어낸 사실(예: 「평가 사용자가 좋아하는 색은 청록이다」)을 준비할 때 한 번 넣는다 |
 | 로그인 | 하지 않는다. Google 동의 화면에 주소를 더하지 않는다. 실행기가 `app_user` 행으로 `CurrentUser` 를 만든다 |
 | 숨기기 | 아래 「숨기는 곳」 표 |
@@ -160,6 +160,22 @@ sequenceDiagram
 평가 전용 사용자가 없으면 칸 대신 「평가 사용자 준비」 단추와 한 줄 안내를 보인다.
 확인 목록은 시각, 계기, 결과, 걸린 시간을 한 줄로, 펼치면 기능별 결과와 까닭을 보인다. 실패 기능은 `executionIds` 마다 관리자 품질 화면 안의 실행 트리 보기로 잇는다. 그 보기는 위 `admin.quality` 의 트리 조회를 쓴다. 30일이 지나 비워진 줄은 링크를 그리지 않는다.
 관리자 메뉴 자리는 관리자 영역 재편 스펙을 따른다. 그 스펙이 아직 머지되지 않았으면 지금 관리자 메뉴 끝에 「품질」 로 더하고 재편 PR 이 옮긴다.
+
+### 실행기 구현 메모
+
+계획 검토(2026-11-20)에서 나온 실행기 쪽 제약이다. 실행기 PR 의 계획이 이 절을 따른다.
+
+- **시작 잠금은 평가 사용자 행으로 한다.** `AppUserRepository.findByIdForUpdate(평가 사용자 번호)` 로 잠근 뒤 `RUNNING` 인 `DEPLOY_CHECK` 를 찾는다. `group_setting` 은 키마다 줄이라 잠글 줄이 없을 수 있다.
+- **기능 결과는 기능이 끝날 때마다 `result_json` 에 더해 저장한다.** 도중에 재기동돼도 실패 기능의 대화 번호가 남아 30일 정리가 지울 수 있다. 재기동 때 끝내지 못한 기능은 `FAILED`, 까닭 `INTERRUPTED` 로 적고 줄을 `FAILED` 로 끝낸다.
+- **조회 값은 `quality/application/dto` 의 record 로 돌려준다.** `admin` 은 기능의 `domain` 을 쓰지 못한다(`ADMIN_USES_ONLY_FEATURE_APPLICATION`).
+- **보관함 판정과 정리에 쓸 조회를 `chat.artifact` 에 더한다.** 지금 `ArtifactVaultService.list` 의 항목에는 대화 번호와 `vault_origin` 이 없다. 그 대화로 `vault_origin` 이 있는 보관 행 번호를 돌려주는 조회를 둔다.
+- **예약 작업 발화 기능은 결과와 상관없이 끝날 때 작업을 보관 처리한다.** 시간 초과로 끝나도 발화하지 않은 `ONCE` 작업이 뒤 기능 도중에 발화하지 않게 한다. 작업 입력은 알림 `NotifyPolicy.NEVER`, 시간대 `Asia/Seoul`.
+- **위임 기능은 `send` 가 돌아온 뒤 트리에 위임 자식이 없으면 바로 `NO_CHILD` 로 끝낸다.** 10분을 기다리지 않는다.
+- **설정은 `application.yml` 에 `${ASSISTANT_QUALITY_FEATURE_TIMEOUT:10m}` 꼴 자리를 둔다.** e2e 가 환경 변수로 줄인다.
+- **통합 테스트가 실행기를 끝까지 돌리지 않게 `start` 를 「줄 만들기」 와 「띄우기」 로 나눈다.** 끝내기와 알림은 따로 부를 수 있는 메서드로 두고 직접 테스트한다. 마감 값은 `LiveProperties` 로 읽어 테스트에서 줄일 수 있게 한다.
+- **e2e 시나리오는 `test/e2e/run.ts` 의 맨 끝에 등록한다.** 사용자를 하나 더 만들어 앞 시나리오의 사람 수 세기를 깨지 않게 한다.
+- **화면 PR 전까지 알림의 이동 대상 `/admin/quality` 는 없는 화면이다.** 실행기 PR 과 화면 PR 을 같은 배포에 묶거나, 화면 PR 이 먼저 머지되게 한다.
+- 까닭 코드에는 기능 규칙의 코드와 함께 `BUSY`, `INTERRUPTED`, `RUN_FAILED`, `TIMED_OUT` 을 둔다.
 
 ## 실패와 일관성
 

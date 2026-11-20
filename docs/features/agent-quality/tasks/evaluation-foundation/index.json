@@ -1,0 +1,41 @@
+{
+  "name": "evaluation-foundation",
+  "description": "배포 뒤 확인의 기반: quality_run 과 app_user.evaluation, 평가 전용 사용자 준비와 숨기기, 기능별 규칙 판정, 평가 사용자 관리자 API",
+  "pr_scope": "배포 뒤 확인이 기대는 저장 표와 평가 전용 사용자, 기능별 규칙 판정을 Control Plane 에 만든다.",
+  "deferred": [
+    {
+      "what": "실행기와 확인 시작·조회 API, 실패 알림, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3). 설계의 「실행기 구현 메모」 를 따른다",
+      "why": "운영 코드 상한(scripts/pr/pr-size.mjs, 1500줄)을 넘지 않게 스펙의 「한 단계가 상한을 넘으면 그 단계 안에서 나눈다」 를 따라 나눈다. 계획 검토에서 실행기만 800~900줄로 추정했다",
+      "after": "이 계획의 PR 이 머지된 뒤"
+    },
+    {
+      "what": "품질 화면 /admin/quality 첫 칸(확인 목록, 다시 확인, 평가 사용자 준비 단추, 평가 사용자 실행 트리 보기)과 그 API, 관리자 사용량의 「평가」 한 줄(REQ4, REQ2 의 사용량 부분)",
+      "why": "같은 크기 상한. 실행기 PR 과 같은 배포에 묶는다(알림 이동 대상)",
+      "after": "실행기 PR 이 머지된 뒤"
+    },
+    {
+      "what": "PR2 정기 평가와 모델 채점(REQ5~REQ10)",
+      "why": "스펙 DECISION1 의 PR 순서",
+      "after": "PR1 의 화면 PR 이 머지된 뒤"
+    },
+    {
+      "what": "PR3 좋다·나쁘다 단추와 문항 후보(REQ11~REQ14)",
+      "why": "스펙 DECISION1 의 PR 순서",
+      "after": "PR2 가 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/agent-quality/spec.md",
+  "design": "docs/features/agent-quality/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ1", "REQ2"],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ1", "REQ2"]},
+    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ2"]},
+    {"number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ1"]},
+    {"number": 4, "file": "phase-04.md", "execution_profile": "standard", "requirements": ["REQ2"]}
+  ]
+}
