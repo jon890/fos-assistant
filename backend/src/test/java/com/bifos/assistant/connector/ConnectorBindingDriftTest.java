@@ -24,6 +24,7 @@ import com.bifos.assistant.connector.connection.config.ConnectorBindingPropertie
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.SkippedSkill;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
@@ -242,6 +243,56 @@ class ConnectorBindingDriftTest {
         assertThat(notificationsOf(revokedAdmin.id())).as("차단된 관리자").isEmpty();
         assertThat(notificationsOf(owner.id())).as("MEMBER 역할 사용자").isEmpty();
         assertThat(output.getAll()).contains("connector " + DEMO + " drifted: NOT_INSTALLED");
+    }
+
+
+    @Test
+    @DisplayName("다시 보낸 설치의 빠진 스킬로 바인딩의 기록을 덮어쓰고 빈 목록이면 비운다")
+    void reinstallOverwritesSkippedSkills() {
+        jdbc.update("UPDATE agent_connector_binding SET skipped_skills = ? WHERE id = ?",
+            "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]", demo.id());
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false, false, false, false, List.of(
+                new HermesConnectorClient.SkippedSkill("demo-runner", List.of("sandbox_unregistered")))));
+
+        applier.resyncDrifted();
+
+        assertThat(reload(demo).skippedSkills())
+            .containsExactly(new SkippedSkill(
+                "demo-runner", List.of("sandbox_unregistered")));
+
+        // 관리자가 반영 완료를 마친 것처럼 READY 로 되돌려 다음 어긋남을 다시 맞추게 한다.
+        jdbc.update("UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
+            + " restart_required_since = NULL, apply_due_at = NULL WHERE id = ?", demo.id());
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false));
+
+        applier.resyncDrifted();
+
+        // 설치 상태는 여전히 어긋남으로 읽혀 반영 확인은 실패한다. 설치 응답은 받았으므로 기록은 그 응답으로 바뀐다.
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(reload(demo).skippedSkills()).as("조건을 채운 다시 설치").isEmpty();
+        assertThat(reload(demo).skippedSkillsJson()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("다시 보낸 설치가 실패하면 빠진 스킬의 옛 기록을 둔다")
+    void failedReinstallKeepsSkippedSkills() {
+        String recorded = "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]";
+        jdbc.update("UPDATE agent_connector_binding SET skipped_skills = ? WHERE id = ?", recorded, demo.id());
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenThrow(new IllegalStateException("down"));
+
+        applier.resyncDrifted();
+
+        verify(connector, times(1))
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+        assertThat(reload(demo).skippedSkills())
+            .extracting(SkippedSkill::name)
+            .containsExactly("demo-runner");
     }
 
 

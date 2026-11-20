@@ -9,6 +9,7 @@ import java.util.Set;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorInstallResult;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.SkippedSkill;
 import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.application.port.ConnectorProfileRejected;
 import com.bifos.assistant.hermes.application.port.ConnectorSandboxUnavailable;
@@ -94,7 +95,7 @@ public class ConnectorBindingInstalls {
 
 
     /**
-     * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다.
+     * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다. 빠진 에이전트용 스킬은 이 응답의 목록으로 덮어쓴다.
      *
      * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면
      * 반영 예정 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
@@ -102,6 +103,10 @@ public class ConnectorBindingInstalls {
      * @return 재시작이나 반영 예정을 기다려야 해 지금 반영을 확인할 수 없는가
      */
     private boolean record(ConnectorBinding binding, InstallResult installed, Instant now) {
+        // 빠진 에이전트용 스킬은 설치 응답마다 덮어쓴다. 껐다 켜기 단계와 상관없다.
+        binding.recordSkippedSkills(installed.skippedSkills().stream()
+            .map(skipped -> new SkippedSkill(skipped.name(), skipped.reasons()))
+            .toList());
         // 껐다 켜기의 단계는 보낸 요청이 아니라 답이 정한다(ADR-20261120 / connector-auto-apply). 끈 채 남았다는 답이 아니면 켜진 것이다.
         if (installed.cycleOff()) {
             binding.installed(installed.pluginUpdated(), now);
