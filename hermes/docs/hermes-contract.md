@@ -2459,6 +2459,13 @@ Control Plane 이 올린 스킬을 저장하고 게시하는 규칙은 [`docs/fe
 [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/skill_utils.py),
 [skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/skill_manager_tool.py) 다.
 
+#### 스킬 본문의 변수
+
+**Hermes 는 스킬 본문에서 `${HERMES_SKILL_DIR}` 와 `${HERMES_SESSION_ID}` 만 바꾸고, Claude Code 의 `${CLAUDE_PLUGIN_ROOT}` 같은 다른 `${이름}` 은 그대로 둔다.**
+2026-11-20 에 상류 main 의 `agent/skill_preprocessing.py` 의 `_SKILL_TEMPLATE_RE` 로 확인했고, 기준 버전 v0.23.2 에서 실측하지는 않았다.
+그대로 남은 `${이름}` 은 모델이 셸 명령에 옮겨 쓰면 셸이 실행 공간의 env 로 푼다. 그 env 는 셸 설정의 `docker_env` 로 들어간다(위 「실행 공간」 의 칸 표).
+플러그인의 에이전트용 스킬은 이 동작에 기대어, 셸 설정이 요구 env 를 넘길 때만 설치된다([ADR-20261120 / plugin-agent-skills](adr/ADR-20261120-plugin-agent-skills.md)). Hermes 를 올릴 때 치환 목록이 늘었는지 다시 본다.
+
 #### `skill_manage` 만 빼는 설정
 
 v0.21.5 소스로 확인했다. **`skill_view` 를 두고 `skill_manage` 만 도구 목록에서 빼는 공식 설정은 없다.**

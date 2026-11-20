@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  activityLabel, activityOutcome, activitySummaryLabel, applyChatEvent, emptyActivity, failActivity, fromTree,
+  activityLabel, activityOutcome, activityUses, applyChatEvent, emptyActivity, failActivity, fromTree,
 } from "../../src/components/chat/activity/activity-state.ts";
 import { formatSeconds } from "../../src/lib/format.ts";
 import type {
@@ -174,20 +174,27 @@ test("실행 트리의 PROVIDER_SWITCHED 사건은 줄을 만들지 않고 같�
   assert.deepEqual(fromTree(tree).map((item) => [item.kind, item.name]), [["tool", "검색"]]);
 });
 
-test("끝난 블록의 접힌 한 줄은 중지와 오류를 먼저 보고 그 밖에는 도구와 도우미의 수로 고른다", () => {
-  const both = { toolCount: 2, subagentCount: 1 };
-  assert.equal(activitySummaryLabel(both, "stopped"), "하다가 멈췄어요");
-  assert.equal(activitySummaryLabel(both, "failed"), "끝까지 하지 못했어요");
-  assert.equal(activitySummaryLabel(both, "done"), "찾아보고 도우미와 함께 정리했어요");
-  assert.equal(activitySummaryLabel({ toolCount: 0, subagentCount: 1 }, "done"), "도우미와 함께 정리했어요");
-  assert.equal(activitySummaryLabel({ toolCount: 1, subagentCount: 0 }, "done"), "필요한 것을 확인하고 답했어요");
-  assert.equal(activitySummaryLabel({ toolCount: 0, subagentCount: 0 }, "done"), "차례로 정리했어요");
+test("흘러온 항목은 도구와 도우미만 쓴 것으로 바뀌고 플러그인 이름을 함께 넘긴다", () => {
+  const gmail = { service: "Gmail", title: "메일 읽기" };
+  let state = applyChatEvent(emptyActivity(0), { type: "interim", text: "찾아볼게요" });
+  state = applyChatEvent(state, { type: "tool", toolName: "mcp__gmail__get_message", connector: gmail, phase: "started" });
+  state = applyChatEvent(state, { type: "subagent", phase: "started", goal: "자료를 찾는다" });
+
+  assert.deepEqual(activityUses(state.items), [
+    { kind: "TOOL", toolName: "mcp__gmail__get_message", connector: gmail },
+    { kind: "SUBAGENT" },
+  ]);
+  assert.equal(activityLabel(state.items[1]!), "Gmail · 메일 읽기");
 });
 
-test("접힌 한 줄에는 도구와 도우미의 수가 글자로 들어가지 않는다", () => {
-  for (const outcome of ["done", "stopped", "failed"] as const) {
-    assert.doesNotMatch(activitySummaryLabel({ toolCount: 7, subagentCount: 3 }, outcome), /[0-9]/);
-  }
+test("실행 트리의 플러그인 도구도 서비스 이름과 도구 제목으로 보인다", () => {
+  const started: ExecutionEventView = {
+    ...toolStarted(2, "mcp__gmail__get_message"),
+    connector: { service: "Gmail", title: "메일 읽기" },
+  };
+  const tree = { truncated: false, root: node(1, "SUCCEEDED", [started]) };
+
+  assert.deepEqual(fromTree(tree).map(activityLabel), ["Gmail · 메일 읽기"]);
 });
 
 test("흘러온 사건으로 끝난 블록은 중지가 있으면 멈춤, 끝나지 않은 줄이 있으면 실패, 그 밖에는 끝남이다", () => {
@@ -208,4 +215,10 @@ test("formatSeconds 는 1초가 안 되면 null 이고 그 밖에는 초와 분�
   assert.equal(formatSeconds(1_000), "1초");
   assert.equal(formatSeconds(2_100), "2초");
   assert.equal(formatSeconds(72_000), "1분 12초");
+});
+
+test("끝 사건의 빈 detail 은 시작 사건의 검색어를 지우지 않는다", () => {
+  let state = applyChatEvent(emptyActivity(0), { type: "tool", toolName: "web_search", detail: "서울 날씨", phase: "started" });
+  state = applyChatEvent(state, { type: "tool", toolName: "web_search", detail: "", phase: "completed" });
+  assert.equal(state.items[0]!.detail, "서울 날씨");
 });

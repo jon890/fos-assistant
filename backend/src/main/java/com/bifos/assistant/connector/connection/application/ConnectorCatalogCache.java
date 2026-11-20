@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
  * 도구 호출 판정이 쓰는 카탈로그를 잠시 메모리에 둔다(ADR-049).
  *
  * <p>판정은 도구 호출마다 오므로 그때마다 대시보드를 읽지 않는다. 연결 화면은 이 값을 쓰지 않고 요청마다 다시 읽는다.
- * 운영자가 목록을 바꾼 것이 그 화면에는 바로 보여야 하기 때문이다. 에이전트 목록의 플러그인 이름({@code ConnectorNameLookup})만
- * 이 값을 쓴다. 이름은 보관 시간만큼 늦어도 위험이 없다. 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는
+ * 운영자가 목록을 바꾼 것이 그 화면에는 바로 보여야 하기 때문이다. 에이전트 목록의 플러그인 이름({@code ConnectorNameLookup})과
+ * 작업 과정의 도구 이름({@code ConnectorToolNameLookup})만 이 값을 쓴다. 이름은 보관 시간만큼 늦어도 위험이 없다. 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는
  * 전제다.
  */
 @Component
@@ -56,7 +56,15 @@ public class ConnectorCatalogCache {
      * <p>읽기 실패는 잠시 기억한다. 그동안은 대시보드를 다시 부르지 않고 그 예외를 바로 던진다. 대시보드가 응답하지
      * 않을 때 판정마다 잠금을 쥔 채 응답 시간 한도까지 기다리면 뒤의 판정이 줄줄이 밀린다.
      */
-    public synchronized Optional<ConnectorManifest> find(String connectorId) {
+    public Optional<ConnectorManifest> find(String connectorId) {
+        return manifests().stream()
+            .filter(manifest -> manifest.id().equals(connectorId))
+            .findFirst();
+    }
+
+
+    /** 지금 받는 manifest 전부다. {@link #find} 와 같은 보관 시간과 실패 규칙을 따른다. */
+    public synchronized List<ConnectorManifest> manifests() {
         Instant now = Instant.now(clock);
         ConnectorPolicyProperties settings = properties.current();
         if (readAt == null || !now.isBefore(readAt.plus(settings.catalogTtl()))) {
@@ -75,8 +83,6 @@ public class ConnectorCatalogCache {
             failure = null;
             readAt = now;
         }
-        return manifests.stream()
-            .filter(manifest -> manifest.id().equals(connectorId))
-            .findFirst();
+        return manifests;
     }
 }

@@ -486,6 +486,7 @@ manifest 가 선언한 주인 env 는 plugin 이 서버 정의에 직접 넣는�
 
 - 붙이기는 한 묶음으로 쓰고 실패하면 이 요청이 쓴 파일만 되돌린다. 쓰기 전에 설정, 소유 기록, 이름 대응 파일, 뗀 서버 기록을 떠 두되 `.env` 와 스킬 파일은 떠 두지 않는다
 - 스킬은 plugin 의 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. 앞머리가 환경 값이나 자격 증명 파일을 요청하는 스킬이 있으면 그 플러그인을 카탈로그에 내지 않는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))
+- `assistant.json` 의 `agent_skills` 가 선언한 에이전트용 스킬도 같이 복사하되, 셸 env 를 요구하는 스킬은 그 에이전트의 셸 설정이 이름을 모두 넘길 때만 복사한다. 빠진 스킬은 응답의 `skipped_skills` 로 낸다. 요구와 결정은 [에이전트용 스킬 스펙](agent-skill/spec.md) 이 갖는다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않고 형식만 본다. 운영자가 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다. 기본 key 는 지우지 않는다
 - 떼기는 서버를 이름 대응에서 빼지 않고 뗀 서버 기록에 남긴다. 까닭은 [플러그인 도구 정책](connector-policy.md) 의 「이름 대응」 이 갖는다
 - 서버 정의나 이름 대응이 지금 manifest 와 어긋난 바인딩 항목은 그 항목만 `configured: false` 이고 `policy_hook` 을 거짓으로 만들지 않는다. 같은 profile 의 다른 플러그인은 붙이기, probe, 실행이 그대로 된다([ADR-20261009 / connector-install-drift](../adr/ADR-20261009-connector-install-drift.md))

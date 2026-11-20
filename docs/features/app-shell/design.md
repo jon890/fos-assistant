@@ -1,6 +1,6 @@
 # 화면 틀과 메뉴 배치 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1-REQ7)과 PR2(REQ8-REQ10)를 설계한다. PR3 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1-REQ7), PR2(REQ8-REQ10), PR3(REQ11-REQ15)을 설계한다. PR4 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
 
 ## 요구사항 연결
 
@@ -16,11 +16,11 @@
 | REQ8 | `Composer` 의 테두리 상자(`composer-shell`)를 세로 두 줄로 바꾼다. 위 줄은 글 칸, 아래 줄(`composer-actions`)은 왼쪽에 「＋」 와 `ModelTierPicker`, 오른쪽(`ml-auto`)에 중지와 보내기다. 상자 아래에 있던 모델 단계 줄을 없앤다. 「＋」 는 지금 사진 첨부 단추의 동작과 접근성 이름(「사진 첨부」)을 그대로 쓰고 아이콘만 `Plus` 다 |
 | REQ9 | `AgentPicker`(카드 묶음)를 지우고 새 부품 `AgentSwitcher` 가 이름표 단추와 목록을 그린다. 새 대화 화면에서 `StartAgentSwitcher` 가 같은 단추를 넓은 화면의 머리 줄과 휴대폰 위 막대 가운데(portal) 두 자리에 둔다. 대화가 만들어졌으면(`agentLocked`) 목록 대신 안내 popover 를 연다 |
 | REQ10 | 메시지가 있는 대화와 대화방은 지금 머리 줄을 `ConversationHeader` 로 옮겨 그대로 그린다. 단추가 아니므로 목록이 열리지 않는다. 위 막대 가운데는 화면이 자리를 차지하지 않으므로 지금처럼 `/` 로 가는 제목 링크다 |
-| REQ11 | PR3 이 설계한다. 방향은 작업 과정 블록이 도구 사건으로 지금 하는 일 한 줄을 고르는 것이다 |
-| REQ12 | REQ11 과 같은 PR 이 함께 설계한다 |
-| REQ13 | REQ11 과 같은 PR 이 함께 설계한다. 방향은 도구 이름을 종류로 묶는 표를 `web/src/lib/tool-label.ts` 옆에 두는 것이다 |
-| REQ14 | REQ11 과 같은 PR 이 함께 설계한다. 플러그인이 선언한 서비스 이름과 도구 제목을 화면이 읽는 길을 먼저 확인한다 |
-| REQ15 | REQ11 과 같은 PR 이 함께 설계한다 |
+| REQ11 | 작업 과정 블록(`ActivityBlock`)의 도는 줄이 가장 최근 항목의 종류 아이콘, 지금 문장, 읽어도 되는 대상(검색어, 사진 질문)을 보인다. 글자는 `activity-shimmer` 로 움직이고 움직임 줄이기에서는 멈춘다. 문장이 바뀔 때 낭독기가 읽도록 줄 밖에 `aria-live="polite"` 글을 둔다 |
+| REQ12 | 「깊이 조사」 단추가 main 에 없어 이 PR 은 만들지 않는다. 답변 품질 PR2 가 이 블록의 펼침 시작값과 알약을 더한다 |
+| REQ13 | 끝난 블록의 한 줄을 「쓴 것의 목록」 으로 고른다. 도는 중에는 흘러온 항목으로, 끝난 답은 메시지 조회의 `activity.uses` 로 만든다. 종류 이름은 `web/src/lib/tool-kind.ts` 가 정하고 같은 이름을 한 번만 세어 셋까지 잇는다 |
+| REQ14 | Control Plane 이 플러그인 도구의 등록 이름을 카탈로그 캐시로 서비스 이름과 도구 제목(`connector`)으로 바꿔 스트림 사건, 실행 트리, `activity.uses` 에 붙인다. 화면은 `connector` 가 있으면 그것을, 없으면 지금 문장 표와 종류 표를 쓴다 |
+| REQ15 | 펼친 목록(`ActivityTimeline`), 옆 패널, 실행 하나 화면(`ExecutionEventRow`)이 같은 `toolLabel` 에 `connector` 를 넘긴다. 끝난 줄은 종류 아이콘을, 도는 줄과 실패한 줄은 지금 상태 아이콘을 보인다 |
 | REQ16 | PR4 가 설계한다. 방향은 `/now` 화면에 탭을 두고 알림 목록 부품을 그 안으로 옮기는 것이다 |
 | REQ17 | REQ16 과 같은 PR 이 함께 설계한다 |
 | REQ18 | REQ16 과 같은 PR 이 함께 설계한다 |
@@ -29,7 +29,7 @@
 
 ## 책임과 경계
 
-모두 `web` 안의 화면 틀이다. Control Plane 과 Hermes 는 바뀌지 않는다.
+PR1 과 PR2 는 모두 `web` 안의 화면 틀이다. PR3 은 Control Plane 의 응답에 칸을 더한다. Hermes 는 바뀌지 않는다.
 
 | 부품 | 맡는 것 |
 | --- | --- |
@@ -47,6 +47,12 @@
 | `components/chat/start-screen.tsx`(PR2) | 인사와 실패·빈 안내, 이름표를 두 자리에 두는 `StartAgentSwitcher` |
 | `components/chat/conversation-header.tsx`(PR2, 새 파일) | 메시지가 있는 대화와 대화방의 머리 줄. `conversation-session-view.tsx` 에서 옮긴다 |
 | `components/shell/title-slot.ts`, `mobile-top-bar.tsx`(PR2, 새 파일) | 휴대폰 위 막대와 그 가운데 자리. `app-shell.tsx` 에서 위 막대를 옮긴다 |
+| `lib/tool-label.ts`(PR3) | 도는 줄과 끝난 줄의 문장. 플러그인 도구는 「서비스 이름 · 도구 제목」 |
+| `lib/tool-kind.ts`(PR3, 새 파일) | 도구를 종류로 묶는 표와 접힌 줄을 잇는 함수. 다른 모듈을 부르지 않아 노드 테스트가 직접 부른다 |
+| `components/chat/activity/activity-icon.tsx`(PR3, 새 파일) | 종류마다의 아이콘 |
+| `usage/execution/application/port/ConnectorToolNames`(PR3, backend) | 등록 이름을 서비스 이름과 도구 제목으로 바꾸는 port. `connector` 가 위 패키지라 `usage` 에 두고 `connector` 가 구현한다 |
+| `connector/connection/application/ConnectorToolNameLookup`(PR3, backend) | 그 구현. 카탈로그 캐시(`ConnectorCatalogCache`)의 manifest 마다 등록 이름을 계산해 찾는다 |
+| `chat/turn/application/ChatConversationQueries`(PR3, backend) | `activity.uses` 를 만든다 |
 
 `ThemeToggle` 은 사이드바만 쓰므로 지우고, 세 값과 이름을 `AccountMenu` 가 갖는다. 표시 이름은 스펙대로 「밝게」, 「어둡게」, 「기기 설정」 이다.
 
@@ -139,13 +145,47 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 틀이 화면의 단추를 값으로 받아 그리면 단추의 상태와 콜백이 화면 밖으로 나가 화면이 다시 그려질 때마다 틀에 새 값을 넣어야 한다. portal 은 단추를 화면의 React 트리 안에 둔 채 그리는 자리만 옮긴다.
 머리 줄의 단추는 `md:flex`, 위 막대는 `md:hidden` 이라 폭은 CSS 로만 나눈다(DECISION2 와 같은 까닭). 두 단추가 DOM 에 함께 있고 보이는 것은 하나다.
 
+### 작업 과정의 이름
+
+**플러그인 도구의 이름은 Control Plane 이 붙여 보낸다.** 등록 이름(`mcp__<서버>__<도구>`)은 줄이고 글자를 바꿔 원래 이름을 되찾을 수 없다(`hermes/docs/hermes-contract.md` 의 「MCP 도구의 등록 이름」).
+그래서 `ConnectorToolNameLookup` 이 카탈로그의 manifest 마다 `HermesToolName.of(mcpServer, 도구)` 를 계산해 같은 값을 찾는다.
+선언한 도구에 없는 등록 이름도 서버 이름까지의 앞부분이 그 manifest 의 것이면 서비스 이름만 붙인다. 제목을 선언하지 않은 도구와 표준 플러그인(`schema: 3`)이 여기 든다.
+바인딩을 보지 않으므로 그룹에 공개한 다른 사람의 에이전트와 끝난 지 오래된 답도 같은 이름을 받는다(spec DECISION24). 카탈로그를 읽지 못하면 이름을 붙이지 않고 화면은 「연결된 서비스」 로 보인다.
+카탈로그는 이미 도구 판정과 에이전트 목록이 쓰는 캐시라 대시보드를 더 부르지 않는다.
+
+| 응답 | 더하는 칸 |
+| --- | --- |
+| 대화 스트림의 `tool` 사건 | `connector: { service, title }`. 플러그인 도구가 아니면 null |
+| 실행 트리의 도구 사건(`ExecutionEventView`) | 같은 `connector` |
+| 메시지 조회의 `activity` | `uses`: 그 답이 쓴 도구와 도우미를 처음 쓴 차례로, 같은 것은 한 번만. 줄마다 `kind`(`TOOL`, `SUBAGENT`), `toolName`, `connector` |
+
+`uses` 의 차례는 트리 안 사건의 `occurredAt`, 실행 번호, `sequence` 순이다. 자식 실행은 첫 사건의 때에 도우미 한 줄이다.
+`toolCount` 와 `subagentCount` 는 그대로 두어 블록을 그릴지 정하는 데만 쓴다. 지금 저장된 사건으로 만들므로 이 PR 앞에 끝난 답도 같은 줄을 받는다.
+도구 이름은 지금도 스트림과 실행 트리로 모든 사용자에게 가므로 `uses` 의 `toolName` 이 새로 내보내는 값은 아니다. 화면의 글자에는 그리지 않는다.
+
+**종류의 이름과 문장은 화면이 정한다.** `tool-kind.ts` 의 표가 도구 이름(`mcp__` 를 뗀 이름)을 spec REQ14 의 종류로 묶는다.
+
+| 도구 | 접힌 줄 | 펼친 줄과 도는 줄 |
+| --- | --- | --- |
+| 지금 문장 표의 도구 | 종류 이름 | 지금 문장 |
+| `connector` 가 있는 도구 | 서비스 이름 | 「서비스 이름 · 도구 제목」, 제목이 없으면 서비스 이름 |
+| `connector` 가 없는 `mcp__` 도구 | 「연결된 서비스」 | 지금 문장(「연결된 서비스를 썼어요」) |
+| 그 밖 | 「그 밖의 도구」 | 지금 문장(「도구를 썼어요」) |
+| 하위 에이전트 | 「도우미」 | 지금 문장(목표) |
+
+접힌 줄은 끝난 모양(`done`, `stopped`, `failed`)의 머리말 뒤에 이름을 셋까지 가운뎃점으로 잇고 넷째부터 「외 N」 이다. `done` 은 머리말이 없고, 이름이 하나도 없으면 「차례로 정리했어요」 다.
+
+**도는 줄의 움직임은 글자 위를 지나가는 밝기다.** `activity-shimmer` 는 글자색을 그라데이션으로 칠해 옆으로 옮기고, `prefers-reduced-motion: reduce` 에서는 `animation: none` 이다.
+낭독기가 읽는 글은 단추 이름과 따로 둔 `sr-only` 의 `aria-live="polite"` 다. 단추 안에 live 영역을 두면 걸린 시간이 바뀔 때마다 읽는다.
+
 ## 실패와 일관성
 
 - 역할을 읽지 못한 상태는 지금 `shellRoleState` 그대로다. 메뉴는 열리고 「관리자 화면」 만 빠진다(DECISION19).
 - 설정 틀은 대화 목록과 알림 구독(`ConversationsProvider`, `NotificationsProvider`)을 끄지 않는다. 「대화로」 를 눌러 돌아갈 때 목록을 다시 읽지 않게 하려는 것이다. 관리자 틀만 지금처럼 끈다.
 - 마지막 대화 경로는 지금처럼 `/chat/` 으로 들어갈 때마다 `sessionStorage` 에 적는다. 저장소를 막은 브라우저는 `/` 로 돌아간다.
 - 단축키(`use-shortcuts.ts`)는 사이드바가 있는 틀에서만 켠다. 설정 틀에는 사이드바와 검색칸이 없다.
-- 배포 순서: `web` 하나만 바뀌므로 없다.
+- 배포 순서: PR1, PR2 는 `web` 하나만 바뀐다. PR3 은 Control Plane 과 화면을 함께 배포한다. 화면만 먼저 나가면 `uses` 가 없는 끝난 답이 모두 「차례로 정리했어요」 로 보이고, Control Plane 만 먼저 나가면 더한 칸을 화면이 읽지 않을 뿐이다.
+- 카탈로그를 읽지 못해 `connector` 가 비면 플러그인 도구는 「연결된 서비스」 로 보이고 실패하지 않는다(PR3).
 
 ## 검증 전략
 
@@ -158,6 +198,10 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | REQ8 | 브라우저 테스트(넓은 화면, 360px) | 아래 줄 단추가 상자 안 한 줄에 겹치지 않는지, 상자 뒤에 다른 줄이 없는지, 사진을 받지 못하는 에이전트에 「＋」 가 없는지(`missing-agent.spec.ts`), 「＋」 가 사진 고르는 창을 바로 여는지(`composer-agent-switcher.spec.ts`), 고른 사진을 붙여 보내는지(`chat-attachment.spec.ts`) |
 | REQ9 | 브라우저 테스트(넓은 화면, 360px) | `/new` 에 카드가 없는지, 이름표로 고르고 보내면 그 에이전트의 대화인지, 목록의 체크와 「에이전트 관리」, 하나뿐일 때의 목록, 사진이나 모델 단계를 먼저 고른 뒤의 안내 |
 | REQ10 | 브라우저 테스트 | 메시지를 보낸 뒤 이름표 단추가 없는지, 대화방의 이름표, 360px 위 막대 가운데가 `/` 로 가는지 |
+| REQ11 | 브라우저 테스트(넓은 화면, 360px). 가짜 Hermes 대본이 검색과 페이지 읽기를 차례로 부르고 멈춘다 | 도는 줄이 검색 문장과 검색어에서 페이지 읽기 문장으로 바뀌는지, 펼치면 앞의 검색 줄이 있는지, 움직임 줄이기에서 글자가 멈추는지 |
+| REQ13 | 노드 테스트(`tool-kind.ts`), 브라우저 테스트 | 종류 다섯이면 「외 2」, 같은 종류 한 번, 중지와 실패의 머리말. 다시 연 대화에서 같은 줄인지, 줄에 숫자가 없는지 |
+| REQ14 | 백엔드 테스트(`ConnectorToolNameLookup`, 메시지 조회의 `uses`), 브라우저 테스트(가짜 카탈로그의 플러그인 도구) | 선언한 도구의 서비스 이름과 제목, 제목이 없는 도구, 찾지 못한 등록 이름, 카탈로그 실패. 화면 글자에 `mcp__` 가 없는지 |
+| REQ15 | 브라우저 테스트, 노드 테스트 | 펼친 목록의 아이콘과 이름, 검색어, 실패 줄의 모양, 옆 패널과 실행 하나 화면의 플러그인 도구 이름 |
 
 ### 함께 고칠 문서
 
@@ -166,6 +210,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 - `docs/features/users.md` 의 「관리자 영역」 입구
 - `docs/prd.md` 와 ADR-063 가운데 사이드바의 관리자 입구를 적은 문장(있으면 현재 원본만 고치고 ADR 의 결정은 바꾸지 않는다)
 - `docs/features/app-shell.md` 의 구현된 흐름
+- `docs/features/execution.md` 의 「작업 과정 블록」 과 「도구를 보이는 말」, `docs/features/chat.md` 의 `activity` 요약(PR3)
 
 기존 브라우저 테스트 가운데 사이드바의 「주요 화면」 메뉴, `admin-entry`, 밝기 단추를 찾는 것은 새 자리로 고친다. 로그인 세션은 테스트 도우미가 쿠키로 만들므로 로그아웃 테스트는 자기 browser context 에서만 한다.
 
@@ -181,5 +226,8 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | DECISION5 | 설정 틀에서 대화 목록과 알림 구독 | 끄지 않는다 | 작성자 | 「대화로」 로 돌아갈 때 목록을 다시 읽지 않는다. 관리자 틀만 지금처럼 끈다 |
 | DECISION7 | 휴대폰 위 막대에 이름표를 두는 방법 | 틀이 내린 자리 요소에 화면이 portal 로 그린다 | 작성자 | 틀이 단추를 값으로 받으면 화면 상태가 틀로 새어 나간다. 지금 제목 context(`useShellTitle`)는 글자만 넘기므로 단추를 넘기기에 맞지 않다 |
 | DECISION8 | 목록을 그리는 부품 | 기존 `DropdownMenu` 의 radio 묶음 | 작성자 | 이름 메뉴와 같은 부품이라 키보드 이동과 `Esc` 닫기, 체크 표시를 새로 만들지 않는다 |
+| DECISION9 | 플러그인 도구의 이름을 정하는 곳 | Control Plane 이 카탈로그 캐시로 붙여 보낸다 | 작성자 | 등록 이름에서 원래 이름을 되찾을 수 없어 manifest 의 서버 이름으로 계산해야 한다. 화면이 카탈로그를 따로 읽으면 연결하지 않은 사용자와 공개 에이전트에서 이름을 잃는다 |
+| DECISION10 | 끝난 답의 접힌 줄을 만드는 값 | 메시지 조회가 쓴 것의 목록(`uses`)을 보내고 화면이 종류로 묶는다 | 작성자 | 종류 표와 문장 표를 화면 한곳에 둔다. 끝난 답마다 트리를 읽으면 대화를 열 때 조회가 답 수만큼 는다 |
+| DECISION11 | 읽은 사이트의 이름(REQ15 의 대상) | 이 PR 은 보이지 않는다. 페이지 읽기의 대상은 지금처럼 사용자에게 오지 않는다 | 작성자 | 누구에게 무엇이 보이는지는 답변 품질 스펙이 정한다(spec REQ15). 그 스펙이 대상을 열면 같은 줄 아래에 보인다 |
 
-ADR 은 남기지 않는다. 여덟 결정 모두 기존 관례를 따르거나 한 파일에서 되돌릴 수 있다.
+ADR 은 남기지 않는다. 모든 결정이 기존 관례를 따르거나 응답 칸을 빼는 것으로 되돌릴 수 있다.

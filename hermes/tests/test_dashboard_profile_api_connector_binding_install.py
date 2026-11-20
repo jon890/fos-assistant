@@ -613,3 +613,127 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertEqual(executed.status_code, 400, executed.body)
         self.assertEqual(called.status_code, 400, called.body)
         self.assertEqual(ran, [(REMOTE, ["REMOTE_TOKEN"]), (REMOTE, ["REMOTE_TOKEN"])])
+
+
+class AgentSkillBindingTest(support.ProfileApiRouteTest):
+    """플러그인의 에이전트용 스킬을 셸 조건과 이름 겹침에 따라 설치하고 맞춘다(ADR-20261120 plugin-agent-skills)."""
+
+    def setUp(self):
+        super().setUp()
+        self.demo, _ = self.agent_skill_fixture()
+        self.skills = self.root / "alice/skills"
+
+    def configured(self):
+        entries = {entry["plugin"]: entry for entry in self.status_of()["connectors"]}
+        return entries[DEMO]["configured"]
+
+    def installed(self):
+        return sorted(path.name for path in self.skills.iterdir() if (path / "SKILL.md").is_file())
+
+    def test_shell_off_binds_without_the_runner_and_stays_configured(self):
+        """셸 조건이 없으면 요구 env 스킬만 빠지고, 조건이 그대로인 동안 상태 판정은 어긋남으로 보지 않는다(REQ2, REQ3, REQ4)."""
+        self.set_shell(terminal=False, docker=False)
+        before = self.alice_config()["terminal"]
+        response = self.bind()
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertEqual(response.body["skipped_skills"], [{"name": "demo-runner", "reasons": [
+            "terminal_off", "sandbox_unregistered", "sandbox_env_missing"]}])
+        self.assertEqual(self.installed(), ["demo", "demo-report"])
+        self.assertIs(self.configured(), True)
+        # 같은 요청은 바뀐 것이 없어도 판정한 목록을 낸다.
+        again = self.bind()
+        self.assertIs(again.body["changed"], False)
+        self.assertEqual(again.body["skipped_skills"], response.body["skipped_skills"])
+        # 붙이기는 셸 설정과 `.env` 를 바꾸지 않는다(REQ7).
+        self.assertEqual(self.alice_config()["terminal"], before)
+        self.assertEqual(self.env_text(), "")
+
+    def test_full_shell_installs_every_agent_skill(self):
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        response = self.bind()
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertEqual(response.body["skipped_skills"], [])
+        self.assertEqual(self.installed(), ["demo", "demo-report", "demo-runner"])
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(record[DEMO]["skills"], ["demo", "demo-report", "demo-runner"])
+        self.assertIs(self.configured(), True)
+
+    def test_shell_changes_are_seen_as_drift_and_fixed_by_reinstall(self):
+        """조건을 갖추면 어긋남이고 다시 설치가 깔고, 조건을 잃으면 어긋남이고 다시 설치가 지운다(REQ4)."""
+        self.set_shell(terminal=False)
+        self.assertEqual(self.bind().status_code, 200)
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertIs(self.configured(), False)
+        self.assertEqual(self.bind().body["skipped_skills"], [])
+        self.assertEqual(self.installed(), ["demo", "demo-report", "demo-runner"])
+        self.assertIs(self.configured(), True)
+        self.set_shell(terminal=False, env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertIs(self.configured(), False)
+        self.assertEqual(self.bind().body["skipped_skills"], [{"name": "demo-runner", "reasons": ["terminal_off"]}])
+        self.assertFalse((self.skills / "demo-runner").exists())
+        self.assertIs(self.configured(), True)
+
+    def test_new_plugin_version_is_seen_as_drift_and_installed_by_reinstall(self):
+        """새 버전이 에이전트용 스킬을 더하거나 본문을 바꾸면 어긋남이고, 다시 설치가 깐다(REQ4)."""
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertEqual(self.bind().status_code, 200)
+        added = self.demo / "agent-skills" / "extra"
+        added.mkdir()
+        (added / "SKILL.md").write_text("---\nname: demo-extra\n---\n새 스킬\n", encoding="utf-8")
+        (self.demo / "agent-skills/report/SKILL.md").write_text("---\nname: demo-report\n---\n바뀐 본문\n",
+                                                                encoding="utf-8")
+        self.assertIs(self.configured(), False)
+        self.assertEqual(self.bind().body["skipped_skills"], [])
+        self.assertEqual(self.installed(), ["demo", "demo-extra", "demo-report", "demo-runner"])
+        self.assertIn("바뀐 본문", (self.skills / "demo-report/SKILL.md").read_text(encoding="utf-8"))
+        self.assertIs(self.configured(), True)
+
+    def test_disabled_agent_skill_stays_disabled_after_reinstall(self):
+        """관리자가 꺼 둔 에이전트용 스킬은 다시 설치해도 꺼진 채다(REQ2)."""
+        self.set_shell(terminal=False)
+        self.assertEqual(self.bind().status_code, 200)
+        config = self.alice_config()
+        config["skills"]["disabled"] = list(config["skills"]["disabled"]) + ["demo-report"]
+        self.write_config("alice", config)
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertIs(self.bind().body["changed"], True)
+        self.assertIn("demo-report", self.alice_config()["skills"]["disabled"])
+
+    def test_detach_removes_the_installed_agent_skills(self):
+        """떼면 설치한 에이전트용 스킬도 지운다. 떼기 응답에는 빠진 목록 칸이 없다(REQ5)."""
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertEqual(self.bind().status_code, 200)
+        response = self.bind(enabled=False)
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertNotIn("skipped_skills", response.body)
+        self.assertFalse((self.skills / "demo-report").exists())
+        self.assertFalse((self.skills / "demo-runner").exists())
+
+    def test_first_bind_refuses_a_taken_name_and_later_overlap_skips_only_that_skill(self):
+        """처음 붙일 때 겹치면 409 이고, 붙인 뒤 올린 스킬과 겹치면 그 스킬만 빼고 바인딩은 그대로다(REQ6)."""
+        self.set_shell(terminal=False)
+        taken = self.skills / "demo-report"
+        taken.mkdir(parents=True)
+        (taken / "SKILL.md").write_text("---\nname: demo-report\n---\n모델이 만든 스킬\n", encoding="utf-8")
+        before = self.tree("alice")
+        self.assertEqual(self.bind().status_code, 409)
+        self.assertEqual(self.tree("alice"), before)
+
+        (taken / "SKILL.md").unlink()
+        taken.rmdir()
+        self.assertEqual(self.bind().status_code, 200)
+        self.assertEqual(self.installed(), ["demo", "demo-report"])
+        uploaded = self.root.parent / "uploaded-skills" / "alice" / "v1"
+        (uploaded / "demo-report").mkdir(parents=True)
+        (uploaded / "demo-report/SKILL.md").write_text("---\nname: demo-report\n---\n올린 스킬\n", encoding="utf-8")
+        config = self.alice_config()
+        config["skills"]["external_dirs"] = [str(uploaded)]
+        self.write_config("alice", config)
+        self.assertIs(self.configured(), False)
+        response = self.bind()
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIn({"name": "demo-report", "reasons": ["name_taken"]}, response.body["skipped_skills"])
+        self.assertFalse((self.skills / "demo-report").exists())
+        self.assertEqual((uploaded / "demo-report/SKILL.md").read_text(encoding="utf-8"),
+                         "---\nname: demo-report\n---\n올린 스킬\n")
+        self.assertIs(self.configured(), True)
