@@ -17,5 +17,5 @@ covers: `backend/src/main/java/com/bifos/assistant/crypto/domain/ServerSecrets.j
 
 ## 남은 것
 
-관리자 화면의 VAPID 줄(웹 프록시 경로 `web/src/app/api/admin/secrets/vapid` 와 화면)은 아직 없다. 후속으로 더한다.
+관리자 화면의 VAPID 줄(웹 프록시 경로와 화면)은 아직 없다. 후속으로 더한다.
 스펙의 PR 나눔대로 profile API key(PR2), provider API key 와 Hermes 동기화(PR3)가 남았다.
