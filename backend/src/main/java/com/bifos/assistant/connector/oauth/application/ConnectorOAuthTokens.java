@@ -152,7 +152,7 @@ public class ConnectorOAuthTokens {
             case OK -> current.put(connection.id(), new ConnectorOAuthToken(token.accessToken(), token.expiresAt()));
             case GRANT_REVOKED -> {
                 current.remove(connection.id());
-                alerts.reconnectRequired(connection.userId(), connection.id(), manifest.title());
+                alerts.reconnectRequired(connection, manifest.title());
             }
             case APP_REJECTED -> alerts.appRejected(connection.userId(), app.secretName(), manifest.title());
             // 그 사이 붙여 넣기로 바뀌어 OAuth 파일이 없다. 메모리 칸만 지운다.

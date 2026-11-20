@@ -37,16 +37,21 @@ public class ConnectorOAuthAlerts {
 
     /**
      * 서비스가 갱신을 거절했다. 사용자 행을 잠그고 연결을 다시 읽어, 아직 표시가 없을 때만 다시 연결 필요로 바꾸고 알림 하나를 남긴다.
+     * 갱신하는 사이 연결이 바뀌었으면(다시 연결, 붙여 넣기, 해제) 옛 토큰의 거절이라 아무것도 하지 않는다.
      *
+     * @param observed 갱신을 시작할 때 읽은 연결
      * @param title 알림에 쓸 플러그인 이름
      */
-    public void reconnectRequired(long userId, long connectionId, String title) {
+    public void reconnectRequired(ConnectorConnection observed, String title) {
+        long userId = observed.userId();
+        long connectionId = observed.id();
         transactions.executeWithoutResult(status -> {
             if (users.findByIdForUpdate(userId).isEmpty()) {
                 return;
             }
             ConnectorConnection connection = connections.findById(connectionId).orElse(null);
-            if (connection == null || connection.status() == ConnectionStatus.DISCONNECTED
+            if (connection == null || !connection.updatedAt().equals(observed.updatedAt())
+                || connection.status() == ConnectionStatus.DISCONNECTED
                 || !connection.fields().auth().usesOAuth() || connection.fields().auth().reconnectRequired()) {
                 return;
             }

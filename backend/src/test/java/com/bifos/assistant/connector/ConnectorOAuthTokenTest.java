@@ -203,6 +203,26 @@ class ConnectorOAuthTokenTest {
 
 
     @Test
+    @DisplayName("갱신하는 사이 다시 연결한 연결은 옛 토큰의 거절로 끊기지 않는다")
+    void staleRevocationDoesNotBreakReconnectedConnection() {
+        ConnectorConnection connection = oauthConnection();
+        whenRefresh(connection).thenAnswer(call -> {
+            ConnectorConnection again = connections.findById(connection.id()).orElseThrow();
+            again.connected(again.fields(), clock.instant());
+            connections.save(again);
+            return new Token(Outcome.GRANT_REVOKED, null, null);
+        });
+
+        tokens.refresh(connection.id(), null);
+
+        ConnectorConnection saved = connections.findById(connection.id()).orElseThrow();
+        assertThat(saved.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(saved.fields().auth().reconnectRequired()).isFalse();
+        assertThat(notificationsOf(owner)).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("서비스가 앱 자격을 거절하면 연결은 두고 관리자에게만 한 번 알리며 앱을 바꾸면 읽음이 된다")
     void appRejectedKeepsConnectionAndNotifiesAdminsOnce() throws Exception {
         ConnectorConnection connection = oauthConnection();
