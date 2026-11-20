@@ -25,13 +25,13 @@ config:
 ---
 flowchart LR
   side[사이드바]:::shell --> name[이름 줄]:::entry
-  name --> settings[「설정」 → /settings]:::shell
-  name --> admin[「관리자 화면」 → /admin<br/>ADMIN 만]:::shell
+  name --> settings["「설정」 → /settings"]:::shell
+  name --> admin["「관리자 화면」 → /admin<br/>ADMIN 만"]:::shell
   name --> theme[「화면 밝기」]:::action
   name --> out[「로그아웃」]:::action
-  settings --> back[「대화로」 → 마지막 대화]:::shell
-  out --> post[POST /signout<br/>이 브라우저의 세션만 지움]:::server
-  post --> signin[/signin 을 문서째 연다]:::shell
+  settings --> back["「대화로」 → 마지막 대화"]:::shell
+  out --> post["POST /signout<br/>이 브라우저의 세션만 지움"]:::server
+  post --> signin["/signin 을 문서째 연다"]:::shell
   classDef shell fill:#e8f1ff,stroke:#3b6fb6
   classDef entry fill:#fff4d6,stroke:#b08900
   classDef action fill:#eaf7ea,stroke:#3a8a3a

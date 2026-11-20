@@ -16,7 +16,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 ### 주소와 들어오는 길
 
 - `/now` 는 서버에서 `GET /api/v1/attention` 을 읽어 그린다
-- 사이드바 최상단, 「새 대화」 단추 바로 아래에 「지금 볼 것」 링크가 있고 `nowCount` 가 0 보다 크면 그 수를 배지로 붙인다. 주요 화면 메뉴에는 넣지 않는다
+- 사이드바 위쪽, 대화 검색 바로 아래에 「지금 볼 것」 링크가 있고 `nowCount` 가 0 보다 크면 그 수를 배지로 붙인다. 주요 화면 메뉴에는 넣지 않는다
 - 새 대화 화면 `/` 의 인사 아래 한 줄 「확인할 것 N건」 이 `/now` 로 간다
 
 **새 대화 화면의 한 줄은 홈을 그린 뒤에 채운다.** 브라우저가 `GET /api/v1/attention/summary` 를 부르고, `nowCount` 가 0 이거나 부르기가 실패하면 그리지 않는다. 홈은 서버에서 읽는 것이 없어 `loading.tsx` 를 두지 않는다.
