@@ -76,3 +76,11 @@ test("bfcache 에서 돌아온 문서는 다시 읽는다", async ({ page }) => 
   await reloaded;
   expect(await page.evaluate(() => (window as Window & { beforeReload?: boolean }).beforeReload)).toBeUndefined();
 });
+
+test("다른 출처에서 보낸 로그아웃 요청은 거절하고 로그인은 그대로다", async ({ page }) => {
+  await page.goto("/new");
+  const response = await page.request.post("/signout", { headers: { origin: "https://other.example" } });
+  expect(response.status()).toBe(403);
+  await page.goto("/new");
+  await expect(page).toHaveURL(/\/new$/);
+});
