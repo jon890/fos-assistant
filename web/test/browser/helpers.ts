@@ -138,3 +138,18 @@ export async function openAccountMenu(page: Page, testInfo: TestInfo) {
   await trigger.click();
   await expect(page.getByRole("menu")).toBeVisible();
 }
+
+
+/**
+ * 관리자 메뉴를 찾는다. 휴대폰 프로젝트에서는 메뉴가 서랍 안에 있어 머리의 단추로 먼저 연다.
+ *
+ * <p>넓은 화면은 메뉴가 늘 보인다. 서랍이 닫힌 휴대폰에서는 접근성 트리에 메뉴가 없다.
+ */
+export async function openAdminMenu(page: Page, testInfo: TestInfo): Promise<Locator> {
+  if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: "관리자 메뉴 열기" }).click();
+  }
+  const menu = page.getByRole("navigation", { name: "관리자 메뉴" });
+  await expect(menu).toBeVisible();
+  return menu;
+}
