@@ -2,7 +2,7 @@
 
 대화마다 모델과 단계를 고르고, 실행이 쓴 토큰과 사용량을 기록해 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/admin/group-tier-settings.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
+covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/admin/group-tier-settings.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
 
 ## 요구
 
@@ -14,7 +14,7 @@ covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/ja
 - 관리자는 첫 반응 시간을 제품 지표로 본다.
 
 **금액과 모델과 토큰은 관리자 영역에만 그린다.**
-`/usage` 는 역할과 상관없이 실행 건수와, 에이전트 이름, 시각, 걸린 시간, 상태, 쓴 스킬 이름, 다시 보낸 실행 표시만 보인다.
+사용자 결정(2026-11-20)에 따라 사용자 사용량 화면(`/usage`)과 설정의 사용량 항목은 없앤다. 옛 주소는 404다. 실행 기록과 집계는 계속 남기고 관리자 영역에서만 본다.
 **화면만 가리지 않는다. Control Plane 이 `MEMBER` 역할에게는 그 값을 응답에서 뺀다.**
 빼는 값의 표는 [`docs/features/chat.md`](chat.md) 의 「역할에 따라 응답에서 빼는 값」 절이 갖는다.
 `ADMIN` 은 일반 화면에서도 응답으로는 그 값을 받는다. 일반 화면이 그리지 않을 뿐이다([ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md)).
@@ -58,10 +58,10 @@ sequenceDiagram
 
 ## 사용량 화면
 
-`/usage` 와 `/admin/usage` 는 같은 부품을 쓰고 탭으로 나눈다. 고른 탭은 주소 `?tab=` 에 남아 새로 고쳐도 같은 탭이 열린다.
+사용량 화면은 관리자 영역(`/admin/usage`)에만 두고 탭으로 나눈다. 고른 탭은 주소 `?tab=` 에 남아 새로 고쳐도 같은 탭이 열린다.
 탭과 절은 `web/src/components/usage/` 가 갖는다. 「설정별 사용량」 탭과 「사용량 내역」, 「첫 반응 시간」, 「먼저 알리기」 절은 `/admin/usage` 에만 있다.
-두 화면 모두 자기 실행만 읽는다. 여러 사용자의 실행을 모아 보는 별도 화면은 없다.
-실행 상세(`/executions/{id}`)의 머리 요약도 같은 규칙을 따르고, 도구 줄의 원본은 `/admin/executions/{id}` 에서만 보인다.
+관리자 사용량 화면은 자기 실행만 읽는다. 여러 사용자의 실행을 모아 보는 별도 화면은 없다.
+실행 상세(`/executions/{id}`)는 대화와 지금 화면에서 계속 열 수 있고 대화 목록이 있는 틀을 쓴다. 금액과 모델과 토큰을 가리는 규칙은 유지하며, 도구 줄의 원본은 `/admin/executions/{id}` 에서만 보인다.
 
 | 절 | 그리지 않는 때 |
 | --- | --- |

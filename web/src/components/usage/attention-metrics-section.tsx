@@ -44,7 +44,7 @@ function firstAction(seconds: number | null): string {
 /**
  * 지금 화면에 보인 항목을 종류별로 숨김, 미루기, 행동 비율로 보인다.
  *
- * 관리자 사용량 화면에서만 그린다. 일반 사용량 화면에는 역할로 갈리는 표시를 두지 않는다.
+ * 관리자 사용량 화면에서 먼저 알리기 지표를 그린다.
  */
 export function AttentionMetricsSection({
   metrics,
