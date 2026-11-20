@@ -6,11 +6,13 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECFieldFp;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.ECPublicKeySpec;
+import java.security.spec.EllipticCurve;
 import java.util.Arrays;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -46,19 +48,34 @@ public final class P256 {
     }
 
 
-    /** 비압축 점 65바이트를 공개 키로 바꾼다. 곡선 위의 점이 아니면 {@link IllegalArgumentException} 이다. */
+    /** 비압축 점 65바이트를 공개 키로 바꾼다. 길이와 머리 바이트를 보고, 곡선 위의 점인지는 {@code y^2 = x^3 + ax + b} 로 직접 본다. 아니면 {@link IllegalArgumentException} 이다. */
     public static ECPublicKey publicKey(byte[] uncompressed) {
         if (uncompressed == null || uncompressed.length != PUBLIC_BYTES || uncompressed[0] != 0x04) {
             throw new IllegalArgumentException("P-256 public key must be a 65 byte uncompressed point");
         }
         BigInteger x = new BigInteger(1, Arrays.copyOfRange(uncompressed, 1, 1 + COORDINATE_BYTES));
         BigInteger y = new BigInteger(1, Arrays.copyOfRange(uncompressed, 1 + COORDINATE_BYTES, PUBLIC_BYTES));
+        if (!onCurve(x, y)) {
+            throw new IllegalArgumentException("P-256 public key is not a point on the curve");
+        }
         try {
             return (ECPublicKey)KeyFactory.getInstance("EC")
                 .generatePublic(new ECPublicKeySpec(new ECPoint(x, y), params()));
         } catch (GeneralSecurityException ex) {
             throw new IllegalArgumentException("P-256 public key is not a point on the curve", ex);
         }
+    }
+
+
+    private static boolean onCurve(BigInteger x, BigInteger y) {
+        EllipticCurve curve = PARAMS.getCurve();
+        BigInteger p = ((ECFieldFp)curve.getField()).getP();
+        if (x.compareTo(p) >= 0 || y.compareTo(p) >= 0) {
+            return false;
+        }
+        BigInteger left = y.multiply(y).mod(p);
+        BigInteger right = x.pow(3).add(curve.getA().multiply(x)).add(curve.getB()).mod(p);
+        return left.equals(right);
     }
 
 

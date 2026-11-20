@@ -49,13 +49,13 @@
 
 ### 3-1. `notification/infra/VapidKeys.java`
 
-빈. 기동 때 키가 설정돼 있으면 비밀 키 파일(base64url 32바이트 한 줄)을 읽어 P-256 `ECPrivateKey` 로, 공개 키(base64url 비압축 65바이트)를 `ECPublicKey` 로 해석하고, 비밀 키에서 계산한 공개 점이 공개 키와 같은지 본다. 실패하면 예외로 기동을 멈춘다. 메시지에 키 값과 파일 내용을 넣지 않는다. `enabled()`, `publicKeyBase64Url()`, `privateKey()`, `publicKey()`, `subject()` 를 준다. 설정이 없으면 `enabled()` 가 거짓이다.
+빈. 기동 때 키가 설정돼 있으면 비밀 키 파일(base64url 32바이트 한 줄)을 읽어 P-256 `ECPrivateKey` 로, 공개 키(base64url 비압축 65바이트)를 `ECPublicKey` 로 해석하고, 비밀 키로 서명한 글을 공개 키가 검증하는지 보아 한 쌍인지 확인한다. 실패하면 예외로 기동을 멈춘다. 메시지에 키 값과 파일 내용을 넣지 않는다. `enabled()`, `publicKeyBase64Url()`, `privateKey()`, `publicKey()`, `subject()` 를 준다. 설정이 없으면 `enabled()` 가 거짓이다.
 
 ### 4. `notification/domain/PushDevice.java`, `PushDevices.java`, `PushEndpointPolicy.java`
 
 - `PushDevice`(record): `UUID id`, `String endpoint`, `String endpointHash`, `String p256dh`, `String auth`, `String name`, `String timeZone`, `Instant registeredAt`. `toString` 은 주소와 키를 내지 않는다
 - `PushDevices`: 불변 목록. `upsert(PushDevice, int max)`(같은 `endpointHash` 면 키·이름·시간대·`registeredAt` 을 바꾸고 `id` 는 유지, 없으면 더하고 `max` 를 넘으면 `registeredAt` 이 가장 이른 것을 뺀다), `removeByHash`, `removeById`, `containsHash`, `newestFirst()`
-- `PushEndpointPolicy`: 허용 호스트 목록을 받아 `check(String endpoint)` 가 통과 여부를 낸다. 규칙: `URI` 로 해석, 스킴 `https`, 포트 없음이나 443, userinfo 없음, 호스트가 IP 리터럴(IPv4 점 넷, `[` 로 시작하는 IPv6)이 아님, 호스트가 항목과 정확히 같거나 항목이 `.` 으로 시작하면 그 문자열로 끝남. 대소문자 무시. 주소 길이 상한 1024
+- `PushEndpointPolicy`: 허용 호스트 목록을 받아 `allows(String endpoint)` 가 통과 여부를 낸다. 규칙: `URI` 로 해석, 스킴 `https`, 포트 없음이나 443, userinfo 없음, 호스트가 IP 리터럴(IPv4 점 넷, `[` 로 시작하는 IPv6)이 아님, 호스트가 항목과 정확히 같거나 항목이 `.` 으로 시작하면 그 문자열로 끝남. 대소문자 무시. 주소 길이 상한 1024
 
 ### 5. `notification/infra/PushDevicesCodec.java`, `PushDeviceRepository.java`
 

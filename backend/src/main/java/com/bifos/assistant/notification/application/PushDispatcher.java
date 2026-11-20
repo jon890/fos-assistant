@@ -95,7 +95,12 @@ public class PushDispatcher {
             }
             byte[] payload = payload(event);
             for (PushDevice device : targets) {
-                deliverTo(event.userId(), device, payload);
+                try {
+                    deliverTo(event.userId(), device, payload);
+                } catch (RuntimeException ex) {
+                    log.warn("push delivery failed userId={} deviceId={} error={}",
+                        event.userId(), device.id(), ex.getClass().getSimpleName());
+                }
             }
         } catch (RuntimeException ex) {
             log.warn("push delivery failed userId={} error={}", event.userId(), ex.getClass().getSimpleName());
@@ -134,7 +139,7 @@ public class PushDispatcher {
                 log.warn("push dropped userId={} deviceId={} status={} attempts={}", userId, device.id(), response.status(), attempt + 1);
                 return;
             }
-            if (!pause(waitFor(response, retryDelays.get(attempt)))) {
+            if (!pause(waitFor(response, retryDelays.get(attempt))) || heldByOthers(userId, device)) {
                 return;
             }
         }
@@ -147,7 +152,8 @@ public class PushDispatcher {
 
 
     private Duration waitFor(PushResponse response, Duration delay) {
-        if (response.retryAfter() == null) {
+        boolean honored = response.status() == 429 || response.status() == 503;
+        if (!honored || response.retryAfter() == null) {
             return delay;
         }
         return response.retryAfter().compareTo(retryAfterMax) > 0 ? retryAfterMax : response.retryAfter();

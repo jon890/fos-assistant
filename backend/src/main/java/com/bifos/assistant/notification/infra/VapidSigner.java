@@ -7,6 +7,7 @@ import java.security.Signature;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,7 +37,7 @@ public class VapidSigner {
             throw new IllegalStateException("web push is not configured");
         }
         URI uri = URI.create(endpoint);
-        String audience = uri.getScheme() + "://" + uri.getHost();
+        String audience = (uri.getScheme() + "://" + uri.getHost()).toLowerCase(Locale.ROOT);
         Claims claims = new Claims(audience, now.plus(LIFETIME).getEpochSecond(), keys.subject());
         String unsigned = HEADER + "." + B64.encodeToString(JSON.writeValueAsBytes(claims));
         try {

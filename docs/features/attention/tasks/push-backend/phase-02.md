@@ -60,7 +60,7 @@ record: `Long notificationId`, `Long userId`, `NotificationKind kind`, `String t
 
 ### 7. 테스트
 
-- `notification/WebPushEncryptorTest`: RFC 8291 부록 A 의 값(사용자 에이전트 공개 키, auth secret, 서버 키 쌍, salt, 평문 「When I grow up, I want to be a watermelon」)으로 같은 본문을 만든다. 예시 값은 RFC 원문에서 그대로 옮긴다
+- `notification/infra/WebPushEncryptorTest`(패키지 범위 오버로드를 부르려고 infra 패키지에 둔다): RFC 8291 부록 A 의 값(사용자 에이전트 공개 키, auth secret, 서버 키 쌍, salt, 평문 「When I grow up, I want to be a watermelon」)으로 같은 본문을 만든다. 예시 값은 RFC 원문에서 그대로 옮긴다
 - `notification/VapidSignerTest`: 머리 모양, `aud` 가 주소의 출처, `exp` 가 12시간 뒤, 서명이 공개 키로 검증된다
 - `notification/WebPushClientTest`: JDK `HttpServer`(http, 127.0.0.1)로 머리(`TTL`, `Content-Encoding`, `Urgency`, `Authorization`)와 본문이 그대로 가는지, 302 를 따르지 않는지, `Retry-After` 를 읽는지, 연결 실패가 상태 0 인지 본다. 클라이언트는 주소 정책을 보지 않으므로 http 로 띄울 수 있다
 - 대역: `testsupport/RecordingWebPushClient.java` 를 `IntegrationTestDoubles` 에 `@Primary` 빈으로 올린다. 받은 주소·머리·본문을 모으고, 정해 두지 않으면 네트워크 없이 201 을 돌려준다. 검사가 상태 코드 목록과 지연(`CountDownLatch` 로 검사 안에서 풀기)을 정하고, `IntegrationTestIsolation` 이 검사마다 되돌릴 수 있게 `reset()` 을 둔다(검사 클래스 안에 빈 설정을 두지 않는다, rule-17). 지연은 검사 안에서 반드시 풀어 공통 확장의 join 상한(30초)에 걸리지 않게 한다
@@ -89,7 +89,7 @@ scripts/dev/check-local.sh --fast
 | `backend/src/main/java/com/bifos/assistant/notification/infra/WebPushClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/PushDispatcher.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/PushDeviceService.java` | 수정 (`removeIfUnchanged`) |
-| `backend/src/test/java/com/bifos/assistant/notification/WebPushEncryptorTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/notification/infra/WebPushEncryptorTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/VapidSignerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/PushDispatcherTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/WebPushClientTest.java` | 신규 |

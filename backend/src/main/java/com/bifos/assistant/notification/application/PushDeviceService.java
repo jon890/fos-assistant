@@ -7,6 +7,7 @@ import com.bifos.assistant.notification.domain.PushDevice;
 import com.bifos.assistant.notification.domain.PushDevices;
 import com.bifos.assistant.notification.domain.PushEndpointPolicy;
 import com.bifos.assistant.notification.infra.PushDeviceRepository;
+import com.bifos.assistant.notification.infra.P256;
 import com.bifos.assistant.notification.infra.PushDevicesCodec;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -16,7 +17,11 @@ import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.ZoneId;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -40,6 +45,7 @@ public class PushDeviceService {
     static final int P256DH_MAX = 200;
     static final int AUTH_MAX = 100;
     static final int TIME_ZONE_MAX = 64;
+    static final int AUTH_BYTES = 16;
 
     private final PushDeviceRepository repository;
     private final PushRegistrationLock lock;
@@ -98,18 +104,19 @@ public class PushDeviceService {
         return lock.run(() -> newTransaction.execute(status -> {
             TreeSet<Long> owners = new TreeSet<>(repository.findUserIdsHoldingHash(hash));
             owners.add(user.id());
+            Map<Long, PushDevices> locked = new TreeMap<>();
             for (Long owner : owners) {
-                repository.lockUser(owner);
+                lockAndRead(owner).ifPresent(devices -> locked.put(owner, devices));
             }
-            for (Long owner : owners) {
-                if (!owner.equals(user.id())) {
-                    PushDevices theirs = read(owner);
-                    if (theirs.containsHash(hash)) {
-                        repository.storeDevices(owner, PushDevicesCodec.encode(theirs.removeByHash(hash)));
-                    }
+            if (!locked.containsKey(user.id())) {
+                throw new ApiException(ErrorCode.UNAUTHENTICATED, "the requesting user no longer exists");
+            }
+            locked.forEach((owner, theirs) -> {
+                if (!owner.equals(user.id()) && theirs.containsHash(hash)) {
+                    repository.storeDevices(owner, PushDevicesCodec.encode(theirs.removeByHash(hash)));
                 }
-            }
-            PushDevices mine = read(user.id()).upsert(candidate, maxDevices);
+            });
+            PushDevices mine = locked.get(user.id()).upsert(candidate, maxDevices);
             repository.storeDevices(user.id(), PushDevicesCodec.encode(mine));
             return mine.findByHash(hash);
         }));
@@ -160,16 +167,24 @@ public class PushDeviceService {
 
     private void mutate(Long userId, UnaryOperator<PushDevices> change) {
         lock.run(() -> newTransaction.execute(status -> {
-            if (repository.lockUser(userId).isEmpty()) {
+            Optional<PushDevices> found = lockAndRead(userId);
+            if (found.isEmpty()) {
                 return null;
             }
-            PushDevices current = read(userId);
+            PushDevices current = found.get();
             PushDevices next = change.apply(current);
             if (!next.equals(current)) {
                 repository.storeDevices(userId, PushDevicesCodec.encode(next));
             }
             return null;
         }));
+    }
+
+
+    /** 그 사용자 행을 잠그고 최신 목록을 읽는다. 사용자가 없으면 빈 값이다. */
+    private Optional<PushDevices> lockAndRead(Long userId) {
+        List<String> rows = repository.lockAndReadDevicesJson(userId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(PushDevicesCodec.decode(rows.getFirst()));
     }
 
 
@@ -184,6 +199,7 @@ public class PushDeviceService {
         }
         requireLength("keys.p256dh", registration.p256dh(), P256DH_MAX);
         requireLength("keys.auth", registration.auth(), AUTH_MAX);
+        requireKeys(registration.p256dh(), registration.auth());
         String name = registration.name() == null ? "" : registration.name().strip();
         requireLength("name", name, NAME_MAX);
         requireLength("timeZone", registration.timeZone(), TIME_ZONE_MAX);
@@ -191,6 +207,19 @@ public class PushDeviceService {
             ZoneId.of(registration.timeZone());
         } catch (DateTimeException ex) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "timeZone is not a known zone");
+        }
+    }
+
+
+    /** 보낼 때에야 깨진 것을 알면 기기가 목록에 남은 채 늘 건너뛰어진다. 그래서 등록할 때 곡선 위의 점과 16바이트 인증 값인지 본다. */
+    private static void requireKeys(String p256dh, String auth) {
+        try {
+            P256.publicKey(Base64.getUrlDecoder().decode(p256dh));
+            if (Base64.getUrlDecoder().decode(auth).length != AUTH_BYTES) {
+                throw new IllegalArgumentException("auth must be 16 bytes");
+            }
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "keys are not a valid push subscription");
         }
     }
 

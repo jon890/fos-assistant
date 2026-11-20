@@ -13,7 +13,7 @@
 | REQ5 | 알림 저장이 커밋된 뒤 푸시 하위 기능이 그 알림의 사용자 기기 목록을 읽어 기기마다 암호화한 글을 보낸다. 서비스 워커는 받은 글을 그대로 시스템 알림으로 띄운다 |
 | REQ6 | 푸시 글의 열 주소는 `/n/<알림 공개 식별자>` 이다. 이 화면이 서버에서 읽음으로 바꾸고 `notificationHref` 의 곳으로 보낸다. 로그인이 없으면 이 화면이 `/signin?next=<인코딩한 그 주소>` 를 직접 만들어 보내고 로그인 뒤 돌아온다. 다른 화면의 로그인 이동은 바꾸지 않는다 |
 | REQ7 | 보내기는 커밋 뒤 사건에서 가상 스레드로 돈다. 알림을 만든 트랜잭션과 호출 스레드는 기다리지 않는다 |
-| REQ8 | 푸시 서비스 응답으로 기기를 지우거나 다시 시도한다. 로그는 사용자 번호, 기기 번호, 상태 코드만 남긴다 |
+| REQ8 | 푸시 서비스 응답으로 기기를 지우거나 다시 시도한다. 로그는 사용자 번호, 기기 번호, 상태 코드, 시도 횟수, 예외 종류만 남긴다 |
 | REQ9 | 로그아웃 전에 웹이 `DELETE /api/v1/push/devices/current` 를 부르고 브라우저 구독을 끊는다. 다른 사용자가 같은 주소로 등록하면 등록 트랜잭션이 앞 사용자의 줄에서 그 기기를 뺀다. 관리자가 접근을 끄면 이미 있는 사건 `UserAccessRevoked` 를 받아 그 사용자의 기기 칸을 비운다. 정리 작업은 `app_user` 줄을 지우므로 칸이 함께 사라진다 |
 | REQ10 | (PR2) 푸시 설정 칸의 끈 묶음을 보내기 전에 거른다. 묶음은 `NotificationKind` 마다 정한 값이다 |
 | REQ11 | (PR2) 보내기 전에 알림의 `created_at` 을 조용한 시간과 비교한다. 걸리면 보내지 않고 버린다 |
@@ -65,7 +65,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | --- | --- | --- |
 | `GET /api/v1/push/config` | `{enabled, publicKey}`. 서버에 키가 없으면 `enabled: false` 이고 화면은 「이 서버는 아직 알림을 보낼 수 없어요」 를 보인다 | PR1 |
 | `GET /api/v1/push/devices` | 기기 목록(`id`, `name`, `registeredAt`, `endpointHash`), 최근 등록 순 | PR1 |
-| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone` | PR1 |
+| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`. 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
 | `DELETE /api/v1/push/devices/current` | 본문의 `endpoint` 와 같은 내 기기를 지운다. 없어도 204 | PR1 |
 | `PATCH /api/v1/push/devices/{id}`, `DELETE /api/v1/push/devices/{id}` | 이름 고치기와 지우기. 남의 기기와 없는 기기는 같은 404 `PUSH_DEVICE_NOT_FOUND` | PR2 |
 | `GET /api/v1/push/settings`, `PUT /api/v1/push/settings` | 끈 묶음과 조용한 시간. 관리자 아닌 사용자가 `ADMIN` 묶음을 보내면 무시한다 | PR2 |
@@ -100,7 +100,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | 응답 | 처리 |
 | --- | --- |
 | 2xx | 끝 |
-| 404, 410 | 그 사용자 줄을 잠그고 그 기기 번호가 아직 있으면 뺀다 |
+| 404, 410 | 그 사용자 줄을 잠그고, 보낼 때 읽은 기기와 번호와 `registeredAt` 이 같은 기기가 있으면 뺀다 |
 | 429, 5xx, 연결 실패 | 두 번까지 다시 보낸다(1초, 4초 뒤. `Retry-After` 가 있으면 30초 안에서 따른다). 그래도 실패하면 버린다 |
 | 그 밖의 4xx | 버리고 경고 로그 |
 
@@ -108,7 +108,7 @@ Hermes 는 이 기능에 닿지 않는다.
 
 ### 설정
 
-`assistant.push` 의 `vapid-public-key`(base64url), `vapid-private-key-file`(비밀 키 base64url 한 줄을 담은 파일 경로), `subject`, `allowed-endpoint-hosts`, `connect-timeout`, `request-timeout` 이다. `@Validated` 로 공개 키와 비밀 키 파일이 함께 있거나 함께 없는지 본다(rule-24). 파일을 읽어 P-256 키로 해석하고 공개 키와 한 쌍인지 보는 일은 KEK 처럼 `notification.infra` 의 빈이 기동 때 하고, 실패하면 기동을 멈춘다.
+`assistant.push` 의 `vapid-public-key`(base64url), `vapid-private-key-file`(비밀 키 base64url 한 줄을 담은 파일 경로), `subject`, `allowed-endpoint-hosts`, `connect-timeout`(5s), `request-timeout`(10s), `retry-delays`(1s, 4s), `retry-after-max`(30s), `max-devices`(10) 이다. `@Validated` 로 공개 키, 비밀 키 파일, `subject` 셋이 함께 있거나 함께 없는지 보고 어긋나면 기동을 멈춘다(rule-24). 파일을 읽어 P-256 키로 해석하고 공개 키와 한 쌍인지 보는 일은 KEK 처럼 `notification.infra` 의 빈이 기동 때 하고, 실패하면 기동을 멈춘다.
 값은 환경 변수로 넣고 저장소에 적지 않는다. 비밀 키를 파일로 받는 것은 데이터 암호화 KEK(`kek-file`)와 같은 관례다. 어디에 두는지는 운영 저장소가 갖는다.
 
 ### 웹
@@ -130,7 +130,7 @@ Hermes 는 이 기능에 닿지 않는다.
 
 - **알림을 만든 일은 푸시를 기다리지 않는다.** 커밋 뒤 사건 안에서는 스레드만 띄운다. 스레드 안의 모든 예외는 로그로 끝난다
 - 기기 목록을 읽은 뒤 기기가 지워지면 그 기기로 한 번 더 갈 수 있다. 410 을 받으면 지운다. 받아들인다
-- 등록과 410 정리가 같은 줄을 동시에 바꾸면 잠금 순서로 하나씩 돈다. 정리는 번호로 찾은 기기만 빼므로, 그 사이 같은 주소로 다시 등록해 번호가 바뀐 기기는 지우지 않는다(rule-68)
+- 등록과 410 정리가 같은 줄을 동시에 바꾸면 잠금 순서로 하나씩 돈다. 정리는 번호와 `registeredAt` 이 보낼 때와 같은 기기만 뺀다. 그 사이 같은 주소로 다시 등록하면 번호는 같고 `registeredAt` 이 바뀌므로 지우지 않는다(rule-68)
 - 서버 한 대 전제(ADR-070)는 바뀌지 않는다. 사건 수신자가 Control Plane 하나다
 - 배포 순서: 마이그레이션과 backend 를 먼저 올리고 웹을 올린다. backend 만 올라간 동안 웹은 푸시 API 를 부르지 않는다. 웹만 먼저 올라가면 `config` 가 404 라 화면이 「아직 보낼 수 없어요」 를 보인다
 - 서버에 키를 넣지 않고 배포해도 기동한다. `enabled: false` 로 보내기를 건너뛴다

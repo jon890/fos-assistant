@@ -153,7 +153,24 @@ class PushDispatcherTest {
 
         assertThat(client.sent()).hasSize(3);
         assertThat(devices.list(alice)).hasSize(1);
-        assertThat(output.getAll()).doesNotContain(browser.endpoint()).doesNotContain(browser.auth());
+        assertThat(output.getAll()).doesNotContain(browser.endpoint()).doesNotContain(browser.p256dh()).doesNotContain(browser.auth());
+    }
+
+
+    @Test
+    @DisplayName("429 의 Retry-After 는 상한 안에서 따르고, 500 의 Retry-After 는 따르지 않는다")
+    void retryAfterOnlyFor429And503() throws Exception {
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/retry-after-1").registration());
+        client.respond(429, Duration.ofMinutes(10));
+        client.respond(500, Duration.ofMinutes(10));
+
+        long started = System.nanoTime();
+        notify(alice, "제목", "본문");
+        background.awaitIdle(WAIT);
+        Duration took = Duration.ofNanos(System.nanoTime() - started);
+
+        assertThat(client.sent()).hasSize(3);
+        assertThat(took).as("상한(검사 설정 50ms)과 다시 시도 간격만 기다린다").isLessThan(Duration.ofSeconds(5));
     }
 
 

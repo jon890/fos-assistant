@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.notification.application.PushDeviceService;
+import com.bifos.assistant.notification.application.PushRegistrationLock;
 import com.bifos.assistant.notification.application.dto.PushRegistration;
 import com.bifos.assistant.notification.domain.PushDevice;
 import com.bifos.assistant.notification.infra.VapidKeys;
@@ -17,8 +18,10 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,6 +44,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class PushDeviceServiceTest {
 
     private static final String ENDPOINT = "https://fcm.googleapis.com/fcm/send/device-a";
+    private static final TestSubscriptionKeys KEYS = TestSubscriptionKeys.create();
 
     @Autowired
     PushDeviceService service;
@@ -59,6 +63,12 @@ class PushDeviceServiceTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    PushRegistrationLock registrationLock;
+
+    @Autowired
+    TestClock contextClock;
 
     private final List<Long> createdUsers = new ArrayList<>();
     private final List<Long> createdPeople = new ArrayList<>();
@@ -105,6 +115,46 @@ class PushDeviceServiceTest {
 
         assertThat(service.list(alice)).isEmpty();
         assertThat(service.list(bob)).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("등록은 서버 안 잠금을 잡아야 돌고, 잠금이 풀린 뒤에 끝난다")
+    void registrationWaitsForLock() throws Exception {
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Void> holder = CompletableFuture.runAsync(() -> registrationLock.run(() -> {
+            held.countDown();
+            awaitQuietly(release);
+            return null;
+        }));
+        held.await(5, TimeUnit.SECONDS);
+
+        CompletableFuture<PushDevice> registering = CompletableFuture.supplyAsync(() -> service.register(alice, registration(ENDPOINT, "PC")));
+        try {
+            Thread.sleep(300);
+            assertThat(registering).as("잠금을 쥔 동안 등록은 끝나지 않는다").isNotDone();
+        } finally {
+            release.countDown();
+        }
+        holder.get(5, TimeUnit.SECONDS);
+        assertThat(registering.get(10, TimeUnit.SECONDS).endpointHash()).isEqualTo(Sha256.hex(ENDPOINT));
+    }
+
+
+    @Test
+    @DisplayName("410 을 받기 전에 같은 주소로 다시 등록한 기기는 정리가 지우지 않는다")
+    void removeIfUnchangedKeepsReRegistered() {
+        contextClock.set(Instant.parse("2026-11-20T00:00:00Z"));
+        PushDevice sent = service.register(alice, registration(ENDPOINT, "PC"));
+        contextClock.set(Instant.parse("2026-11-20T00:01:00Z"));
+        service.register(alice, registration(ENDPOINT, "PC"));
+
+        service.removeIfUnchanged(alice.id(), sent);
+        assertThat(service.list(alice)).hasSize(1);
+
+        service.removeIfUnchanged(alice.id(), service.list(alice).getFirst());
+        assertThat(service.list(alice)).isEmpty();
     }
 
 
@@ -170,7 +220,13 @@ class PushDeviceServiceTest {
         assertThatThrownBy(() -> service.register(alice, registration("https://internal.example/x", "PC")))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> service.register(alice,
-            new PushRegistration(ENDPOINT, "p256dh", "auth", "PC", "Mars/Olympus")))
+            new PushRegistration(ENDPOINT, KEYS.p256dh(), KEYS.auth(), "PC", "Mars/Olympus")))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> service.register(alice,
+            new PushRegistration(ENDPOINT, "BPublicKeyOfBrowser", KEYS.auth(), "PC", "Asia/Seoul")))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> service.register(alice,
+            new PushRegistration(ENDPOINT, KEYS.p256dh(), "c2hvcnQ", "PC", "Asia/Seoul")))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(service.list(alice)).isEmpty();
     }
@@ -212,6 +268,15 @@ class PushDeviceServiceTest {
 
 
     private static PushRegistration registration(String endpoint, String name) {
-        return new PushRegistration(endpoint, "BPublicKeyOfBrowser", "authSecret", name, "Asia/Seoul");
+        return new PushRegistration(endpoint, KEYS.p256dh(), KEYS.auth(), name, "Asia/Seoul");
+    }
+
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

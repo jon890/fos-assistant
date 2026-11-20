@@ -66,11 +66,6 @@ public record PushDevices(List<PushDevice> devices) {
     }
 
 
-    public boolean containsId(UUID id) {
-        return devices.stream().anyMatch(device -> device.id().equals(id));
-    }
-
-
     /** 같은 주소의 기기다. 없으면 null 이다. */
     public PushDevice findByHash(String endpointHash) {
         return devices.stream().filter(device -> device.endpointHash().equals(endpointHash)).findFirst().orElse(null);

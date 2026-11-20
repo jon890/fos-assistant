@@ -37,8 +37,9 @@ import tools.jackson.databind.json.JsonMapper;
 class PushControllerTest {
 
     private static final String ENDPOINT = "https://fcm.googleapis.com/fcm/send/controller-device";
-    private static final String P256DH = "BrowserPublicKeyValue";
-    private static final String AUTH = "BrowserAuthValue";
+    private static final TestSubscriptionKeys KEYS = TestSubscriptionKeys.create();
+    private static final String P256DH = KEYS.p256dh();
+    private static final String AUTH = KEYS.auth();
 
     @Autowired
     PushDeviceService devices;

@@ -80,7 +80,8 @@ public class VapidKeys {
         try {
             return Files.readString(Path.of(file), StandardCharsets.US_ASCII).strip();
         } catch (IOException | RuntimeException ex) {
-            throw new IllegalStateException("web push: VAPID private key file cannot be read", ex);
+            // 원인 예외의 메시지에 파일 경로가 들어 있어 붙이지 않고 종류만 적는다.
+            throw new IllegalStateException("web push: VAPID private key file cannot be read (" + ex.getClass().getSimpleName() + ")");
         }
     }
 
