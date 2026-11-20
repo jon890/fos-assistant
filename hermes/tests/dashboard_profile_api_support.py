@@ -201,7 +201,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         cls.profiles.profile_exists = lambda name: (cls.root / name).is_dir()
         cls.profiles.delete_profile = delete_profile
         cls.profiles.NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
-        responses.JSONResponse = lambda body, status_code: types.SimpleNamespace(
+        responses.JSONResponse = lambda body, status_code=200, headers=None: types.SimpleNamespace(
             status_code=status_code, body=body
         )
 
@@ -610,7 +610,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request("/api/profiles", "POST", token="valid",
                             body=body if body is not None else {"name": "alice", "no_skills": True})
 
-    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None, full_response=False):
+    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None, full_response=False, skills_payload=None):
         pairs = [("profile", value) for value in query_profiles] + list((query or {}).items())
 
         class QueryParams:
@@ -638,6 +638,12 @@ class ProfileApiRouteTest(unittest.TestCase):
             authenticated = getattr(current.state, "token_authenticated", False)
             if not (authenticated or current.cookie):
                 return types.SimpleNamespace(status_code=401)
+            if path == "/api/skills" and method == "GET" and skills_payload is not None:
+                async def body_iterator():
+                    yield json.dumps(skills_payload).encode("utf-8")
+
+                return types.SimpleNamespace(status_code=200, headers={}, body=skills_payload,
+                                             body_iterator=body_iterator())
             if path == "/api/profiles" and method == "POST":
                 # 처리기 흉내. 실패 응답이면 아무것도 만들지 않는다.
                 if self.handler_status < 400:

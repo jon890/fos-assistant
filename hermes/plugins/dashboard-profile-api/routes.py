@@ -83,6 +83,7 @@ from .env import (
     _check_env_update,
 )
 
+from .skill_list import _with_skill_owners
 from .profiles import (
     _check_profile_create,
     _check_skill_toggle,
@@ -263,6 +264,8 @@ def _install_gate() -> bool:
             raise
         if written is not None and response.status_code >= 400:
             _restore_config(checked[0], checked[1], written)
+        if request.url.path == "/api/skills" and response.status_code == 200:
+            return await _with_skill_owners(request.query_params.getlist("profile")[0], response)
         if request.url.path == "/api/env" and response.status_code < 400:
             body = await _json_object(request)
             # 그 key 를 칸으로 가진 플러그인다. 기본 key 는 여기 걸리지 않는다.

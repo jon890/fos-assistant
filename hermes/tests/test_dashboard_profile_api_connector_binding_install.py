@@ -652,6 +652,24 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
     def installed(self):
         return sorted(path.name for path in self.skills.iterdir() if (path / "SKILL.md").is_file())
 
+    def test_skill_list_marks_only_installed_skills_as_owned_by_plugin(self):
+        """설치되지 않은 스킬과 뗀 스킬에는 같은 이름이 색인에 남아도 설치 출처를 붙이지 않는다."""
+        self.set_shell(terminal=False, docker=False)
+        self.assertEqual(self.bind().status_code, 200)
+        skills = [{"name": "demo-report", "enabled": False}, {"name": "demo-runner", "enabled": True}]
+
+        def read():
+            return self.request("/api/skills", "GET", token="valid", query_profiles=("alice",),
+                                full_response=True, skills_payload=skills).body
+
+        installed, skipped = read()
+        self.assertEqual(installed["connector_id"], DEMO)
+        self.assertEqual(installed["connector_title"], "검사용 메모")
+        self.assertIs(installed["enabled"], False)
+        self.assertNotIn("connector_id", skipped)
+        self.assertEqual(self.bind(enabled=False).status_code, 200)
+        self.assertEqual(read(), skills)
+
     def test_shell_off_binds_without_the_runner_and_stays_configured(self):
         """셸 조건이 없으면 요구 env 스킬만 빠지고, 조건이 그대로인 동안 상태 판정은 어긋남으로 보지 않는다(REQ2, REQ3, REQ4)."""
         self.set_shell(terminal=False, docker=False)
