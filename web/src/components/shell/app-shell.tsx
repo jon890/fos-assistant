@@ -31,6 +31,11 @@ import {
   useAppName,
 } from "./shell-account";
 import { Sidebar } from "./sidebar";
+import {
+  readCollapsed,
+  subscribeCollapsed,
+  updateCollapsed,
+} from "./sidebar-collapsed";
 import { NotificationBell } from "@/components/notification/notification-bell";
 import { NotificationsProvider } from "@/components/notification/notifications-provider";
 import { useShortcuts } from "./use-shortcuts";
@@ -50,36 +55,6 @@ const TitleContext = createContext<Dispatch<
 const DisplayNameContext = createContext<string | null>(null);
 /** 역할이 `ADMIN` 인지다. `useAdminView()` 만 읽는다. 관리자 영역 안인지는 그 훅이 경로로 따로 본다. */
 const AdminContext = createContext(false);
-
-const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
-/** 이번 화면에서 접거나 편 값이다. 저장소에 적지 못해도 현재 화면은 이 값을 따른다. 아직 바꾸지 않았으면 null 이다 */
-let collapsedOverride: boolean | null = null;
-const collapsedListeners = new Set<() => void>();
-
-function subscribeCollapsed(onChange: () => void): () => void {
-  collapsedListeners.add(onChange);
-  return () => collapsedListeners.delete(onChange);
-}
-
-function readCollapsed(): boolean {
-  if (collapsedOverride !== null) return collapsedOverride;
-  try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
-  } catch {
-    /* 저장소를 막은 브라우저에서도 화면을 연다. */
-    return false;
-  }
-}
-
-function updateCollapsed(value: boolean): void {
-  collapsedOverride = value;
-  try {
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, value ? "1" : "0");
-  } catch {
-    /* 저장할 수 없어도 현재 화면은 바꾼다. */
-  }
-  collapsedListeners.forEach((onChange) => onChange());
-}
 
 function isAdminArea(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
