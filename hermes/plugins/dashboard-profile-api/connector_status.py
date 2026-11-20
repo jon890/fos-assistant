@@ -136,15 +136,18 @@ def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict, d
 
 
 def _status_skipped_skills(profile_dir: pathlib.Path, config: dict, manifest, entry) -> dict:
-    """상태 응답 항목에 더할 `skipped_skills` 칸이다. 설치된 바인딩이 에이전트용 스킬을 가질 때만 낸다.
+    """상태 응답 항목에 더할 `skipped_skills` 칸이다. 설치된 바인딩이면 낸다. 에이전트용 스킬 선언이 없으면 빈 목록이다.
 
     붙이기 응답이 아니라 지금 profile 기준으로 다시 계산한다. 붙인 뒤에 생긴 이름 겹침이나 옛 설치가 남긴 겹침은
     설치 상태 판정이 어긋남으로 보지 않아 재설치가 없으므로, 이 칸이 아니면 까닭이 어디에도 남지 않는다.
     계산이 실패하면 칸을 빼서 Control Plane 이 기존 기록을 지우지 않게 한다.
     """
     try:
-        if entry is None or manifest is None or not manifest.get("agent_skills"):
+        if entry is None or manifest is None:
             return {}
+        if not manifest.get("agent_skills"):
+            # 선언이 사라졌으면 이전에 남긴 기록을 Control Plane 이 비우게 빈 목록을 낸다.
+            return {"skipped_skills": []}
         _, skipped = _agent_skill_plan(profile_dir, config, manifest, entry["skills"])
         return {"skipped_skills": [{"name": name, "reasons": reasons} for name, reasons in sorted(skipped.items())]}
     except Exception:

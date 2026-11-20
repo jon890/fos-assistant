@@ -67,8 +67,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
                       "tools": {"mcp__other__list_scopes": "list_scopes"}}}})
         status = self.status_of()
         self.assertEqual(status["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
-            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
         self.assertIs(status["policy_hook"], True)
         # 사건 실행의 도구 판정을 하는 fos-ctx 가 묶음과 같다. Control Plane 은 이 칸이 참일 때만 사건 실행을 연다.
         self.assertIs(status["tool_guard"], True)
@@ -161,8 +161,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         declared["mcpServers"]["other"]["args"].append("--verbose")
         (other / ".mcp.json").write_text(json.dumps(declared), encoding="utf-8")
 
-        expected = [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
-                    {"plugin": OTHER, "enabled": True, "configured": False, "mode": "bind"}]
+        expected = [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []},
+                    {"plugin": OTHER, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []}]
         self.assertEqual(self.status_of()["connectors"], expected)
         self.assertEqual(self.connector_probe("demo"), 204)
         self.assertEqual(self.connector_probe("other"), 503)
@@ -211,8 +211,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"}})
         status, warnings = self.warnings_of_status()
         self.assertEqual(status["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
-            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
         self.assertIs(status["policy_hook"], True)
         self.assertEqual(warnings, [])
         self.assertEqual(self.tool_map(), tool_map)
@@ -240,8 +240,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
         status, warnings = self.warnings_of_status()
         self.assertEqual(status["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
-            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
         self.assertIs(status["policy_hook"], True)
         self.assertEqual(warnings, [])
 
@@ -400,7 +400,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(response.status_code, 200, response.body)
         self.assertIs(response.body["changed"], True)
         self.assertEqual(self.status_of()["connectors"][0],
-                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
+                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []})
 
     def test_rebinding_an_owned_connector_is_accepted_while_the_policy_hook_is_off(self):
         """이미 붙은 플러그인을 다시 설치하는 것은 fos-ctx 가 꺼져 있어도 받고, hook 상태는 거짓으로 남는다."""
@@ -433,7 +433,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(self.request("/api/connectors", "GET", token="valid", query_profiles=["human"],
                                       full_response=True).body["policy_hook"], True)
         self.assertEqual(self.status_of("human")["connectors"][0],
-                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
+                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []})
         self.assertEqual(self.connector_probe(profile="human"), 204)
 
         removed = self.bind(profile="human", enabled=False)
@@ -605,8 +605,8 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertEqual(self.bind(REMOTE, "c3").status_code, 200)
 
         self.assertEqual(self.status_of()["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
-            {"plugin": REMOTE, "enabled": True, "configured": True, "mode": "bind"}])
+            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []},
+            {"plugin": REMOTE, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
         self.assertEqual(self.connector_probe("remote"), 204)
         self.assertEqual(self.connector_probe("demo"), 204)
         self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
@@ -711,6 +711,25 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
         entry = self.status_entry()
         self.assertIs(entry["configured"], True)
         self.assertEqual(entry["skipped_skills"], [{"name": "demo-report", "reasons": ["name_taken"]}])
+
+    def test_status_clears_skipped_skills_when_the_plugin_no_longer_declares_agent_skills(self):
+        """마지막 에이전트용 스킬 선언이 사라지면 빈 목록을 내 Control Plane 이 옛 기록을 비우게 한다."""
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertEqual(self.bind().status_code, 200)
+        declared = json.loads((self.demo / "connector.json").read_text(encoding="utf-8"))
+        del declared["agent_skills"]
+        (self.demo / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        shutil.rmtree(self.demo / "agent-skills")
+        recorded = self.root / "alice" / ".fos-connectors.json"
+        state = json.loads(recorded.read_text(encoding="utf-8"))
+        state[DEMO]["skills"] = ["demo"]
+        recorded.write_text(json.dumps(state), encoding="utf-8")
+        shutil.rmtree(self.skills / "demo-report")
+        shutil.rmtree(self.skills / "demo-runner")
+
+        entry = self.status_entry()
+        self.assertIs(entry["configured"], True)
+        self.assertEqual(entry["skipped_skills"], [])
 
     def test_status_omits_skipped_skills_for_a_plugin_that_is_not_installed(self):
         self.assertNotIn("skipped_skills", self.status_entry())

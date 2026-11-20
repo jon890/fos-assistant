@@ -297,6 +297,26 @@ class ConnectorBindingDriftTest {
 
 
     @Test
+    @DisplayName("상태를 읽는 동안 바인딩이 바뀌었으면 오래된 빠진 스킬 답으로 기록을 덮지 않는다")
+    void doesNotOverwriteSkippedSkillsWhenBindingChangedWhileReading() {
+        ConnectorState stale = new ConnectorState(
+            "p", true, true, false, true, HermesConnectorClient.MODE_BIND, null, false,
+            List.of(new HermesConnectorClient.SkippedSkill("demo-runner", List.of("terminal_off"))));
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenAnswer(invocation -> {
+            // 점검이 응답을 받은 뒤 수동 확인이 새 사유를 저장하고 바인딩을 다시 READY 로 만든 순서다.
+            jdbc.update("UPDATE agent_connector_binding SET skipped_skills = ?,"
+                + " updated_at = updated_at + INTERVAL '1' SECOND WHERE id = ?",
+                "[{\"name\":\"demo-runner\",\"reasons\":[\"name_taken\"]}]", demo.id());
+            return stale;
+        });
+
+        applier.resyncDrifted();
+
+        assertThat(reload(demo).skippedSkills()).containsExactly(new SkippedSkill("demo-runner", List.of("name_taken")));
+    }
+
+
+    @Test
     @DisplayName("다시 보낸 설치가 실패하면 빠진 스킬의 옛 기록을 둔다")
     void failedReinstallKeepsSkippedSkills() {
         String recorded = "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]";

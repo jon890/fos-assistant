@@ -277,6 +277,8 @@ public class ConnectorBindingApplier {
                 agents.findByIdForUpdate(candidate.agentId());
                 bindings.findById(candidate.bindingId())
                     .filter(binding -> binding.status() == BindingStatus.READY)
+                    // 조회하는 동안 수동 확인 같은 다른 경로가 바인딩을 바꿨으면 그 답은 오래된 것이다.
+                    .filter(binding -> binding.updatedAt().equals(candidate.updatedAt()))
                     .filter(binding -> !binding.skippedSkills().equals(current))
                     .ifPresent(binding -> {
                         binding.recordSkippedSkills(current);
