@@ -276,6 +276,24 @@ class PromptFrameTest(ImageSourceFixture):
         self.assertEqual(received["aspect_ratio"], "landscape")
         self.assertEqual(self.remembered_links(), ["https://shop.example.com/goods/1"])
 
+    def test_failed_link_tells_to_redraw_with_previous_image_only(self):
+        """다음 장면에서 다시 받는 링크만 실패하면 막는 글이 링크를 빼고 앞 그림만 참고로 다시 그리라고 한다(스펙 DECISION52)."""
+        self.answers = {"link:shop.example.com/goods/1": (502, "IMAGE_SOURCE_LINK_FAILED")}
+
+        decision = self.plugin.pre_tool_call(
+            tool_name="image_generate",
+            args={"prompt": self.SCENE, "aspect_ratio": "landscape",
+                  "reference_image_urls": ["generated:공원의 가족", "link:shop.example.com/goods/1"]},
+            session_id=base.VECTOR_SESSION, tool_call_id="call_1")
+
+        self.assertEqual(decision["action"], "block")
+        self.assertIn("link:shop.example.com/goods/1: 링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다. "
+                      "같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
+                      "image_generate 를 다시 부르고", decision["message"])
+        self.assertNotIn("generated:공원의 가족:", decision["message"])
+        self.assertEqual(self.copied(), [])
+        self.assertEqual(self.remembered_links(), [])
+
     def test_gone_previous_image_tells_to_redraw_with_person_lines(self):
         """앞 그림 파일이 지워졌으면 막는 글이 그 그림을 빼고 인물 줄만으로 다시 그리라고 한다. 사진이 지워진 것과는 글이 다르다."""
         self.answers = {"generated:공원의 가족": (410, "IMAGE_SOURCE_GONE"), "attachment:13": (410, "IMAGE_SOURCE_GONE")}

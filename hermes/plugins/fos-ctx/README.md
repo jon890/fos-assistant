@@ -273,6 +273,8 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 제한 시간 | 한 호출의 모든 가리킴을 합쳐 `FETCH_BUDGET`(15초) |
 | 맥락이 없다 | `tool_call_id` 나 session 이 빈 호출(코드 실행 안의 호출)은 막는다 |
 
+링크(`link:`)를 쓰지 못한 까닭에는 「다음 장면이고 앞 그림은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 다시 부른다」 를 덧붙인다(스펙 generated-image DECISION52).
+
 ### 승인 관문으로 가는 동작을 막는다
 
 Hermes 가 위험하다고 분류한 `terminal` 명령, Hermes 가 승인을 요구하는 경로(`~/.ssh/config`, 셸 시작 파일)의 `write_file` 과 `patch`, 모든 `computer_use` 호출을 맨 먼저 막는다(1.11.0 부터, fos-assistant [Hermes 업그레이드 스펙](../../../docs/features/hermes-upgrade/spec.md) 의 REQ5).

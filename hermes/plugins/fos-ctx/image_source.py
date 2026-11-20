@@ -63,6 +63,9 @@ LINK_REASONS = {
     "IMAGE_SOURCE_LINK_FAILED": "링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다",
 }
 FAILED = "사진을 받지 못했다. 잠시 뒤 다시 부탁하라고 안내한다"
+# 링크를 쓰지 못했을 때 덧붙인다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
+LINK_NEXT_SCENE = ("같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
+                   "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다")
 OLD_SERVER = "이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다"
 NO_CONTEXT = "이 호출에서는 사진을 받을 수 없다. 대화에서 직접 image_generate 를 부른다"
 HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없다."
@@ -284,7 +287,7 @@ def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written, link
         if problem == OLD_SERVER:
             return OLD_SERVER
         if problem:
-            problems.append(key + ": " + problem)
+            problems.append(key + ": " + problem + (". " + LINK_NEXT_SCENE if key.startswith(LINK_PREFIX) else ""))
             copies[key] = None
             continue
         path = folder / (secrets.token_hex(16) + EXTENSIONS[content_type])
