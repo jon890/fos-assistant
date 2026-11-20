@@ -46,7 +46,7 @@ async function startWith(page: Page, agentName: string) {
 async function routeSkills(
   page: Page,
   body: {
-    skills: { name: string; enabled: boolean }[];
+    skills: { name: string; enabled: boolean; source?: "CONNECTOR" }[];
     skillsToolsetEnabled: boolean;
   },
 ) {
@@ -57,9 +57,9 @@ async function routeSkills(
       contentType: "application/json",
       body: JSON.stringify({
         skills: body.skills.map((skill) => ({
-          ...skill,
           description: "",
           source: "UPLOADED",
+          ...skill,
         })),
         editable: true,
         skillsToolsetEnabled: body.skillsToolsetEnabled,
@@ -389,11 +389,11 @@ test("스킬 목록이 빈 에이전트에서 / 를 치면 스킬이 없다고 �
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
 });
 
-test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 스킬이 있어도 스킬이 없다고 알린다", async ({
+test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 플러그인 스킬이 있어도 스킬이 없다고 알린다", async ({
   page,
 }) => {
   await routeSkills(page, {
-    skills: [{ name: "hermes-help", enabled: true }],
+    skills: [{ name: "demo-note-review", enabled: true, source: "CONNECTOR" }],
     skillsToolsetEnabled: false,
   });
   await page.goto("/new");
