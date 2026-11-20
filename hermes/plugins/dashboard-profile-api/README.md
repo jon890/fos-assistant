@@ -614,7 +614,7 @@ PR2 의 요구사항도 같은 테스트 기반으로 실제 파일과 실제 �
 
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
-| DECISION1 | 환경 변수 이름 | 환경 변수 이름을 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작한다 | 작성자 | 대시보드 운영 값의 접두 `FOS_ASSISTANT_` 를 따르고, Control Plane 의 `ASSISTANT_DATA_ENCRYPTION_` 과 이름으로 갈린다 |
+| DECISION1 | 환경 변수 이름 | 환경 변수 이름을 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작한다 | 작성자 | 대시보드 운영 값의 접두 `FOS_ASSISTANT_` 를 따르고, Control Plane 의 데이터 암호화 환경 변수와 이름으로 구분된다 |
 | DECISION2 | key 캐시 | key 를 캐시하지 않고 부를 때마다 읽는다 | 작성자 | 파일이 작고 쓰기가 드물다. 캐시를 두면 테스트와 key 교체 때 낡은 값을 쓴다 |
 | DECISION3 | 「key 필수」 의 모르는 값 | 「key 필수」 의 모르는 값은 켠 것으로 본다 | 작성자 | 오타가 평문 쓰기로 이어지지 않게 한다 |
 | DECISION4 | 쓰기 전 소유 확인 | 쓰기 전 소유 확인은 풀지 않고 `connector` 만 본다 | 작성자 | key 를 잃은 파일도 같은 플러그인의 새 값으로 덮어써야 다시 등록이 된다 |
