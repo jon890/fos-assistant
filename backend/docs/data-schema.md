@@ -324,8 +324,8 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 #### 결과물 자동 보관 컬럼
 
-`artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다. 비어 있으면 `ArtifactAutoVaultSetting.DEFAULT_ENABLED`(켜짐)를 따른다. 두 값은 같아야 한다.
-주문 상한처럼 엔티티의 넣기와 고치기에서 빼고 전용 쿼리로만 읽고 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
+`artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
+**지금은 읽지도 쓰지도 않는다.** 「결과물 자동 보관」 스위치를 없애 자동 보관이 늘 돈다([파일 공간 스펙](../../docs/features/workspace/spec.md) REQ16). 칸을 지우는 마이그레이션은 되돌릴 수 없어 칸을 남겼다([설계](../../docs/features/workspace/design.md) DECISION11). 엔티티는 검사의 스키마가 같은 칸을 갖도록 넣기와 고치기에서 뺀 매핑만 둔다.
 
 ### allowed_person
 

@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultItem;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.domain.ArtifactReferences;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.artifact.domain.VaultDownloadName;
 import com.bifos.assistant.chat.artifact.domain.VaultLabel;
 import com.bifos.assistant.chat.artifact.domain.VaultFileType;
 import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
@@ -253,7 +254,8 @@ public class ArtifactVaultService {
 
     /** 보관본 하나의 뿌리 파일을 푼다. 없거나 남의 것이면 같은 응답이다. 풀지 못하면 본문 일부도 주지 않는다. */
     public ArtifactVaultContent read(Long ownerUserId, Long id) {
-        return content(root(ownerUserId, id));
+        ChatArtifact root = root(ownerUserId, id);
+        return content(root, VaultDownloadName.of(titleOf(ownerUserId, root), fileName(root.path()), null));
     }
 
 
@@ -266,10 +268,11 @@ public class ArtifactVaultService {
         ChatArtifact root = root(ownerUserId, id);
         String normalized = normalizedOrMissing(path);
         if (normalized.equals(root.path())) {
-            return content(root);
+            return content(root, fileName(root.path()));
         }
-        return content(rows.findByVaultBundleIdAndPathAndVaultUserId(root.id(), normalized, ownerUserId)
-            .orElseThrow(ArtifactVaultService::missing));
+        ChatArtifact part = rows.findByVaultBundleIdAndPathAndVaultUserId(root.id(), normalized, ownerUserId)
+            .orElseThrow(ArtifactVaultService::missing);
+        return content(part, fileName(part.path()));
     }
 
 
@@ -287,7 +290,7 @@ public class ArtifactVaultService {
         for (ArtifactVaultPart part : rows.listParts(root.id(), ownerUserId)) {
             bodies.open(rows.findById(part.getId()).orElseThrow(ArtifactVaultService::missing));
         }
-        return baseName(fileName(root.path())) + ".zip";
+        return VaultDownloadName.of(titleOf(ownerUserId, root), baseName(fileName(root.path())) + ".zip", "zip");
     }
 
 
@@ -383,10 +386,18 @@ public class ArtifactVaultService {
     }
 
 
-    private ArtifactVaultContent content(ChatArtifact row) {
+    private ArtifactVaultContent content(ChatArtifact row, String name) {
         byte[] body = bodies.open(row);
         VaultFileType type = VaultFileType.of(row.path()).orElseThrow(ArtifactVaultService::missing);
-        return new ArtifactVaultContent(fileName(row.path()), type.contentType(), type.inline(), body);
+        return new ArtifactVaultContent(name, type.contentType(), type.inline(), body);
+    }
+
+
+    /** 뿌리 행의 제목이다. 없거나 풀지 못하면 null 이고 내려받는 이름이 파일 이름이 된다. */
+    private String titleOf(Long ownerUserId, ChatArtifact root) {
+        return metas.open(ownerUserId, root.conversationId(), root.path(), root.vaultMeta(), root.vaultMetaKeyId())
+            .map(VaultLabel::title)
+            .orElse(null);
     }
 
 
