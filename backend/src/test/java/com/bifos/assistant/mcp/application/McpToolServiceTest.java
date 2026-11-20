@@ -269,7 +269,7 @@ class McpToolServiceTest {
         assertThat(tools.invalidContext())
             .isEqualTo(Map.of(
                 "content",
-                List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
+                List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.")),
                 "isError",
                 true));
     }

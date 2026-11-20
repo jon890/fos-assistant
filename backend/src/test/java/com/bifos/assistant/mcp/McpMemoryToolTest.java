@@ -388,7 +388,7 @@ class McpMemoryToolTest {
 
         assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
         assertThat(rejected.path("result").path("content").get(0).path("text").asString())
-            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.");
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
         assertThat(missing).isEqualTo(rejected);
     }

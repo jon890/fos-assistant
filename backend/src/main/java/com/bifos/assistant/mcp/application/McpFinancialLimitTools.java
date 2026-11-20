@@ -32,13 +32,12 @@ public class McpFinancialLimitTools {
 
 
     public Map<String, Object> read(McpCaller caller) {
-        return McpToolService.result(JSON.writeValueAsString(requests.read(caller.user())), false);
+        return McpToolService.success(JSON.writeValueAsString(requests.read(caller.user())));
     }
 
 
     public Map<String, Object> change(McpCaller caller, String name, String value) {
-        return McpToolService.result(JSON.writeValueAsString(requests.change(caller.user(), caller.originExecution().id(), name, value)),
-            false);
+        return McpToolService.success(JSON.writeValueAsString(requests.change(caller.user(), caller.originExecution().id(), name, value)));
     }
 
 

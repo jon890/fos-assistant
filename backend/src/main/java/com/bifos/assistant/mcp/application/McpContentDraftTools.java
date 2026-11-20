@@ -11,6 +11,7 @@ import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -79,11 +80,16 @@ public class McpContentDraftTools {
             // 오류의 현재 revision도 현재 권한을 확인한 뒤에만 돌려준다.
             guard.requireCurrent(caller);
             if (error == null) {
-                return McpToolService.result(ExternalData.wrap(json.writeValueAsString(result)), false);
+                return McpToolService.success(ExternalData.wrap(json.writeValueAsString(result)));
             }
             if (error instanceof ContentDraftBindingChoiceException choice) {
                 // 바인딩을 정하지 못한 까닭은 모델이 다음 호출을 고치도록 고정 문구로 싣는다.
-                return McpToolService.result(json.writeValueAsString(Map.of("code", error.code().name(), "message", choice.getMessage())), true);
+                Map<String, Object> fields = new LinkedHashMap<>();
+                fields.put("code", error.code().name());
+                fields.put("message", choice.getMessage());
+                return McpToolService.jsonFailure(fields, ContentDraftBindingChoiceException.MANY.equals(choice.getMessage())
+                    ? ToolFailureText.alternative(choice.getMessage(), "bindingId 를 지정해 다시 부른다")
+                    : ToolFailureText.askUser(choice.getMessage()));
             }
             if (error.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ContentDraftInputReader.invalid();
@@ -91,7 +97,8 @@ public class McpContentDraftTools {
             if (error.code() == ErrorCode.MCP_CALL_CONTEXT_INVALID) {
                 return invalidContext();
             }
-            var failure = json.createObjectNode().put("code", error.code().name());
+            Map<String, Object> failure = new LinkedHashMap<>();
+            failure.put("code", error.code().name());
             if (error instanceof ContentDraftException typed && typed.currentRevision() != null) {
                 failure.put("currentRevision", typed.currentRevision());
             }
@@ -103,20 +110,35 @@ public class McpContentDraftTools {
             } else if (error.code() == ErrorCode.IMAGE_SOURCE_GONE) {
                 failure.put("message", IMAGE_GONE_MESSAGE);
             }
-            return McpToolService.result(json.writeValueAsString(failure), true);
+            return McpToolService.jsonFailure(failure, nextFor(error.code()));
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ContentDraftInputReader.invalid();
             }
             return invalidContext();
         } catch (RuntimeException ex) {
-            return McpToolService.result("{\"code\":\"INTERNAL_ERROR\"}", true);
+            return McpToolService.jsonFailure(Map.of("code", ErrorCode.INTERNAL_ERROR.name()), nextFor(ErrorCode.INTERNAL_ERROR));
         }
     }
 
 
     private static Map<String, Object> invalidContext() {
-        return McpToolService.result("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.", true);
+        return McpToolService.failure(McpToolService.INVALID_CONTEXT);
+    }
+
+
+    /** 원고 도구의 JSON 실패마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(ErrorCode code) {
+        String failure = code.name();
+        if (code.name().endsWith("_CONFLICT") || code == ErrorCode.CONTENT_DRAFT_STALE) {
+            return ToolFailureText.alternative(failure, "currentRevision 으로 다시 읽고 고쳐 부른다");
+        }
+        return switch (code) {
+            case CONTENT_DRAFT_DUPLICATE_PHOTO -> ToolFailureText.alternative(failure, "중복된 사진 블록을 지우고 다시 저장한다");
+            case IMAGE_SOURCE_UNKNOWN -> ToolFailureText.alternative(failure, "실행 입력의 「이 대화에서 만든 그림」 제목을 글자 그대로 써서 다시 부른다");
+            case INTERNAL_ERROR -> ToolFailureText.alternative(failure, McpToolService.SERVER_FAILURE_NEXT);
+            default -> ToolFailureText.askUser(failure);
+        };
     }
 
 

@@ -131,6 +131,15 @@ Control Plane MCP 도구가 모델에게 돌려주는 실패(도구 결과의 `i
 | `backend/src/test/java/com/bifos/assistant/mcp/McpMediaObservationToolTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpToolResultShape.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpArtifactWriteToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpCallerInvariantTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpContentDraftSnapshotsTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpFollowUpToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpMemorySearchToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpPrincipalTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/application/McpConnectorListToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolServiceTest.java` | 수정 |
 | `backend/docs/code-architecture.md` | 수정 |
 | `docs/features/content-draft.md` | 수정 |
 | `docs/features/attachment.md` | 수정 |

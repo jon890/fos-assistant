@@ -5,6 +5,7 @@ import static com.bifos.assistant.mcp.presentation.McpRpc.invalidParams;
 import static com.bifos.assistant.mcp.presentation.McpRpc.response;
 import static com.bifos.assistant.mcp.presentation.McpRpc.text;
 
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
@@ -83,18 +84,18 @@ public class McpArtifactCalls {
 
 
     /** 내부 예외 문구를 그대로 내보내지 않고, 정해 둔 오류 이유만 반환한다. */
-    private static String artifactValidationReason(ApiException exception) {
+    private static ToolFailureText artifactValidationReason(ApiException exception) {
         String message = exception.getMessage();
         if (message == null) {
             return INVALID_ARGUMENTS;
         }
-        return switch (message) {
-            case "inline artifact content must be HTML or CSS", "URL artifact path must be an image" ->
-                "허용하지 않은 확장자입니다.";
+        String reason = switch (message) {
+            case "inline artifact content must be HTML or CSS", "URL artifact path must be an image" -> "허용하지 않은 확장자입니다.";
             case "artifact path is invalid", "artifact path is required" -> "경로 형식이 올바르지 않습니다.";
             case "artifact content must not exceed 5 MiB" -> "파일 크기가 5MB를 초과했습니다.";
             case "artifact source URL is invalid" -> "주소 형식이 올바르지 않습니다.";
-            default -> INVALID_ARGUMENTS;
+            default -> null;
         };
+        return reason == null ? INVALID_ARGUMENTS : ToolFailureText.alternative(reason, "경로, 확장자, 크기를 고쳐 다시 부른다");
     }
 }

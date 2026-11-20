@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
@@ -21,6 +22,7 @@ final class McpToolResultShape {
     static final Path FIXTURE = Path.of("../test/fixtures/mcp-call-tool-result-v1.json");
     /** 이 Control Plane 이 내는 내용 블록이다. 다른 종류를 내기 시작하면 그 필수 칸을 여기에 더한다. */
     private static final Set<String> CONTENT_TYPES = Set.of("text");
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
 
     static boolean accepts(JsonNode result) {
@@ -43,12 +45,31 @@ final class McpToolResultShape {
     }
 
 
+    /** 모양에 더해 실패 결과가 끝 줄로 끝나는지 본다(docs/features/tool-fallback/spec.md 의 REQ3). */
     static void assertCallToolResult(String tool, JsonNode result) {
         assertThat(accepts(result)).as("%s 의 결과가 CallToolResult 모양이 아니다: %s", tool, result).isTrue();
+        if (result.path("isError").asBoolean(false)) {
+            assertEndsWithStep(tool, result.path("content").path(0).path("text").stringValue());
+        }
+    }
+
+
+    /** 실패 글의 마지막 줄이 다음 방법이나 바로 알림이다. 글이 JSON 객체면 {@code next} 칸을 본다. */
+    static void assertEndsWithStep(String tool, String text) {
+        String endLine;
+        JsonNode parsed = text.startsWith("{") ? JSON.readTree(text) : null;
+        if (parsed != null && parsed.isObject()) {
+            endLine = parsed.path("next").asString("");
+        } else {
+            endLine = text.substring(text.lastIndexOf('\n') + 1);
+        }
+        assertThat(endLine.startsWith(ToolFailureText.NEXT_PREFIX) || endLine.equals(ToolFailureText.ASK_USER))
+            .as("%s 의 실패 글이 끝 줄로 끝나지 않는다: %s", tool, text)
+            .isTrue();
     }
 
 
     static JsonNode fixture() throws Exception {
-        return JsonMapper.builder().build().readTree(Files.readString(FIXTURE));
+        return JSON.readTree(Files.readString(FIXTURE));
     }
 }
