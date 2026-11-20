@@ -1,0 +1,72 @@
+{
+  "name": "control-plane",
+  "description": "OAuth 단추 연결의 시작·돌아오기, 토큰 통로와 갱신, 다시 연결 필요 알림, 해제 때 취소",
+  "pr_scope": "Control Plane 이 단추 연결을 시작하고 끝내며, 토큰 통로로 유효한 토큰을 주고, 끊김을 알리고, 해제 때 제공자 허락을 취소한다.",
+  "deferred": [
+    {
+      "what": "서명 비밀 「새로 만들기」 와 통로 주소 다시 쓰기",
+      "why": "운영 코드 줄 수 상한 안에 연결 흐름을 먼저 넣는다. 처음 쓸 때 만드는 것은 이번 PR 에 있다",
+      "after": "이 PR 머지"
+    },
+    {
+      "what": "웹 연결 단추와 돌아오는 화면, 서버 비밀값 화면, 알림 이동",
+      "why": "연결 실행 API 가 먼저 필요하다",
+      "after": "이 PR 머지"
+    },
+    {
+      "what": "Gmail 단추 연결",
+      "why": "실제 GitHub 연결을 먼저 확인한다",
+      "after": "웹 PR 배포와 GitHub 연결 확인"
+    }
+  ],
+  "status": "in_progress",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/connector-oauth/spec.md",
+  "design": "docs/features/connector-oauth/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ3",
+    "REQ4",
+    "REQ5",
+    "REQ6",
+    "REQ7",
+    "REQ8",
+    "REQ9",
+    "REQ11"
+  ],
+  "total_phases": 3,
+  "current_phase": 2,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ6",
+        "REQ7"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ3",
+        "REQ4",
+        "REQ5",
+        "REQ9",
+        "REQ11"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ7",
+        "REQ8",
+        "REQ9"
+      ]
+    }
+  ]
+}

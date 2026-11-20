@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.connection.infra;
 
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,10 @@ public interface ConnectorConnectionRepository extends JpaRepository<ConnectorCo
 
 
     List<ConnectorConnection> findByUserIdIn(List<Long> userIds);
+
+
+    /** 그 상태의 연결이다. 단추 연결의 예약 갱신이 쓸 수 있는 연결을 훑을 때 쓴다. */
+    List<ConnectorConnection> findByStatus(ConnectionStatus status);
 
 
     /** 사용자 정리 때 그 사용자의 연결 번호를 읽는다. 칸 값을 풀지 않으려고 엔티티를 읽지 않는다. */

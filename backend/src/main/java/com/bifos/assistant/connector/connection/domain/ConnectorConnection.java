@@ -144,6 +144,18 @@ public class ConnectorConnection extends CreatedAtEntity {
     }
 
 
+    /**
+     * 서비스가 단추 연결의 갱신을 거절했다. 다시 연결할 때까지 준비 안 됨으로 두고 표시를 남긴다. 단추 연결에서만 부른다.
+     */
+    public void reconnectRequired(Instant now) {
+        now = nextRevision(now);
+        this.fields = new ConnectionFields(
+            fields.values(), fields.secretPrefixes(), new ConnectionAuth(fields.auth().provider(), true));
+        this.status = ConnectionStatus.PENDING;
+        this.updatedAt = now;
+    }
+
+
     public void recordUndeclaredTools(int count) {
         this.undeclaredTools = count;
     }
