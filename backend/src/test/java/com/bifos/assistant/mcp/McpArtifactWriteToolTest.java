@@ -526,8 +526,7 @@ class McpArtifactWriteToolTest {
         assertThat(artifact.path("description").asString()).contains("5MB를 넘을 수 없다");
         assertThat(artifact.path("description").asString())
             .contains("html", "css", "png", "jpg", "jpeg", "gif", "webp");
-        assertThat(artifact.path("inputSchema").path("additionalProperties").asBoolean())
-            .isFalse();
+        assertThat(artifact.path("inputSchema").has("additionalProperties")).isFalse();
         assertThat(artifact.path("inputSchema").path("oneOf")).hasSize(2);
     }
 

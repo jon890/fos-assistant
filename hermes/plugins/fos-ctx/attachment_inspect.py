@@ -28,7 +28,7 @@ SCHEMA = {
                    "개요만 보고 작은 글자를 읽었다고 하지 않는다. overview와 region은 함께 쓰지 않는다. "
                    "큰 사진은 표시 원본 좌표 [x1,y1,x2,y2] 영역으로 조회한다. 한 번에 한 장씩 본다.",
     "parameters": {
-        "type": "object", "additionalProperties": False,
+        "type": "object",
         "properties": {
             "overview": {"type": "boolean", "description": "원본 대신 축소 전체 개요를 명시적으로 요청한다."},
             "attachment_id": {"type": "integer", "minimum": 1},

@@ -56,6 +56,32 @@ class McpToolCatalogTest {
     }
 
 
+    @Test
+    @DisplayName("모든 도구는 모델에게 서명 인자를 노출하지 않고 실행 맥락을 허용한다")
+    @SuppressWarnings("unchecked")
+    void allowsRuntimeContextForEveryTool() {
+        LiveProperties<DelegationProperties> properties = mock(LiveProperties.class);
+        when(properties.current()).thenReturn(settings(20));
+        var catalog = new McpToolCatalog(properties,
+            new McpMemoryRemember(null, null, null, null),
+            new McpMediaObservationTools(null, null, null, null, null),
+            new McpContentDraftTools(null, null, null, null),
+            new McpContentDraftSnapshots(null, null, null, null),
+            new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
+            new McpApprovalResumeTool(mock(ApprovalResumes.class)),
+            new McpFileSpaceTools(null, null, null));
+
+        assertThat(catalog.tools()).allSatisfy(tool -> {
+            assertThat(tool.get("inputSchema")).isInstanceOf(Map.class);
+            var schema = (Map<String, Object>)tool.get("inputSchema");
+            assertThat(schema).as("%s의 루트 스키마", tool.get("name"))
+                .doesNotContainKey("additionalProperties");
+            assertThat((Map<String, Object>)schema.get("properties")).doesNotContainKey("_fos_ctx");
+            assertThat((List<String>)schema.getOrDefault("required", List.of())).doesNotContain("_fos_ctx");
+        });
+    }
+
+
     private static String description(List<Map<String, Object>> definitions) {
         return definitions.stream().filter(tool -> "agent_status".equals(tool.get("name")))
             .map(tool -> (String)tool.get("description")).findFirst().orElseThrow();
