@@ -121,4 +121,19 @@ class MemorySummaryBackfillTest {
         assertThat(jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, broken.id())).isNull();
         assertThat(reread(fine).summary()).isEqualTo("멀쩡한 본문");
     }
+
+
+    @Test
+    @DisplayName("이관 전 줄을 요약 없이 고치면 빈 글로 묻히지 않고 이관 규칙으로 요약을 정한다")
+    void revisingPendingRowAppliesRule() {
+        Memory shortFact = pending(memories.create(ADMIN, MemoryScope.USER, "짧은 사실", "옛 본문", false));
+        Memory longFact = pending(memories.create(ADMIN, MemoryScope.USER, "긴 사실", "옛 긴 본문", false));
+
+        memories.update(ADMIN, shortFact.id(), "새 본문", MemoryRetrieval.SEARCH);
+        memories.update(ADMIN, longFact.id(), "다".repeat(201), MemoryRetrieval.SEARCH);
+
+        assertThat(reread(shortFact).summary()).isEqualTo("새 본문");
+        assertThat(reread(longFact).storedSummary()).isNotNull();
+        assertThat(reread(longFact).summary()).isEmpty();
+    }
 }

@@ -96,14 +96,14 @@ public final class MemoryAdminDtos {
         long maxCharsMin,
         long maxCharsMax) {
 
-        public static MemoryContextSettingView of(MemoryContextBudget budget, MemoryContextSettings settings) {
+        public static MemoryContextSettingView of(MemoryContextBudget budget, long summaryCeiling) {
             return new MemoryContextSettingView(
                 budget.summaryMaxChars(),
                 budget.maxChars(),
                 MemoryContextBudget.DEFAULT_SUMMARY_MAX_CHARS,
                 MemoryContextBudget.DEFAULT_MAX_CHARS,
                 MemoryContextSettings.SUMMARY_MIN,
-                settings.summaryCeiling(budget.maxChars()),
+                summaryCeiling,
                 MemoryContextSettings.TOTAL_MIN,
                 MemoryContextSettings.TOTAL_MAX);
         }

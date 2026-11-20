@@ -96,20 +96,27 @@ public class MemorySummaryBackfill implements ApplicationRunner {
         if (!row.readable()) {
             return false;
         }
-        String summary = target(row) ? row.content() : "";
+        String summary = ruleSummary(row, row.content(), row.retrieval());
         row.fillSummary(summary, texts.sealSummary(row.stored(), summary).orElse(null));
         memories.saveAndFlush(row);
         return true;
     }
 
 
-    /** 배포 직전 옛 개인 사실 구역의 후보 조건과 같다. */
-    static boolean target(Memory memory) {
-        return memory.scope() == MemoryScope.USER
+    /**
+     * 요약 칸이 없는 경로가 정하는 요약이다. 배포 직전 옛 개인 사실 구역의 후보 조건(개인 범위의 승인된 사실, {@code SEARCH}, 대체되지 않음, 본문
+     * {@link Memory#SUMMARY_MAX} 자 이하)이면 본문을, 아니면 빈 글을 낸다. 이관과 화면 경로(만들기, 고치기)와 이관 전 줄을 고치는 경로가 함께 쓴다.
+     *
+     * @param content 적용할 본문. 고치는 경로는 새 본문이다
+     * @param retrieval 적용할 꺼내는 방식
+     */
+    static String ruleSummary(Memory memory, String content, MemoryRetrieval retrieval) {
+        boolean target = memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.status() == MemoryStatus.ACCEPTED
-            && memory.retrieval() == MemoryRetrieval.SEARCH
+            && retrieval == MemoryRetrieval.SEARCH
             && memory.supersededByMemoryId() == null
-            && memory.content().length() <= Memory.SUMMARY_MAX;
+            && content.length() <= Memory.SUMMARY_MAX;
+        return target ? content : "";
     }
 }

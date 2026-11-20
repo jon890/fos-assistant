@@ -3,6 +3,7 @@ package com.bifos.assistant.admin.memory.presentation;
 import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.MemoryContextSettingView;
 import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.ReplaceMemoryContextRequest;
 import com.bifos.assistant.memory.application.MemoryContextSettings;
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -26,13 +27,18 @@ public class MemorySettingAdminController {
     @GetMapping
     public MemoryContextSettingView get() {
         CurrentUser admin = currentUser.requireAdmin();
-        return MemoryContextSettingView.of(settings.budgetFor(admin.groupId()), settings);
+        return view(settings.budgetFor(admin.groupId()));
     }
 
 
     @PutMapping
     public MemoryContextSettingView replace(@Valid @RequestBody ReplaceMemoryContextRequest request) {
         CurrentUser admin = currentUser.requireAdmin();
-        return MemoryContextSettingView.of(settings.save(admin, request.summaryMaxChars(), request.maxChars()), settings);
+        return view(settings.save(admin, request.summaryMaxChars(), request.maxChars()));
+    }
+
+
+    private MemoryContextSettingView view(MemoryContextBudget budget) {
+        return MemoryContextSettingView.of(budget, settings.summaryCeiling(budget.maxChars()));
     }
 }

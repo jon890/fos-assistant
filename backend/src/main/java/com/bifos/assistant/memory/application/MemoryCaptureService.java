@@ -99,7 +99,8 @@ public class MemoryCaptureService {
         }
         MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
         String body = request.content();
-        String summary = request.summary() == null ? "" : request.summary();
+        // 제안에는 요약을 두지 않는다. 제안 카드가 요약을 보이기 전(PR2)에는 사용자가 보지 못한 요약이 받아들이는 순간 매 실행에 들어가기 때문이다
+        String summary = !direct || request.summary() == null ? "" : request.summary();
         Memory created = (direct
             ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
             : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant()))
@@ -240,7 +241,10 @@ public class MemoryCaptureService {
         }
         Memory memory = found.get();
         // 요약을 주지 않았으면 지금 요약을 둔다. 빈 글이면 지운다
-        String summary = request.summary() == null ? memory.summary() : request.summary();
+        String current = memory.storedSummary() == null
+            ? MemorySummaryBackfill.ruleSummary(memory, request.content(), memory.retrieval())
+            : memory.summary();
+        String summary = request.summary() == null ? current : request.summary();
         if (request.content().equals(memory.content()) && summary.equals(memory.summary())) {
             return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
         }
@@ -281,8 +285,10 @@ public class MemoryCaptureService {
                 existing.id());
             case REJECTED -> new MemoryRememberResult(MemoryRememberOutcome.REJECTED_BEFORE, existing.id());
             case PROPOSED -> {
-                // 저장된 제안의 요약에 민감해 보이는 글이 있으면 지금 호출이 깨끗해도 받아들이지 않는다. 이번 호출의 요약은 쓰지 않는다
-                if (!direct || MemorySensitiveHints.suspected(existing.title(), existing.content(), existing.summary())) {
+                // 저장된 제안의 요약이 이번 호출의 요약과 다르거나 민감해 보이면 받아들이지 않는다. 대조를 거치지 않은 요약이 들어가지 않게 한다
+                String requested = request.summary() == null ? "" : request.summary();
+                if (!direct || !existing.summary().equals(requested)
+                    || MemorySensitiveHints.suspected(existing.title(), existing.content(), existing.summary())) {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());

@@ -177,7 +177,7 @@ export const memoryRememberMcpScenario: Scenario = {
       expect(instructions.includes("# 지금 묻는 사람에 대해 기억한 것"), `요약 구역이 없다:\n${instructions}`);
       expect(instructions.includes(factLine(savedMemory, DIRECT_SUMMARY)), `요약 구역에 저장한 사실이 없다:\n${instructions}`);
 
-      step("부정이 사라진 본문은 제안으로 남고 받아들이면 요약 구역에 들어간다");
+      step("부정이 사라진 본문은 제안으로 남고, 제안에는 요약을 두지 않아 받아들여도 요약 구역이 아니라 색인에 든다");
       context.hermes.setMemoryRememberCall(
         NEGATED_TEXT, { title: NEGATED_TITLE, content: "강아지는 고기를 좋아한다", summary: NEGATED_SUMMARY });
       const negated = await send(context, NEGATED_TEXT, direct.conversationId);
@@ -199,8 +199,9 @@ export const memoryRememberMcpScenario: Scenario = {
         "제안 받아들이기",
       );
       await send(context, "제안 승인 뒤 확인", direct.conversationId);
-      expect((context.hermes.lastSubmittedInstructions() ?? "").includes(factLine(proposedMemory, NEGATED_SUMMARY)),
-        "받아들인 제안이 요약 구역에 들어가지 않았다");
+      const afterAccept = context.hermes.lastSubmittedInstructions() ?? "";
+      expect(afterAccept.includes(indexLine(proposedMemory)) && !afterAccept.includes(NEGATED_SUMMARY),
+        `받아들인 제안이 요약 없이 색인에 들지 않았다:\n${afterAccept}`);
 
       step("같은 대화의 앞 turn 이 바깥 도구를 썼으면 근거가 있어도 제안으로 내려간다");
       context.hermes.setOutsideToolRun(OUTSIDE_SEARCH_TEXT);

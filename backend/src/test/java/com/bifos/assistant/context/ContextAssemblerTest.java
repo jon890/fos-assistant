@@ -903,6 +903,7 @@ class ContextAssemblerTest {
         Memory summarized = memories.create(ADMIN, MemoryScope.USER, "일하는 방식", "상세-표식-3301 주력은 자바와 스프링이다", false);
         MemorySummaryRows.summarize(texts, jdbc, summarized, "백엔드 개발자");
         Memory plain = memories.create(ADMIN, MemoryScope.USER, "요약 없는 사실", "요약없음-표식-7720", false);
+        MemorySummaryRows.summarize(texts, jdbc, plain, "");
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -949,6 +950,20 @@ class ContextAssemblerTest {
             .extracting(ContextItem::source)
             .containsExactly(ContextSource.MEMORY_FACTS, ContextSource.MEMORY_SEARCH);
         assertThat(result.instructions()).contains("둘째 알레르기 있음", "땅콩 들어간 음식은 먹으면 안 된다");
+    }
+
+
+    @Test
+    @DisplayName("질문과 관련 없는 요약 기억의 상세는 질문 관련 구역에 들지 않는다")
+    void leavesUnrelatedDetailOut() {
+        Memory unrelated = memories.create(
+            ADMIN, MemoryScope.USER, "출근 방법", "무관상세-표식-5501 지하철 2호선으로 출근한다", false);
+        MemorySummaryRows.summarize(texts, jdbc, unrelated, "지하철 출근");
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId, "땅콩 들어간 거 먹어도 돼?");
+
+        assertThat(result.instructions()).contains("지하철 출근").doesNotContain("무관상세-표식-5501");
+        assertThat(result.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_SEARCH);
     }
 
 

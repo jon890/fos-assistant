@@ -32,7 +32,11 @@ class MemoryRevisionWriter {
 
 
     Memory revise(CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval) {
-        return revise(user, memory, content, memory.summary(), retrieval);
+        // 이관 전(NULL) 줄은 지금 요약이 빈 글이라 그대로 적으면 이관 대상에서 영영 빠진다. 이관 규칙으로 정한다
+        String summary = memory.storedSummary() == null
+            ? MemorySummaryBackfill.ruleSummary(memory, content, retrieval)
+            : memory.summary();
+        return revise(user, memory, content, summary, retrieval);
     }
 
 

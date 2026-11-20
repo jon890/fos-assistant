@@ -347,7 +347,7 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("바깥 글을 읽은 대화의 요약은 제안이고 받아들이기 전에는 요약 구역에 없다")
+    @DisplayName("바깥 글을 읽은 대화는 제안이고 제안에는 요약을 두지 않아 받아들이기 전에도 뒤에도 요약 구역에 없다")
     void proposesSummaryAfterExternalRead() throws Exception {
         askedInThisTurn();
         toolStarted("web_search");
@@ -356,6 +356,10 @@ class McpMemoryRememberToolTest {
             .isEqualTo(PROPOSED);
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(onlyMemory().summary()).isEmpty();
+        assertThat(Objects.toString(assembler.assemble(currentDad(), dadRun.agentId()).instructions(), ""))
+            .doesNotContain("제안요약-표식-6610");
+        memoryService.accept(currentDad(), onlyMemory().id());
         assertThat(Objects.toString(assembler.assemble(currentDad(), dadRun.agentId()).instructions(), ""))
             .doesNotContain("제안요약-표식-6610");
     }
@@ -401,8 +405,8 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("요약이 민감해 보이는 기존 제안은 같은 제목과 본문의 바로 저장 호출이 받아들이지 않는다")
-    void doesNotAcceptProposalWithSensitiveSummary() throws Exception {
+    @DisplayName("같은 제목과 본문의 기존 제안은 요약이 같을 때만 바로 저장 호출이 받아들인다")
+    void acceptsExistingProposalOnlyWithSameSummary() throws Exception {
         captureService.remember(currentDad(), MemoryAccess.of(Set.of("core")), new MemoryRememberRequest(
             "다른 사람", "다른 사람은 홍길동이다", "홍길동 통장 있음", null, false, null, 990_101L, null, false, false, false));
         askedInThisTurn();
@@ -410,6 +414,9 @@ class McpMemoryRememberToolTest {
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "깨끗한 요약"))))
             .startsWith("같은 제안이 이미 있다");
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null)))).startsWith(REMEMBERED);
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
+        assertThat(onlyMemory().summary()).isEmpty();
     }
 
 

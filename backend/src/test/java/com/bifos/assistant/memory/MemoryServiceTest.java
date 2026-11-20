@@ -442,7 +442,7 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("요약 칸이 없는 화면 수정은 요약이 옛 본문과 같으면 새 본문을 따라가고, 새 본문이 200자를 넘으면 비우고, 따로 쓴 요약은 둔다")
+    @DisplayName("요약 칸이 없는 화면은 짧은 개인 사실을 만들 때 본문을 요약으로 두고, 본문을 고치면 비서가 쓴 요약도 새 본문으로 덮거나 200자를 넘으면 비운다")
     void screenUpdateKeepsSummaryInStep() {
         Memory followed = memories.create(ADMIN, MemoryScope.USER, "따라갈 사실", "옛 본문", false);
         MemorySummaryRows.summarizeAsContent(texts, jdbc, followed);
@@ -457,7 +457,13 @@ class MemoryServiceTest {
 
         assertThat(repository.findById(followed.id()).orElseThrow().summary()).isEqualTo("새 본문");
         assertThat(repository.findById(cleared.id()).orElseThrow().summary()).isEmpty();
-        assertThat(repository.findById(custom.id()).orElseThrow().summary()).isEqualTo("따로 쓴 요약");
+        assertThat(repository.findById(custom.id()).orElseThrow().summary()).isEqualTo("새 본문 셋");
+        Memory created = memories.create(ADMIN, MemoryScope.USER, "새로 만든 사실", "새로 만든 본문", false);
+        assertThat(repository.findById(created.id()).orElseThrow().summary()).isEqualTo("새로 만든 본문");
+        Memory longCreated = memories.create(ADMIN, MemoryScope.USER, "긴 사실", "가".repeat(201), false);
+        assertThat(repository.findById(longCreated.id()).orElseThrow().summary()).isEmpty();
+        Memory groupCreated = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
+        assertThat(repository.findById(groupCreated.id()).orElseThrow().summary()).isEmpty();
     }
 
 

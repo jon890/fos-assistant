@@ -164,13 +164,13 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     }
 
 
-    /** 제목과 본문을 풀었는가. */
     /** 그 revision 의 요약이다. 없거나 풀지 못하면 빈 글이다. */
     public String summary() {
         return opened().map(MemoryText::summary).orElse("");
     }
 
 
+    /** 제목과 본문을 풀었는가. */
     public boolean readable() {
         return opened().isPresent();
     }
