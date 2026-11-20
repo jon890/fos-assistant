@@ -6,8 +6,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | REQ1 | 알림 허락과 구독을 대역한 브라우저, 대역한 `/api/push/*` | `web/test/browser/push-settings.spec.ts` 의 등록 사례: 단추를 누르고 허락 | PUT 이 한 번 가고 목록에 기기 한 줄과 「이 기기」, 단추 대신 「이 기기는 알림을 받고 있어요」 | 로컬 Playwright(빌드한 서버) | worker | 없음 | PR 전 |
 | REQ1 | 브라우저 구독은 있는데 서버 목록에 그 해시가 없음 | 같은 spec 의 지운 기기 사례: 화면을 연다 | 단추가 보이고 PUT 이 가지 않는다 | 로컬 Playwright | worker | 없음 | PR 전 |
-| REQ2 | 여러 user agent 문자열 | `web/test/unit/push.test.ts` 의 `deviceName` 표 | 「iPhone 앱」, 「Mac Chrome」 등 정한 이름, 같은 이름에 번호 없음 | node test | worker | 없음 | PR 전 |
-| REQ3 | 거절, 미지원, 아이폰 Safari 탭, 홈 화면 앱, iOS 16.3, 서버 꺼짐 | `push-settings.spec.ts` 의 상태 사례와 `push.test.ts` 의 `pushScreenState` 표 | 거절과 미지원은 단추 없이 안내, 아이폰 탭은 안내 카드 셋, 홈 화면 앱은 단추, 16.3 은 버전 안내 | 로컬 Playwright, node test | worker | 없음 | PR 전 |
+| REQ2 | 여러 user agent 문자열 | `web/test/unit/push-device.test.ts` 의 `deviceName` 표 | 「iPhone 앱」, 「Mac Chrome」 등 정한 이름, 같은 이름에 번호 없음 | node test | worker | 없음 | PR 전 |
+| REQ3 | 거절, 미지원, 아이폰 Safari 탭, 홈 화면 앱, iOS 16.3, 서버 꺼짐 | `push-settings.spec.ts` 의 상태 사례와 `push-device.test.ts` 의 `pushScreenState` 표 | 거절과 미지원은 단추 없이 안내, 아이폰 탭은 안내 카드 셋, 홈 화면 앱은 단추, 16.3 은 버전 안내 | 로컬 Playwright, node test | worker | 없음 | PR 전 |
 | REQ4 | `APP_NAME=검사용 비서` 로 뜬 웹 | `web/test/browser/web-app.spec.ts` | manifest 이름과 `standalone`, 아이콘 경로가 PNG 로 200 | 로컬 Playwright | worker | 없음 | PR 전 |
 | REQ5, REQ6 | 서비스 워커 파일 | `web/test/unit/push-service-worker.test.ts` | 푸시 글의 제목과 본문 그대로 표시, 바깥 주소 거절, 열린 창을 앞으로 가져와 옮김 | node test | worker | 없음 | PR 전 |
 | REQ6 | 세션 없는 브라우저, 없는 알림 번호 | `web/test/browser/push-open.spec.ts` | 로그인 화면 `next` 에 `/n/<id>`, 없는 알림은 `/notifications` | 로컬 Playwright | worker | 없음 | PR 전 |

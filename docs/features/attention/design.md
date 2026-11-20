@@ -65,7 +65,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | --- | --- | --- |
 | `GET /api/v1/push/config` | `{enabled, publicKey}`. 서버에 키가 없으면 `enabled: false` 이고 화면은 「이 서버는 아직 알림을 보낼 수 없어요」 를 보인다 | PR1 |
 | `GET /api/v1/push/devices` | 기기 목록(`id`, `name`, `registeredAt`, `endpointHash`), 최근 등록 순 | PR1 |
-| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`. 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
+| `PUT /api/v1/push/devices` | 등록과 갱신. 본문 `endpoint`, `keys.p256dh`, `keys.auth`, `name`, `timeZone`, `publicKey`(구독할 때 쓴 VAPID 공개 키. 서버 비밀값 기능이 지금 키와 비교해 다르면 409 `PUSH_KEY_CHANGED` 로 거절하고, 웹은 다시 구독해 한 번 더 등록한다. 그 전의 Control Plane 은 이 칸을 읽지 않는다). 서버에 키가 없으면 409 `PUSH_NOT_CONFIGURED`, 허용 밖 주소나 길이·시간대 오류는 400 `VALIDATION_FAILED` | PR1 |
 | `DELETE /api/v1/push/devices/current` | 본문의 `endpoint` 와 같은 내 기기를 지운다. 없어도 204 | PR1 |
 | `PATCH /api/v1/push/devices/{id}`, `DELETE /api/v1/push/devices/{id}` | 이름 고치기와 지우기. 남의 기기와 없는 기기는 같은 404 `PUSH_DEVICE_NOT_FOUND` | PR2 |
 | `GET /api/v1/push/settings`, `PUT /api/v1/push/settings` | 끈 묶음과 조용한 시간. 관리자 아닌 사용자가 `ADMIN` 묶음을 보내면 무시한다 | PR2 |

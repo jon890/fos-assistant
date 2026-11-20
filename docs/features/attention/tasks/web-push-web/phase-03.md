@@ -31,7 +31,7 @@
 
 ### 1. `web/src/lib/push-open.ts`
 
-- `safeNextPath(raw)`: `decodeURIComponent` 한 값을 위 규칙으로 검사해 통과하면 **디코딩한 값**을 돌려준다. 디코딩이 실패하면(`%E0`) `/`.
+- `safeNextPath(value)`: Next 가 검색어에서 이미 디코딩한 값을 위 규칙으로 검사한다. 다시 디코딩하지 않는다(두 번 인코딩한 `//` 가 검사를 지나지 않게).
 - `openTarget(result)`: 읽기 결과(성공이면 `NotificationView`)에서 `notificationHref` 또는 `/notifications`.
 - `openNotification(id, markRead)`: `isPublicId` 가 아니면 `/notifications`. `markRead(id)` 를 한 번 부르고 그 결과를 `openTarget` 에 넣는다. 화면은 `callControlPlane` 을 넘긴다. 이 함수가 「읽음을 부르고 그 곳으로 보낸다」 를 node 테스트로 증명하는 자리다.
 - `signinPathFor(notificationId)`: `/signin?next=<인코딩한 /n/<id>>`.
@@ -81,6 +81,9 @@ cd web && pnpm test:browser account-menu.spec.ts
 |---|---|
 | `web/src/lib/push-open.ts` | 신규 |
 | `web/src/app/n/[notificationId]/page.tsx` | 신규 |
+| `web/src/app/n/[notificationId]/loading.tsx` | 신규 |
+| `web/eslint.config.mjs` | 수정 (node 테스트가 읽는 파일) |
+| `web/test/unit/loading-routes.test.ts` | 수정 |
 | `web/src/app/signin/page.tsx` | 수정 |
 | `web/src/lib/push.ts` | 수정 (releaseThisDevice) |
 | `web/src/components/shell/account-menu.tsx` | 수정 |

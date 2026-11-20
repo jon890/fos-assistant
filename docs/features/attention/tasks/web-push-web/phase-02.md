@@ -29,7 +29,10 @@
 
 ## 작업 항목
 
-### 1. `web/src/lib/push.ts`
+### 1. `web/src/lib/push.ts` 와 `web/src/lib/push-device.ts`
+
+판정 함수(`deviceName`, `iosInfo`, `pushScreenState`, 키 비교)는 import 없는 `push-device.ts` 에 둬 node 테스트가 바로 읽는다. 브라우저 API 와 fetch 는 `push.ts` 다.
+
 
 - `deviceName(userAgent, standalone)`: 「iPhone 앱」, 「iPad Safari」, 「Mac Chrome」, 「Windows Edge」, 「Android Chrome」 처럼 OS 와 브라우저. 홈 화면 앱이면 브라우저 대신 「앱」. 모르면 「브라우저」.
 - `iosVersion(userAgent)`: iPhone, iPad, 그리고 터치가 있는 Mac 모양 iPad 를 iOS 로 보고 버전을 돌려준다. 아니면 null.
@@ -58,7 +61,7 @@
 
 ### 5. 테스트
 
-- `web/test/unit/push.test.ts`: `deviceName` 표, `iosVersion`, `pushScreenState` 의 우선순위.
+- `web/test/unit/push-device.test.ts`: `deviceName` 표, `iosVersion`, `pushScreenState` 의 우선순위.
 - `web/test/node/settings-area.test.ts`: 묶음 다섯, `/settings/notifications` 가 「알림」 을 고른다.
 - `web/test/browser/settings.spec.ts`: 묶음 수 다섯과 묶음 목록(「알림」 포함).
 - `web/test/browser/push-settings.spec.ts`: init script 로 `Notification`, `navigator.serviceWorker`, `PushManager` 를 대역하고 `/api/push/*` 를 route 로 대역해 단추 → 허락 → 목록 한 줄과 「이 기기」, 거절 안내, 미지원 안내, 아이폰 Safari 탭 안내 셋, 홈 화면 앱(`display-mode: standalone`)이면 단추, 서버 꺼짐 안내, 서버에서 지운 기기면 단추가 다시 보임을 본다. 등록 PUT 본문의 `timeZone` 이 `Asia/Seoul`(playwright 설정의 `timezoneId`), `name` 이 user agent 로 만든 이름, `keys` 와 `publicKey` 가 있음을 본다. PUT 이 409 `PUSH_KEY_CHANGED` 를 한 번 돌려주면 다시 구독하고 PUT 이 두 번 간다.
@@ -67,7 +70,7 @@
 
 ```bash
 cd web && pnpm typecheck && pnpm lint && pnpm test:node
-cd web && node --test test/unit/push.test.ts test/node/settings-area.test.ts
+cd web && node --test test/unit/push-device.test.ts test/node/settings-area.test.ts
 cd web && pnpm test:browser push-settings.spec.ts settings.spec.ts
 ```
 
@@ -76,6 +79,8 @@ cd web && pnpm test:browser push-settings.spec.ts settings.spec.ts
 | 파일 | 변경 |
 |---|---|
 | `web/src/lib/push.ts` | 신규 |
+| `web/src/lib/push-device.ts` | 신규 |
+| `web/src/components/notification/use-push-settings.ts` | 신규 |
 | `web/src/app/api/push/config/route.ts` | 신규 |
 | `web/src/app/api/push/devices/route.ts` | 신규 |
 | `web/src/app/api/push/devices/current/route.ts` | 신규 |
@@ -85,7 +90,7 @@ cd web && pnpm test:browser push-settings.spec.ts settings.spec.ts
 | `web/src/components/notification/ios-install-guide.tsx` | 신규 |
 | `docs/features/app-shell/spec.md` | 수정 |
 | `web/docs/code-architecture.md` | 수정 |
-| `web/test/unit/push.test.ts` | 신규 |
+| `web/test/unit/push-device.test.ts` | 신규 |
 | `web/test/node/settings-area.test.ts` | 수정 |
 | `web/test/browser/settings.spec.ts` | 수정 |
 | `web/test/browser/push-settings.spec.ts` | 신규 |
