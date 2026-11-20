@@ -58,9 +58,9 @@ export function addressable(path: string): boolean {
   return !/[%;\\]/.test(path);
 }
 
-/** 경로 줄의 조각이다. 맨 앞은 사용자 디렉터리 자체인 「파일 공간」 이다. 빈 조각은 건너뛴다. */
+/** 경로 줄의 조각이다. 맨 앞은 사용자 디렉터리 자체인 「작업 폴더」 다. 빈 조각은 건너뛴다. */
 export function crumbs(path: string): { name: string; path: string }[] {
-  const result = [{ name: "파일 공간", path: "" }];
+  const result = [{ name: "작업 폴더", path: "" }];
   let current = "";
   for (const name of path.split("/").filter((part) => part !== "")) {
     current = joinPath(current, name);
@@ -69,13 +69,13 @@ export function crumbs(path: string): { name: string; path: string }[] {
   return result;
 }
 
-/** `/files` 화면의 주소다. 연 디렉터리는 `path`, 미리 보는 파일은 `file` 인자에 둔다. */
+/** 「에이전트 작업 폴더」 화면의 주소다. 연 디렉터리는 `path`, 미리 보는 파일은 `file` 인자에 둔다. */
 export function explorerHref(path: string, file?: string): string {
   const query = new URLSearchParams();
   if (path !== "") query.set("path", path);
   if (file !== undefined) query.set("file", file);
   const search = query.toString();
-  return search === "" ? "/files" : `/files?${search}`;
+  return search === "" ? "/files/workspace" : `/files/workspace?${search}`;
 }
 
 /**

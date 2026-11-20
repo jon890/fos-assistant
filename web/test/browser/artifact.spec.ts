@@ -153,32 +153,23 @@ test("폴더 이름이 같은 결과물은 답 아래 줄과 패널 머리가 �
   }
 });
 
-test("자동 보관을 켜면 스위치가 남고 답 아래 결과물 옆에 보관 상태가 보인다", async ({ page }) => {
-  await page.goto("/files?tab=vault");
-  const toggle = page.getByRole("switch", { name: "결과물 자동 보관" });
-  await expect(toggle).toHaveAttribute("aria-checked", /true|false/);
-  try {
-    if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
-    await page.reload();
-    await expect(page.getByRole("switch", { name: "결과물 자동 보관" })).toHaveAttribute("aria-checked", "true");
+test("파일 공간에 자동 보관 스위치가 없고 답 아래 결과물 옆에 보관 상태가 보인다", async ({ page }) => {
+  await page.goto("/files");
+  await expect(page.getByTestId("my-files")).toBeVisible();
+  await expect(page.getByRole("switch", { name: "결과물 자동 보관" })).toHaveCount(0);
 
-    // 화면 검사의 Control Plane 은 사용자 데이터 key 를 두지 않아 보관 자체는 끝나지 않는다. 보관이 끝나는 것은
-    // backend 의 ArtifactAutoVaultTest 가 본다. 여기서는 자동 보관 대상이 된 결과물 옆에 상태가 보이는지만 본다.
-    await sendProbe(page);
-    const conversationUrl = page.url();
-    await page.goto(conversationUrl);
-    const status = page
-      .getByTestId("assistant-message")
-      .last()
-      .getByTestId("message-artifact")
-      .first()
-      .getByTestId("artifact-auto-vault");
-    await expect(status).toHaveText(/보관 중|보관 완료|보관 실패/, { timeout: 10_000 });
-  } finally {
-    // 기본값으로 되돌려 다른 테스트가 보관 상태를 보지 않게 한다.
-    await page.request.put("/api/artifact-vault/auto", { data: { enabled: false } });
-  }
+  // 화면 검사의 Control Plane 은 사용자 데이터 key 를 두지 않아 보관 자체는 끝나지 않는다. 보관이 끝나는 것은
+  // backend 의 ArtifactAutoVaultTest 가 본다. 여기서는 스위치 없이도 결과물 옆에 상태가 보이는지만 본다.
+  await sendProbe(page);
+  const conversationUrl = page.url();
+  await page.goto(conversationUrl);
+  const status = page
+    .getByTestId("assistant-message")
+    .last()
+    .getByTestId("message-artifact")
+    .first()
+    .getByTestId("artifact-auto-vault");
+  await expect(status).toHaveText(/보관 중|보관 완료|보관 실패/, { timeout: 10_000 });
 });
 
 test("비서가 내 파일에 넣은 파일은 답 아래에 제목과 내려받기, 내 파일에서 보기로 보이고 지운 파일은 안내만 보인다", async ({ page }) => {
@@ -214,7 +205,7 @@ test("비서가 내 파일에 넣은 파일은 답 아래에 제목과 내려받
   );
   await expect(rows.nth(0).getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute(
     "href",
-    "/files?tab=vault&item=31",
+    "/files?item=31",
   );
   await expect(rows.nth(1)).toHaveText(/내 파일에서 지운 파일이에요/);
   await expect(rows.nth(1).getByRole("link")).toHaveCount(0);
