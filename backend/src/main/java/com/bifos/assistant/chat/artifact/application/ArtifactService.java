@@ -38,18 +38,25 @@ import org.springframework.stereotype.Service;
 public class ArtifactService {
 
     /**
-     * 그림 만들기 규칙이다(스펙 generated-image REQ4, REQ6, REQ10). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
+     * 그림 만들기와 고치기 규칙이다(스펙 generated-image REQ4, REQ6, REQ10, REQ15~REQ17). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
      *
      * <p>{@code 제목:} 줄은 fos-ctx 가 떼어 제목으로 쓴다. 글자를 바꾸면 {@code hermes/plugins/fos-ctx/generated_image.py} 의
-     * {@code TITLE_PREFIX} 도 함께 바꾼다.
+     * {@code TITLE_PREFIX} 도 함께 바꾼다. {@code attachment:} 와 {@code generated:} 는 같은 plugin 의 {@code image_source.py} 가 읽는다.
      */
-    static final String IMAGE_RULES = "아래 네 줄은 image_generate 도구가 있고 사용자가 그림을 만들어 달라고 했을 때만 따른다.\n"
+    static final String IMAGE_RULES = "아래 여섯 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
         + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
         + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
         + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
-        + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.\n";
+        + "- 이 대화에 보낸 사진이나 이 대화에서 만든 그림을 바탕으로 고칠 때는 바탕 한 장을 image_url 에, 참고할 것을 reference_image_urls 에 넣는다."
+        + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적고 파일 경로나 인터넷 주소는 쓰지 않는다.\n"
+        + "- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다."
+        + " 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다.\n"
+        + "- 그림을 만들지 못했거나 쓸 수 없는 사진이라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진과 그 까닭)과 다시 부탁하는 방법을 답한다.\n";
+
+    /** 실행 입력에 제목을 적는 만든 그림의 수다. 새것부터 센다(스펙 generated-image REQ17). */
+    static final int IMAGE_TITLE_LIMIT = 20;
 
     /**
      * 파일 공간 규칙이다(스펙 workspace REQ7, REQ8). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
@@ -69,6 +76,7 @@ public class ArtifactService {
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
     private final ChatArtifactWriter writer;
+    private final GeneratedImageService images;
 
 
     /**
@@ -90,9 +98,20 @@ public class ArtifactService {
             // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
             + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
             + IMAGE_RULES
+            + imageTitles(conversation.id())
             + FILE_SPACE_RULES
             + "\n"
             + SkillAgentNotice.PARAGRAPH;
+    }
+
+
+    /** 파일이 남은 만든 그림의 제목 줄이다. 없으면 빈 글이다. 모델이 고칠 그림을 제목으로 가리킬 수 있게 한다. */
+    private String imageTitles(Long conversationId) {
+        List<String> titles = images.liveTitles(conversationId, IMAGE_TITLE_LIMIT);
+        if (titles.isEmpty()) {
+            return "";
+        }
+        return "이 대화에서 만든 그림: " + titles.stream().map(title -> "「" + title + "」").collect(Collectors.joining(", ")) + "\n";
     }
 
 

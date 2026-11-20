@@ -67,6 +67,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         "/internal/hermes/attachment-inspect",
         "/internal/hermes/attachment-inspect/validate",
         "/internal/hermes/generated-image",
+        "/internal/hermes/image-source",
         "/api/v1/signin/allowed",
         "/api/v1/signin/completed");
 
