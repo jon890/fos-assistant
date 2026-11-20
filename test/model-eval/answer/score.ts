@@ -23,7 +23,14 @@ export type QuestionScore = {
   unknownLinks: number;
   latencyMs: number | null;
   tools: ToolCounts;
+  /** 형식 참고 칸이다. 통과 판정에 쓰지 않는다. 칸이 생기기 전 보고서를 다시 쓴 문항에는 없다. */
+  format?: FormatCheck;
 };
+/**
+ * 답의 형식 참고 칸이다(spec REQ20). 세는 기준은 spec DECISION30 이 갖는다.
+ * `sourceListForm` 은 출처 절이 없으면 null, 있으면 그 절이 `#` 제목 아래 `- [이름](주소)` 목록인지다.
+ */
+export type FormatCheck = { sourceListForm: boolean | null; bareUrls: number; repeatedSources: number; longParagraphs: number };
 export type SetOutcome = "PASS" | "PASS_PENDING_COMPARE" | "PARTIAL" | "FAIL" | "ERROR";
 export type SetScore = {
   outcome: SetOutcome;
@@ -36,6 +43,9 @@ export type SetScore = {
   similar: number;
   compared: number;
   compareTotal: number;
+  /** 형식 참고 칸을 하나라도 어긴 문항 수와 형식을 본 문항 수다. 통과 판정에 쓰지 않는다. */
+  formatViolations: number;
+  formatChecked: number;
   reasons: string[];
 };
 
@@ -84,9 +94,8 @@ function headingRest(line: string): string | null {
   return match ? (match[1] ?? "") : null;
 }
 
-/** 답 끝의 「출처」 절에 든 주소다. 절이 없으면 빈 목록이다. 절 밖의 링크는 세지 않는다. */
-export function sourceLinks(answer: string | string[]): string[] {
-  if (Array.isArray(answer)) return [...new Set(answer.flatMap((message) => sourceLinks(message)))];
+/** 답 끝의 「출처」 절이다. 머리 줄과 그 줄에 이어진 본문, 다음 머리 전까지의 줄을 돌려준다. 절이 없으면 null 이다. */
+function sourceSection(answer: string): { heading: string; rest: string; lines: string[] } | null {
   const lines = answer.split(/\r?\n/);
   let start = -1;
   let rest = "";
@@ -97,17 +106,91 @@ export function sourceLinks(answer: string | string[]): string[] {
       rest = found;
     }
   }
-  if (start < 0) return [];
-  const body: string[] = [rest];
+  if (start < 0) return null;
+  const body: string[] = [];
   for (const line of lines.slice(start + 1)) {
     if (NEXT_HEADING.test(line)) break;
     body.push(line);
   }
-  const text = body.join("\n");
+  return { heading: lines[start], rest, lines: body };
+}
+
+/** 글에 든 주소를 나온 차례대로 모두 뽑는다. 마크다운 링크를 먼저 뽑고 남은 글에서 맨 주소를 뽑는다. */
+function allLinks(text: string): string[] {
   const found: string[] = [];
   for (const match of text.matchAll(MARKDOWN_LINK)) found.push(match[1]);
   for (const match of text.replace(MARKDOWN_LINK, " ").matchAll(URL_PATTERN)) found.push(match[0]);
-  return [...new Set(found.map((url) => url.replace(/[.,;:!?]+$/, "")))];
+  return found.map((url) => url.replace(/[.,;:!?]+$/, ""));
+}
+
+/** 답 끝의 「출처」 절에 든 주소다. 절이 없으면 빈 목록이다. 절 밖의 링크는 세지 않는다. */
+export function sourceLinks(answer: string | string[]): string[] {
+  if (Array.isArray(answer)) return [...new Set(answer.flatMap((message) => sourceLinks(message)))];
+  const section = sourceSection(answer);
+  if (!section) return [];
+  return [...new Set(allLinks([section.rest, ...section.lines].join("\n")))];
+}
+
+const SOURCE_HASH_HEADING = /^\s{0,3}#{1,6}\s+출처\s*[:：]?\s*$/;
+const SOURCE_LIST_ITEM = /^\s*[-*+]\s+\[([^\]]+)\]\((https?:\/\/[^\s]+)\)\s*$/;
+const SENTENCE_END = /[.?!](?=\s|$)/g;
+
+/** 같은 주소인지 보려고 scheme 과 host 의 대소문자, 끝의 `/`, `#` 뒤를 무시한다. */
+function sameUrlKey(url: string): string {
+  const withoutHash = url.split("#")[0];
+  const match = /^(https?:\/\/[^/?]+)(.*)$/i.exec(withoutHash);
+  const key = match ? match[1].toLowerCase() + match[2] : withoutHash;
+  return key.replace(/\/+$/, "");
+}
+
+/** 코드 블록과 인라인 코드를 뺀 글이다. 그 안의 주소와 문장은 세지 않는다. */
+function withoutCode(text: string): string {
+  return text.replace(/^\s{0,3}(`{3,}|~{3,})[\s\S]*?^\s{0,3}\1\s*$/gm, "").replace(/`[^`\n]*`/g, "");
+}
+
+function checkMessage(answer: string): FormatCheck {
+  const section = sourceSection(answer);
+  let sourceListForm: boolean | null = null;
+  let repeatedSources = 0;
+  if (section) {
+    const items = section.lines.filter((line) => line.trim() !== "");
+    sourceListForm =
+      SOURCE_HASH_HEADING.test(section.heading) &&
+      section.rest.trim() === "" &&
+      items.length > 0 &&
+      items.every((line) => {
+        const item = SOURCE_LIST_ITEM.exec(line);
+        return item !== null && !/^https?:\/\//.test(item[1].trim());
+      });
+    const links = allLinks([section.rest, ...section.lines].join("\n")).map(sameUrlKey);
+    repeatedSources = links.length - new Set(links).size;
+  }
+  const text = withoutCode(answer);
+  const urlTexts = [...text.matchAll(MARKDOWN_LINK)].filter((match) => /^\[\s*https?:\/\//.test(match[0])).length;
+  const bareUrls = urlTexts + [...text.replace(MARKDOWN_LINK, " ").matchAll(URL_PATTERN)].length;
+  const longParagraphs = text
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter((block) => block !== "" && !/^(?:[-*+]\s|\d+[.)]\s|\||>|#)/.test(block))
+    .filter((block) => (block.replace(MARKDOWN_LINK, "링크").match(SENTENCE_END) ?? []).length >= 4).length;
+  return { sourceListForm, bareUrls, repeatedSources, longParagraphs };
+}
+
+/** 답의 형식 참고 칸이다. 메시지가 여럿이면 수는 더하고, 출처 꼴은 출처 절이 있는 메시지 가운데 하나라도 어기면 어긴 것이다. */
+export function formatCheck(answer: string | string[]): FormatCheck {
+  const checks = (Array.isArray(answer) ? answer : [answer]).map(checkMessage);
+  const forms = checks.map((check) => check.sourceListForm).filter((form) => form !== null);
+  return {
+    sourceListForm: forms.length === 0 ? null : forms.every(Boolean),
+    bareUrls: checks.reduce((sum, check) => sum + check.bareUrls, 0),
+    repeatedSources: checks.reduce((sum, check) => sum + check.repeatedSources, 0),
+    longParagraphs: checks.reduce((sum, check) => sum + check.longParagraphs, 0),
+  };
+}
+
+/** 형식 참고 칸을 하나라도 어겼는가. */
+export function violatesFormat(check: FormatCheck): boolean {
+  return check.sourceListForm === false || check.bareUrls > 0 || check.repeatedSources > 0 || check.longParagraphs > 0;
 }
 
 /** 그 시각의 한국 날짜가 답에 들었는가. 「11월 18일」 과 연도가 붙은 「2026-11-18」, 「2026.11.18」, 「2026/11/18」 꼴을 받는다. 연도 없는 「11/18」 은 버전 번호나 범위와 헷갈려 받지 않는다. */
@@ -174,6 +257,7 @@ export function scoreQuestion(
     unknownLinks: states.filter((state) => state === "unknown").length,
     latencyMs: root?.latencyMs ?? null,
     tools: root ? toolCounts(root) : { search: 0, searchFailed: 0, extract: 0, extractFailed: 0 },
+    format: formatCheck(answer),
   };
 }
 
@@ -223,6 +307,8 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
   const similarNeeded = Math.ceil(compareIds.size * SIMILAR_RATIO - 1e-9);
   const compareDone = given.length >= compareIds.size;
   if (compareDone && similar < similarNeeded) reasons.push(`「비슷하다」 ${similar}/${compareIds.size} (기준 ${similarNeeded} 이상)`);
+  const formatted = scores.filter((score) => score.format !== undefined);
+  const formatViolations = formatted.filter((score) => violatesFormat(score.format!)).length;
   const errors = scores.filter((score) => score.error).length;
   let outcome: SetOutcome;
   if (errors > 0) {
@@ -244,6 +330,8 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
     similar,
     compared: given.length,
     compareTotal: compareIds.size,
+    formatViolations,
+    formatChecked: formatted.length,
     reasons,
   };
 }
@@ -280,6 +368,7 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     `- 오늘 날짜 문항: ${set.datePassed ? "통과" : "미달"}`,
     `- 사람 비교: 「비슷하다」 ${set.similar}/${set.compareTotal} (적은 것 ${set.compared}개)`,
     ...set.reasons.map((reason) => `- ${set.outcome === "PARTIAL" ? "참고" : "미달"}: ${reason}`),
+    `- 형식 참고(통과 기준 아님): 어긴 문항 ${set.formatViolations}/${set.formatChecked}`,
     "",
     "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -287,6 +376,19 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
       const result = score.error ? `오류: ${score.error}` : score.passed ? "통과" : "미달";
       const tools = score.tools;
       return `| ${score.id} | ${score.category} | ${score.check} | ${result} | ${score.sourceLinks} | ${score.openLinks} | ${score.closedLinks} | ${score.unknownLinks} | ${seconds(score.latencyMs)} | ${tools.search}(${tools.searchFailed}) | ${tools.extract}(${tools.extractFailed}) |`;
+    }),
+    "",
+    "## 형식 참고",
+    "",
+    "통과 기준에 들지 않는다. 출처 꼴은 출처 절이 있는 답만 보고, 주소 노출은 코드 밖의 맨 주소와 링크 글자가 주소인 링크, 긴 문단은 네 문장 이상인 문단이다.",
+    "",
+    "| 문항 | 출처 꼴 | 주소 노출 | 같은 주소 반복 | 긴 문단 |",
+    "| --- | --- | --- | --- | --- |",
+    ...scores.map((score) => {
+      const format = score.format;
+      if (!format) return `| ${score.id} | - | - | - | - |`;
+      const form = format.sourceListForm === null ? "해당 없음" : format.sourceListForm ? "맞음" : "어김";
+      return `| ${score.id} | ${form} | ${format.bareUrls} | ${format.repeatedSources} | ${format.longParagraphs} |`;
     }),
     "",
     "## 사람 비교",

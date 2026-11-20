@@ -51,7 +51,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 그림을 고칠 바탕 사진을 받아 가는 경로의 권한과 응답을 확인한다(스펙 generated-image REQ15, REQ16, REQ20, REQ21, REQ23).
+ * 실제 HTTP 경계에서 그림을 고칠 바탕 사진을 받아 가는 경로의 권한과 응답을 확인한다(스펙 generated-image REQ15, REQ16, REQ20, REQ21, REQ23, REQ25).
  *
  * <p>본문은 운영 코드가 아니라 이 테스트가 {@code hermes/plugins/fos-ctx/README.md} 의 「그림을 고칠 사진을 받는다」 대로 따로 만든다.
  */
@@ -251,6 +251,27 @@ class ImageSourceEndpointTest {
         assertThat(send("link:https://shop.example.com/goods/1").statusCode()).isEqualTo(200);
         assertThat(web.requested()).as("같은 링크를 다시 쓰면 다시 받는다")
             .containsExactly("shop.example.com/goods/1", "img.example.com/p.png", "shop.example.com/goods/1", "img.example.com/p.png");
+    }
+
+
+    @Test
+    @DisplayName("그림에 남긴 꼴의 링크를 이어지는 장면에서 다시 가리키면 대화에 있는 링크로 보고 다시 받는다")
+    void refetchesStoredFormOfSentLink() throws Exception {
+        byte[] png = png(45);
+        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), "이 양말 https://쇼핑.example.com/상품/1 신은 아이 그려 줘", Instant.now()));
+        String stored = "https://xn--hp4bo76a.example.com/%EC%83%81%ED%92%88/1";
+        web.image(stored, "image/png", png);
+
+        HttpResponse<byte[]> first = send("link:https://쇼핑.example.com/상품/1");
+        assertThat(first.statusCode()).isEqualTo(200);
+        assertThat(first.headers().firstValue("x-image-source-link")).as("그림에 남기는 꼴").contains(stored);
+
+        HttpResponse<byte[]> again = send("link:" + stored);
+
+        assertThat(again.statusCode()).as("스펙 generated-image REQ25").isEqualTo(200);
+        assertThat(again.headers().firstValue("x-image-source-link")).contains(stored);
+        assertThat(again.body()).containsExactly(png);
+        assertThat(web.requested()).hasSize(2);
     }
 
 

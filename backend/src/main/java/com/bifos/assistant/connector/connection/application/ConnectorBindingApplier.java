@@ -4,6 +4,7 @@ import com.bifos.assistant.connector.connection.config.ConnectorBindingPropertie
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.connection.application.dto.CycleStep;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.DueBinding;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
@@ -64,6 +65,9 @@ public class ConnectorBindingApplier {
     private final NotificationService notifications;
     private final SignInRevocation access;
     private final ConnectorBindingProperties properties;
+    private final ConnectorInstallAttempts attempts;
+    /** 껐다 켜기 단계를 진행한다(ADR-20261120 / connector-auto-apply). 반영 예정 확인과 같은 주기에 돈다. */
+    private final ConnectorBindingCycles cycles;
 
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
@@ -80,6 +84,7 @@ public class ConnectorBindingApplier {
     @Scheduled(cron = "${assistant.connector.binding.apply-cron}")
     public void runScheduled() {
         applyDue();
+        cycles.advance();
     }
 
 
@@ -145,10 +150,17 @@ public class ConnectorBindingApplier {
         }
         if (catalog == null) {
             binding.pending(now);
+            binding.markApplyFailed(now);
             bindings.save(binding);
             return null;
         }
-        return service.resync(binding, manifest(catalog, binding.connection().connectorId()), false);
+        return automatic(binding, manifest(catalog, binding.connection().connectorId()), now);
+    }
+
+
+    /** 예약 작업의 반영 맞추기다. 자동 시도라 실패하면 실패 표시를 남기고, 껐다 켜기 단계의 바인딩에는 설치를 보내지 않는다. */
+    private ConnectorBindingAttempt automatic(ConnectorBinding binding, Optional<ConnectorManifest> manifest, Instant now) {
+        return attempts.begin(binding, manifest, true, false, false, now, true, CycleStep.NONE);
     }
 
 
@@ -282,15 +294,17 @@ public class ConnectorBindingApplier {
         Instant now = clock.instant();
         if (streak >= DRIFT_STREAK_LIMIT) {
             binding.pending(now);
+            binding.markApplyFailed(now);
             bindings.save(binding);
             return Drifted.pending(owner.groupId(), binding, true);
         }
         if (catalog == null) {
             binding.pending(now);
+            binding.markApplyFailed(now);
             bindings.save(binding);
             return Drifted.pending(owner.groupId(), binding, false);
         }
-        ConnectorBindingAttempt attempt = service.resync(binding, manifest(catalog, candidate.connectorId()), false);
+        ConnectorBindingAttempt attempt = automatic(binding, manifest(catalog, candidate.connectorId()), now);
         return new Drifted(owner.groupId(), false, false, binding.restartRequired(), false, attempt);
     }
 
@@ -302,7 +316,9 @@ public class ConnectorBindingApplier {
         if (binding == null || owner == null) {
             return null;
         }
-        boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED;
+        // 껐다 켜기는 사람 없이 끝나므로 관리자에게 할 일을 남기지 않는다(ADR-20261120 / connector-auto-apply).
+        boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED
+            && outcome != ResyncOutcome.CYCLE_PENDING;
         return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired(), true, null);
     }
 

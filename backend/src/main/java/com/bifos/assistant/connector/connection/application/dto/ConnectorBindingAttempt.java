@@ -12,6 +12,8 @@ import java.util.UUID;
  * <p>시도 UUID는 DB 결과 대조용이며 Hermes에 보내지 않는다.
  *
  * @param undeclaredAsk 선언하지 않은 도구를 호출마다 묻는 커넥터({@code default_tool_policy: ask})인가. 참이면 선언하지 않은 도구 수를 세지 않는다
+ * @param automatic 사람이 아닌 예약 작업이 시작한 시도인가. 자동 시도의 실패는 바인딩에 실패 표시를 남긴다(ADR-20261120 / connector-auto-apply)
+ * @param cycleStep 껐다 켜기의 걸음
  */
 public record ConnectorBindingAttempt(
     Long bindingId,
@@ -38,7 +40,9 @@ public record ConnectorBindingAttempt(
     boolean replaceValues,
     ResyncOutcome waiting,
     List<String> declaredTools,
-    boolean undeclaredAsk) {
+    boolean undeclaredAsk,
+    boolean automatic,
+    CycleStep cycleStep) {
 
     public ConnectorBindingAttempt {
         declaredTools = List.copyOf(declaredTools);

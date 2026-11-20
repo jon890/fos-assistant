@@ -77,7 +77,7 @@ fos-agents 쪽 디렉터리와 manifest 칸 채우기는 이 저장소 밖이다
 
 PR2 는 이 설계를 다시 열지 않고 아래만 정한다. 정확한 칸과 마이그레이션은 PR2 계획이 정한다.
 
-- Control Plane 의 설치 결과 읽기(`HttpHermesConnectorClient`)가 `skipped_skills` 를 읽고, 성공한 설치 응답만 바인딩 행에 저장한다. 새 테이블은 만들지 않고 `connector_binding` 에 JSON 컬럼을 더한다.
+- Control Plane 의 설치 결과 읽기(`HttpHermesConnectorClient`)가 `skipped_skills` 를 읽고, 성공한 설치 응답만 바인딩 행에 저장한다. 새 테이블은 만들지 않고 `agent_connector_binding` 에 JSON 글 컬럼을 더한다.
 - 에이전트 연결 목록 응답의 바인딩마다 그 값을 내고, 웹의 `agent-connections-section.tsx` 가 spec REQ9 의 문구로 그린다.
 - 「스킬 도구가 꺼져 있다」 안내(`agent-connections-section.tsx`)는 설치된 스킬이 없고 빠진 스킬만 있으면 띄우지 않는다. 그 판정에 빠진 목록이 필요해 PR2 에서 함께 고친다.
 - 카탈로그 `skills` 를 그대로 내는 관리자·주인 응답(`ConnectionAdminDtos`, `ConnectionDtos`)과 웹 `lib/agent-connection.ts` 의 주석은 뜻이 「설치할 수 있는 스킬」 로 넓어진 것만 문서로 맞춘다.
