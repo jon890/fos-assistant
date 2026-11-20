@@ -47,6 +47,7 @@ public class McpMemoryRemember {
         "mcp__fos_assistant__memory_remember",
         "mcp__fos_assistant__follow_up_propose",
         "mcp__fos_assistant__agent_list",
+        "mcp__fos_assistant__connector_list",
         "mcp__fos_assistant__agent_delegate",
         "mcp__fos_assistant__artifact_write",
         "mcp__fos_assistant__file_space_put",
