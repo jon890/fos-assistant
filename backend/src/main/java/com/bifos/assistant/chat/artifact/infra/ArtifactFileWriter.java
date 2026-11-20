@@ -9,36 +9,32 @@ import com.bifos.assistant.shared.error.ApiException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 
-/** 검증한 결과물 경로에서 임시 파일을 완성하고 원자적으로 교체한다. 대화 잠금은 호출자가 잡는다. */
+/**
+ * 검증한 결과물 경로에서 임시 파일을 완성하고 원자적으로 교체한다. 대화 잠금은 호출자가 잡는다.
+ *
+ * <p>{@link SecureDirectoryStream} 의 핸들에서만 쓴다. 핸들로 임시 파일을 만들고 교체해, 확인과 열기 사이에 중간 디렉터리가
+ * 링크로 바뀌어도 다른 디렉터리에 쓰지 않는다(#359). 핸들을 쓸 수 없는 운영체제(musl)에서는 결과물 저장을 끈다(fail-closed).
+ * 운영 이미지는 glibc 다.
+ */
 @Slf4j(topic = "com.bifos.assistant.chat.artifact.infra.ArtifactStore")
 final class ArtifactFileWriter {
 
-    private static final AtomicBoolean UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED = new AtomicBoolean();
-
     private final ArtifactPathPolicy paths;
-    private final boolean forceAtomicMoveFallback;
-    private final ArtifactAtomicMover atomicMover;
 
 
-    ArtifactFileWriter(ArtifactPathPolicy paths, boolean forceAtomicMoveFallback, ArtifactAtomicMover atomicMover) {
+    ArtifactFileWriter(ArtifactPathPolicy paths) {
         this.paths = paths;
-        this.forceAtomicMoveFallback = forceAtomicMoveFallback;
-        this.atomicMover = atomicMover;
     }
 
 
@@ -50,16 +46,10 @@ final class ArtifactFileWriter {
             verifyParent(parent, folder);
             requireOrdinaryTarget(target);
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(parent)) {
-                if (!forceAtomicMoveFallback && stream instanceof SecureDirectoryStream<Path> secure) {
-                    writeWithSecureDirectory(secure, target.getFileName(), content);
-                } else {
-                    if (!forceAtomicMoveFallback) {
-                        warnUnsupportedSecureDirectoryOnce();
-                    } else {
-                        log.warn("using forced checked atomic artifact replacement for verification");
-                    }
-                    writeWithAtomicMove(parent, target, folder, content, atomicMover);
+                if (!(stream instanceof SecureDirectoryStream<Path> secure)) {
+                    throw new IOException("secure artifact write is unavailable");
                 }
+                writeWithSecureDirectory(secure, target.getFileName(), content);
             }
             return content.length;
         } catch (ApiException ex) {
@@ -91,33 +81,6 @@ final class ArtifactFileWriter {
     }
 
 
-    private static void writeWithAtomicMove(
-        Path parent, Path target, Path folder, byte[] content, ArtifactAtomicMover atomicMover) throws IOException {
-        Path temporary = null;
-        try {
-            temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
-            try (SeekableByteChannel channel = Files.newByteChannel(
-                temporary, EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
-                writeFully(channel, content);
-            }
-            verifyParent(parent, folder);
-            requireOrdinaryTarget(target);
-            atomicMover.move(temporary, target);
-            temporary = null;
-        } catch (AtomicMoveNotSupportedException ex) {
-            throw ex;
-        } finally {
-            if (temporary != null) {
-                try {
-                    Files.deleteIfExists(temporary);
-                } catch (IOException ignored) {
-                    // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
-                }
-            }
-        }
-    }
-
-
     private static void writeFully(SeekableByteChannel channel, byte[] content) throws IOException {
         ByteBuffer buffer = ByteBuffer.wrap(content);
         while (buffer.hasRemaining()) {
@@ -131,18 +94,6 @@ final class ArtifactFileWriter {
             directory.deleteFile(temporary);
         } catch (IOException ignored) {
             // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
-        }
-    }
-
-
-    static void atomicMove(Path source, Path target) throws IOException {
-        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-
-    private static void warnUnsupportedSecureDirectoryOnce() {
-        if (UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED.compareAndSet(false, true)) {
-            log.warn("SecureDirectoryStream is unavailable; using checked atomic artifact replacement");
         }
     }
 }

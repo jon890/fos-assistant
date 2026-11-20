@@ -12,17 +12,23 @@ import com.bifos.assistant.workspace.infra.LinkSwapRace;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.api.Assumptions;
 
 /**
- * #359 재현이다. 넣기 도구가 부르는 {@link WorkspaceSandboxFiles#read} 를 그대로 되풀이한다. 지금 JDK 가
- * {@link SecureDirectoryStream} 을 주면 핸들 경로를, 주지 않으면(운영 이미지 musl) 대체 경로를 탄다. 운영과 같은 경로를 보려면
- * Alpine JDK 21 에서 돌린다. 결과 줄의 {@code read fallback} 이 그 경로다.
+ * #359 의 링크 바꿔치기 경쟁을 합성 환경에서 되풀이하는 회귀 guard 다. 넣기 도구가 부르는 {@link WorkspaceSandboxFiles#read}
+ * 를 그대로 되풀이하면서, 공격자 공간의 중간 디렉터리를 다른 사용자 폴더나 실행 공간 밖을 가리키는 링크와 계속 바꾼다.
+ *
+ * <p>고치기 전(운영 musl 이미지의 대체 경로)에는 다른 사용자 본문이 샜다. 고친 뒤 {@link SecureDirectoryStream} 만 쓰는
+ * 핸들 경로(glibc)에서는 핸들로 따라와 한 건도 새지 않는다. {@link SecureDirectoryStream} 이 없는 운영체제에서는 파일 공간이
+ * 꺼져(fail-closed) 모두 {@code MISSING} 이라 역시 새지 않는다. 운영과 같은 핸들 경로를 보려면 glibc 에서 돌린다.
+ *
+ * <p>스레드 경쟁이라 시간이 들고 결과가 확률적이어서 기본 검사에서 빼고 {@code linkRaceTest} 가 돌린다. 시간은
+ * {@code -PlinkRace.seconds} 로 바꾼다.
  */
 @Tag("link-race")
 class WorkspaceSandboxFilesLinkRaceTest {
@@ -45,7 +51,7 @@ class WorkspaceSandboxFilesLinkRaceTest {
             LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(root.toString(), "")));
         String handle;
         try (var stream = Files.newDirectoryStream(root)) {
-            handle = stream instanceof SecureDirectoryStream ? "secure" : "fallback";
+            handle = stream instanceof SecureDirectoryStream ? "secure" : "fail-closed";
         }
         LinkSwapRace.Tally tally = new LinkSwapRace.Tally();
         long deadline = System.nanoTime() + LinkRaceSettings.nanos();

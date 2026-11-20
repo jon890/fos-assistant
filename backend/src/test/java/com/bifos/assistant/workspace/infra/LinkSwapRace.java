@@ -126,7 +126,6 @@ public final class LinkSwapRace implements AutoCloseable {
         EXCHANGE
     }
 
-
     /** 시도 결과를 센다. 키는 {@code own}, {@code leaked}, 또는 실패 까닭이다. */
     public static final class Tally {
 
