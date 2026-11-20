@@ -1,294 +1,201 @@
-# 기억 전체 암호화 기술 설계
+# 기억 요약과 상세 두 층 기술 설계
 
-스펙: [`spec.md`](spec.md). PR1 이 구현한 REQ1 부터 REQ4, REQ6 부터 REQ8 은 앞의 절들이, PR2 가 구현한 REQ5 의 코드와 화면, 스펙 DECISION17 은 「PR2: 민감 구분 제거와 평문 해시」 절이, REQ5 의 「칸이 없다」 는 「PR3: 옛 칸 삭제」 절이 다룬다.
-되돌리기 어려운 결정과 근거는 [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 이 갖는다.
-PR2 와 PR3 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-20261103-memory-sensitivity-removal.md) 이 갖는다.
-
-## 지금 구조
-
-- 민감 기억 본문만 환경 변수 key 로 암호화한다([ADR-055](../../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)). `content_key_id` 가 그 key id(글)를 적는다. 제목과 일반 본문은 평문이다.
-- 대화 메시지는 KEK 로 감싼 사용자별 데이터 key 로 암호화한다([ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md)). 엔티티는 저장된 글을 들고, 읽어 온 엔티티에 Hibernate `POST_LOAD` 사건으로 복호화 도구를 붙여 본문을 처음 꺼낼 때 푼다(`ChatMessageLoadListener`).
-- 기억의 제목과 본문을 읽는 자리는 엔티티의 `title()`, `content()` 를 그대로 부른다. 조립(`context`), 도구(`mcp`), 화면 DTO, 정비, 대화의 「참고한 기억」 이 모두 그렇다. JPQL 이 제목과 본문을 직접 고르는 곳은 검색 후보(`MemorySearchCandidates`)와 임베딩 원천(`MemoryEmbeddingRepository`) 두 곳이다.
-
-## 바꾸는 구조 한눈에
-
-| 층 | 무엇을 바꾸나 |
-| --- | --- |
-| `crypto` | `user_data_key` 줄의 주인을 사용자 또는 그룹으로 넓힌다. 주인 값 `KeyOwner` 와, 주인으로 암호화하고 푸는 `OwnedTextCipher` 를 더한다. 기존 `TextCipher`, `BinaryCipher` 는 그대로 사용자 주인으로 돈다 |
-| `memory.domain` | `Memory`, `MemoryRevision` 이 저장된 글(`storedTitle`, `storedContent`)과 데이터 key 번호(`dataKeyId`)를 들고, `title()`, `content()` 는 처음 부를 때 푼 글을 낸다. 풀지 못하면 `readable()` 이 거짓이고 제목은 「읽지 못함」 이다 |
-| `memory.application` | `MemoryTexts` 가 새 줄의 암호화와 읽어 온 줄의 풀기를 맡는다. `MemoryTextMigration` 이 기동할 때 남은 줄을 데이터 key 로 옮긴다. 옛 보정(`MemoryContentBackfill`, `MemoryContentSealer`)은 지운다 |
-| `memory.infra` | 읽어 온 기억과 revision 에 `MemoryTexts` 를 붙이는 `POST_LOAD` 사건을 둔다. 제목과 본문을 직접 고르던 질의는 엔티티를 읽게 바꾼다 |
-| 소비자 | 「암호문이라 건너뛴다」(`sealed()`) 판정을 「풀었다」(`readable()`) 판정으로 바꾼다 |
-| DB | `memory`, `memory_revision` 에 `data_key_id` 컬럼, 제목 컬럼 길이를 넓힌다. `user_data_key` 에 `group_id` 컬럼을 더하고 `user_id` 를 비울 수 있게 한다. 새 테이블은 없다 |
-
-## REQ 마다 해결 방법
-
-### REQ1 제목과 본문을 평문으로 두지 않는다
-
-- 새 컬럼 `data_key_id BIGINT NULL` 을 `memory` 와 `memory_revision` 에 둔다. 제목과 본문을 암호화한 `user_data_key.id` 다. 비어 있으면 두 컬럼이 평문이거나 옛 key 의 줄이다.
-  옛 컬럼 `content_key_id`(환경 변수 key 의 id)는 이관이 끝날 때까지 읽기만 하고 PR2 가 읽기를 걷어 냈으며 PR3 이 칸을 지웠다. 숫자 key 번호와 글 key id 를 한 컬럼에 섞지 않는다(DECISION1).
-- 제목과 본문은 같은 데이터 key 로 따로 암호화한다. 모양은 기존 `v1.<IV>.<암호문과 태그>` 다.
-- **AAD 는 `memory:<memory_id>:<컬럼>:<USER|GROUP>:<주인 번호>` 다.** `<컬럼>` 은 `title` 이나 `content` 다. revision(`memory_revision`)은 자기 `memory_id` 로 같은 AAD 를 만든다(DECISION2).
-  그래서 revision 을 남길 때 지금 줄의 암호문을 다시 쓰지 않고 그대로 옮긴다. 암호문을 다른 기억이나 다른 컬럼, 다른 주인으로 옮기면 풀리지 않는다.
-- 줄 번호가 생겨야 AAD 를 만들 수 있다. 새 기억은 대화 메시지와 같이 빈 글로 넣고, 같은 트랜잭션에서 번호로 AAD 를 만들어 암호문으로 고친다. DB 에 평문이 한 번도 쓰이지 않는다.
-  새 기억을 넣는 자리는 모두 `MemoryTexts.insert` 를 거친다. `MemoryService` 의 만들기와 제안, 문서 만들기, `MemoryCaptureService` 의 바로 저장과 제안이다.
-- **줄을 넣기 전에 주인 데이터 key 를 쓸 수 있는지 먼저 본다.** 넣은 뒤에 거절하면, 거절을 결과 값으로 바꿔 돌려주는 `MemoryCaptureService.remember` 같은 자리에서 빈 제목과 빈 본문의 줄이 커밋된다.
-- 고치기(`MemoryRevisionWriter.revise`)는 제목과 새 본문을 먼저 암호화하고, 엔티티의 `revise` 가 그 암호문을 저장 필드에 한 번에 적는다. 평문이 저장 필드에 놓이는 순간이 없어 중간의 자동 flush 가 평문을 쓰지 못한다.
-- revision 은 지금 줄이 데이터 key 의 암호문이면 그대로 옮긴다. 아직 이관하지 않은 줄(웹 요청은 기동 이관보다 먼저 받는다)의 revision 은 주인 데이터 key 로 새로 암호화해 남긴다.
-- 새 저장 경로가 `MemoryTexts` 를 거치지 않아 평문 줄이 생겨도, 다음 기동의 이관이 그 줄을 데이터 key 로 옮긴다. 저장 경로마다 암호문인지는 테스트가 본다.
-- 질의가 제목과 본문을 직접 고르면 암호문이 나간다. 그래서 검색 후보와 임베딩 원천은 엔티티를 읽고 앱에서 값으로 옮긴다. 운영 기억이 수십 건이라 줄마다 엔티티를 읽는 비용은 작다. 측정 게이트(REQ4)로 확인한다.
-
-### REQ2 주인 key 로 암호화한다
-
-- `user_data_key` 에 `group_id BIGINT NULL` 컬럼을 더하고 `user_id` 를 `NULL` 로 둘 수 있게 한다. CHECK 제약으로 둘 가운데 정확히 하나만 채운다. `group_id` 에 유일 제약을 둔다(그룹마다 한 줄).
-  테이블 이름은 바꾸지 않는다. 바꾸면 외부 백업 절차와 사용자 정리(`UserPurgeWriter`)가 함께 바뀐다(DECISION3).
-- 데이터 key 를 감싸는 AAD 는 사용자 줄이 지금처럼 `user_data_key:user:<사용자 번호>`, 그룹 줄이 `user_data_key:group:<그룹 번호>` 다. 감싼 key 를 다른 주인의 줄로 옮기면 풀리지 않는다.
-- `crypto.domain.KeyOwner` 는 주인의 종류(`USER`, `GROUP`)와 번호다. `DataKey` 는 사용자 번호 대신 주인을 든다.
-- `crypto.domain.OwnedTextCipher` 를 더한다. `seal(KeyOwner, aad, plain)` 과 `open(keyId, KeyOwner, aad, sealed)` 두 동작이고 `DataKeyService` 가 구현한다.
-  기존 `TextCipher` 와 `BinaryCipher` 의 메서드는 바꾸지 않고 `KeyOwner.user(...)` 로 같은 길을 돈다. 테스트의 익명 구현과 mock 이 그대로 돈다.
-- 풀 때 데이터 key 줄의 주인이 그 기억의 주인과 다르면 풀지 않는다(기존 사용자 key 와 같은 검사). 다른 사용자나 다른 그룹의 key 로 쓴 암호문은 열리지 않는다.
-- KEK 교체(`DataKeyRewrapper`)는 그룹 줄도 같은 방식으로 다시 감싼다. 감싸기 AAD 를 줄의 주인으로 만든다.
-- 사용자 정리는 `user_id` 로만 지우므로 그룹 줄을 건드리지 않는다. 그룹 줄의 수명은 그룹 삭제 흐름이 생기면 정한다(스펙 DECISION16).
-
-### REQ3 민감 key 로 암호화한 28건을 잃지 않고 옮긴다
-
-`MemoryTextMigration`(`ApplicationRunner`)이 기동할 때 돈다. 순서와 실패 처리는 아래 「이관 순서와 실패 처리」 가 갖는다.
-
-- 대상은 `data_key_id` 가 빈 `memory` 줄과 `memory_revision` 줄 전부다. 평문 줄과 옛 key 줄이 함께 든다.
-- 줄마다 트랜잭션 하나에서 쓰기 잠금으로 다시 읽고, 평문을 얻어(옛 key 줄은 `MemoryContentCipher.open`) 주인 데이터 key 로 다시 쓴다. `content_key_id` 는 비운다. revision 번호와 `updated_at`, `changed_at` 은 그대로 둔다.
-- **같은 트랜잭션에서 새 암호문을 다시 풀어 옮기기 전 평문의 SHA-256 과 비교한다.** 다르면 그 줄을 되돌리고 실패로 센다. 그래서 줄마다 해시 대조를 지난 줄만 커밋된다.
-- 끝나면 옮긴 수(해시 대조를 지난 줄만 센다)와 그 가운데 옛 key 줄 수(`legacyVerified`), 실패 수를 info 한 줄로, 실패한 줄 번호를 error 한 줄로 남긴다. 줄마다의 실패는 예외 클래스 이름만 남긴다. 본문과 해시 값은 로그에 넣지 않는다.
-- 옛 key 줄이 0건이 되면 옛 key 설정은 읽을 줄이 없다. 옛 key 를 빼는 일은 운영 확인 뒤 코디네이터가 한다(스펙 DECISION12).
-
-### REQ4 화면과 에이전트의 동작은 같다
-
-엔티티의 `title()`, `content()` 가 푼 글을 내므로 대부분의 소비자는 코드가 바뀌지 않는다. 바뀌는 자리는 아래뿐이다.
-
-| 자리 | 지금 | 바꾼 뒤 |
-| --- | --- | --- |
-| 개인 사실 구역, 항상 층(`ContextAssembler`) | `!memory.sealed()` 인 줄만 싣는다 | `memory.readable()` 인 줄만 싣는다 |
-| 질문 구역(`MemorySearchSection`) | 일반이고 평문인 줄만 본문을 점수에 넘긴다 | 일반이고 풀린 줄만 본문을 넘긴다 |
-| `memory_search` 후보(`MemorySearchCandidates`) | SQL 이 민감·암호문 본문을 `NULL` 로 바꾼다 | 권한 조건 그대로 엔티티를 읽고, 풀리지 않은 줄은 빼고, 민감 줄의 본문은 앱에서 `null` 로 바꾼다 |
-| 임베딩 원천(`MemoryEmbeddingRepository`) | `content_key_id is null` 인 일반 줄 | `content_key_id` 조건을 빼고 엔티티를 읽어 풀린 줄만 낸다. 민감 줄은 지금처럼 `sensitivity` 조건으로 빠진다 |
-| 바로 저장의 되돌리기(`MemoryCaptureService.restore`) | 암호문 revision 이면 되돌리지 않는다 | 풀린 revision 이면 되돌린다. 민감 revision 은 지금처럼 이 길로 오지 않는다 |
-| 정비 규칙의 중복(`MemoryMaintenanceRules.dedup`) | 민감 줄과 암호문 줄을 보지 않는다 | 민감 줄과 풀리지 않은 줄을 보지 않는다 |
-| 화면 DTO(`MemoryDtos`, `ChatDtos`) | 민감이거나 암호문이면 본문을 빈 글로 낸다 | 민감이거나 풀리지 않았으면 빈 글로 낸다. 목록 DTO 에 `unreadable` 을 더한다 |
-| `memory_read`(`MemoryService.contentOf`) | 옛 key 로 푼다 | 엔티티의 `content()` 를 낸다. 풀리지 않았으면 지금처럼 `MEMORY_ENCRYPTION_UNAVAILABLE` 이다 |
-
-- 민감 구분은 PR1 에서 그대로다. 민감 허용이 없는 에이전트는 민감 줄을 받지 않고, 화면은 민감 본문을 싣지 않는다. 바꾸는 것은 저장 모양뿐이다.
-- 「Memory 회수 측정」 게이트는 기존 측정 테스트(`MemoryEmbeddingEvalTest` 와 합성 측정)를 그대로 돌려 확인한다. 기준 파일을 바꾸지 않는다.
-
-### REQ6 key 를 읽지 못하면 평문으로 내려 저장하지 않는다
-
-| 상태 | 저장과 수정 | 읽기 |
-| --- | --- | --- |
-| KEK 가 설정되지 않았다(`required` 가 거짓인 로컬과 개발) | 평문으로 저장한다. 처음 평문으로 저장할 때 한 번 경고한다. 대화 메시지와 같다 | 평문 줄을 그대로 읽는다 |
-| KEK 는 있는데 그 주인의 데이터 key 를 풀지 못한다 | `MEMORY_ENCRYPTION_UNAVAILABLE`(409)로 거절한다. 줄도 revision 도 바뀌지 않는다. 평문으로 내려 저장하지 않는다 | 그 줄만 「읽지 못함」 이다. 목록은 실패하지 않는다 |
-| 데이터 key 는 있는데 암호문이 풀리지 않는다(다른 줄에서 옮겼다, 태그가 틀렸다) | 고치기를 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 거절한다. 제목을 몰라 덮어쓰면 제목을 잃는다. 지우기는 된다 | 그 줄만 「읽지 못함」 이다 |
-| 데이터베이스에 닿지 못한다 | 요청이 실패한다 | 요청이 실패한다. 일시 장애를 「읽지 못함」 으로 기억하지 않는다(기존 `DataKeyService` 동작) |
-
-- 운영은 `assistant.data-encryption.required` 가 켜져 있어 첫 줄의 상태가 생기지 않는다.
-- 「읽지 못함」 은 엔티티의 `title()` 이 내는 고정 글이다. 본문은 빈 글이다. 풀리지 않은 줄은 실행에 싣지 않는다. `MemoryService` 가 항상 층과 색인 후보를 낼 때 한 번에 빼므로 개인 사실 구역, 질문·연결 구역, 살펴보기 입력이 같은 판정을 쓴다. 검색 후보와 임베딩 원천에서도 뺀다. 목록 DTO 의 `unreadable` 이 참이면 화면은 고치기 단추를 숨기고 본문 자리에 「이 기억은 지금 읽지 못해요.」 를 보인다. 지우기는 그대로 된다.
-- 풀기 실패 경고는 데이터 key 번호와 주인, 옛 key 줄이면 기억 번호만 남긴다. 풀지 못한 데이터 key 는 1분 동안 다시 읽지 않는다(`DataKeyService` 의 기존 동작).
-
-### REQ7 관리자 화면은 남의 개인 기억 제목을 보이지 않는다
-
-지금 코드가 이미 만족한다. 이 PR 은 테스트로 고정한다.
-
-- 에이전트 상세의 「기억 영역」(`AgentMemorySettingService`)은 collection 마다 건수와 collection 변경 기록만 낸다. 항목 제목은 응답에 없다.
-- 정리 후보(`MemoryMaintenanceService.candidatesFor`)는 `USER` 항목을 주인에게만 낸다. 그룹 관리자는 `GROUP` 항목만 본다.
-- 테스트는 다른 사용자의 `USER` 기억 제목이 두 응답 어디에도 없고, 그 기억이 건수에는 들어 있는 것을 본다.
-
-### REQ8 이관 실패가 남지 않는다
-
-- 이관은 줄 하나가 실패해도 그 줄 번호만 로그에 남기고 다음 줄로 간다. 기동은 멈추지 않는다. 다음 기동이 남은 줄을 다시 본다.
-- 실패한 줄은 옛 모양 그대로다. 평문 줄은 평문으로, 옛 key 줄은 옛 key 로 읽힌다. PR1 은 옛 key 읽기를 남겨 둔다.
-- PR2 는 운영에서 `data_key_id` 가 빈 줄과 `content_key_id` 가 찬 줄이 모두 0건인 것을 확인한 뒤에만 연다. 확인은 코디네이터가 한다.
-
-## 책임과 경계
-
-| 클래스 | 자리 | 맡는 것 |
-| --- | --- | --- |
-| `KeyOwner` | `crypto.domain` | 데이터 key 주인. 종류와 번호. 감싸기 AAD 를 만든다 |
-| `OwnedTextCipher` | `crypto.domain` | 주인으로 글을 암호화하고 푼다. 구현은 `DataKeyService` |
-| `UserDataKey` | `crypto.domain.entity` | `user_id` 또는 `group_id` 하나를 주인으로 갖는다 |
-| `MemoryTextOpener` | `memory.domain` | 엔티티가 처음 글을 꺼낼 때 부르는 복호화 도구. 대화의 `MessageContentOpener` 와 같은 역할이다 |
-| `MemoryTexts` | `memory.application` | `MemoryTextOpener` 구현. 새 줄 넣기(`insert`), 고칠 본문 암호화, revision 암호화, 풀기. 옛 key 줄은 `MemoryContentCipher` 로 푼다 |
-| `MemoryTextMigration` | `memory.application` | 기동할 때의 이관. 줄마다 `REQUIRES_NEW` 의 `TransactionTemplate` 으로 트랜잭션을 연다. 바깥 트랜잭션 안에서 불려도 줄마다 따로 커밋한다 |
-| `MemoryTextLoadListener` | `memory.infra` | `POST_LOAD` 에서 `MemoryTextOpener` 를 붙인다. infra 는 domain 의 인터페이스만 알고 application 의 빈 이름을 모른다(rule-5) |
-| `MemoryContentCipher` | `memory.application` | 옛 환경 변수 key 로 푼다. 새로 암호화하지 않는다. PR2 가 지운다 |
-
-- `memory.application` 직하 클래스 수는 rule-75 의 상한(25)에 닿아 있다. 옛 보정 둘을 지우고 새 둘을 더해 수가 늘지 않는다. 더 늘려야 하면 이관을 하위 패키지로 옮긴다.
-- 엔티티에 리스너 주석을 달지 않는다. 달면 domain 이 infra 를 가리킨다. 대화 메시지와 같이 Hibernate 사건 목록에 직접 더한다.
-- `MemoryTexts` 는 푼 글을 엔티티의 `@Transient` 필드에만 둔다. 저장 필드(`storedTitle`, `storedContent`)은 바꾸지 않으므로 읽기만 한 엔티티가 dirty 로 보이지 않는다.
-
-## 데이터
-
-| 테이블 | 컬럼 | 바꾸는 것 |
-| --- | --- | --- |
-| `memory` | `data_key_id` | 새 컬럼. `BIGINT NULL`. 외래 키를 두지 않는다(데이터 key 줄을 지워 본문을 없애는 길을 막지 않는다) |
-| `memory` | `title` | `VARCHAR(200)` 에서 `VARCHAR(1200)` 으로 넓힌다. 제목 200자를 4바이트 글자로 채운 암호문이 들어가는 길이다. 입력 제한 200자는 화면 요청(`@Size`), 문서 요청, `memory_remember` 의 검사가 지킨다. 컬럼이 넓어져 마지막 제한이 사라지므로 화면 요청에 빠져 있던 `@Size(max = 200)` 를 더한다 |
-| `memory_revision` | `data_key_id`, `title` | `memory` 와 같다 |
-| `user_data_key` | `group_id` | 새 컬럼. `BIGINT NULL`, 유일 |
-| `user_data_key` | `user_id` | `NOT NULL` 을 푼다. CHECK 로 `user_id` 와 `group_id` 가운데 하나만 찬다 |
-
-- DDL 과 DML 을 섞지 않는다. 이 PR 의 마이그레이션은 DDL 하나다. 줄을 옮기는 일은 key 가 필요해 SQL 이 아니라 기동 작업이 한다.
-- 새 컬럼과 바꾼 컬럼에 한국어 `COMMENT` 를 단다. `MODIFY` 는 기존 설명을 그대로 다시 적는다.
-
-## 이관 순서와 실패 처리
-
-1. 코디네이터가 이관 직전 DB 백업을 뜨고, 두 테이블의 전체 줄 수와 `content_key_id` 가 찬 줄 수를 적어 둔다(스펙 DECISION11).
-2. 배포한 Control Plane 이 Flyway 로 컬럼을 더하고 뜬다.
-3. `MemoryTextMigration` 이 `data_key_id` 가 빈 줄의 번호를 트랜잭션 밖에서 읽는다. 기억 다음 revision 의 순서다.
-4. 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽는다. 그 사이 누가 옮겼으면 건너뛴다.
-5. 평문을 얻는다. 옛 key 줄은 옛 key 로 풀고, 풀지 못하면 실패로 센다.
-6. 주인 데이터 key 로 제목과 본문을 쓰고 `data_key_id` 를 적고 `content_key_id` 를 비운다.
-7. 같은 트랜잭션에서 다시 풀어 평문 해시와 비교한다. 다르면 예외로 되돌린다.
-8. 끝에 건수와 실패 번호를 로그로 남긴다. 실패가 있으면 error 다.
-9. 코디네이터가 운영에서 `data_key_id` 가 빈 줄 0건, `content_key_id` 가 찬 줄 0건, 줄 수가 이관 전과 같은 것을 확인한다. 로그의 `legacyVerified` 가 1단계에 적어 둔 옛 key 줄 수(두 테이블 합)와 같은지 본다.
-10. 확인 뒤 평문이 남은 옛 백업, 이관 직전 백업, 옛 환경 변수 key 를 지운다(스펙 DECISION12).
-11. **DB 의 바이너리 로그(binlog)에도 이관 UPDATE 의 이전 값과 그동안의 평문 INSERT 가 남는다.** 확인한 시점 이전의 binlog 를 지우거나 binlog 가 꺼진 설정인지 본다. 해제된 페이지에 남은 평문은 테이블을 다시 만들어 지우는 것을 함께 검토한다. 실행 방법은 운영 저장소가 갖는다.
-
-- 이관 중에 들어온 요청은 새 길로 저장하므로 이관 대상에 새로 들지 않는다. 이관이 잠근 줄을 고치려는 요청은 잠금을 기다린다.
-- KEK 가 없으면 이관하지 않고 남은 줄 수만 경고한다.
-- 이 PR 을 배포한 뒤 직전 이미지로 되돌리지 않는다. 직전 이미지는 `data_key_id` 를 몰라 암호문을 그대로 낸다(스펙 DECISION11). 문제가 생기면 앞으로 고친다.
-
-## 검증 전략
-
-| REQ | 테스트 | DB |
-| --- | --- | --- |
-| REQ1 | 화면, 제안, 문서, 그룹 기억을 만들고 고친 뒤 SQL 로 제목과 본문이 `v1.` 모양이고 `data_key_id` 가 찬 것을 본다. revision 도 같다 | H2, MySQL |
-| REQ2 | 다른 사용자, 다른 그룹, 다른 기억 번호, 다른 컬럼으로 암호문을 옮기면 「읽지 못함」 이 된다. 그룹 key 줄이 `user_data_key` 에 한 줄 생긴다 | H2 |
-| REQ3 | 실제 MySQL 에 옛 key 로 암호화한 민감 줄, 평문 일반 줄, revision 줄을 넣고 이관한 뒤, 건수와 줄마다의 평문 해시가 이관 전과 같고, `content_key_id` 가 찬 줄과 `data_key_id` 가 빈 줄이 0건인 것을 본다. 두 번 돌려도 바뀌지 않는다 | MySQL |
-| REQ4 | 기존 기억, 조립, 도구, 측정 테스트를 통과시킨다. 측정 fixture 는 넣은 줄을 이관으로 데이터 key 의 암호문으로 바꾸고 `data_key_id` 가 빈 줄이 없는 것을 확인한 뒤 측정한다. 바뀐 기대값은 SQL 로 평문을 기대하던 것과, 가짜 암호문 줄이 색인에 제목으로 오르던 것(이제 풀지 못한 줄로 빠진다)뿐이다 | H2 |
-| REQ6 | 실제 MySQL 에서 KEK 파일에 없는 KEK 로 감싼 데이터 key 를 둔 사용자가 기억을 저장하고 고치면 409 이고 줄과 revision 이 바뀌지 않는다. 같은 사용자의 목록은 그 줄을 「읽지 못함」 으로 내고 실패하지 않는다. KEK 가 꺼진 설치는 평문으로 저장한다 | MySQL, H2 |
-| REQ7 | 관리자가 다른 사용자의 개인 기억이 있는 에이전트 설정과 정리 후보를 읽어도 그 제목이 응답에 없고 건수에는 들어 있다 | H2 |
-| REQ8 | 줄 하나의 이관이 실패해도 다른 줄은 옮겨지고 기동이 이어지며, 로그에 그 줄 번호만 남고 본문이 없다 | H2 |
-
-## 이번 변경의 기술 결정
-
-| ID | 결정 | 까닭 |
-| --- | --- | --- |
-| DECISION1 | 데이터 key 번호는 새 컬럼 `data_key_id` 에 적고 옛 `content_key_id` 는 PR2 까지 읽기만 한다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 `content_key_id` 재사용 |
-| DECISION2 | AAD 에 기억 번호와 컬럼을 묶고 revision 번호는 묶지 않는다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 AAD 두 항목 |
-| DECISION3 | 그룹 key 는 `user_data_key` 에 `group_id` 줄로 둔다. 테이블 이름은 바꾸지 않는다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 그룹 key 새 테이블 |
-| DECISION4 | 제목도 본문과 같은 key 로 따로 암호화한다. 풀 때는 둘을 함께 푼다 | 스펙 DECISION4. 컬럼마다 AAD 가 달라 제목과 본문을 바꿔 넣으면 풀리지 않는다. 함께 풀어 한 줄의 읽기 결과가 하나다 |
-| DECISION5 | 이관은 SQL 마이그레이션이 아니라 기동 작업이다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 SQL 이관 |
-| DECISION6 | 제안 중복 키(`proposal_dedup_key`)와 임베딩 지문은 PR1 에서 그대로 둔다 | 스펙 DECISION17. 원문 전체를 맞혀야 확인되는 해시다. PR2 가 둘을 주인 key 로 만든 HMAC 으로 바꾼다 |
-| DECISION7 | 「읽지 못함」 은 서버가 제목 자리에 내는 고정 글이고 목록 DTO 의 `unreadable` 로 화면이 고치기를 막는다 | 제목을 보이는 화면(목록, 제안 카드, 「기억했어요」, 「참고한 기억」)이 따로 고치지 않아도 같은 글을 보인다 |
+스펙: [`spec.md`](spec.md)(확인 2026-11-20). 지금 동작은 [기능 파일](../memory.md)이 갖고, 이 설계는 바뀌는 곳만 적는다.
+PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3 의 절은 그 PR 을 시작할 때 다시 대조하고 고친다.
 
 ## 요구사항 연결
 
-| ID | 해결 방법 | PR |
+| ID | PR | 해결 방법 |
 | --- | --- | --- |
-| REQ1 | 「REQ 마다 해결 방법」 의 REQ1. 제목과 본문을 주인 데이터 key 로 따로 암호화하고 새 줄은 빈 글로 넣은 뒤 같은 트랜잭션에서 암호문으로 고친다 | PR1 |
-| REQ2 | 「REQ 마다 해결 방법」 의 REQ2. `user_data_key` 에 그룹 줄을 더하고 풀 때 key 주인을 대조한다 | PR1 |
-| REQ3 | 「REQ 마다 해결 방법」 의 REQ3 과 「이관 순서와 실패 처리」. 기동 이관이 줄마다 다시 쓰고 평문 해시를 대조한다 | PR1 |
-| REQ4 | 「REQ 마다 해결 방법」 의 REQ4. 엔티티가 푼 글을 내고 `sealed()` 판정을 `readable()` 로 바꾼다 | PR1 |
-| REQ5 | 「PR2: 민감 구분 제거와 평문 해시」. 엔티티와 질의, 화면에서 민감도와 민감 허용을 빼고, 「PR3: 옛 칸 삭제」 가 칸을 지운다 | PR2, PR3 |
-| REQ6 | 「REQ 마다 해결 방법」 의 REQ6. key 를 풀지 못하면 저장을 거절하고 그 줄만 「읽지 못함」 이다 | PR1 |
-| REQ7 | 「REQ 마다 해결 방법」 의 REQ7. 관리자 응답에 남의 개인 기억 제목을 싣지 않는 것을 테스트로 고정한다 | PR1 |
-| REQ8 | 「REQ 마다 해결 방법」 의 REQ8. 실패한 줄은 번호만 남기고 기동을 잇는다 | PR1 |
+| REQ1 | PR1 | `memory.summary`, `memory_revision.summary` 칸을 더하고 제목·본문과 같은 주인 key 로 암호화한다. AAD 의 칸 이름은 `summary` 다. 길이 상한 200자는 `Memory.SUMMARY_MAX` 가 갖는다 |
+| REQ2 | PR1 | `ContextAssembler` 의 개인 사실 구역을 요약 구역으로 바꾼다. 후보는 색인 후보 가운데 `USER`, `MEMORY`, 풀림, 요약이 빈 글이 아닌 것이다. 질문 관련 구역 후보에서 빼지 않는다 |
+| REQ3 | PR1 | 고르는 순서와 건너뛰기는 지금 `chooseFacts` 를 쓴다. 빠진 요약은 색인 줄의 선택 근거에 `summary-over-budget` 을 붙여 실행 기록에 남긴다 |
+| REQ4 | PR1 | `group_setting` 의 새 키 `MEMORY_CONTEXT` 와 읽는 쪽 `MemoryContextSettings`, 관리자 API `/api/v1/admin/memory-settings` |
+| REQ5 | PR1 | `memory_remember` 의 선택 인자 `summary`. 판정은 `McpMemoryRemember` 와 `MemoryCaptureService` 의 지금 자리에서 요약까지 본다 |
+| REQ6 | PR1 | `memory_remember` 의 선택 인자 `replaces`. 바로 저장이면 같은 트랜잭션에서 대체 칸을 채우고, 제안이면 `memory_capture.replaced_memory_ids` 에 두었다가 받아들일 때 채운다. 기록 목록 응답과 대화의 기록 줄이 옛 제목을 보인다 |
+| REQ7 | PR1 | `ContextAssembler.MEMORY_INSTRUCTIONS` 와 요약 구역 머리 글을 고치고, 기억 회수 측정의 합성 사례에 세 질문을 더한다 |
+| REQ8 | PR1 | 기동 이관 `MemorySummaryBackfill`. 요약 칸이 `NULL` 인 줄만 본다 |
+| REQ9 | PR2 | 목록 응답에 요약, 묶음, 「요약에 못 들어감」, 대체 정보를 더하고 사용량 API 를 둔다. 화면은 `web/src/components/memory/` |
+| REQ10 | PR2 | 관리자 화면 `/admin/memory` 와 사람마다 사용량 API |
+| REQ11 | PR3 | 정비 루프의 새 동작 `SUMMARY` 와 Hermes 실행 한 번으로 문장을 만드는 생성기 |
+| REQ12 | PR3 | 평가 세트와 채점 기준을 저장소에 두고, 실제 모델 실행은 코디네이터가 운영에서 돌린다 |
 
-## PR2: 민감 구분 제거와 평문 해시
+## 책임과 경계
 
-PR1 을 배포한 뒤 운영에서 데이터 key 로 옮기지 않은 줄과 옛 key 줄이 모두 0건인 것을 확인했다(2026-11-03). 그래서 PR2 는 옛 key 를 읽지 않아도 된다.
-
-### 바꾸는 구조
-
-| 층 | 무엇을 바꾸나 |
-| --- | --- |
-| `memory.domain` | `Memory`, `MemoryRevision` 이 `sensitivity`, `content_key_id` 를 매핑하지 않는다. `MemoryPlacement` 는 collection 과 꺼내는 방식만 갖는다. `StoredContent` 를 지운다. `MemorySensitivity` 는 문맥 항목의 민감도로만 남는다 |
-| `memory.application` | `MemoryTexts` 가 옛 key 를 읽지 않고, 제안 중복 키와 임베딩 지문을 주인 key 의 HMAC 으로 낸다. `MemoryTextMigration` 이 기동할 때 남은 SHA-256 해시를 HMAC 으로 바꾼다. `MemoryContentCipher` 와 `MemoryEncryptionProperties` 를 지운다 |
-| `memory` 의 판정 | `MemoryAccess` 는 받는 collection 만 갖는다. 질의(`MemoryQueries`, 검색 후보, 임베딩 원천)에서 민감도 조건을 뺀다. 민감 항목 수정 거절(`MEMORY_SENSITIVE_NOT_EDITABLE`)과 `ALWAYS` 거절(`MEMORY_SENSITIVE_ALWAYS`)을 지운다 |
-| `crypto` | `OwnedTextCipher.mac(owner, purpose, text)` 을 더한다. `DataKeyService` 가 데이터 key 에서 쓰임마다 HMAC key 를 뽑는다 |
-| `agent` | `AgentMemoryCollection`, `AgentMemoryCollectionChange` 가 `allow_sensitive` 를 매핑하지 않는다. `AgentMemoryGrants` 는 collection 만 갖는다. 최근 변경은 옛 `SENSITIVE_CHANGED` 기록을 내지 않는다 |
-| 화면 | `/memory` 목록과 문서, 제안 카드, 대화의 「기억했어요」 에서 민감 배지와 숨김 문구, 문서의 민감 선택을 지운다. 에이전트 상세의 「민감 항목까지」 를 지운다 |
-| `memory_remember` | `sensitive` 인자는 그대로 받는다. 참이면 늘 제안이고 저장하지 않는다(스펙 DECISION8) |
-
-### HMAC
-
-- `DataKeyService.mac` 은 `HMAC-SHA256(데이터 key, "data_key_mac:" + 쓰임)` 으로 HMAC key 를 뽑고, 그 key 로 글의 HMAC-SHA256 을 낸다. 쓰임은 `memory:proposal_dedup`, `memory:embedding` 이다
-- 제안 중복 키는 `USER` 주인의 key 로 `주인 번호 \0 제목 \0 본문` 을 HMAC 한 64자 hex 다. 칸 길이(64)가 그대로다
-- 임베딩 지문은 기억의 주인(`USER` 는 사용자, `GROUP` 은 그룹)의 key 로 `모델 \n 글` 을 HMAC 한 32바이트다. 칸 길이(`BINARY(32)`)가 그대로다. 그래서 검색 후보(`RelevanceCandidate`, `MemorySearchCandidate`)와 임베딩 원천(`MemoryEmbeddingSource`)이 범위와 주인 번호를 든다
-- KEK 가 없는 설치는 글이 평문이라 지금처럼 SHA-256 을 쓴다. 주인 key 를 풀지 못하면 중복 키는 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 저장을 거절하고, 지문은 빈 값이라 그 기억은 벡터를 쓰지 않는다
-
-### 이미 있는 해시 바꾸기
-
-`MemoryTextMigration.rekeyHashes` 가 글 이관 다음에 돈다. 줄마다 `REQUIRES_NEW` 트랜잭션이고 실패한 줄은 번호만 남긴다.
-
-1. 제안 중복 키가 있는 줄을 쓰기 잠금으로 읽어 지금 글로 HMAC 을 내고, 다르면 바꾼다. 같은 HMAC 을 이미 다른 줄이 가졌으면(직전 이미지로 되돌린 동안이나 이관 전에 같은 글의 제안이 새 키로 먼저 생겼다) 이 줄의 키를 비운다. 유일 제약에 걸려 평문 해시가 남지 않게 한다
-2. 벡터가 있는 줄은 지금 글과 그 줄의 모델로 HMAC 을 낸다. 같으면 둔다. 저장된 지문이 같은 글의 SHA-256 이면 지문만 HMAC 으로 바꾸고(`replaceFingerprint`, 지문이 그대로일 때만 쓴다) 벡터는 그대로 둔다. 둘 다 아니면 낡은 벡터라 벡터째 비운다. 비우기도 지문이 그대로일 때만 쓴다
-3. 이미 HMAC 인 줄은 건드리지 않으므로 기동마다 돌아도 된다. KEK 가 없으면 돌지 않는다
-
-벡터를 다시 계산하지 않는 까닭은 다시 쓴 벡터마다 연결 찾기가 돌아, 사람이 정리한 대체 제안이 다시 생길 수 있어서다.
+- `memory` 모듈이 요약 칸의 저장, 암호화, revision 기록, 대체, 이관, 그룹 설정 `MEMORY_CONTEXT` 의 모양과 검사를 갖는다. 새 모듈은 만들지 않는다.
+- `context` 모듈의 `ContextAssembler` 가 요약 구역을 조립한다. 예산은 `MemoryService` 를 거쳐 `MemoryContextSettings` 에서 받는다. `context` 가 `user` 를 새로 import 하지 않게 한다(패키지 순환을 늘리지 않는다).
+- `mcp` 모듈의 `McpMemoryRemember` 가 도구 인자와 조건 1~5 를 본다. 조건 3 과 6, 7 은 지금처럼 각 자리가 본다.
+- 관리자 API 는 이미 있는 `admin/memory/presentation`(`AgentMemorySettingController` 옆)에 둔다. 서비스는 `memory` 모듈의 것을 쓴다. 키 상수 `MEMORY_CONTEXT` 는 `user.domain.GroupSetting` 에 `MEMORY_COLLECTIONS` 와 같은 방식으로 더한다.
+- `mcp` 의 인자 경로 전체(`McpDtos.MemoryRememberArguments.FIELDS`, `McpController.remember`, `McpToolService.remember`, `McpMemoryRemember`)와 `MemoryRememberRequest` 가 새 인자를 받는다. 모르는 인자와 모양 오류의 `-32602` 는 지금처럼 `McpController` 가 낸다.
+- 그룹 설정 줄의 읽기와 쓰기는 `user.application.GroupSettingStore` 를 쓴다. 모델 설정과 도구 숨김이 같은 방식이다.
 
 ## 인터페이스와 데이터
 
-| 자리 | 바뀐 뒤 |
-| --- | --- |
-| `GET /api/v1/memories` 의 `MemoryView` | `sensitive` 를 뺀다. 본문은 풀린 줄이면 늘 싣는다 |
-| 문서 요청(`CreateDocumentRequest`, `UpdateDocumentRequest`) | `sensitive` 를 받지 않는다. 옛 화면이 보내도 무시한다 |
-| 문서 응답(`DocumentSummaryView`, `DocumentView`) | `sensitive` 를 뺀다 |
-| 대화의 기억 기록(`MemoryCaptureView`) | `sensitive` 를 뺀다 |
-| 관리자 기억 영역(`AgentMemorySettingView`) | collection 의 `allowSensitive`, `sensitiveEntryCount`, 변경의 `allowSensitive` 를 뺀다. 저장 요청은 `collection` 만 받고 옛 `allowSensitive` 는 무시한다 |
-| 오류 코드 | `MEMORY_SENSITIVE_NOT_EDITABLE`, `MEMORY_SENSITIVE_ALWAYS` 를 지운다 |
-| 설정 | `assistant.memory.encryption.*`(옛 환경 변수 key)를 지운다. 환경 변수가 남아 있어도 읽지 않는다 |
-| `memory.sensitivity`, `memory.content_key_id`, `memory_revision.sensitivity`, `memory_revision.content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` | 엔티티가 매핑하지 않는 옛 칸이다. 기본값이 없던 `memory_revision.sensitivity` 와 `agent_memory_collection_change.allow_sensitive` 에 기본값만 둔다(`V20261103054413`, DDL 하나). 칸은 「PR3」 절의 마이그레이션이 지웠다 |
-| `proposal_dedup_key`, `embedding_fingerprint` | 칸 모양은 그대로이고 값이 HMAC 이다 |
+### 스키마(PR1)
 
-H2 테스트 DB 는 엔티티로 스키마를 만들므로 PR2 동안은 옛 칸을 테스트 자원 `memory-legacy-columns.sql` 로 따로 만들어 운영 스키마와 맞췄다. PR3 이 칸과 그 파일을 함께 지웠다.
+마이그레이션 하나에 DDL 만 둔다. 번호는 `orch queue reserve` 로 받는다.
+
+| 표 | 칸 | 뜻 |
+| --- | --- | --- |
+| `memory` | `summary TEXT NULL` | 요약 줄. 암호문이거나(키가 있으면) 평문. `NULL` 은 「이 기능 전에 만든 줄이라 아직 이관하지 않았다」, 빈 글(암호화한 빈 글)은 「요약 없음」 이다 |
+| `memory_revision` | `summary TEXT NULL` | 그 revision 의 요약. 이 기능 전 판은 `NULL` 이고 「요약 없음」 으로 읽는다 |
+| `memory_capture` | `replaced_memory_ids VARCHAR(512) NULL` | 합치기 요청에서 대신할 수 있다고 판정한 옛 기억 번호의 JSON 배열. 합치기가 아니면 `NULL` |
+
+- 이 기능 뒤에 쓰는 모든 경로는 `summary` 를 `NULL` 로 두지 않는다. 요약이 없으면 빈 글을 암호화해 둔다. 그래서 `NULL` 이 이관 표지가 되고, 사용자가 요약을 지운 줄을 이관이 다시 채우지 않는다
+- 테이블은 늘지 않는다
+
+### 글 타입
+
+`MemoryText(title, content)` 에 `summary` 를 더한다. 풀지 못하면 지금처럼 셋 다 없다. `StoredMemoryText`, `SealedMemoryText` 도 `summary` 를 갖는다.
+`MemoryTexts.seal` 은 요약을 `memory:<번호>:summary:<범위>:<주인>` AAD 로 암호화하고 `open` 은 저장된 요약이 `NULL` 이면 빈 글로 낸다.
+`Memory.summary()` 는 푼 요약이고 없으면 빈 글이다. `Memory.hasSummary()` 는 빈 글이 아닌가다.
+요약을 적는 엔티티 메서드는 `USER` 범위의 `MEMORY` 가 아니면 빈 글 밖의 값을 거절한다(`IllegalArgumentException`). 그룹 기억과 문서에 요약이 생기지 않는 불변식이고, 그 요청을 받는 화면 경로는 PR2 가 `VALIDATION_FAILED` 로 바꿔 낸다.
+
+요약을 다루는 기존 경로를 모두 바꾼다.
+
+- `MemoryTextMigration` 의 `rewrite`, `verify`, `migrateRevision` 이 요약도 함께 다시 암호화하고 해시를 대조한다. 평문 줄의 평문 요약이 제목·본문만 암호화된 채 남지 않게 한다
+- `MemoryRevisionWriter.saveRevision`(revision 을 남길 때 다시 암호화하는 분기 포함)과 `revise` 가 요약을 받는다. `MemoryService.revise` 와 `update` 도 요약 인자를 받는다(`null` 은 지금 값 유지)
+- 되돌리기 `MemoryCaptureService.restore` 는 이전 revision 의 본문과 함께 요약도 되돌린다. 이전 revision 의 요약이 `NULL` 이면 빈 글로 되돌린다
+- 화면 수정(`PATCH /api/v1/memories/{id}`, PR2 전까지 요약 칸이 없다)은 본문이 바뀌고 지금 요약이 옛 본문과 같으면 요약을 새 본문으로 바꾸되 새 본문이 200자를 넘으면 요약을 비운다. 요약이 옛 본문과 다르면 그대로 둔다. 이관으로 「요약 = 본문」 이 된 기억을 화면에서 고쳐도 옛 사실이 요약으로 남지 않게 한다
+
+### 조립(PR1)
+
+```text
+항상 층 → 요약 구역(MEMORY_FACTS) → 질문 관련 구역(MEMORY_SEARCH) → 색인(MEMORY_INDEX)
+```
+
+- 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 지금처럼 `MEMORY_FACTS` 줄을 읽는다
+- 요약 구역에 든 기억도 질문 관련 구역의 후보다. `MemorySearchSection.place` 에 「색인에 다시 놓지 않을 번호」(요약 구역에 든 번호)를 넘긴다. 요약 구역에 든 기억이 색인에 두 번 오르지 않게 한다
+- 요약 구역의 고른 규칙 이름은 `facts-recent-v2` 로 올린다(`ContextSelection` 의 「규칙을 바꾸면 버전을 올린다」)
+- 예산은 `MemoryContextSettings.forGroup(groupId)` 의 `summaryMaxChars` 와 `maxChars` 다. `assistant.context.max-chars`, `facts-max-chars`, `facts-item-max-chars` 설정은 지운다. 그룹이 없는 사용자는 기본값이다
+- 요약 구역 예산이 0 이 되는 값은 받지 않는다(최솟값 1,000). 운영에서 구역을 끄는 길은 없다. 회수 측정의 `factsOff` 모드는 테스트가 예산을 0 으로 주는 seam(`MemoryContextSettings` 의 값을 테스트가 바꾸는 것)으로 유지한다
+- 요약 구역은 색인 몫을 떼어 둔 뒤의 자리에 담긴다. 그래서 저장 검사에 `summaryMaxChars ≤ maxChars - maxChars / index-budget-ratio` 를 더한다(기본 비율 4 에서 전체의 3/4). 스펙의 「요약은 전체를 넘지 못한다」 보다 좁고, 설정 값과 실제로 담기는 예산이 어긋나지 않게 한다
+- 넘친 요약은 색인 줄로 가고, 그 색인 항목의 선택 근거 이름을 `summary-over-budget-v1` 로 둔다. 질문 점수가 있어도 이 근거가 앞선다. 넘친 번호 집합을 `MemorySearchPlacement` 에 넘겨 `appendIndex` 가 점수 근거로 덮지 않게 한다. `execution_context_source` 에 그대로 남는다. `context_omitted_items` 는 지금처럼 색인에서도 빠진 항목만 센다
+- `assembleForOwner` 는 지금처럼 collection 을 필터링하지 않고 조립한다. PR2 의 사용량과 「요약에 못 들어감」 표시가 이 결과를 쓴다(스펙 DECISION23)
+
+### 그룹 설정 `MEMORY_CONTEXT`(PR1, PR3 에서 칸을 더함)
+
+```json
+{"version":1,"summaryMaxChars":4000,"maxChars":10000}
+```
+
+- PR3 이 `dailySummaryProposals`(기본 3, 0~20)와 `summaryProposalTier`(`INSTANT`, `MEDIUM`, `HIGH`, 기본은 평가로 고른 값)를 선택 칸으로 더한다. 칸이 없으면 기본값이다. 버전은 올리지 않는다
+- 범위는 스펙 REQ4 다. 서버가 저장할 때 검사하고 `VALIDATION_FAILED` 로 거절한다
+- 읽을 때 모르는 버전이나 깨진 JSON 은 기본값으로 돌고 경고 로그를 남긴다(스펙 DECISION19). 모델 설정과 반대인 까닭은 그 결정이 갖는다
+- 저장은 `readForUpdate` 로 잠그고 줄 전체를 쓴다
+
+### 관리자 API(PR1)
+
+| 경로 | 뜻 |
+| --- | --- |
+| `GET /api/v1/admin/memory-settings` | 요청자 그룹의 지금 값과 기본값, 허용 범위 |
+| `PUT /api/v1/admin/memory-settings` | 본문 `{summaryMaxChars, maxChars}`. 저장한 값을 낸다 |
+
+`ADMIN` 이 아니면 `FORBIDDEN` 이다. 바뀐 값은 다음 조립부터 쓰인다. 캐시를 두지 않는다.
+
+### `memory_remember`(PR1)
+
+| 인자 | 모양 | 뜻 |
+| --- | --- | --- |
+| `summary` | 문자열, 0~200자, 선택 | 새 기억이면 그 요약. 빠지면 요약 없음. `memory_id` 로 고칠 때 빠지면 지금 요약을 두고, 빈 글이면 지운다 |
+| `replaces` | 정수 배열, 1~10개, 선택, 중복 없음 | 새 기억이 대신할 옛 기억 번호. `memory_id` 와 함께 주면 `-32602` 다(`McpController`) |
+
+- 바로 저장 조건 3 은 본문과 요약을 따로 질문 원문과 대조한다. 요약이 없거나 빈 글이면 요약은 대조하지 않는다. 둘 중 하나라도 어긋나면 제안이다. 조건 7 은 제목, 본문, 요약을 본다
+- 같은 제목과 본문의 제안이 이미 있고 이번 호출이 바로 저장 조건이면 지금은 그 제안을 받아들인다(`existingOutcome`). 이때 저장된 제안의 요약에도 조건 7 을 다시 적용하고, 어긋나면 받아들이지 않고 「같은 제안이 이미 있다」 로 둔다. 이번 호출의 `summary` 와 `replaces` 는 이 분기에서 쓰지 않는다(결과 글에 「이미 있는 제안을 받아들였다」 만 알린다)
+- 중복 판정은 지금처럼 제목과 본문이다. 같은 제목과 본문의 새 기억은 요약이 달라도 「이미 안다」 다
+- `memory_id` 로 고치는 경로는 본문을 주지 않고 요약만 바꿀 수 없다. 본문은 지금처럼 필수 인자다. 「이미 안다」 판정은 본문과 요약(주지 않았으면 지금 값)이 모두 같을 때다. 같은 본문에 다른 요약을 주면 요약만 바뀐 revision 이 하나 생긴다
+- 대신할 수 있는 번호는 `MemoryCaptureService.replaceable` 이 판정한다: 요청자의 `USER`, `MEMORY`, `ACCEPTED`, 풀림, 대체되지 않음, 받는 collection, 새 기억 자신이 아님. 나머지는 건너뛰고 결과 글에 「대신하지 못함: 번호 목록」 만 적는다. 까닭은 적지 않는다
+- 대체 칸의 매핑은 지금처럼 읽기 전용(`insertable = false, updatable = false`)으로 둔다. 쓰기는 조건부 네이티브 UPDATE 하나다: `SET superseded_by_memory_id = :new WHERE id IN (:ids) AND scope = 'USER' AND owner_user_id = :user AND entry_type = 'MEMORY' AND status = 'ACCEPTED' AND superseded_by_memory_id IS NULL AND id <> :new` 에 collection 조건(받는 collection 이 있을 때)을 더한다. 판정과 쓰기가 한 문장이라 남의 줄을 잠그지 않고 경쟁도 없다. 번호는 정렬해서 넘긴다. 영향받은 줄의 번호는 같은 트랜잭션에서 다시 조회해 결과 글과 기록에 쓴다. 풀리는지는 쓰기 전에 엔티티를 잠그지 않고 읽어 제외한다
+- 바로 저장이든 제안이든 판정을 통과한 번호를 `memory_capture.replaced_memory_ids` 에 둔다. 바로 저장은 위 UPDATE 로 실제 대체한 번호만 둔다
+- 제안을 받아들이는 `MemoryService.accept` 는 그 기억의 `PROPOSED` 기록을 찾아 같은 UPDATE 를 돈다. 이 경로에는 에이전트의 collection 범위가 없으므로 collection 조건을 빼고 주인·범위·상태 조건만 건다(대신할 옛 기억도 주인 자신의 기억이다). 실제로 대체한 번호로 기록의 `replaced_memory_ids` 를 고쳐, 대신하지 않은 제목이 「합쳤어요」 에 보이지 않게 한다
+- 되돌리기와 삭제는 지금 규칙(대신한 새 항목을 지우거나 승인을 벗어나게 하면 옛 항목의 칸을 비운다)이 그대로 옛 기억을 살린다
+- 결과 글과 `isError` 의 문구는 `McpMemoryRemember` 가 갖는다
+
+### 대화의 기록 줄(PR1)
+
+`GET` 기록 목록(`MemoryCaptureController`)의 항목에 `replacedTitles`(문자열 배열)를 더한다. `replaced_memory_ids` 가운데 지금 요청자가 볼 수 있는 기억의 지금 제목이다. 풀지 못한 기억은 뺀다.
+화면은 `web/src/components/chat/memory-*` 의 기록 줄과 제안 카드가 「n개를 합쳤어요」 와 제목 목록을 보인다. 평문으로만 그린다(ADR-009).
+
+### 지침(PR1)
+
+- `MEMORY_INSTRUCTIONS` 에 더한다: 남길 때 한 줄 요약(`summary`)을 함께 쓴다. 금방 바뀌는 진행 중인 일(지원 현황, 예약)은 요약 없이 `archivable` 을 참으로 남긴다. 사용자가 기억 정리를 부탁하면 같은 주제의 기억을 하나로 합쳐 `replaces` 에 옛 번호를 준다
+- 요약 구역 머리 글에 더한다: 일 맡기기, 이직·경력, 돈·가계부, 여행·일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 번호로 `memory_read` 를 불러 상세를 읽는다. 진행 중인 일은 `memory_search` 로 찾는다
+- 지침 글이 바뀌므로 지시문 지문이 한 번 바뀐다
+
+### 이관(PR1)
+
+`MemorySummaryBackfill` 이 기동 뒤 한 번 돈다. `MemoryTextMigration` 과 같은 틀이다.
+
+0. `MemoryTextMigration` 뒤에 돈다(`@Order` 로 차례를 정한다). 평문 줄에 요약 암호문을 먼저 쓰면 평문 분기가 그 암호문을 요약으로 내기 때문이다
+1. `summary IS NULL` 이고 암호화가 켜진 설치면 `data_key_id IS NOT NULL` 인 `memory` 줄의 번호를 읽는다. 아직 데이터 key 로 옮기지 못한 줄은 다음 기동에 본다
+2. 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽는다. 여전히 `NULL` 이면 아래로 정하고 암호화해 적는다. revision 번호와 갱신 시각은 바꾸지 않는다
+   - 대상(스펙 REQ8: `USER`, `MEMORY`, `ACCEPTED`, `SEARCH`, 대체되지 않음, 풀림, 본문 200자 이하)이면 요약 = 본문
+   - 아니면 빈 글
+3. 풀지 못한 줄은 건너뛰고 번호만 로그에 남긴다. 다음 기동에 다시 본다
+
+`memory_revision.summary` 는 이관하지 않는다. `NULL` 은 「요약 없음」 으로 읽는다.
+
+### 화면(PR2)
+
+PR2 를 시작할 때 이 절을 자세히 쓴다. 지금 정한 것만 적는다.
+
+- 목록 응답(`MemoryDtos`)에 `summary`, `summaryOmitted`, `alwaysInjected`, `supersededByMemoryId` 를 더한다. 묶음은 화면이 이 칸으로 나눈다
+- 사용량 `GET /api/v1/memory/summary-usage` 는 `assembleForOwner` 의 요약 구역 글자 수와 예산을 낸다
+- 관리자 사용량은 사람마다 같은 계산을 하고 숫자만 낸다
+
+### 정비 루프 요약 제안(PR3)
+
+PR3 을 시작할 때 이 절을 자세히 쓴다. 지금 정한 것만 적는다.
+
+- 동작 이름 `SUMMARY` 를 정비 사건의 `reason_code` 에 더한다. 제안 문장은 사건의 `detail` 에 주인 key 로 암호화해 둔다. 평문을 DB 에 두지 않는다
+- 후보는 요약이 있는 기억 가운데, 마지막으로 요약이 바뀐 revision 보다 뒤에 본문이 바뀐 revision 이 있는 것이다. revision 기록에서 계산하므로 칸을 더하지 않는다
+- 문장은 Hermes 실행 한 번으로 만든다. 입력은 그 기억의 상세와 지금 요약만이고 도구를 주지 않는다. 결과는 200자 이하 한 줄인지 검사하고 아니면 문장 없는 후보로 남긴다
+- 받아들이면 `memory_remember` 와 같은 수정 경로로 요약만 바꾸고, 후보를 만든 revision 과 지금 revision 이 다르면 거절한다(스펙 DECISION20)
+- 실제 모델 평가는 [`answer-quality.md`](../answer-quality.md) 의 답변 품질 평가와 같은 틀로 코디네이터가 운영에서 돌린다
 
 ## 실패와 일관성
 
-- **이 PR 을 배포한 뒤 PR1 이미지로 되돌릴 수 있다.** 칸이 남아 있어 `ddl-auto: validate` 가 지나간다. 되돌린 이미지는 칸에 남은 `SENSITIVE` 를 읽어 그 줄을 다시 숨긴다. PR2 이미지가 넣은 줄은 기본값 `NORMAL` 이라 숨지 않는다
-- 되돌린 동안 PR1 이미지는 SHA-256 으로 중복 키를 낸다. 다시 올리면 기동 이관이 HMAC 으로 바꾸고, 같은 글의 키가 겹치면 나중 줄의 키를 비운다. 그 사이 같은 제안이 한 번 더 생길 수 있다. 되돌림이라는 예외 상황이라 막지 않는다
-- 되돌린 PR1 이미지는 HMAC 지문을 낡은 것으로 보고 첫 주기에 벡터를 모두 다시 임베딩한다. 다시 쓴 벡터마다 연결 찾기가 돌아 정리한 대체 제안이 다시 생길 수 있다. 되돌리기 전에 임베딩을 끄면 막을 수 있고, 절차는 운영 저장소가 갖는다
-- 해시 바꾸기는 줄마다 따로 커밋한다. 한 줄이 실패해도 다음 줄로 가고 기동은 잇는다. 실패한 줄은 다음 기동이 다시 본다
-- 지문 바꾸기는 저장된 지문이 읽은 값 그대로일 때만 쓴다. 그 사이 채우는 작업이 새 벡터를 썼으면 덮지 않는다
-- 옛 key 줄이 남아 있으면 옛 key 를 읽지 않으므로 암호문을 평문으로 본다. 운영 0건을 확인한 뒤 이 PR 을 열었다(스펙 REQ8). 칸을 지우는 PR3 이 그 칸이 빈 것을 다시 보고, 남았으면 지우지 않고 멈춘다
+- 요약을 암호화하지 못하면 지금 제목·본문과 같이 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 저장을 거절한다. 평문으로 내려 저장하지 않는다
+- 합치기의 대체 칸은 새 기억 저장과 같은 트랜잭션에서 쓴다. 저장이 실패하면 대체도 남지 않는다
+- 이관은 줄마다 트랜잭션이고 실패한 줄만 남긴다. 기동은 잇는다. 이관 전에 실행이 돌면 그 줄은 요약 칸이 `NULL` 이라 요약이 없는 것으로 읽혀 잠깐 색인에만 있다. 이관이 끝나면 다음 실행부터 요약 구역에 든다
+- 배포 순서: 마이그레이션과 코드가 한 이미지다. 직전 이미지로 되돌려도 새 칸만 남고 옛 코드는 읽지 않는다. 되돌린 동안 만든 기억은 `summary` 가 `NULL` 이라 다시 올릴 때 이관 대상이 된다. 되돌린 동안 본문을 고친 기억은 요약이 옛 사실로 남을 수 있다. 되돌리기는 드물고 사용자가 화면과 대화에서 고칠 수 있어 이 위험을 받아들인다. 되돌렸다가 다시 올렸으면 운영 확인에서 `updated_at` 이 배포 시각 뒤이고 요약이 있는 줄을 확인한다
+- 관리자 설정 저장 둘이 동시에 오면 줄 잠금으로 하나씩 돈다. 줄이 없던 첫 저장 둘은 한쪽이 실패한다(`GroupSettingStore` 의 지금 동작)
 
-## PR2 검증 전략
+## 검증 전략
 
-| REQ | 테스트 | DB |
-| --- | --- | --- |
-| REQ5 | 직전 이미지가 `SENSITIVE` 로 남긴 줄이 목록에 본문과 함께 보이고 목록 경로로 고쳐지며, collection 을 받은 에이전트의 색인과 `memory_read` 에 실린다. 에이전트 기억 영역의 응답과 화면에 민감 허용이 없고, 옛 `SENSITIVE_CHANGED` 기록은 최근 변경에 없다 | H2 |
-| REQ5 | 옛 key 설정 없이 뜬 서버가 화면, 그룹, 문서, 제안 기억을 저장하고 다시 읽는다 | H2, MySQL |
-| DECISION17 | 제안 중복 키가 평문 SHA-256 이 아니고 같은 글이면 같은 값, 다른 사용자면 다른 값이다. 기동 이관이 SHA-256 이던 중복 키와 지문을 HMAC 으로 바꾸고 벡터는 그대로이며, 낡은 지문은 벡터째 비우고, 두 번 돌려도 바뀌지 않는다 | H2, MySQL |
-| REQ4 | 기존 기억, 조립, 도구, 측정 테스트를 통과시킨다. 측정 데이터의 민감 경계 사례(BO-04)는 받지 않는 collection 경계로 바꿔 같은 금지 판정을 유지한다 | H2 |
+| ID | 경계와 환경 |
+| --- | --- |
+| REQ1 | 엔티티와 `MemoryTexts` 단위 테스트(다른 칸 AAD 로 풀리지 않음), H2 통합 테스트로 revision 기록의 요약, 그룹과 문서 거절 |
+| REQ2, REQ3 | `ContextAssembler` 통합 테스트: 요약 줄 모양, collection 거르기, `ALWAYS`/`ARCHIVE` 제외, 질문 관련 구역에 상세가 함께 드는 것, 예산 넘침의 건너뛰기와 선택 근거 |
+| REQ4 | 관리자 API 통합 테스트(권한, 범위, 줄 없음 기본값, 깨진 JSON 기본값)와 조립이 바뀐 값을 쓰는 테스트 |
+| REQ5, REQ6 | `McpMemoryRemember` 와 `MemoryCaptureService` 통합 테스트: 바로 저장과 제안, 요약의 부정·민감 검사, 요약 유지와 지우기, 합치기의 바로 저장·제안 받아들이기·되돌리기, 대신할 수 없는 번호 건너뛰기, 기록 목록의 `replacedTitles` |
+| REQ7 | 기억 회수 측정의 합성 사례 세 개와 기존 게이트. 픽스처(`MemoryEvalFixture`)는 넣은 뒤 요약 이관을 불러 요약을 채운다. 요약 구역의 뜻이 바뀌므로 기준 파일은 이 PR 에서 다시 만들고, 이전 값과 나란히 PR 본문에 적는다(기능 파일 「기준 파일」 의 갱신 절차). 배포 뒤 실제 대화 한 번 왕복은 코디네이터가 운영에서 확인한다 |
+| REQ8 | 이관 통합 테스트: 대상과 대상 밖, 두 번 실행, 풀지 못한 줄 건너뛰기, 이관 전후 요약 구역 번호 집합 포함 |
+| REQ9, REQ10 | PR2 의 화면 테스트와 API 테스트 |
+| REQ11, REQ12 | PR3 의 정비 루프 통합 테스트와 운영 평가 결과 |
+
+MySQL 의 새 칸은 Draft CI 의 `backend-mysql` 로 확인한다.
 
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
-| DECISION8 | 칸을 이 PR 에서 지울지 | 지우지 않는다. 코드는 읽고 쓰지 않고 기본값 DDL 만 담는다. 칸은 배포를 확인한 뒤 따로 지운다 | 작성자(위임) | 코디네이터가 정했다(2026-11-03). 직전 이미지로 되돌릴 길을 남긴다(ADR-20261102 / table-reduce-r2 의 선례) |
-| DECISION9 | HMAC key | 데이터 key 에서 쓰임마다 HMAC 으로 뽑는다 | 작성자 | 암호화 key 를 HMAC key 로 그대로 쓰지 않는다. 데이터 key 를 지우면 해시도 맞혀 볼 수 없다 |
-| DECISION10 | 이미 있는 임베딩 지문 | 같은 글의 SHA-256 이면 그 자리에서 HMAC 으로 바꾸고, 아니면 벡터째 비운다 | 작성자 | 다시 임베딩하면 연결 찾기가 다시 돌아 정리한 대체 제안이 되살아날 수 있다 |
-| DECISION11 | `MemorySensitivity` | 문맥 항목의 민감도로 남긴다. 기억 항목은 늘 `NORMAL` 이다 | 작성자 | 위임 결과, 커넥터 결과, 할 일이 `SENSITIVE` 로 `instructions` 에서 빠지는 규칙은 그대로다 |
-| DECISION12 | 옛 `SENSITIVE_CHANGED` 기록 | 값은 읽을 수 있게 두고 최근 변경에 내지 않는다 | 작성자 | 없어진 설정의 변경을 보여도 뜻이 없다. 지우면 감사 기록이 사라진다 |
+| DECISION1 | 요약 저장 자리 | `memory`, `memory_revision` 의 새 칸 | 작성자 | revision 기록, 암호화, 권한이 기억 한 줄 단위로 맞는다(스펙 DECISION2). 본문 안에 섞으면 검색과 `memory_read` 가 모두 바뀐다 |
+| DECISION2 | 「아직 이관하지 않음」 표지 | 요약 칸 `NULL`. 이 기능 뒤 쓰기는 늘 빈 글이라도 적는다 | 작성자 | 따로 표지 칸이나 표를 두지 않고, 사용자가 지운 요약을 이관이 다시 채우지 않는다 |
+| DECISION3 | 예산을 읽는 자리 | `group_setting` 의 `MEMORY_CONTEXT` 를 조립마다 읽는다. 캐시 없음 | 작성자 | 그룹 설정의 기존 방식이고 줄 하나 읽기라 비용이 작다. 저장 뒤 비울 캐시가 없다 |
+| DECISION4 | 넘친 요약의 기록 | 색인 항목의 선택 근거 이름 `summary-over-budget` | 작성자 | 기존 실행 기록 칸으로 남기고, 빠진 항목 수의 뜻(색인에서도 빠짐)을 바꾸지 않는다 |
+| DECISION5 | 제안 상태 합치기의 대신할 번호 | `memory_capture.replaced_memory_ids` 에 두고 받아들일 때 다시 판정 | 작성자 | 제안 카드가 받아들일 때까지 아무것도 바꾸지 않는다. 받아들이는 트랜잭션이 기록을 이미 읽는다 |
+| DECISION6 | 설정 파일의 기억 예산 값 | `max-chars`, `facts-max-chars`, `facts-item-max-chars` 를 지운다 | 작성자 | 같은 값의 원본이 둘이면 어느 쪽이 쓰이는지 헷갈린다(스펙 DECISION4) |
+| DECISION7 | 요약 제안 문장의 저장 | 정비 사건 `detail` 에 주인 key 로 암호화 | 작성자 | 기억 글을 평문으로 두지 않는다는 결정([ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md))을 따른다 |
+| DECISION8 | PR2 전 화면 수정의 요약 | 지금 요약이 옛 본문과 같으면 새 본문으로 따라가고, 새 본문이 200자를 넘으면 비운다 | 작성자 | 이관한 요약이 화면 수정 뒤 옛 사실로 남지 않는다. 사용자가 따로 쓴 요약은 건드리지 않는다 |
+| DECISION9 | 대체 칸 쓰기 | 조건부 네이티브 UPDATE 하나. 엔티티 매핑은 읽기 전용 그대로 | 작성자 | 남의 줄을 잠그지 않고 경쟁과 낡은 엔티티 flush 가 칸을 되살리지 않는다 |
+| DECISION10 | 요약 예산의 저장 검사 | 스펙 범위에 더해 요약 ≤ 전체 - 색인 몫 | 작성자 | 색인 몫을 먼저 떼어 두는 조립 순서 때문에 그보다 큰 값은 실제로 담기지 않는다 |
+| DECISION11 | 직전 이미지로 되돌렸을 때의 낡은 요약 | 받아들인다. 다시 올렸으면 운영 확인에서 본다 | 작성자 | 되돌리기가 드물고 사용자가 고칠 수 있다. 막으려면 옛 코드가 알 수 없는 표지가 필요하다 |
 
-## PR3: 옛 칸 삭제
+## 결정 기록 연결
 
-PR2 를 배포한 뒤 운영에서 옛 key 줄(`content_key_id` 가 찬 줄)이 0건인 것을 확인했다(2026-11-03). PR3 은 코드가 읽고 쓰지 않는 옛 칸 여섯 개를 지워 REQ5 의 「칸이 없다」 를 닫는다.
-
-| 표 | 지우는 칸 |
-| --- | --- |
-| `memory` | `sensitivity`, `content_key_id` |
-| `memory_revision` | `sensitivity`, `content_key_id` |
-| `agent_memory_collection` | `allow_sensitive` |
-| `agent_memory_collection_change` | `allow_sensitive` |
-
-- `V20261103054416__MemoryLegacyKeyGuard`(Java)가 먼저 돈다. `memory` 와 `memory_revision` 에서 `content_key_id` 가 찬 줄을 세어 하나라도 있으면 줄 수만 담은 예외로 멈춘다. DDL 을 하지 않으므로 멈춰도 칸은 그대로이고, 줄을 데이터 key 로 옮긴 뒤 실패한 기록을 정리하고 다시 올린다. 본문과 key id 는 예외에 넣지 않는다
-- 칸을 지우는 SQL 은 표마다 파일이다(`V20261103054417` 부터 `V20261103054420`). MySQL DDL 은 되돌려지지 않아 한 표가 실패해도 앞 표의 삭제는 남는다. H2 가 한 문장에서 칸 여럿을 지우는 문법을 받지 않아 칸마다 문장을 나눈다
-- `V20261103054421` 이 지운 `content_key_id` 를 가리키던 `content`, `data_key_id` 컬럼 설명을 지금 뜻으로 다시 적는다. 타입은 그대로다
-- `sensitivity` 와 `allow_sensitive` 는 확인하지 않는다. 코드가 PR2 부터 읽지 않는 값이고 지워도 잃는 동작이 없다
-- 테스트 자원 `memory-legacy-columns.sql` 과 `application-test.yml` 의 import 항목을 지우고, 칸에 값을 넣던 테스트와 사용자 purge fixture(`purge/fixture.sql`)에서 옛 칸을 뺀다
-- **이 PR 을 배포한 뒤에는 PR1 이전 이미지로 되돌리지 못한다.** 그 이미지는 칸을 매핑해 `ddl-auto: validate` 가 실패한다. PR2 이미지는 칸을 매핑하지 않아 칸이 없어도 뜬다
-
-### PR3 검증 전략
-
-| REQ | 테스트 | DB |
-| --- | --- | --- |
-| REQ5 | 옛 칸이 있는 Flyway 스키마에 줄을 넣고 끝까지 적용하면 줄은 그대로이고 여섯 칸이 모두 없다(`MemoryLegacyColumnsDropMigrationTest`) | H2, MySQL |
-| REQ8 | 옛 key 줄이 있으면 줄 수를 알리고 멈추며 어느 칸도 지우지 않는다(같은 테스트) | H2, MySQL |
-| REQ4 | 기억을 읽고 쓰는 기존 테스트, 조립, 도구, 사용자 purge 가 칸 없는 스키마에서 통과한다 | H2, MySQL |
+| 결정 | 종류 | ADR 또는 필요 없음의 이유 | 현재 규칙의 원본 |
+| --- | --- | --- | --- |
+| 요약 구역(스펙 DECISION2, DECISION4) | 기억 조립 | [ADR-20261008 / memory-facts](../../adr/ADR-20261008-memory-facts.md) 를 PR1 에서 갱신한다 | [`docs/features/memory.md`](../memory.md) 「요약 구역」 |
+| 정비 루프의 LLM 제안(스펙 DECISION9) | 정비 정책 | [ADR-20261015 / memory-maintenance](../../adr/ADR-20261015-memory-maintenance.md) 를 PR3 에서 갱신한다 | [`docs/features/memory.md`](../memory.md) 「정비 루프」 |
+| 설계 DECISION1~7 | 내부 구조 | 필요 없음. 되돌리기 쉬운 배치이고 이 설계와 기능 파일이 원본이다 | 이 문서 |
