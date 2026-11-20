@@ -92,8 +92,11 @@ test("이름표로 다른 에이전트를 고르고 보내면 그 에이전트�
   if (testInfo.project.name === "mobile") {
     const home = page.getByRole("banner").getByRole("link", { name: /홈$/ });
     await expect(home).toHaveText("성격 비서");
+    await expect(home).toHaveAttribute("href", "/");
+    // `/` 는 대화방이 없는 사용자에게 새 대화 화면을 연다. 어느 쪽이든 지금 대화를 떠난다.
+    const here = page.url();
     await home.click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).not.toHaveURL(here);
   } else {
     await expect(page.getByRole("main").getByTitle("성격 비서")).toBeVisible();
     await page.getByRole("main").getByTestId("agent-badge").first().click();
