@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.connection.application;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
@@ -282,7 +283,7 @@ public class ConnectorConnectionService {
 
 
     /**
-     * 연결을 해제한다. 붙은 바인딩을 모두 뗀 뒤 보관 파일을 지운다.
+     * 연결을 해제한다. 붙은 바인딩을 모두 뗀 뒤 단추 연결이면 서비스 쪽 허락 취소를 시도하고 보관 파일을 지운다.
      *
      * <p>바인딩마다 떼기가 성공하면 그 행을 바로 지운다. 중간에 실패하면 연결을 {@code PENDING} 으로 두고 연결 실패로
      * 끝낸다. 남은 바인딩의 profile 에는 값이 남아 있고 보관 파일도 그대로다. 다시 해제하면 남은 바인딩부터 이어서 뗀다.
@@ -296,10 +297,13 @@ public class ConnectorConnectionService {
         Instant now = now();
         approvals.rejectPendingFor(connection, now);
         String step = STEP_DETACH;
+        final ConnectionOAuthRevoke revoke;
         try {
             for (ConnectorBinding binding : bindings.findByConnectionId(connection.id())) {
                 bindingService.detach(binding);
             }
+            // 바인딩 떼기가 실패했을 때 허락만 사라지지 않게 모두 뗀 뒤에 취소한다. 취소가 실패해도 해제는 잇는다(스펙 REQ8).
+            revoke = oauth.revoke(connection, manifest);
             step = STEP_VAULT;
             connector.deleteVault(connection.vault());
         } catch (RuntimeException ex) {
@@ -310,7 +314,7 @@ public class ConnectorConnectionService {
         }
         oauth.forget(connection);
         connection.disconnected(now);
-        return ConnectionSnapshot.from(connections.save(connection), List.of());
+        return ConnectionSnapshot.from(connections.save(connection), List.of()).withOAuthRevoke(revoke);
     }
 
 

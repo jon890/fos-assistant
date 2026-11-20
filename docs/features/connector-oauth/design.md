@@ -14,7 +14,7 @@
 | REQ5 | 상태 값 검사, 서비스의 `error` 응답, 부분 허락, 확인 도구 실패, 앱 자격 거절을 `OAuthOutcome` 하나로 모아 웹의 돌아오는 경로가 연결 화면에 까닭과 「다시 시도」 를 그린다. 실패하면 대기 파일을 지운다 |
 | REQ6 | Control Plane 의 토큰 통로가 연결 표식을 받아 지금 유효한 access token 을 준다. 통로 주소는 OAuth 파일에 있고 실행기가 칸처럼 `token_env` 로 넣는다. OAuth 파일은 보관 파일 리비전 밖이라 갱신이 서버 정의를 바꾸지 않는다 |
 | REQ7 | 대시보드가 서비스 응답을 `ok`, `grant_revoked`, `app_rejected`, `unavailable` 로 나눠 답한다. `grant_revoked` 면 연결을 `PENDING` 과 `auth.reconnectRequired` 로 바꾸고 바뀌는 순간에만 사용자 알림을 남긴다. `app_rejected` 는 연결을 두고 관리자 알림을, `unavailable` 은 그 호출만 실패시킨다 |
-| REQ8 | 해제가 보관 파일을 지우기 전에 대시보드에 취소를 맡긴다. 실패하거나 건너뛰면 해제를 그대로 잇고 응답에 `oauthRevoke: failed` 와 제공자 설정 주소를 담는다. GitHub 은 성공해도 앱 설치 화면 주소를 담는다 |
+| REQ8 | 해제가 바인딩을 모두 뗀 뒤 보관 파일을 지우기 전에 대시보드에 취소를 맡긴다. 실패하거나 건너뛰면 해제를 그대로 잇고 응답의 `oauthRevoke` 에 `status: failed` 와 제공자 설정 주소(`settingsUrl`)를 담는다. GitHub 은 성공해도(`status: revoked`) 앱 설치 화면 주소(`installSettingsUrl`)를 담는다 |
 | REQ9 | 연결의 `fields` JSON 에 `auth.method`(`oauth` 나 `manual`)를 둔다. 붙여 넣기 등록은 OAuth 파일을 지우고, 단추 연결의 commit 은 보관 파일을 단추 밖 칸만으로 바꾼다 |
 | REQ10 | PR2. Gmail 선언에 `oauth`(google, 두 scope, 칸 `client_id`, `client_secret`, `refresh_token`)를 더하고, Gmail 서버가 토큰 env 가 있으면 통로에서 받고 없으면 지금처럼 스스로 갱신한다 |
 | REQ11 | 시작과 돌아오기 API 는 로그인한 사용자의 연결만 다룬다. 상태 값에 사용자 번호가 들어 있고 돌아올 때 요청자와 같아야 한다 |
@@ -228,7 +228,7 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 - **동시 돌아오기**: 나중 begin 이 대기 파일과 `nonce` 를 덮는다. 앞 흐름의 commit 은 `nonce` 가 달라 409 로 끝나고 화면에 「다시 시도」 를 보인다. 나중 흐름이 이긴다(스펙 DECISION16). commit 과 연결 커밋은 지금 등록의 사용자 행 잠금 안에서 한다
 - **갱신 중 Control Plane 종료**: 대시보드는 바뀐 refresh token 을 OAuth 파일에 쓴 뒤 답한다. 답을 못 받아도 다음 갱신이 새 refresh token 으로 돈다
 - **OAuth 파일 쓰기 실패**: 갱신은 받은 refresh token 을 쓰지 못하면 `unavailable` 로 답하고 access token 을 주지 않는다. GitHub 은 옛 refresh token 이 이미 무효라 다음 갱신이 `grant_revoked` 가 된다. 이 경우를 로그로 구분한다
-- **해제**: 취소 → 지금 해제(바인딩 떼기, 보관 파일 지우기, 연결 `DISCONNECTED`). 취소 실패는 해제를 막지 않는다. 메모리 칸을 지운다
+- **해제**: 바인딩 떼기 → 취소 → 보관 파일 지우기 → 연결 `DISCONNECTED`. 바인딩을 떼지 못했는데 허락만 사라지지 않게 취소는 모두 뗀 뒤에 한다. 취소 실패는 해제를 막지 않는다. 대시보드의 결과가 `ok` 일 때만 `revoked` 이고, 다른 결과와 예외, 건너뛴 경우(카탈로그에서 빠짐, 앱 값 없음, 공유 앱을 다른 연결이 씀)는 `failed` 다. 카탈로그에서 빠진 플러그인은 설정 주소도 알 수 없어 주소 없이 답한다. 취소 뒤 보관 파일 지우기가 실패하면 연결은 `PENDING` 으로 남고, 다시 해제하면 취소는 `failed` 로 끝나 안내가 보인다. 메모리 칸을 지운다
 - **배포 순서**: 대시보드 plugin 이 먼저다. 옛 plugin 은 카탈로그에 `oauth` 가 없어 Control Plane 이 단추를 내지 않는다. 옛 Control Plane 은 새 카탈로그의 `oauth` 값을 무시한다. 실행기 인자 `@oauth` 는 새 plugin 이 만든 정의에만 있다. 이미 바인딩이 있는 플러그인에 `oauth` 선언을 더하면(PR2 의 Gmail, 저장소 밖 커리어) 붙여 넣기 바인딩의 정의도 인자가 늘어 한 번 재시작 대기가 된다. 연결 반영 자동화가 없으면 관리자가 반영 완료를 누른다
 - **서버 비밀값 PR1a 가 없으면** 이 기능을 시작하지 않는다(스펙 「선행 조건」)
 

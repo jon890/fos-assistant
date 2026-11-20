@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.connection.application.port;
 
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -24,6 +25,16 @@ public interface ConnectionOAuth {
      * 못했으면 {@code UNAVAILABLE}. 확인 도구를 불러도 되면 비어 있다
      */
     Optional<ConnectorCallError> refreshForCheck(long connectionId);
+
+
+    /**
+     * 해제하는 단추 연결의 서비스 쪽 허락을 취소한다(스펙 REQ8). 바인딩을 모두 뗀 뒤 보관 파일을 지우기 전에 부른다. 실패해도 예외를 던지지
+     * 않는다. 해제를 막지 않기 위해서다.
+     *
+     * @param manifest 카탈로그의 선언. 빠진 플러그인이면 비어 있고 취소를 건너뛴다
+     * @return 취소의 결과. 단추 연결이 아니면 null
+     */
+    ConnectionOAuthRevoke revoke(ConnectorConnection connection, Optional<ConnectorManifest> manifest);
 
 
     /** 값을 붙여 넣어 다시 등록했거나 해제했다. 메모리의 토큰을 지우고 끊김 알림을 읽음으로 바꾼다. 연결의 트랜잭션 안에서 부른다. */

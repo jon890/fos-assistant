@@ -1,17 +1,31 @@
 package com.bifos.assistant.connector.oauth.application;
 
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke.Status;
 import com.bifos.assistant.connector.connection.application.port.ConnectionOAuth;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthApp;
+import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthToken;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.Outcome;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration.AppScope;
+import com.bifos.assistant.hermes.application.port.HermesConnectorOAuthClient;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** 연결의 등록, 확인, 해제가 맡긴 단추 연결의 일을 한다. */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConnectorOAuthConnections implements ConnectionOAuth {
+    private final ConnectorConnectionRepository connections;
+    private final HermesConnectorOAuthClient oauth;
     private final ConnectorOAuthApps apps;
     private final ConnectorOAuthSigner signer;
     private final ConnectorOAuthTokens tokens;
@@ -37,6 +51,50 @@ public class ConnectorOAuthConnections implements ConnectionOAuth {
             case GRANT_REVOKED -> Optional.of(ConnectorCallError.CREDENTIAL_REJECTED);
             default -> Optional.of(ConnectorCallError.UNAVAILABLE);
         };
+    }
+
+
+    /**
+     * 취소 범위는 {@code docs/features/connector-oauth/design.md} 의 「취소 범위」 가 갖는다. 공유 앱은 토큰 하나를 취소하면 그 앱의 허락
+     * 전체가 사라져, 같은 사용자의 다른 연결이 그 앱을 쓰고 있으면 취소하지 않는다.
+     */
+    @Override
+    public ConnectionOAuthRevoke revoke(ConnectorConnection connection, Optional<ConnectorManifest> manifest) {
+        if (!connection.fields().auth().usesOAuth()) {
+            return null;
+        }
+        ConnectorOAuthDeclaration declared = manifest.map(ConnectorManifest::oauth).orElse(null);
+        if (declared == null) {
+            // 카탈로그에서 빠졌거나 선언이 사라져 어느 앱의 허락인지 알 수 없다.
+            return new ConnectionOAuthRevoke(Status.FAILED, null, null);
+        }
+        ConnectionOAuthRevoke failed = new ConnectionOAuthRevoke(Status.FAILED, declared.settingsUrl(), declared.installSettingsUrl());
+        try {
+            ConnectorOAuthApp app = apps.app(manifest.get()).orElse(null);
+            if (app == null || (declared.appScope() == AppScope.SHARED && sharedByAnother(connection))) {
+                return failed;
+            }
+            String accessToken = tokens.current(connection.id()).map(ConnectorOAuthToken::accessToken).orElse(null);
+            Outcome outcome = oauth.revoke(connection.vault(), connection.connectorId(), app.credentials(), accessToken);
+            if (outcome != Outcome.OK) {
+                log.warn("connector OAuth revoke did not succeed connection={} outcome={}", connection.id(), outcome);
+                return failed;
+            }
+            return new ConnectionOAuthRevoke(Status.REVOKED, null, declared.installSettingsUrl());
+        } catch (RuntimeException ex) {
+            // 예외 메시지와 원격 응답에는 토큰과 앱 자격이 섞일 수 있어 종류만 남긴다.
+            log.warn("connector OAuth revoke failed connection={} exception={}", connection.id(), ex.getClass().getSimpleName());
+            return failed;
+        }
+    }
+
+
+    /** 같은 사용자의 다른 쓸 수 있는 단추 연결이 같은 제공자를 쓰는가. */
+    private boolean sharedByAnother(ConnectorConnection connection) {
+        String provider = connection.fields().auth().provider();
+        return connections.findByUserId(connection.userId()).stream()
+            .anyMatch(other -> !other.id().equals(connection.id()) && other.status() == ConnectionStatus.READY
+                && provider.equals(other.fields().auth().provider()));
     }
 
 
