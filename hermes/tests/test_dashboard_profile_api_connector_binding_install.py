@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import yaml
 from unittest import mock
 from plugin_loading import patch_plugin
@@ -684,6 +685,35 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
                                 full_response=True, skills_payload=skills)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.body, skills)
+
+    def status_entry(self):
+        entries = {entry["plugin"]: entry for entry in self.status_of()["connectors"]}
+        return entries[DEMO]
+
+    def test_status_reports_agent_skills_skipped_by_an_old_name_taken(self):
+        """재설치가 없던 옛 바인딩에서도 이름 겹침으로 빠진 스킬의 까닭이 상태 응답에 나온다.
+
+        운영에서 카테고리 폴더 아래 옛 링크와 이름이 겹친 에이전트용 스킬이 설치되지 않았고, 상태 판정은 그 상태를
+        설치됨으로 보아 재설치도 없었다. 그래서 설치 응답에서만 채우는 skipped_skills 가 비어 있었다.
+        """
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertEqual(self.bind().status_code, 200)
+        self.assertEqual(self.status_entry()["skipped_skills"], [])
+        shutil.rmtree(self.skills / "demo-report")
+        recorded = self.root / "alice" / ".fos-connectors.json"
+        state = json.loads(recorded.read_text(encoding="utf-8"))
+        state[DEMO]["skills"].remove("demo-report")
+        recorded.write_text(json.dumps(state), encoding="utf-8")
+        category = self.skills / "category" / "demo-report"
+        category.mkdir(parents=True)
+        (category / "SKILL.md").write_text("---\nname: demo-report\n---\n옛 스킬\n", encoding="utf-8")
+
+        entry = self.status_entry()
+        self.assertIs(entry["configured"], True)
+        self.assertEqual(entry["skipped_skills"], [{"name": "demo-report", "reasons": ["name_taken"]}])
+
+    def test_status_omits_skipped_skills_for_a_plugin_that_is_not_installed(self):
+        self.assertNotIn("skipped_skills", self.status_entry())
 
     def test_shell_off_binds_without_the_runner_and_stays_configured(self):
         """셸 조건이 없으면 요구 env 스킬만 빠지고, 조건이 그대로인 동안 상태 판정은 어긋남으로 보지 않는다(REQ2, REQ3, REQ4)."""
