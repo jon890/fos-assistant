@@ -15,6 +15,7 @@ import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFileSpaceTools;
 import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.mcp.application.McpConnectorAttachTool;
 import com.bifos.assistant.mcp.application.McpFollowUpTools;
 import com.bifos.assistant.mcp.application.McpMemoryForgetTool;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
@@ -84,8 +85,7 @@ public class McpController {
         // 읽기와, 지우지 않고 승인 카드만 띄우는 지우기는 늘 받는다(스펙 service-concepts DECISION32).
         McpTaskTools.LIST,
         McpTaskTools.DELETE,
-        McpFollowUpTools.LIST,
-        McpMemoryForgetTool.NAME);
+        McpFollowUpTools.LIST, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE, FILE_SPACE_PUT);
     /**
@@ -108,6 +108,7 @@ public class McpController {
     private final McpTaskCalls taskCalls;
     private final McpFollowUpTools followUpTools;
     private final McpMemoryForgetTool memoryForget;
+    private final McpConnectorAttachTool connectorAttach;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -154,7 +155,8 @@ public class McpController {
             Map.entry(McpTaskTools.DELETE, (caller, id, args) -> taskCalls.delete(caller, id, args)),
             Map.entry(McpFollowUpTools.LIST, this::listFollowUps),
             Map.entry(McpFollowUpTools.DONE, this::finishFollowUp),
-            Map.entry(McpMemoryForgetTool.NAME, this::forgetMemory));
+            Map.entry(McpMemoryForgetTool.NAME, this::forgetMemory),
+            Map.entry(McpConnectorAttachTool.NAME, this::attachConnector));
     }
 
 
@@ -444,6 +446,13 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, memoryForget.forget(caller, memoryId.longValue()));
+    }
+
+
+    /** 인자는 비지 않은 글 {@code connector} 하나다. */
+    private Map<String, Object> attachConnector(McpCaller caller, JsonNode id, JsonNode arguments) {
+        String connector = arguments.size() == 1 && text(arguments, "connector") ? arguments.get("connector").asString().strip() : "";
+        return McpConnectorAttachTool.accepts(connector) ? response(id, connectorAttach.attach(caller, connector)) : invalidParams(id, INVALID_ARGUMENTS);
     }
 
 

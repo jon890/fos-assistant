@@ -194,7 +194,8 @@ class McpMemoryToolTest {
                 "task_delete",
                 "follow_up_list",
                 "follow_up_done",
-                "memory_forget");
+                "memory_forget",
+                "connector_attach");
         JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)
             .filter(tool -> "memory_search".equals(tool.path("name").asString()))
             .findFirst().orElseThrow();

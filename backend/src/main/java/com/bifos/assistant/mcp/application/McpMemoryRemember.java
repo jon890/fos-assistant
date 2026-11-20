@@ -54,6 +54,7 @@ public class McpMemoryRemember {
         "mcp__fos_assistant__memory_forget",
         "mcp__fos_assistant__agent_list",
         "mcp__fos_assistant__connector_list",
+        "mcp__fos_assistant__connector_attach",
         "mcp__fos_assistant__task_list",
         "mcp__fos_assistant__task_create",
         "mcp__fos_assistant__task_update",

@@ -37,6 +37,7 @@ import com.bifos.assistant.mcp.application.McpCurrentCallerGuard;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpFollowUpTools;
 import com.bifos.assistant.mcp.application.McpMemoryForgetTool;
+import com.bifos.assistant.mcp.application.McpConnectorAttachTool;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
@@ -86,7 +87,7 @@ class McpContentDraftSnapshotsTest {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftImages.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
         controller = new McpController(tools, mock(McpArtifactCalls.class), mock(McpFileSpaceCalls.class), callers, mock(McpMediaObservationTools.class), drafts, tool,
-            mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), mock(McpConnectorListTool.class), mock(McpTaskCalls.class), mock(McpFollowUpTools.class), mock(McpMemoryForgetTool.class), checks,
+            mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), mock(McpConnectorListTool.class), mock(McpTaskCalls.class), mock(McpFollowUpTools.class), mock(McpMemoryForgetTool.class), mock(McpConnectorAttachTool.class), checks,
             mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);
         when(origin.id()).thenReturn(31L);

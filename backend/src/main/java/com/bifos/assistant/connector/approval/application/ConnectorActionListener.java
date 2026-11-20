@@ -146,6 +146,10 @@ public class ConnectorActionListener {
             return closure.resultText();
         }
         String name = "「" + closure.title() + "」";
+        if (closure.status() == ActionStatus.UNKNOWN) {
+            // 트랜잭션 밖에서 도는 Control Plane 동작이 결과를 적기 전에 끊겼다. 됐는지 모르므로 거절로 알리지 않는다.
+            return name + " 요청의 결과를 확인하지 못했어요. 그 화면에서 상태를 확인해 주세요";
+        }
         if (closure.status() == ActionStatus.EXPIRED) {
             return name + " 요청이 승인 없이 만료됐어요";
         }
