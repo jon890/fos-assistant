@@ -281,7 +281,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         keep_off = cycle_off or (off and not _cycle_elapsed(marks, plugin))
         if keep_off:
             servers[name] = {**server, "enabled": False}
-            marks.setdefault(plugin, _cycle_now())
+            if not off:
+                # 켜진 서버를 끌 때만 시각을 새로 적는다. 남은 옛 기록의 시각으로 켜기를 앞당기지 않는다.
+                marks[plugin] = _cycle_now()
         elif off:
             marks.pop(plugin)
         restart = restart and not keep_off and not off
@@ -343,9 +345,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         elif enabled:
             raise FileExistsError("skills.disabled 를 고칠 수 없는 profile 이다")
         # 떼기는 표식 없이 뗀다. 운영자가 설정을 바꿔도 떼야 `.env` 에 비밀이 남지 않는다.
-    targets = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
+    # 끄기 기록을 설정보다 먼저 쓴다. 그 사이 멈춰도 「설정은 꺼짐, 기록 없음」 이 남아 409 로 막히지 않는다.
+    targets = {cycle_path: _cycle_bytes(marks),
+               config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
                state_path: (json.dumps(state) + "\n").encode(), env_path: new_env,
-               detached_path: _detached_bytes(detached), cycle_path: _cycle_bytes(marks),
+               detached_path: _detached_bytes(detached),
                # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 싣고 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있다.
                tool_map_path: _tool_map_bytes(_connector_tool_map(state, detached)) if state or detached else None,
                **desired, **{path: None for path in stale}}

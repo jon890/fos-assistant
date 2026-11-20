@@ -115,6 +115,28 @@ class ProfileApiConnectorBindingCycleTest(support.ProfileApiRouteTest):
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"], self.record()[DEMO]["server"])
         self.assertEqual(self.marks(), {})
 
+    def test_mark_is_written_before_config(self):
+        """끄기 기록을 설정보다 먼저 써서, 설정 쓰기가 실패해도 기록 없는 꺼진 항목이 남지 않는다."""
+        self.bound_and_changed()
+        order = []
+        original = self.plugin._atomic_private_write
+        prefix = self.plugin.__name__ + "."
+
+        def record(path, value):
+            if "connector-backups" not in path.parts:
+                order.append(path.name)
+            return original(path, value)
+
+        with contextlib.ExitStack() as stack:
+            for key, module in list(sys.modules.items()):
+                if key.startswith(prefix) and hasattr(module, "_atomic_private_write"):
+                    stack.enter_context(mock.patch.object(module, "_atomic_private_write", side_effect=record))
+            with self.clock(1000.0):
+                self.assertEqual(self.bind(cycle="off").status_code, 200)
+
+        written = [name for name in order if name in (".fos-connector-cycle.json", "config.yaml")]
+        self.assertEqual(written[:2], [".fos-connector-cycle.json", "config.yaml"])
+
     def test_disabled_entry_without_mark_is_an_operator_change(self):
         """끄기 기록 없이 enabled 만 다르면 운영자가 바꾼 서버로 보고 거절한다."""
         self.bind_fixture()
