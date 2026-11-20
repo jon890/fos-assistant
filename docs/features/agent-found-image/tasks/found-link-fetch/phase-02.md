@@ -35,7 +35,7 @@ fos-ctx 가 알린 주소 후보를 대화마다 해시로 남기는 경로를 �
 
 ### 2. 테스트 스키마: `backend/src/test/resources/conversation-found-link-hashes-column.sql`, `backend/src/test/resources/application-test.yml`
 
-새 SQL 파일에 같은 칸을 더하는 `ALTER TABLE conversation ADD COLUMN found_link_hashes CLOB NULL;` 를 두고(H2 가 받는 형이면 `MEDIUMTEXT` 그대로 쓴다), `hibernate.hbm2ddl.import_files` 값에 쉼표로 이어 더한다. 주석도 함께 고친다.
+새 SQL 파일에 같은 칸을 더하는 `ALTER TABLE conversation ADD COLUMN found_link_hashes MEDIUMTEXT NULL;` 를 두고(테스트의 H2 는 `MODE=MySQL` 이고 `pending_messages` 가 이미 `LONGTEXT` 로 만들어진다), `hibernate.hbm2ddl.import_files` 값에 쉼표로 이어 더한다. 주석도 함께 고친다.
 
 ### 3. `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationRepository.java` 에 전용 질의 셋
 
@@ -43,7 +43,7 @@ fos-ctx 가 알린 주소 후보를 대화마다 해시로 남기는 경로를 �
 - `appendFoundLinkHashes(id, hashes, limit)`: `update conversation set found_link_hashes = right(concat(coalesce(found_link_hashes, ''), :hashes), :limit) where id = :id and deleted_at is null`. `@Modifying`
 - `clearFoundLinkHashes(id)`: `update conversation set found_link_hashes = null where id = :id`. `@Modifying`
 
-모두 `nativeQuery = true` 다. H2 와 MySQL 에서 같은 문장이 도는지 테스트로 본다. H2 가 CLOB 에 `right` 를 받지 못하면 `substring` 과 `char_length` 로 같은 뜻의 문장을 쓴다.
+모두 `nativeQuery = true` 다. 새 질의 셋은 `RepositoryQuerySweep` 가 자동으로 모아 `RepositoryQueryMysqlTest` 가 MySQL 에서 실행한다(인자가 Long, String, int 다). MySQL 에서는 문장이 도는지만 보고, 뒤 640,000자만 남는 동작은 H2 의 `FoundLinksTest` 가 본다.
 
 ### 4. `backend/src/main/java/com/bifos/assistant/chat/conversation/application/LinkTarget.java` 에 해시와 변환
 
@@ -80,7 +80,9 @@ fos-ctx 가 알린 주소 후보를 대화마다 해시로 남기는 경로를 �
 
 ### 9. 대화를 지울 때 칸을 비운다
 
-`backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatConversationManagement.java` 에서 `pendingMessages.clear(conversationId)` 를 부르는 자리에 `foundLinks.clear(conversationId)` 를 더한다. `FoundLinks.clear` 는 `clearFoundLinkHashes` 를 부른다.
+`backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatConversationManagement.java` 에서 `pendingMessages.clear(conversationId)` 를 부르는 자리에 `foundLinks.clear(conversationId)` 를 더한다. `FoundLinks.clear` 는 `@Transactional` 이고 `clearFoundLinkHashes` 를 부른다.
+
+대화에 지운 시각을 적는 길은 하나 더 있다. 사용자 정리(`UserConversationPurge.deleteAll`)는 `ChatConversationManagement` 를 거치지 않는다. 두 길을 모두 지나는 `backend/src/main/java/com/bifos/assistant/chat/purge/application/ConversationPurgeWriter.java` 의 `purge` 가 대기 메시지를 비우는 자리에도 `foundLinks.clear(conversationId)` 를 더한다. 정리 검사도 함께 고친다. `backend/src/test/resources/purge/fixture.sql` 의 conversation 행에 `found_link_hashes` 값을 넣고, `PurgeCoverageMysqlTest` 의 `case "conversation"` 에 `assertCleared("conversation", "found_link_hashes")` 를 더하고, `backend/src/test/resources/purge/tables.tsv` 의 conversation 설명을 고친다.
 
 ### 10. `backend/src/main/java/com/bifos/assistant/chat/artifact/application/ArtifactService.java` 의 `IMAGE_RULES`
 
@@ -93,14 +95,15 @@ fos-ctx 가 알린 주소 후보를 대화마다 해시로 남기는 경로를 �
 ### 11. 문서
 
 - `backend/docs/data-schema.md` 의 `conversation` 절에 `found_link_hashes` 를 적는다(뜻, 해시 32자 이어 붙임, 엔티티가 읽지 않음, 지울 때 비움). 「지운 대화」 설명에서 대기 메시지와 함께 비운다고 적는다
+- `docs/features/mcp.md` 의 profile 토큰 경로 목록에 `/internal/hermes/found-links` 를 적는다
 - `docs/features/agent-found-image.md` 의 `covers:` 에 `FoundLinks.java`, `FoundLinkService.java` 를 더하고 「아직 구현하지 않았다」 문단을 PR1 의 동작(찾은 주소를 `link:` 로 받는다, 이름만 말해도 찾기는 뒤 PR)으로 바꾼다
 - `docs/features/generated-image/spec.md` 의 범위 밖 줄 「비서가 검색해 찾은 페이지의 사진을 참고 그림으로 쓰기」 와 REQ21, DECISION34 에 비서가 찾은 사진 스펙(`docs/features/agent-found-image/spec.md`)이 바꿨다는 가리킴을 더한다. 요구사항 ID 와 확인 줄은 그대로 둔다
 - `docs/features/generated-image/design.md` 의 「대화에 있는 링크인가」 끝에 찾은 주소 판정은 `docs/features/agent-found-image/design.md` 가 갖는다는 한 줄을 더하고, 「실행 입력의 그림 규칙」 의 「검색이나 페이지에서 찾은 주소는 쓰지 않는다」 를 고친다
 
 ### 12. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/chat/conversation/application/FoundLinksTest.java`(신규, 저장소를 쓰는 통합 테스트): 절대 주소, `&amp;` 꼴과 푼 꼴, `//` 꼴, 상대 주소(기준 있음과 없음)를 알린 뒤 `find` 가 통과하는 것. 글자를 하나 바꾼 주소와 쿼리를 더한 주소는 빈 값. 기준 주소와 같은 후보는 남지 않음. 두 해시의 경계에 걸친 32자를 해시로 갖는 가짜 값이 통과하지 않음. 20,000개를 넘기면 가장 오래된 주소가 빈 값이고 최근 주소는 통과. `find` 로 통과한 주소는 그 뒤 20,000개 가까이 더 알려도 남음. `clear` 뒤와 지운 대화에는 남지 않음. `&amp;` 꼴로 가리키면 돌려주는 주소에 `&amp;` 가 없음
-- `backend/src/test/java/com/bifos/assistant/mcp/FoundLinkEndpointTest.java`(신규): `ImageSourceEndpointTest` 의 준비(서명 `McpCallSigner`, 가짜 받기 객체)를 본보기로 쓴다. 알린 주소를 `link:` 로 가리키면 200 이고 가짜 받기 객체가 그 주소를 받는다. 알리지 않은 주소, 다른 대화의 실행이 알린 주소, 다른 사용자의 실행이 알린 주소는 422 `IMAGE_SOURCE_UNKNOWN` 이고 가짜 받기 객체가 불리지 않는다. 서명이 틀린 알리기와 토큰 없는 알리기는 거절되고 남지 않는다. 링크 2,001개는 400 이다. 받기 객체가 `BLOCKED`, `NO_IMAGE` 로 거절하면 찾은 주소도 `IMAGE_SOURCE_LINK_BLOCKED`, `IMAGE_SOURCE_LINK_NO_IMAGE` 다(REQ3). 찾은 주소를 저장되는 꼴(`https://`, 퍼센트 인코딩한 한글 경로)로 다시 가리켜도 통과한다(REQ8). 비서가 맡긴 에이전트의 실행(위임 자식)이 알린 주소가 부모 대화에서 통과하는지 확인하고, 그 실행의 origin 에 대화가 없으면 204 로 끝나고 남지 않는 것을 확인한다
+- `backend/src/test/java/com/bifos/assistant/chat/conversation/application/FoundLinksTest.java`(신규, 저장소를 쓰는 통합 테스트): 절대 주소, `&amp;` 꼴과 푼 꼴, `//` 꼴, 상대 주소(기준 있음과 없음)를 알린 뒤 `find` 가 통과하는 것. 글자를 하나 바꾼 주소와 쿼리를 더한 주소는 빈 값. 기준 주소와 같은 후보는 남지 않음. 두 해시의 경계에 걸친 32자를 해시로 갖는 가짜 값이 통과하지 않음. 20,000개를 넘기면 가장 오래된 주소가 빈 값이고 최근 주소는 통과(한 번에 2,000개 이하로 나눠 알린다. H2 의 문자열 함수 결과 길이 상한을 피한다). `find` 로 통과한 주소는 그 뒤 20,000개 가까이 더 알려도 남음. `clear` 뒤와 지운 대화에는 남지 않음. `&amp;` 꼴로 가리키면 돌려주는 주소에 `&amp;` 가 없음
+- `backend/src/test/java/com/bifos/assistant/mcp/FoundLinkEndpointTest.java`(신규): `ImageSourceEndpointTest` 의 준비(서명 `McpCallSigner`, 가짜 받기 객체)를 본보기로 쓴다. 알린 주소를 `link:` 로 가리키면 200 이고 가짜 받기 객체가 그 주소를 받는다. 알리지 않은 주소, 다른 대화의 실행이 알린 주소, 다른 사용자의 실행이 알린 주소는 422 `IMAGE_SOURCE_UNKNOWN` 이고 가짜 받기 객체가 불리지 않는다. 서명이 틀린 알리기와 토큰 없는 알리기는 거절되고 남지 않는다. 링크 2,001개는 400 이다. 찾은 주소가 포트가 다른 주소, 대표 사진 없는 페이지, 20MB 를 넘는 사진이면 `IMAGE_SOURCE_LINK_BLOCKED`, `IMAGE_SOURCE_LINK_NO_IMAGE`, `IMAGE_SOURCE_LINK_TOO_LARGE` 다(REQ3, `ImageSourceEndpointTest.reportsEachLinkFailureReason` 의 가짜 웹 준비를 본보기로 쓴다). 알린 주소에서 글자를 하나 바꾼 주소는 422 `IMAGE_SOURCE_UNKNOWN` 이다. 찾은 주소를 저장되는 꼴(`https://`, 퍼센트 인코딩한 한글 경로)로 다시 가리켜도 통과한다(REQ8). 비서가 맡긴 에이전트의 실행(위임 자식)이 알린 주소가 부모 대화에서 통과하는지 확인하고, 그 실행의 origin 에 대화가 없으면 204 로 끝나고 남지 않는 것을 확인한다
 - `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java`: `IMAGE_RULES` 의 글을 보는 단언을 새 줄에 맞춘다. 「찾은 주소는 쓰지 않는다」 가 없고 `web_search` 가 든 줄이 있다
 - 대화를 지운 뒤 칸이 NULL 인 것은 `FoundLinksTest` 에서 `ChatConversationManagement` 의 지우기를 불러 확인한다
 
@@ -122,6 +125,10 @@ fos-ctx 가 알린 주소 후보를 대화마다 해시로 남기는 경로를 �
 | `backend/src/main/java/com/bifos/assistant/shared/config/SecurityConfig.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/ImageSourceService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatConversationManagement.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/purge/application/ConversationPurgeWriter.java` | 수정 |
+| `backend/src/test/resources/purge/fixture.sql` | 수정 |
+| `backend/src/test/resources/purge/tables.tsv` | 수정 |
+| `docs/features/mcp.md` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/application/ArtifactService.java` | 수정 |
 | `backend/docs/data-schema.md` | 수정 |
 | `docs/features/agent-found-image.md` | 수정 |

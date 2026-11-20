@@ -1,0 +1,167 @@
+package com.bifos.assistant.chat.conversation.application;
+
+import com.bifos.assistant.chat.conversation.application.dto.FoundPage;
+import com.bifos.assistant.chat.conversation.application.dto.LinkTarget;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 비서가 웹 검색과 페이지 읽기로 찾은 주소를 대화마다 해시로 남기고, 모델이 가리킨 주소가 그 안에 있는지 답한다
+ * (ADR-20261121 / found-link-image-source, 스펙 agent-found-image REQ2).
+ *
+ * <p>주소 원문은 남기지 않는다. 판정에는 있었는지만 필요하다. 해시는 {@code conversation.found_link_hashes} 에 32자씩 이어 붙이고,
+ * 더하기는 {@code UPDATE} 한 문장이라 한 실행의 도구 결과 여럿이 동시에 알려도 서로를 덮지 않는다. 상한을 넘으면 오래된 것부터 밀려난다.
+ *
+ * <p>같은 주소로 보는 규칙은 {@link LinkTarget} 이 갖는다. 거기에 결과만으로 정해지는 변환(엔티티 풀기, {@code //}, 상대 주소)을 더한다
+ * (스펙 agent-found-image DECISION19). 읽은 페이지 자신의 주소와 같은 후보는 남기지 않는다(DECISION25).
+ */
+@Service
+@RequiredArgsConstructor
+public class FoundLinks {
+    /** 대화 하나에 남기는 해시의 수다. 넘으면 오래된 것부터 버린다. */
+    static final int MAX_HASHES = 20_000;
+    static final int HASH_CHARS = 32;
+    /** 후보 하나의 길이 상한이다. {@code link:} 가리킴의 상한과 같다. */
+    static final int MAX_LINK_CHARS = 2_048;
+
+    private final ConversationRepository conversations;
+
+
+    /** 후보에서 만든 해시를 그 대화에 더한다. 지운 대화에는 더하지 않는다. 남길 것이 없으면 아무것도 하지 않는다. */
+    @Transactional
+    public int record(Long conversationId, List<FoundPage> pages) {
+        Set<String> hashes = new LinkedHashSet<>();
+        for (FoundPage page : pages) {
+            URI base = absolute(page.base());
+            String own = base == null ? null : LinkTarget.of(base.toString()).map(LinkTarget::hash).orElse(null);
+            for (String link : page.links()) {
+                for (String form : forms(link, base)) {
+                    LinkTarget.of(form).map(LinkTarget::hash).filter(hash -> !hash.equals(own)).ifPresent(hashes::add);
+                }
+            }
+        }
+        if (hashes.isEmpty()) {
+            return 0;
+        }
+        List<String> kept = hashes.stream().skip(Math.max(0, hashes.size() - MAX_HASHES)).toList();
+        conversations.appendFoundLinkHashes(conversationId, String.join("", kept), MAX_HASHES * HASH_CHARS);
+        return kept.size();
+    }
+
+
+    /**
+     * @param link 모델이 {@code link:} 뒤에 적은 주소
+     * @return 비서가 그 대화에서 찾은 주소면 받을 주소. 가리킨 글에 엔티티가 있으면 푼 주소다. 아니면 빈 값이다
+     */
+    @Transactional
+    public Optional<URI> find(Long conversationId, String link) {
+        if (link == null) {
+            return Optional.empty();
+        }
+        String stored = conversations.findFoundLinkHashes(conversationId).orElse("");
+        if (stored.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<String> candidates = new LinkedHashSet<>();
+        candidates.add(LinkTarget.decodeEntities(link));
+        candidates.add(link);
+        for (String candidate : candidates) {
+            Optional<LinkTarget> target = LinkTarget.of(candidate);
+            if (target.isPresent() && contains(stored, target.get().hash())) {
+                // 쓴 주소를 뒤로 옮겨, 뒤에 읽은 페이지들에 밀려나 다음 장면에서 빠지는 일을 줄인다.
+                conversations.appendFoundLinkHashes(conversationId, target.get().hash(), MAX_HASHES * HASH_CHARS);
+                return target.get().fetchUri();
+            }
+        }
+        return Optional.empty();
+    }
+
+
+    /** 대화를 지울 때 남긴 해시를 비운다(스펙 agent-found-image DECISION16). */
+    @Transactional
+    public void clear(Long conversationId) {
+        conversations.clearFoundLinkHashes(conversationId);
+    }
+
+
+    /** 해시를 32자 경계로만 비교한다. 구분 문자가 없어 글 전체에서 찾으면 두 해시에 걸친 일치가 생긴다. */
+    private static boolean contains(String stored, String hash) {
+        for (int at = 0; at + HASH_CHARS <= stored.length(); at += HASH_CHARS) {
+            if (stored.startsWith(hash, at)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    /** 후보 하나에서 남길 주소의 꼴을 만든다. 적힌 그대로와 엔티티를 푼 꼴을 각각 절대 주소로 바꾼다. 바꾸지 못한 꼴은 뺀다. */
+    private static Set<String> forms(String link, URI base) {
+        Set<String> forms = new LinkedHashSet<>();
+        if (link == null) {
+            return forms;
+        }
+        String raw = link.strip();
+        if (raw.isEmpty() || raw.length() > MAX_LINK_CHARS || raw.chars().anyMatch(Character::isWhitespace)) {
+            return forms;
+        }
+        for (String written : List.of(raw, LinkTarget.decodeEntities(raw))) {
+            String resolved = resolve(written, base);
+            if (resolved != null) {
+                forms.add(resolved);
+            }
+        }
+        return forms;
+    }
+
+
+    private static String resolve(String written, URI base) {
+        String lower = written.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("https://") || lower.startsWith("http://")) {
+            return written;
+        }
+        if (written.startsWith("//")) {
+            return "https:" + written;
+        }
+        if (base == null) {
+            return null;
+        }
+        try {
+            URI resolved = base.resolve(new URI(LinkTarget.asciiEncoded(written)));
+            String scheme = resolved.getScheme();
+            if (resolved.getHost() == null || scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                return null;
+            }
+            return resolved.toString();
+        } catch (URISyntaxException | IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+
+    /** 기준 주소가 http(s) 절대 주소면 그 주소를, 아니면 null 을 돌려준다. */
+    private static URI absolute(String base) {
+        if (base == null) {
+            return null;
+        }
+        try {
+            URI uri = new URI(LinkTarget.asciiEncoded(base.strip()));
+            String scheme = uri.getScheme();
+            if (uri.getHost() == null || scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                return null;
+            }
+            return uri;
+        } catch (URISyntaxException ex) {
+            return null;
+        }
+    }
+}

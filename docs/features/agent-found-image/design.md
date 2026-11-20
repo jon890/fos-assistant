@@ -68,7 +68,7 @@ origin 판정은 받기 경로와 같다(`McpCallerResolver`). 요청 본문이 
 
 ### 같은 주소로 보는 규칙
 
-`ConversationLinks` 의 주소 비교(`Target`)를 같은 패키지의 값 객체로 꺼내 두 판정이 함께 쓴다. 비교 글은 punycode 소문자 호스트와, 퍼센트 인코딩을 푼 경로와 쿼리다. 조각과 scheme 은 뺀다(그림 스펙 DECISION43).
+`ConversationLinks` 의 주소 비교를 값 객체 `LinkTarget`(`chat.conversation.application.dto`)으로 꺼내 두 판정이 함께 쓴다. 비교 글은 punycode 소문자 호스트와, 퍼센트 인코딩을 푼 경로와 쿼리다. 조각과 scheme 은 뺀다(그림 스펙 DECISION43).
 
 후보 하나에서 아래 꼴을 모두 만들어 각각 남긴다(스펙 DECISION19).
 

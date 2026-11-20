@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.ConversationLinks;
+import com.bifos.assistant.chat.conversation.application.FoundLinks;
 import com.bifos.assistant.mcp.application.dto.GeneratedImageRequest;
 import com.bifos.assistant.mcp.application.dto.ImageSourceRef;
 import com.bifos.assistant.mcp.application.dto.ImageSourceResult;
@@ -34,7 +35,8 @@ import tools.jackson.databind.JsonNode;
  * <p>찾지 못한 까닭은 {@link ErrorCode#IMAGE_SOURCE_UNKNOWN} 과 {@link ErrorCode#IMAGE_SOURCE_GONE} 둘로만 나눈다. 404 는 내지 않는다.
  *
  * <p>링크({@code link:})는 요청자가 그 대화에 보낸 메시지에 있는 주소일 때만 바깥에서 받는다(ADR-20261120 / link-image-source).
- * 대화에 없는 주소로는 바깥 요청을 한 번도 보내지 않는다. 받지 못한 까닭은 {@code IMAGE_SOURCE_LINK_*} 로 그대로 낸다.
+ * 사용자 메시지에 없으면 비서가 그 대화에서 웹 검색과 페이지 읽기로 찾은 주소인지 한 번 더 본다(ADR-20261121 / found-link-image-source).
+ * 둘 다 아닌 주소로는 바깥 요청을 한 번도 보내지 않는다. 받지 못한 까닭은 {@code IMAGE_SOURCE_LINK_*} 로 그대로 낸다.
  */
 @Service
 @Slf4j
@@ -56,6 +58,7 @@ public class ImageSourceService {
     private final GeneratedImageService images;
     private final ConversationAccess access;
     private final ConversationLinks links;
+    private final FoundLinks foundLinks;
     private final LinkImageService linkImages;
 
 
@@ -83,6 +86,7 @@ public class ImageSourceService {
             access.requireOwn(caller.user(), origin.conversationId());
             if (ref.link() != null) {
                 URI link = links.findSentLink(caller.user(), origin.conversationId(), ref.link())
+                    .or(() -> foundLinks.find(origin.conversationId(), ref.link()))
                     .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "this link is not in the conversation"));
                 if (link.toASCIIString().length() > GeneratedImageRequest.MAX_LINK_CHARS) {
                     // 받은 주소는 그림 올리기의 source_links 로 돌아온다. 그 상한을 넘으면 받아도 그림을 남기지 못하므로 받기 전에 막는다.

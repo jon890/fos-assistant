@@ -64,7 +64,8 @@ public class SecurityConfig {
                     "/internal/hermes/attachment-inspect",
                     "/internal/hermes/attachment-inspect/validate",
                     "/internal/hermes/generated-image",
-                    "/internal/hermes/image-source")
+                    "/internal/hermes/image-source",
+                    "/internal/hermes/found-links")
                 .hasRole("MCP")
                 .anyRequest()
                 .authenticated())

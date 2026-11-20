@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.conversation.application;
 
+import com.bifos.assistant.chat.conversation.application.dto.LinkTarget;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;

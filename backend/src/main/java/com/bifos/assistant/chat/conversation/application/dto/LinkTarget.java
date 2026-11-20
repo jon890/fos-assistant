@@ -1,5 +1,6 @@
-package com.bifos.assistant.chat.conversation.application;
+package com.bifos.assistant.chat.conversation.application.dto;
 
+import com.bifos.assistant.shared.util.Sha256;
 import java.io.ByteArrayOutputStream;
 import java.net.IDN;
 import java.net.URI;
@@ -27,9 +28,11 @@ import java.util.regex.Pattern;
  * @param rawHost 받을 주소의 호스트(원래 글)
  * @param rawRest 받을 주소의 경로와 쿼리(원래 글, 조각 뺌)
  */
-record LinkTarget(String host, String altHost, String rest, String rawHost, String rawRest) {
+public record LinkTarget(String host, String altHost, String rest, String rawHost, String rawRest) {
+
 
     private static final Pattern SCHEME = Pattern.compile("(?i)https?://");
+    private static final Pattern AMPERSAND = Pattern.compile("(?i)&(?:amp|#0*38|#x0*26);");
     /** 메시지에서 주소 앞에 붙어도 주소로 보지 않는 여는 괄호와 따옴표다. */
     private static final String LEADING = "([{<\"'「『“‘";
     /** 주소에 쓸 수 있는 ASCII 문자(RFC 3986 의 unreserved, reserved 와 {@code %})다. 이것이 아닌 문자가 주소의 경계다. */
@@ -37,8 +40,7 @@ record LinkTarget(String host, String altHost, String rest, String rawHost, Stri
     /** 메시지에서 주소 끝에 붙어도 주소로 보지 않는 문장 부호다. */
     private static final String TRAILING = ".,)!?]}>\"'」』”’;:";
 
-
-    static Optional<LinkTarget> of(String link) {
+    public static Optional<LinkTarget> of(String link) {
         if (link == null) {
             return Optional.empty();
         }
@@ -63,7 +65,7 @@ record LinkTarget(String host, String altHost, String rest, String rawHost, Stri
 
 
     /** 메시지의 낱말 하나가 이 주소인가. 낱말 전체나 주소에 쓸 수 없는 첫 문자 앞까지가 같아야 한다. */
-    boolean matches(String word) {
+    public boolean matches(String word) {
         String trimmed = trimWord(word);
         return sameAs(comparable(trimmed)) || sameAs(comparable(urlPrefix(trimmed)));
     }
@@ -92,7 +94,34 @@ record LinkTarget(String host, String altHost, String rest, String rawHost, Stri
     }
 
 
-    Optional<URI> fetchUri() {
+    /**
+     * 같은 주소면 같은 글이 되는 비교 글이다. punycode 소문자 호스트와, 퍼센트 인코딩을 푼 경로와 쿼리를 잇는다.
+     *
+     * <p>호스트를 punycode 로 바꾸지 못하면 소문자 호스트를 그대로 쓴다.
+     */
+    public String key() {
+        String lower = host.toLowerCase(Locale.ROOT);
+        try {
+            return IDN.toASCII(lower, IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT) + rest;
+        } catch (IllegalArgumentException ex) {
+            return lower + rest;
+        }
+    }
+
+
+    /** 비교 글의 SHA-256 앞 16바이트를 소문자 16진수 32자로 적은 것이다. 비서가 찾은 주소를 대화에 남길 때 쓴다(ADR-20261121 / found-link-image-source). */
+    public String hash() {
+        return Sha256.hex16(key());
+    }
+
+
+    /** HTML 에 적힌 주소의 {@code &amp;} 와 그 숫자 꼴을 {@code &} 로 바꾼다. 그 밖의 엔티티는 그대로 둔다. */
+    public static String decodeEntities(String link) {
+        return AMPERSAND.matcher(link).replaceAll("&");
+    }
+
+
+    public Optional<URI> fetchUri() {
         try {
             String asciiHost = IDN.toASCII(rawHost.toLowerCase(Locale.ROOT), IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT);
             return Optional.of(new URI("https://" + asciiHost + asciiEncoded(rawRest)));
@@ -113,7 +142,7 @@ record LinkTarget(String host, String altHost, String rest, String rawHost, Stri
 
 
     /** ASCII 밖 문자와 주소에 쓸 수 없는 문자를 UTF-8 퍼센트 인코딩한다. 이미 있는 {@code %XX} 는 그대로 둔다. */
-    private static String asciiEncoded(String text) {
+    public static String asciiEncoded(String text) {
         StringBuilder result = new StringBuilder();
         for (byte value : text.getBytes(StandardCharsets.UTF_8)) {
             int unsigned = value & 0xff;
@@ -162,7 +191,7 @@ record LinkTarget(String host, String altHost, String rest, String rawHost, Stri
 
 
     /** 비교에 쓰는 글이다. 올바른 {@code %XX} 를 UTF-8 로 풀고 틀린 {@code %} 는 그대로 둔다. */
-    static String comparable(String text) {
+    public static String comparable(String text) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         for (int i = 0; i < text.length(); i++) {
             char character = text.charAt(i);
