@@ -335,12 +335,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
 
-    /**
-     * 요약 구역의 결과다.
-     *
-     * @param placed 요약 구역에 든 항목 번호
-     * @param overBudget 요약이 있지만 예산을 넘겨 들지 못한 항목 번호
-     */
+    /** 요약 구역의 결과다. {@code overBudget} 은 요약이 있지만 예산을 넘겨 들지 못한 항목 번호다. */
     private record SummaryPlacement(Set<Long> placed, Set<Long> overBudget) {
     }
 
