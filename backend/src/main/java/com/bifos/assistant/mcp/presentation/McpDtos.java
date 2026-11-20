@@ -187,20 +187,23 @@ public final class McpDtos {
         }
     }
 
-    public record ArtifactWriteArguments(String conversationId, String path, String content, String sourceUrl) {
-        /** JSON의 snake_case 이름을 Java record의 이름으로 바꾼다. */
+    public record ArtifactWriteArguments(
+        String conversationId, String path, String content, String sourceUrl, String title, String description) {
+        /** JSON의 snake_case 이름을 Java record의 이름으로 바꾼다. 선택 인자의 {@code null} 은 없는 것으로 본다. */
         static ArtifactWriteArguments from(JsonNode arguments) {
             return new ArtifactWriteArguments(
                 arguments.get("conversation_id").asString(),
                 arguments.get("path").asString(),
                 optional(arguments, "content"),
-                optional(arguments, "source_url"));
+                optional(arguments, "source_url"),
+                optional(arguments, "title"),
+                optional(arguments, "description"));
         }
 
 
         private static String optional(JsonNode arguments, String name) {
             JsonNode value = arguments.get(name);
-            return value == null ? null : value.asString();
+            return value == null || value.isNull() ? null : value.asString();
         }
     }
 

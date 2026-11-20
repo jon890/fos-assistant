@@ -19,6 +19,8 @@ public interface HermesToolsetClient {
      * API 실행의 toolset 목록을 쓴다.
      *
      * <p>보내기 전에 주인의 첨부 디렉터리를 만든다. Hermes 는 그 디렉터리를 만들지 않는다(ADR-091).
+     * 목록에 {@code image_gen} 이 있으면 같은 쓰기에서 그 profile 에 이미지 서비스 설정을 넣게 한다. 이미 있는 설정은
+     * 덮어쓰지 않는다. 넣지 못하면 목록도 바뀌지 않고 예외가 난다(ADR-20261119 / image-gen-defaults).
      *
      * @param sandboxOwner 셸·파일·사진 도구를 돌릴 격리 실행 공간의 주인 키. 목록에 셸·파일·사진 도구가 있을 때만 Hermes 가 쓴다
      * @throws com.bifos.assistant.shared.error.ApiException 실행 공간이 준비되지 않았으면 {@code

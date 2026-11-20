@@ -23,4 +23,14 @@ public interface ArtifactVaultRow {
 
     /** 묶음 안에서 뿌리가 부르는 파일의 평문 바이트 수 합. */
     long getPartBytes();
+
+
+    Long getConversationId();
+
+
+    /** 암호화한 제목과 설명. 없으면 null 이다. */
+    String getVaultMeta();
+
+
+    Long getVaultMetaKeyId();
 }

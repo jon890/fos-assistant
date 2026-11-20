@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.artifact.application.dto;
 
+import com.bifos.assistant.chat.artifact.domain.VaultFileType;
 import java.time.Instant;
 
 /**
@@ -10,6 +11,14 @@ import java.time.Instant;
  * @param byteSize 묶음 전체의 평문 바이트 수
  * @param fileCount 묶음의 파일 수. 뿌리를 센다. 묶음이 아니면 1 이다
  * @param vaultedAt 보관한 시각
+ * @param title 에이전트가 붙인 제목. 없으면 null 이고 화면이 파일 이름을 쓴다
+ * @param description 한 줄 설명. 없으면 null
  */
-public record ArtifactVaultItem(Long id, String path, long byteSize, int fileCount, Instant vaultedAt) {
+public record ArtifactVaultItem(
+    Long id, String path, long byteSize, int fileCount, Instant vaultedAt, String title, String description) {
+
+    /** 화면이 종류로 나누는 값이다. 받는 형식이 아니면(옛 행) null 이다. */
+    public String kind() {
+        return VaultFileType.of(path).map(type -> type.kind().name()).orElse(null);
+    }
 }

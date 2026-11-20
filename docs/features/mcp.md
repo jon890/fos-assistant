@@ -114,7 +114,7 @@ session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`, `approval_resume`가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`, `approval_resume`, `file_space_put`가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
@@ -171,7 +171,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 **먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS` 와 `CHECK_TREE_WRITE_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
 
 - 제목 검색을 포함한 읽기와 위임 도구는 받는다
-- 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 를 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
+- 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 와 `file_space_put` 을 더 받는다. `file_space_put` 은 대화 인자가 없어 origin 실행의 대화가 점검 대화인지로 본다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
 - `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 
@@ -188,6 +188,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
 | `memory_remember` | [`docs/features/memory.md`](memory.md) 의 「에이전트가 기억을 남기는 길」 |
 | `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
+| `file_space_put` | 아래 「파일 공간에 넣는 도구」 |
 | `approval_resume` | [browser-cowork 설계](browser-cowork/design.md) 의 「PR4 이어 가기」. 호출한 대화의 사람 기다림 승인 하나를 같은 승인으로 한 번 더 실행한다 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않고, Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.
@@ -239,6 +240,18 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 - 호스트 경로와 내부 대화 번호는 반환하지 않는다. URL 의 query, 응답 본문, 파일시스템 경로를 오류나 로그에 노출하지 않는다
 - 같은 경로를 덮어쓸 때도 임시 파일을 완성한 뒤 교체한다. 상한 초과나 다운로드 실패는 임시 파일을 지우고 기존 파일을 보존한다
 - HTML 을 답에 묶는 일은 쓰기 도구가 하지 않는다. 묶는 시점은 [`docs/features/attachment.md`](attachment.md#결과물을-mcp-로-쓸-때) 가 갖는다
+- 선택 인자 `title`, `description` 은 HTML 의 제목과 한 줄 설명이다. 보관할 때 「내 파일」 의 제목이 된다. HTML 이 아니면 쓰지 않고, 암호화를 쓸 수 없으면 제목만 버리고 파일은 쓴다
 
 `source_url` 의 주소 검사와 SSRF 방어는 `ArtifactSourceFetcher` 와 `ArtifactSourceProperties` 가 갖는다.
 허용 목록을 비워 두는 까닭, 검사한 IP 로 연결하는 까닭, 결과물 폴더의 경계로 Hermes 의 `HERMES_WRITE_SAFE_ROOT` 를 쓰지 않는 까닭은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 이 갖는다.
+
+### 파일 공간에 넣는 도구
+
+`file_space_put` 은 에이전트가 만든 파일을 요청자의 「내 파일」(보관함)에 넣는다. 결정은 [ADR-20261119 / file-space-put](../adr/ADR-20261119-file-space-put.md), 기능은 [`workspace.md`](workspace.md) 의 「보관한 결과물」 이 갖는다.
+인자 검사는 `McpFileSpaceCalls`, 경로 판정과 결과 문구는 `McpFileSpaceTools` 가 갖는다.
+
+- 인자는 `path`(필수), `title`, `description` 뿐이다. 대화와 사용자는 인자로 받지 않고 서명한 `_fos_ctx` 의 origin 실행에서 정한다
+- `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다
+- 실행 공간은 Control Plane 이 읽기 전용으로 붙인 루트에서 링크를 따라가지 않고 읽는다. `mcp` 가 `workspace` 를 부르지 못해 `mcp.application.port.SandboxFiles` 를 `workspace` 가 구현한다
+- 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담는다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
+- 보관 자리가 차 있으면 10초까지 기다린다

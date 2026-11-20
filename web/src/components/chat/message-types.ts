@@ -28,12 +28,17 @@ export type MessageArtifact = {
   autoVault?: AutoVaultState | null;
   /** 자동 보관이 실패한 까닭의 오류 코드다 */
   autoVaultError?: string | null;
-  /** `IMAGE` 는 비서가 만든 그림이고 `HTML` 은 결과물 페이지다. 옛 서버 응답에는 없고, 없으면 `HTML` 로 본다 */
-  kind?: "IMAGE" | "HTML";
+  /**
+   * `IMAGE` 는 비서가 만든 그림, `HTML` 은 결과물 페이지, `FILE` 은 비서가 「내 파일」 에 넣은 파일이다. 옛 서버 응답에는 없고, 없으면
+   * `HTML` 로 본다. `FILE` 의 `path` 는 보관본의 경로이고 지웠으면 빈 글이다
+   */
+  kind?: "IMAGE" | "HTML" | "FILE";
   /** 비서가 이미지 도구에 넘긴 그림 지시문이다. 그림이 아니면 null 이다 */
   prompt?: string | null;
-  /** 그 그림의 살아 있는 보관본 번호다. 없으면 null 이다 */
+  /** 그 그림이나 넣은 파일의 보관본 번호다. 없으면 null 이다 */
   vaultItemId?: number | null;
+  /** `FILE` 의 제목이다. 없으면 null 이고 파일 이름을 보인다 */
+  title?: string | null;
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */

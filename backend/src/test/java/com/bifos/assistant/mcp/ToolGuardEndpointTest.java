@@ -183,6 +183,37 @@ class ToolGuardEndpointTest {
 
 
     @Test
+    @DisplayName("사람이 없는 실행과 그 실행이 맡긴 자식의 그림 만들기는 block 이고 다른 도구는 allow 이다")
+    void imageGenerationIsBlockedInUnattendedTree() throws Exception {
+        String root = "fos-" + UUID.randomUUID();
+        Conversation scheduled = conversations.save(Conversation.startedBy(owner.id(), "예약 작업", agent.id(), NOW));
+        AgentExecution turn = running(root, scheduled.id(), null);
+        jdbc.update("UPDATE agent_execution SET unattended = true WHERE id = ?", turn.id());
+        String child = "child-" + UUID.randomUUID();
+        AgentExecution delegated = running("fos-" + UUID.randomUUID(), scheduled.id(), turn.id());
+        bindings.saveAndFlush(HermesSessionBinding.of(PROFILE, child, delegated, root, root));
+
+        assertBlocked(ask("image_generate", root, root), "그림을 만들 수 없다");
+        assertBlocked(ask("image_generate", root, child), "그림을 만들 수 없다");
+        assertAllowed(ask("terminal", root, root));
+    }
+
+
+    @Test
+    @DisplayName("같은 대화라도 사람이 보낸 메시지의 turn 에서는 그림 만들기가 allow 이다")
+    void imageGenerationIsAllowedInAttendedTurn() throws Exception {
+        String root = "fos-" + UUID.randomUUID();
+        Conversation scheduled = conversations.save(Conversation.startedBy(owner.id(), "예약 작업", agent.id(), NOW));
+        AgentExecution unattended = running(root, scheduled.id(), null);
+        jdbc.update("UPDATE agent_execution SET unattended = true WHERE id = ?", unattended.id());
+        jdbc.update("UPDATE agent_execution SET status = 'SUCCEEDED' WHERE id = ?", unattended.id());
+        running(root, scheduled.id(), null);
+
+        assertAllowed(ask("image_generate", root, root));
+    }
+
+
+    @Test
     @DisplayName("점검 대화의 session 인데 도는 실행이 없으면 block 이다")
     void checkConversationWithoutRunningExecutionIsBlocked() throws Exception {
         String root = "fos-" + UUID.randomUUID();

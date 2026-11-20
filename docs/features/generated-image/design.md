@@ -1,6 +1,6 @@
 # 비서가 만든 이미지 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1~REQ10)을 설계한다. PR2 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지)를 설계한다. PR2 의 설계는 아래 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이 갖는다. PR3 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
 
 ## 요구사항 연결
 
@@ -16,10 +16,10 @@
 | REQ8 | 보관함 목록이 그림 항목 줄에 작은 그림을 그린다. 이름은 파일 이름에서 확장자를 뗀 제목이다 |
 | REQ9 | 메시지 응답이 지워진 그림 행마다 그 사용자의 살아 있는 보관본 번호를 함께 준다. 화면이 안내와 「보관함에서 보기」 링크를 그린다 |
 | REQ10 | 파일은 기존 결과물 경로가 대화 주인에게만 준다. 이미지 도구가 실패하면 Hermes 의 오류 결과가 그대로 모델에게 가고, 올리기가 실패하면 fos-ctx 가 경로 없는 오류 결과로 바꾼다 |
-| REQ11 | PR2 가 설계한다. 방향은 기본 비서의 기본 도구에 `image_gen` 을 더하고, 도구 저장 때 대시보드 plugin 이 profile 설정에 이미지 서비스를 함께 쓰며, 실행 공간 준비를 Control Plane 이 요청 밖에서 시작하는 것이다. Control Plane 이 스스로 할 수 있는 준비 범위를 그 설계가 먼저 확인한다 |
-| REQ12 | REQ11 과 같은 PR 이 함께 설계한다 |
-| REQ13 | REQ11 과 같은 PR 이 함께 설계한다 |
-| REQ14 | PR2 가 설계한다. 방향은 fos-ctx 가 이미 묻는 도구 판정(`/internal/hermes/tool-guard`)이 트리 루트의 「사람이 없는 실행」 표시를 보고 `image_generate` 를 막는 것이다 |
+| REQ11 | 기본 도구 설정에 `image_gen` 을 더해 새 기본 비서에 켠다. 이미 있는 기본 비서는 마이그레이션이 `agent.pending_default_toolsets` 에 한 번 넣고 `AgentPendingToolsets` 가 요청 밖에서 켠다. 등급은 관리자 등급 그대로다 |
+| REQ12 | Control Plane 이 `image_gen` 이 든 도구 저장에 `ensure_image_service: true` 를 넣어 보내고, 대시보드 plugin 이 같은 쓰기에서 profile 설정의 `image_gen.provider` 를 넣는다. 쓰지 못하면 저장 전체가 실패한다 |
+| REQ13 | 켜지 못한 기본 비서는 기다리는 목록에 남고 `AgentPendingToolsets` 가 5분마다 다시 켠다. 실행 공간 정책 등록은 Control Plane 이 하지 못해 관리자 알림으로 남긴다. 사람의 도구 저장이 그 도구의 켜짐을 바꾸면 목록에서 뺀다 |
+| REQ14 | fos-ctx 가 이미 묻는 도구 판정(`/internal/hermes/tool-guard`)이 그 호출의 실행을 찾아 트리 루트의 「사람이 없는 실행」 표시가 참이면 `image_generate` 를 막는다. fos-ctx 는 바꾸지 않는다 |
 | REQ15 | PR3 이 설계한다. 방향은 `pre_tool_call` 이 `image_url` 과 `reference_image_urls` 의 사진 가리킴을 Control Plane 에 확인받아 그 대화의 사진과 만든 그림으로만 바꾸는 것이다 |
 | REQ16 | REQ15 과 같은 PR 이 함께 설계한다 |
 | REQ17 | REQ15 과 같은 PR 이 함께 설계한다 |
@@ -89,7 +89,7 @@
 
 **이 경로는 404 를 내지 않는다.** fos-ctx 가 404 를 이 경로가 없는 옛 Control Plane 으로 읽고 결과를 바꾸지 않기 때문이다. 저장 중의 `*_NOT_FOUND` 예외는 500 으로 바꿔 답한다. 도구 판정 경로와 같은 규칙이다.
 
-형식은 확장자가 아니라 파일 머리 바이트로 정한다. 상한은 `assistant.artifact.generated-image-max-bytes`(기본 20MiB)다. 보관함의 파일 하나 상한(5MiB)과는 별개다(스펙 DECISION20).
+형식은 확장자가 아니라 파일 머리 바이트로 정한다. 상한은 `assistant.artifact.generated-image-max-bytes`(기본 20MiB)다. 보관함의 파일 하나 상한과는 별개다(스펙 DECISION20). 보관함의 상한은 [ADR-20261119 / file-space-put](../../adr/ADR-20261119-file-space-put.md) 이 25MiB 로 올렸다.
 
 ### 저장
 
@@ -146,6 +146,92 @@ fos-ctx 가 결과를 바꾸기 전에 저장된 답과 hook 이 건너뛰어진
 - 지워진 그림은 안내 글과, `vaultItemId` 가 있으면 `/files?tab=vault&item=<번호>` 링크를 그린다. 보관함 목록은 `item` 이 있으면 그 줄의 미리보기를 펼친다
 - 보관함 목록의 그림 줄은 이름 앞에 작은 그림을 늦게 불러(`loading="lazy"`) 그린다. 작은 그림 전용 사본은 만들지 않는다
 
+## PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행
+
+근거와 기각한 대안은 [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md) 가 갖는다.
+
+### 책임
+
+| 모듈 | 맡는 것 |
+| --- | --- |
+| 대시보드 plugin | `PUT /api/config` 의 `ensure_image_service`. 이미지 서비스 값과 「이미 있으면 덮어쓰지 않는다」 를 갖는다 |
+| `backend` 의 `hermes` | `image_gen` 이 든 도구 저장에 그 칸을 넣어 보낸다 |
+| `backend` 의 `agent` | 기다리는 목록(`agent.pending_default_toolsets`)의 쓰기, 요청 밖에서 다시 켜기, 관리자 알림, 사람의 저장 뒤 정리 |
+| `backend` 의 `people` | 새 기본 비서를 만들 때 기다리는 목록에 적고, 기본 도구를 켠 뒤 한 번 켜 본다 |
+| `backend` 의 `orchestration` | 도구 판정에서 사람이 없는 실행의 `image_generate` 를 막는다 |
+| `web` | 알림 종류 하나를 더 안다. 화면은 바꾸지 않는다 |
+
+### 실행 공간 준비 가운데 Control Plane 이 하는 범위
+
+스펙 DECISION31 이 먼저 확인하라고 한 것이다.
+
+| 단계 | 누가 하나 |
+| --- | --- |
+| 주인의 첨부 디렉터리 만들기 | Control Plane. 도구 저장 전에 만든다 |
+| 사용자 작업 디렉터리 만들기, profile 의 `terminal:` 을 실행 공간 설정으로 쓰기 | 대시보드 plugin. 도구 저장 때 한다 |
+| profile 을 실행 공간 정책에 등록하기 | 운영. 정책은 대시보드 프로세스의 환경 값이라 Control Plane 이 바꾸지 못한다 |
+
+Control Plane 이 스스로 하는 일은 앞의 둘을 일으키는 도구 저장을 되풀이하는 것이다. 마지막 단계가 남았으면 plugin 이 409 `sandbox_unavailable` 로 답하고, 그것을 관리자 알림으로 남긴다.
+
+### 이미지 서비스 넣기
+
+`PUT /api/config` 본문에 `ensure_image_service`(참 거짓)를 더한다. 계약은 [대시보드 plugin README](../../../hermes/plugins/dashboard-profile-api/README.md) 가 갖는다.
+
+- 참이면 `platform_toolsets.api_server` 에 `image_gen` 이 있어야 한다. 없으면 400 이다
+- 저장된 설정의 `image_gen.provider` 가 비었을 때만 서비스를 넣는다. `image_gen` 의 다른 키와 이미 있는 서비스는 그대로 둔다(스펙 DECISION30)
+- plugin 은 검사한 설정을 Hermes 처리기보다 먼저 쓰고 처리기가 실패하면 되돌린다. 그래서 서비스만 들어가거나 도구만 켜진 상태가 남지 않는다
+- 실행 공간 판정이 먼저다. 정책에 없는 profile 은 409 이고 서비스도 쓰지 않는다
+- Control Plane 은 `image_gen` 이 든 모든 도구 저장에 이 칸을 넣어 보낸다. 사람의 저장, 기본 도구 적용, 기다리는 도구 켜기가 같은 길이다. 이 칸을 모르는 옛 plugin 은 본문을 400 으로 거절하므로 plugin 을 먼저 배포한다(rule-66)
+
+### 기다리는 목록
+
+`agent.pending_default_toolsets` 는 Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름을 쉼표로 이은 글이다. 지금은 `image_gen` 하나만 들어간다(`AgentToolPolicy.retriedDefaults`).
+엔티티 저장은 이 칸을 쓰지 않고 전용 쿼리만 쓴다. 먼저 읽어 둔 에이전트를 나중에 저장해도 비운 값이 되살아나지 않는다(rule-68).
+
+| 때 | 하는 일 |
+| --- | --- |
+| PR2 배포의 마이그레이션 | 지우지 않은 기본 비서(주인의 기본 profile 을 가리키는 `PRIVATE` 에이전트)에 `image_gen` 을 넣는다. 한 번만 돈다 |
+| 첫 로그인 | 새 기본 비서를 저장하는 트랜잭션에서 기본 도구 가운데 `image_gen` 을 넣는다. 커밋 뒤 기본 도구를 켜고 곧바로 한 번 켜 본다 |
+| 5분마다(`assistant.agents.pending-toolsets-cron`) | 목록이 있는 에이전트를 하나씩, 행을 잠근 트랜잭션에서 켜 본다 |
+| 사람의 도구 저장이 끝났다 | 저장 뒤 켜진 이름과, 저장 전에 켜져 있던 이름을 목록에서 뺀다. 꺼진 채 그대로인 이름은 남긴다 |
+
+켜 보는 순서는 `AgentDefaultToolsets.enablePending` 이 갖는다.
+
+| 상황 | 결과 |
+| --- | --- |
+| 그룹에 공개했거나 주인이 없다 | 켜지 않고 목록을 비운다(스펙 DECISION21) |
+| 비밀값을 요청하는 올린 스킬이 있다 | 켜지 않고 기다린다. 관리자에게 알린다 |
+| 실행 공간 정책에 없다(409 `sandbox_unavailable`) | 다른 도구도 쓰지 않고 기다린다. 관리자에게 알린다 |
+| 켰다 | 지금 켜진 도구에 더해 `require_sandbox` 로 쓰고, 다시 읽어 켜졌는지 본 뒤 목록을 비우고 알림을 읽음으로 바꾼다. 이미 켜져 있던 도구도 한 번은 다시 쓴다. 도구만 켜져 있고 이미지 서비스 설정이 없는 profile 에 설정이 들어간다 |
+| Hermes 가 답하지 않거나 설정 쓰기를 거절한다 | 기다린다. 실패가 세 번 이어지면 관리자에게 알린다. 이어진 횟수는 메모리에만 둔다 |
+
+**관리자가 끈 비서는 다시 켜지 않는다(스펙 DECISION23).** 목록에 이름을 넣는 길은 마이그레이션 한 번과 첫 로그인뿐이다. 켜진 뒤나 관리자가 끈 뒤에는 목록이 비어 있어 배포와 재시작, 주기 작업이 그 비서를 보지 않는다.
+
+### 관리자 알림
+
+종류는 `DEFAULT_TOOLS_PENDING` 이고 받는 사람은 주인 그룹의 차단되지 않은 관리자다. 본문에 사용자 표시 이름과 켜지 못한 도구, 까닭이 있다. 누르면 갈 곳은 없다.
+같은 에이전트의 같은 까닭은 한 번만 알린다. 에이전트 번호와 까닭으로 만든 원인 식별자가 이미 있는지로 본다. 까닭이 바뀌면 다시 알리고, 오래된 알림 정리가 줄을 지운 뒤에도 기다리고 있으면 다시 알린다.
+켜지거나 더 기다리지 않게 되면 그 에이전트의 알림을 읽음으로 바꾼다.
+
+### 사람이 없는 실행
+
+`EventToolGuard` 가 도구 판정 요청의 도구 이름을 받는다. 실행을 찾은 호출(등록된 자식의 origin 실행, 루트 session 에서 도는 실행)에서 도구가 `image_generate` 이고 그 실행의 트리 루트가 사람이 없는 실행이면 막는다.
+트리 루트의 판정은 기존 `SessionOwnerResolver.unattendedTree` 다(스펙 DECISION26). 예약 작업 turn, 먼저 살펴보기 turn(단추로 연 것 포함), 그 결과를 전하는 turn, 그 실행들이 맡긴 하위 실행이 모두 여기 든다. 같은 대화라도 사람이 보낸 메시지의 turn 은 루트가 달라 통과한다.
+막힌 호출에 모델이 받는 글은 그림을 만들 수 없다는 것과 결과에 그렇게 적으라는 것이다. 사건 살펴보기 트리는 지금처럼 그 앞의 판정이 먼저 막는다.
+실행을 찾지 못한 호출은 Control Plane 이 연 실행이 아니라서 이 판정으로 막지 않는다.
+
+### 실패와 일관성
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 옛 plugin 에 새 Control Plane 이 `image_gen` 저장을 보낸다 | 400 으로 거절돼 도구가 켜지지 않는다. 사람의 저장은 오류를 보이고, 기다리는 비서는 다음 차례에 다시 본다 |
+| 새 plugin 에 옛 Control Plane 이 저장을 보낸다 | 칸이 없어 지금처럼 toolset 만 쓴다 |
+| 주기 작업과 사람의 도구 저장이 겹친다 | 둘 다 에이전트 행을 잠근다. 주기 작업은 잠금을 기다리고, 사람의 저장은 잠겨 있으면 `AGENT_BUSY` 다 |
+| 켠 직후 서버가 죽어 목록을 비우지 못했다 | 다음 차례가 같은 목록을 한 번 더 쓰고 비운다 |
+| 주기 작업이 행을 잠근 사이 그 비서의 사진이 있는 turn 이 시작된다 | 그 turn 의 원본 조회 도구 확인은 잠금을 기다리지 않아 실패할 수 있다. 겹치는 시간은 5분마다 Hermes 호출 두세 번이고 기다리는 비서에서만 생긴다. 다시 보내면 된다 |
+| 켜고 목록을 비우는 사이 관리자가 끈다 | 행 잠금이 순서를 정한다. 주기 작업이 먼저면 관리자의 저장이 뒤에 끄고 목록은 이미 비어 있다 |
+| 기다리는 에이전트를 지웠다 | 주기 작업이 지운 에이전트를 보지 않는다 |
+
 ## 실패와 일관성
 
 | 무엇 | 어떻게 되나 |
@@ -172,11 +258,15 @@ fos-ctx 가 결과를 바꾸기 전에 저장된 답과 hook 이 건너뛰어진
 | REQ4 의 단락 | 실행 입력을 만드는 기존 테스트에서 단락의 규칙 문장을 본다 |
 | REQ2, REQ3, REQ5, REQ7, REQ9 의 화면 | 화면 단위 테스트와 브라우저 테스트. 넓은 화면과 휴대폰 폭에서 그림, 크게 보기, 지시문 펼치기, 지워진 그림의 링크를 본다 |
 | REQ8 | 보관함 목록의 화면 테스트 |
+| REQ11 | `FirstAgentCreatorTest` 가 새 기본 비서의 도구 목록과 기다리는 목록을, `AgentPendingToolsetsTest` 가 마이그레이션이 기본 비서만 고르는지를 본다. `MEMBER` 역할의 거절은 기존 `AgentToolPolicyTest` 가 본다 |
+| REQ12 | `hermes/tests` 의 `test_dashboard_profile_api_image_service.py` 가 서비스 넣기, 덮어쓰지 않기, 실패 때 되돌리기를 본다. `HermesToolsetRequestTest` 가 Control Plane 이 보내는 본문을 본다 |
+| REQ13 | `AgentPendingToolsetsTest`. 실행 공간이 없을 때의 관리자 알림 한 건, 준비된 뒤 스스로 켜기, 관리자가 끈 뒤 다시 켜지 않기를 본다 |
+| REQ14 | `ToolGuardEndpointTest`. 사람이 없는 실행과 그 자식의 `image_generate` 가 막히고 사람이 보낸 turn 은 통과하는지 본다 |
 
 실제 이미지 서비스로 한 장을 만드는 왕복은 배포 뒤 운영에서 확인한다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」).
 
 운영에서 gpt-image-2 로 만든 그림 한 장은 2,517,146바이트의 PNG 이고 1254x1254 픽셀이었다(2026-11-19, 정사각형 요청, medium 품질, 표본 1장).
-보관함의 파일 하나 상한 5MiB 안이다. 가로나 세로가 긴 그림과 high 품질은 더 클 수 있어, 배포 뒤 그런 그림에서 「보관 실패」 가 나오는지 본다. 자주 나오면 상한을 사용자에게 다시 묻는다(스펙 DECISION20).
+이 설계를 쓸 때의 보관함 상한 5MiB 안이다(지금은 25MiB 다). 가로나 세로가 긴 그림과 high 품질은 더 클 수 있어, 배포 뒤 그런 그림에서 「보관 실패」 가 나오는지 본다. 자주 나오면 상한을 사용자에게 다시 묻는다(스펙 DECISION20).
 
 ## 결정
 
@@ -186,8 +276,12 @@ fos-ctx 가 결과를 바꾸기 전에 저장된 답과 hook 이 건너뛰어진
 | DECISION2 | 제목을 받는 방법 | 지시문 첫 줄의 `제목:` 줄을 fos-ctx 가 뗀다 | 작성자 | `image_generate` 의 인자는 Hermes 가 정해 제목 칸을 더할 수 없다. 떼지 않으면 이미지 서비스가 그 글자를 그림에 그릴 수 있다 |
 | DECISION3 | 제목과 지시문을 두는 곳 | 제목은 파일 이름, 지시문은 `chat_artifact` 의 암호화한 새 칸 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 파일 이름이 제목이면 보관함과 내려받기가 고칠 것 없이 제목을 쓴다 |
 | DECISION4 | 그림 지침을 주는 자리 | 매 turn 붙이는 결과물 폴더 단락 | 작성자 | 그 단락이 이미 「이미지는 `source_url`」 을 안내해 함께 고쳐야 한다. Control Plane 은 그 에이전트에 `image_gen` 이 켜졌는지 저장하지 않아 켜진 에이전트에만 붙일 수 없다 |
-| DECISION5 | 올리기 상한 | 20MiB, 설정 값 | 작성자 | 보관함 상한(5MiB)보다 큰 원본도 대화에는 보여야 한다. 측정한 한 장은 약 2.4MiB 였다(「검증 전략」) |
+| DECISION5 | 올리기 상한 | 20MiB, 설정 값 | 작성자 | 보관함 상한(당시 5MiB)보다 큰 원본도 대화에는 보여야 한다. 측정한 한 장은 약 2.4MiB 였다(「검증 전략」) |
 | DECISION6 | 답 글에 남은 Hermes 쪽 경로 | 저장된 답은 고치지 않고, 내보낼 때 `MEDIA:` 태그와 Hermes 이미지 캐시 경로를 뺀다. 메시지 응답과 화면의 흐르는 답 모두에 적용한다. 이 PR 배포 전에 저장된 옛 답에도 같다 | 사용자 2026-11-19 | 운영에서 답에 홈서버의 내부 경로가 보였고 가려 달라는 요청이 있었다. 경로는 먼저 모델에게 가는 결과에서 빼고, 이 가리기는 그 뒤에 남는 경우를 막는다 |
+| DECISION7 | 실행 공간 준비 가운데 Control Plane 이 하는 범위 | 도구 저장을 되풀이해 디렉터리와 `terminal:` 쓰기를 일으키는 데까지다. 정책 등록은 운영에 남기고 관리자 알림으로 알린다 | 작성자 | [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md). 정책은 대시보드 프로세스의 환경 값이다 |
+| DECISION8 | 기다리는 상태를 두는 곳 | `agent` 의 새 칸 하나 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 재시작 뒤에도 남아야 한다 |
+| DECISION9 | 이미지 서비스 값을 갖는 곳 | 대시보드 plugin. Control Plane 은 넣으라는 표시만 보낸다 | 작성자 | 서비스가 하나다(스펙 DECISION5). 값이 두 곳에 생기지 않는다 |
+| DECISION10 | 사람이 없는 실행을 막는 자리 | 이미 있는 도구 판정 경로 | 작성자 | fos-ctx 가 `image_generate` 를 이미 묻고 요청에 도구 이름이 있다. plugin 을 바꾸지 않는다 |
 
 ## 결정 기록 연결
 
@@ -195,3 +289,4 @@ fos-ctx 가 결과를 바꾸기 전에 저장된 답과 hook 이 건너뛰어진
 | --- | --- | --- | --- |
 | DECISION1, DECISION2 | architecture | [ADR-20261119 / generated-image](../../adr/ADR-20261119-generated-image.md) | 이 설계, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
 | DECISION3, DECISION4, DECISION5, DECISION6 | architecture | 필요 없음. 기존 결정(ADR-027, 새 표 금지)을 따르는 선택이다 | 이 설계 |
+| DECISION7, DECISION8, DECISION9, DECISION10 | architecture | [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md) | 이 설계의 「PR2」, [`agent-skill.md`](../agent-skill.md) 의 「에이전트 도구」 |

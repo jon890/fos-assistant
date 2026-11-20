@@ -23,5 +23,7 @@ public enum NotificationKind {
     /** 사건 감지의 목록 조회가 연결 문제로 정한 횟수만큼 연달아 실패했다. 다시 연결해야 한다. */
     EVENT_WATCH_FAILED,
     /** 플러그인이 사람이 해야 하는 화면에서 멈춰 「내 브라우저」 화면을 넘겼다. 그 대화의 다음 turn 이 시작되면 읽음이 된다. */
-    HANDOFF_REQUESTED
+    HANDOFF_REQUESTED,
+    /** Control Plane 이 기본 비서에 스스로 켜려던 기본 도구를 켜지 못했다. 관리자가 할 일이 남았다(ADR-20261119 / image-gen-defaults). */
+    DEFAULT_TOOLS_PENDING
 }

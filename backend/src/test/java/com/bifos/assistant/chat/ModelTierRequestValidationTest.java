@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.mockito.Mockito.mock;
@@ -30,7 +31,7 @@ class ModelTierRequestValidationTest {
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ChatController(
         chat, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class),
         new AutoTurnNoticeStatuses(List.of()),
-        mock(GeneratedImageService.class)))
+        mock(GeneratedImageService.class), mock(ArtifactPutFiles.class)))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 

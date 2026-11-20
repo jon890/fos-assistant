@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteResult;
 import com.bifos.assistant.chat.artifact.application.ArtifactWriteService;
+import com.bifos.assistant.chat.artifact.application.ChatArtifactWriter;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
@@ -54,8 +56,8 @@ class ArtifactWriteServiceTest {
         when(store.write(42L, "test/index.html", "한글".getBytes(StandardCharsets.UTF_8)))
             .thenReturn(6L);
 
-        ArtifactWriteResult result = new ArtifactWriteService(access, store, fetcher())
-            .write(USER, new ArtifactWriteRequest(publicId, "test/index.html", "한글", null));
+        ArtifactWriteResult result = new ArtifactWriteService(access, store, fetcher(), mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class))
+            .write(USER, new ArtifactWriteRequest(publicId, "test/index.html", "한글", null, null, null));
 
         assertThat(result).isEqualTo(new ArtifactWriteResult("test/index.html", 6L));
     }
@@ -73,19 +75,19 @@ class ArtifactWriteServiceTest {
         when(store.write(42L, "a.css", new byte[0])).thenReturn(0L);
         byte[] exactLimit = new byte[5 * 1024 * 1024];
         when(store.write(42L, "b.css", exactLimit)).thenReturn((long)exactLimit.length);
-        ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher());
+        ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher(), mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class));
 
-        assertThat(service.write(USER, new ArtifactWriteRequest(publicId, "a.css", "", null))
+        assertThat(service.write(USER, new ArtifactWriteRequest(publicId, "a.css", "", null, null, null))
             .byteSize())
                 .isZero();
         assertThat(service.write(
             USER,
             new ArtifactWriteRequest(
-                publicId, "b.css", new String(exactLimit, StandardCharsets.ISO_8859_1), null))
+                publicId, "b.css", new String(exactLimit, StandardCharsets.ISO_8859_1), null, null, null))
             .byteSize())
                 .isEqualTo(exactLimit.length);
         assertThatThrownBy(() -> service.write(
-            USER, new ArtifactWriteRequest(publicId, "c.css", "가".repeat((5 * 1024 * 1024 / 3) + 1), null)))
+            USER, new ArtifactWriteRequest(publicId, "c.css", "가".repeat((5 * 1024 * 1024 / 3) + 1), null, null, null)))
                 .isInstanceOfSatisfying(
                     ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
@@ -100,10 +102,10 @@ class ArtifactWriteServiceTest {
         when(access.requireOwn(USER, publicId))
             .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
 
-        assertThatThrownBy(() -> new ArtifactWriteService(access, store, fetcher())
+        assertThatThrownBy(() -> new ArtifactWriteService(access, store, fetcher(), mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class))
             .write(
                 USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png", null, null)))
                     .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
 
@@ -119,12 +121,12 @@ class ArtifactWriteServiceTest {
         Conversation conversation = mock(Conversation.class);
         UUID publicId = UUID.randomUUID();
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
-        ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher());
+        ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher(), mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class));
 
         assertThatThrownBy(() -> service.write(
-            USER, new ArtifactWriteRequest(publicId, "a.html", "본문", "https://example.com/a.html")))
+            USER, new ArtifactWriteRequest(publicId, "a.html", "본문", "https://example.com/a.html", null, null)))
                 .isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> service.write(USER, new ArtifactWriteRequest(publicId, "a.svg", "본문", null)))
+        assertThatThrownBy(() -> service.write(USER, new ArtifactWriteRequest(publicId, "a.svg", "본문", null, null, null)))
             .isInstanceOf(ApiException.class);
 
         verify(access, Mockito.times(2)).requireOwn(USER, publicId);
@@ -156,11 +158,11 @@ class ArtifactWriteServiceTest {
                     new ByteArrayInputStream(image));
             });
 
-        assertThat(new ArtifactWriteService(access, store, source)
+        assertThat(new ArtifactWriteService(access, store, source, mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class))
             .write(
                 USER,
                 new ArtifactWriteRequest(publicId, "a.png", null,
-                    "https://storep-phinf.pstatic.net/ogq_abc123/original_4.png?type=p100_100")))
+                    "https://storep-phinf.pstatic.net/ogq_abc123/original_4.png?type=p100_100", null, null)))
                         .isEqualTo(new ArtifactWriteResult("a.png", 3L));
     }
 
@@ -182,11 +184,11 @@ class ArtifactWriteServiceTest {
                 throw new AssertionError("transport must not run");
             });
 
-        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source)
+        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source, mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class))
             .write(
                 USER,
                 new ArtifactWriteRequest(
-                    publicId, "../a.png", null, "https://images.example.com/a.png")))
+                    publicId, "../a.png", null, "https://images.example.com/a.png", null, null)))
                         .isInstanceOfSatisfying(
                             ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         verifyNoInteractions(store);
@@ -208,14 +210,14 @@ class ArtifactWriteServiceTest {
             (address, host, uri, connect, read, cancellation) -> {
                 throw new AssertionError("transport must not run");
             });
-        ArtifactWriteService service = new ArtifactWriteService(access, store, source);
+        ArtifactWriteService service = new ArtifactWriteService(access, store, source, mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class));
 
         for (UUID publicId : List.of(UUID.randomUUID(), UUID.randomUUID())) {
             when(access.requireOwn(USER, publicId))
                 .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
             assertThatThrownBy(() -> service.write(
                 USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png", null, null)))
                     .isInstanceOfSatisfying(
                         ApiException.class,
                         ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
@@ -243,10 +245,10 @@ class ArtifactWriteServiceTest {
                 throw new IOException("download failed");
             });
 
-        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source)
+        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source, mock(ArtifactVaultMeta.class), mock(ChatArtifactWriter.class))
             .write(
                 USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png", null, null)))
                     .isInstanceOfSatisfying(ApiException.class,
                         ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
         assertThat(Files.readAllBytes(root.resolve("42/a.png"))).containsExactly(1, 2, 3);

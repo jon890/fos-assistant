@@ -10,7 +10,12 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchChatAgents } from "@/lib/chat-api";
-import { MODEL_TIER_LABELS, type ModelTierCode } from "@/lib/model-tiers";
+import {
+  getModelTiers,
+  MODEL_TIER_LABELS,
+  tierModelLine,
+  type ModelTierCode,
+} from "@/lib/model-tiers";
 import { createTask, updateTask } from "@/lib/task-api";
 import {
   choiceOf,
@@ -102,6 +107,10 @@ export function TaskForm({
   const [modelTier, setModelTier] = useState<ModelTierCode | "">(
     task?.modelTier ?? "",
   );
+  /** 관리자가 채운 단계의 `<모델> · <강도>` 다. 읽지 못했거나 비운 단계는 없다 */
+  const [tierLines, setTierLines] = useState<
+    Partial<Record<ModelTierCode, string>>
+  >({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,6 +122,19 @@ export function TaskForm({
         if (cancelled) return;
         setAgents(data);
         setAgentCode((current) => current || data[0]?.code || "");
+        // 단계 정의는 그룹의 값이라 어느 에이전트로 읽어도 같다. 작업의 에이전트는 꺼져 있을 수 있어, 대화를 시작할 수
+        // 있는 첫 에이전트로 한 번만 읽는다. 읽지 못하면 단계 이름만 보인다.
+        const first = data[0]?.code;
+        if (!first) return;
+        void getModelTiers(first).then((result) => {
+          if (cancelled || !result.ok) return;
+          const lines: Partial<Record<ModelTierCode, string>> = {};
+          for (const tier of result.data.tiers) {
+            const line = tierModelLine(tier);
+            if (line !== null) lines[tier.tier] = line;
+          }
+          setTierLines(lines);
+        });
       })
       .catch(() => {
         if (!cancelled) setAgents([]);
@@ -353,7 +375,9 @@ export function TaskForm({
           <option value="">기본값</option>
           {(Object.keys(MODEL_TIER_LABELS) as ModelTierCode[]).map((code) => (
             <option key={code} value={code}>
-              {MODEL_TIER_LABELS[code]}
+              {tierLines[code] === undefined
+                ? MODEL_TIER_LABELS[code]
+                : `${MODEL_TIER_LABELS[code]} · ${tierLines[code]}`}
             </option>
           ))}
         </NativeSelect>

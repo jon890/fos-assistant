@@ -26,6 +26,10 @@ const LABELS: Record<string, Label> = {
     running: "결과물을 저장하고 있어요",
     done: "결과물을 저장했어요",
   },
+  file_space_put: {
+    running: "파일 공간에 넣고 있어요",
+    done: "파일 공간에 넣었어요",
+  },
   memory_read: { running: "기억을 떠올리고 있어요", done: "기억을 떠올렸어요" },
   memory_search: { running: "기억을 찾고 있어요", done: "기억을 찾았어요" },
   memory_remember: {

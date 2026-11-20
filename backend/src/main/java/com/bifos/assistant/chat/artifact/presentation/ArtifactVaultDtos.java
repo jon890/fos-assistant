@@ -23,11 +23,18 @@ public final class ArtifactVaultDtos {
      *
      * @param byteSize 묶음 전체의 평문 바이트 수
      * @param fileCount 묶음의 파일 수. 뿌리를 센다
+     * @param title 에이전트가 붙인 제목. 없으면 null
+     * @param description 한 줄 설명. 없으면 null
+     * @param kind {@code IMAGE}, {@code DOCUMENT}, {@code TABLE} 가운데 하나
      */
-    public record VaultItemView(Long id, String path, long byteSize, int fileCount, Instant vaultedAt) {
+    public record VaultItemView(
+        Long id, String path, long byteSize, int fileCount, Instant vaultedAt, String title, String description,
+        String kind) {
 
         static VaultItemView of(ArtifactVaultItem item) {
-            return new VaultItemView(item.id(), item.path(), item.byteSize(), item.fileCount(), item.vaultedAt());
+            return new VaultItemView(
+                item.id(), item.path(), item.byteSize(), item.fileCount(), item.vaultedAt(), item.title(),
+                item.description(), item.kind());
         }
     }
 

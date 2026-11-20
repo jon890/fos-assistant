@@ -401,7 +401,7 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 | `GET /api/v1/chat/conversations/{id}/messages` 의 메시지 | `switchedTo` |
 | 대화 스트림과 대화 단위 SSE 의 `subagent` 사건 | `model`, `inputTokens`, `outputTokens` |
 | 같은 흐름의 `switched` 사건 | 사건째 보내지 않는다 |
-| `GET /api/v1/chat/model-tiers` 의 단계 한 줄 | `provider`, `model`, `reasoningEffort` |
+| `GET /api/v1/chat/model-tiers` 의 단계 한 줄 | `provider`. `model` 과 `reasoningEffort` 는 단계를 고르는 곳에 보이므로 모두에게 준다([ADR-20261119 / tier-model-names](../adr/ADR-20261119-tier-model-names.md)) |
 
 | 빼지 않는 값 | 까닭 |
 | --- | --- |

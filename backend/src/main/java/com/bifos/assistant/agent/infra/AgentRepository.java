@@ -108,4 +108,23 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Agent a where a.ownerUserId = :ownerUserId and a.deletedAt is null order by a.id asc")
     List<Agent> findOwnedForUpdate(@Param("ownerUserId") Long ownerUserId);
+
+
+    /**
+     * 기다리는 기본 도구를 적거나 비운다(ADR-20261119 / image-gen-defaults). 엔티티 저장은 이 칸을 쓰지 않는다.
+     *
+     * @param names 쉼표로 이은 도구 이름. 비우려면 null
+     * @return 바꾼 줄 수
+     */
+    @Modifying
+    @Query(value = "update agent set pending_default_toolsets = :names where id = :id", nativeQuery = true)
+    int writePendingDefaultToolsets(@Param("id") Long id, @Param("names") String names);
+
+
+    /** 기다리는 기본 도구가 있는 지우지 않은 에이전트 가운데 {@code afterId} 보다 큰 번호를 번호 순으로 읽는다. */
+    @Query(
+        value = "select id from agent where pending_default_toolsets is not null and deleted_at is null and id > :afterId"
+            + " order by id",
+        nativeQuery = true)
+    List<Long> findIdsWithPendingDefaultToolsets(@Param("afterId") long afterId, Pageable pageable);
 }

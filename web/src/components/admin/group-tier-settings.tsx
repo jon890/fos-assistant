@@ -147,11 +147,19 @@ function TierFields({ item, catalog, onChange }: TierFieldsProps) {
   );
 }
 
+type Props = {
+  /**
+   * 「목록 새로 읽기」 뒤에 부모가 다시 읽은 그룹 목록이다. 있으면 처음 읽은 목록 대신 쓴다. 부모가 이 값만 바꾸므로
+   * 저장 전에 고친 단계 선택은 그대로 남는다.
+   */
+  refreshedCatalog?: GroupModelCatalog | null;
+};
+
 /**
  * 그룹의 기본 단계와 단계별 모델을 정한다. 단계 정의는 그룹의 설정이라 에이전트 없이 읽는다.
  * 에이전트로 읽으면 관리자가 대화를 시작할 수 없는 에이전트(다른 사용자의 비공개 에이전트)에서 조회가 실패한다.
  */
-export function GroupTierSettings() {
+export function GroupTierSettings({ refreshedCatalog = null }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [draftTiers, setDraftTiers] = useState<ModelTier[]>([]);
   const [groupDefaultTier, setGroupDefaultTier] =
@@ -221,6 +229,8 @@ export function GroupTierSettings() {
     );
   }
 
+  const catalog = refreshedCatalog ?? load.catalog;
+
   return (
     <form onSubmit={(event) => void save(event)} className="mt-3 grid gap-4">
       <p className="text-sm text-muted-foreground">
@@ -265,7 +275,7 @@ export function GroupTierSettings() {
           Instant, Medium, High, Extra High, Pro 를 골랐을 때 실제로 도는 모델과
           강도예요. 비워 둔 칸은 사용자에게 보이지 않아요.
         </p>
-        {load.catalog === null ? (
+        {catalog === null ? (
           <Notice variant="warning" role="alert">
             모델 목록을 불러오지 못했어요. 저장된 값만 보이고, 새 모델은 목록을
             다시 읽은 뒤에 고를 수 있어요.
@@ -275,7 +285,7 @@ export function GroupTierSettings() {
           <TierFields
             key={item.tier}
             item={item}
-            catalog={load.catalog}
+            catalog={catalog}
             onChange={updateDraft}
           />
         ))}

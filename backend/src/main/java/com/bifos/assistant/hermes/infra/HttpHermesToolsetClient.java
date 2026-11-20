@@ -23,6 +23,9 @@ import tools.jackson.databind.JsonNode;
 @Slf4j
 public class HttpHermesToolsetClient implements HermesToolsetClient {
 
+    /** Hermes 의 「그림 만들기」 toolset 이름이다. {@code hermes} 가 {@code agent} 보다 아래라 그쪽 상수를 쓰지 못한다. */
+    private static final String IMAGE_TOOLSET = "image_gen";
+
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final String dashboardBaseUrl;
@@ -123,6 +126,11 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         // 참일 때만 싣는다. 이 칸을 모르는 옛 plugin 이 사람의 도구 저장까지 400 으로 거절하지 않게 한다.
         if (requireSandbox) {
             body.put("require_sandbox", true);
+        }
+        // 「그림 만들기」 를 켜는 저장에만 넣는다. plugin 이 같은 쓰기에서 profile 에 이미지 서비스를 넣는다.
+        // 이 칸을 모르는 옛 plugin 은 400 으로 거절해, 서비스 없이 도구만 켜진 채 남지 않는다(ADR-20261119 / image-gen-defaults).
+        if (toolsets.contains(IMAGE_TOOLSET)) {
+            body.put("ensure_image_service", true);
         }
         try {
             restClient

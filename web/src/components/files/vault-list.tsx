@@ -91,17 +91,19 @@ export function VaultListView() {
       {items !== null && items.length === 0 ? (
         <EmptyState
           title="보관한 결과물이 없어요"
-          description="대화에서 결과물을 열고 「보관」을 누르면 HTML 이 부르는 사진과 스타일까지 여기에 암호화해 둬요. 대화를 지워도 남아요."
+          description="대화에서 에이전트가 만든 파일을 여기에 암호화해 둬요. 결과물을 열고 「보관」을 누르거나 에이전트에게 파일 공간에 넣어 달라고 하면 들어와요. 대화를 지워도 남아요."
         />
       ) : null}
       {items?.map((item) => {
         const isHtml = item.path.toLowerCase().endsWith(".html");
         const isImage = isVaultImage(item.path);
         // 비서가 만든 그림은 제목이 곧 파일 이름이라 확장자를 떼고 보인다. HTML 이 부르던 사진은 파일 이름 그대로다.
+        // 비서가 붙인 제목이 있으면 그것을 먼저 보인다.
         const name =
-          isImage && item.path.startsWith("generated/")
+          item.title?.trim() ||
+          (isImage && item.path.startsWith("generated/")
             ? imageTitle(item.path)
-            : artifactName(item.path);
+            : artifactName(item.path));
         const isBundle = item.fileCount > 1;
         return (
           <div
@@ -120,12 +122,19 @@ export function VaultListView() {
                   className="size-10 shrink-0 rounded border border-border object-cover"
                 />
               ) : null}
-              <p
-                className="min-w-0 flex-1 truncate font-medium"
-                title={item.path}
-              >
-                {name}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium" title={item.path}>
+                  {name}
+                </p>
+                {item.description ? (
+                  <p
+                    data-testid="vault-description"
+                    className="truncate text-xs text-muted-foreground"
+                  >
+                    {item.description}
+                  </p>
+                ) : null}
+              </div>
               <span className="text-xs text-muted-foreground">
                 {isBundle ? `파일 ${item.fileCount}개 · ` : ""}
                 {formatSize(item.byteSize)} · {formatFullTime(item.vaultedAt)}

@@ -724,6 +724,10 @@ Hermes v0.21.6 의 `hermes_cli/codex_models.py` 는 `get_codex_model_ids` 에서
 같은 profile 의 목록이 몇십 분 사이에 모델 하나 적은 목록이었다가 정상으로 돌아오는 것이 그 모습이다.
 그래서 Control Plane 은 목록에 없다는 사실만으로 실행을 막지 않는다. 정책은 [model-usage](../../docs/features/model-usage.md) 의 「실행 때 목록 대조 정책」 이 갖는다.
 
+**v0.23.2 는 gpt-6.2 계열을 이름으로 알지 못한다.**
+고정 대체 목록(`DEFAULT_CODEX_MODELS`)에 없어서 계정의 실제 목록 조회가 줄 때만 목록에 나온다. 조회가 준 모델은 이름을 가리지 않고 올린다(`hermes_cli/codex_models.py` 의 `_ranked_slugs`).
+강도는 모르는 모델로 다뤄 `max` 를 `xhigh` 로 낮춰 보낸다(`agent/reasoning_effort.py` 의 `codex_supported_efforts` 가 옛 모델의 강도 집합을 준다). 그래서 이 버전에서 gpt-6.2 계열에 `max` 를 정하면 화면에 보이는 강도와 실제로 돈 강도가 다르다. 소스로 확인했고 운영 왕복으로는 확인하지 않았다(2026-11-19).
+
 다른 경로는 이 목록을 대신하지 못한다.
 `/v1/models` 는 profile 이름만 준다.
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
@@ -2284,6 +2288,7 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 | 무엇 | 동작 | 근거 |
 | --- | --- | --- |
 | 도구가 보이는 조건 | 그 profile 에 이미지 서비스 설정(`image_gen.provider`)이나 FAL key 가 있어야 `image_generate` 가 모델에 보인다. toolset 만 켜면 도구가 숨겨진다 | `tools/image_generation_tool.py` 의 `check_image_generation_requirements` |
+| 이미지 서비스를 넣는 곳 | 대시보드 plugin 이 「그림 만들기」 를 켜는 도구 저장에서 `image_gen.provider` 에 `openai-codex` 를 넣는다. 그 서비스는 그 profile 의 ChatGPT 구독 로그인이 있어야 쓸 수 있다 | `agent/image_gen_registry.py`, `agent/provider_registry.py` 의 `configured_provider_name`, `plugins/image_gen/openai-codex/__init__.py` 의 `is_available` |
 | 결과 | JSON 글이다. 성공이면 `{"success": true, "image": "<경로나 주소>", ...}`, 실패면 `{"success": false, "image": null, "error", "error_type"}` 다. 실행 공간이 있으면 `host_image` 와 `agent_visible_image` 가 더 온다 | `agent/image_gen_provider.py` 의 `success_response`, `tools/image_generation_tool.py` 의 `_postprocess_image_generate_result` |
 | 그림 파일 | base64 로 받은 그림은 그 profile 의 Hermes 홈 아래 `cache/generated/images/` 에 쓰고 `image` 에 그 호스트 경로를 준다. gateway 의 캐시 정리가 이 폴더를 지우지 않는다 | `agent/provider_media.py`, `agent/image_gen_provider.py` 의 `save_b64_image` |
 | 모델에게 주는 안내 | 도구 설명이 「결과의 `image` 를 지금 플랫폼의 파일 전달 방식으로 답에 적으라」 고 한다. API server 에서는 모델이 `MEDIA:<경로>` 나 경로를 그대로 적는다 | `tools/image_generation_tool.py` 의 `_build_dynamic_image_schema` |
@@ -2291,7 +2296,7 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 | `modify` 의 인자 병합 | `pre_tool_call` 이 돌려준 `args` 를 원래 인자 뒤에 얕게 병합한다. 내장 도구와 MCP 도구를 나누지 않는다 | `hermes_cli/plugins.py` |
 | 결과 hook 이 받는 인자 | `transform_tool_result` 는 도구 인자를 `args` 로 받는다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
 
-Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자를 새 버전의 소스에서 다시 본다.
+Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자, 이미지 서비스를 읽는 설정 자리와 그 서비스 plugin 을 새 버전의 소스에서 다시 본다.
 
 ### 네트워크
 

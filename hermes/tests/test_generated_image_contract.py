@@ -8,6 +8,7 @@ fos-ctx 는 Hermes 의 이름을 새로 import 하지 않지만 아래 동작에
 - 그림을 `$HERMES_HOME/cache/generated/images/` 에 쓴다
 - `pre_tool_call` 의 `modify` 가 돌려준 `args` 가 내장 도구의 원래 인자를 덮는다
 - `transform_tool_result` 가 도구 인자를 `args` 로 받는다
+- 이미지 서비스를 profile 설정의 `image_gen.provider` 에서 읽고, 대시보드 plugin 이 넣는 서비스가 Hermes 에 있다
 
 Hermes 없이 도는 검사는 plugin 의 값이 계약과 같은지만 본다.
 Hermes 소스 검사는 `HERMES_SOURCE` 를 줄 때만 돈다. `scripts/checks/check-hermes-contract.sh` 가 이 값을 준다.
@@ -34,6 +35,15 @@ class PluginValuesTest(unittest.TestCase):
         self.assertEqual(plugin.generated_image.CACHE_PARTS, contract.GENERATED_IMAGE_CACHE_PARTS)
         self.assertEqual(plugin.generated_image.TOOL, contract.GENERATED_IMAGE_TOOL)
         self.assertIn(contract.GENERATED_IMAGE_TOOL, contract.HERMES_BUILTIN_TOOLS)
+
+    def test_dashboard_plugin_writes_the_contract_image_service(self):
+        """대시보드 plugin 이 넣는 이미지 서비스의 자리와 이름이 계약의 값과 같다."""
+        source = (ROOT / "plugins/dashboard-profile-api/image_service.py").read_text(encoding="utf-8")
+        values = {node.targets[0].id: node.value.value for node in ast.parse(source).body
+                  if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)}
+        self.assertEqual(
+            (values["IMAGE_SERVICE_SECTION"], values["IMAGE_SERVICE_KEY"], values["IMAGE_SERVICE_PROVIDER"]),
+            contract.IMAGE_SERVICE)
 
 
 class HermesImageSourceTest(unittest.TestCase):
@@ -72,6 +82,14 @@ class HermesImageSourceTest(unittest.TestCase):
         self.assertIn('get_hermes_home() / "%s" / kind' % contract.GENERATED_IMAGE_CACHE_PARTS[0], media)
         self.assertIn(subdir, media)
         self.assertIn(kind, self.source(contract.GENERATED_IMAGE_RESULT[0]))
+
+    def test_image_service_is_read_from_profile_config(self):
+        """이미지 서비스는 `image_gen.provider` 에서 읽고, 넣는 서비스의 plugin 이 Hermes 에 있다."""
+        path, call = contract.IMAGE_SERVICE_CONFIG_READ
+        self.assertIn(call, self.source(path))
+        path, key = contract.IMAGE_SERVICE_CONFIG_KEY
+        self.assertIn(key, self.source(path))
+        self.assertTrue((self.root / contract.IMAGE_SERVICE_PLUGIN).is_file(), "이미지 서비스 plugin 이 없다")
 
     def test_modify_overrides_original_args(self):
         """`modify` 의 `args` 는 원래 인자 뒤에 병합돼 같은 키를 덮는다. 내장 도구와 MCP 도구를 나누지 않는다."""

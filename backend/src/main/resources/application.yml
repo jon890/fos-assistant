@@ -46,14 +46,18 @@ assistant:
     purge-after: 7d
     # 지운 에이전트를 정리하는 시각(초 포함 6필드). 실패한 에이전트는 다음 차례에 다시 본다
     purge-cron: "40 * * * * *"
+    # 기본 비서에 켜지 못한 기본 도구(「그림 만들기」)를 다시 켜 보는 시각(ADR-20261119 / image-gen-defaults)
+    pending-toolsets-cron: "20 */5 * * * *"
   people:
     # 첫 로그인에 만든 기본 에이전트에 켜는 도구다. 셸 계열은 실행 공간 정책에 등록된 profile 에서만 켜고,
-    # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets)
+    # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets).
+    # image_gen 은 빠졌어도 실행 공간이 준비되면 Control Plane 이 스스로 켠다(ADR-20261119 / image-gen-defaults)
     default-toolsets:
       - web
       - terminal
       - file
       - code_execution
+      - image_gen
     # 정리를 예약한 지 30일이 지난 사용자의 데이터를 지우는 시각(ADR-20261101 / user-purge). 실패한 사람은 다음 차례에 다시 본다
     purge-cron: "50 * * * * *"
   chat:

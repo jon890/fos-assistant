@@ -169,6 +169,16 @@ public class ArtifactStore {
 
 
     /**
+     * 대화 폴더 안의 일반 파일을 형식과 상관없이 찾는다. 폴더 안인지 보는 규칙은 {@link #resolveInside} 와 같다.
+     *
+     * <p>에이전트의 넣기 도구가 화면에 내주지 않는 형식(엑셀, PDF 등)을 읽을 때만 쓴다. 화면에 파일을 내주는 길은 이것을 쓰지 않는다.
+     */
+    public Optional<Path> resolveAnyInside(Long conversationId, String relativePath) {
+        return paths.resolveAnyInside(conversationId, relativePath);
+    }
+
+
+    /**
      * 결과물을 쓸 최종 경로를 판정하고 필요한 부모 폴더를 만든다.
      *
      * <p>기존 읽기 경로와 달리 아직 없는 최종 파일도 받는다. 대화 폴더와 이미 있던 부모는 링크를 따라가지

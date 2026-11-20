@@ -349,6 +349,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
 - `description`, `icon`, `color` 는 화면과 위임 도구 `agent_list` 가 쓰는 한 줄 소개와 이름표다. Hermes 는 읽지 않는다. 비면 화면이 할 수 있는 일, 이름 첫 글자, `code` 로 정한 자동 색으로 대신 그린다. 고를 수 있는 값과 상한은 `AgentIntroduction` 과 `AgentColor` 가 갖는다([에이전트 팀](../../docs/features/agent-team.md))
 - 첫 로그인에 만든 에이전트(기본 비서)는 이름이 「비서」 다. `V20261105074407` 이 이미 있던 첫 에이전트 가운데 이름이 사용자 표시 이름 그대로이고 주인이 그 사람인 줄만 「비서」 로 바꾸고 소개를 채웠다. 사람이 저장한 것이 아니어서 `updated_at` 은 바꾸지 않았다
+- `pending_default_toolsets` 는 Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름을 쉼표로 이은 글이다. 지금은 `image_gen` 만 들어간다. `V20261105074418` 이 이미 있던 기본 비서에 한 번 넣었고 새 기본 비서는 첫 로그인이 넣는다. 켜졌거나 관리자가 그 도구를 끄면 NULL 이다. 그룹에 공개했거나 지운 에이전트도 비운다. 엔티티 저장은 이 컬럼을 쓰지 않고 `AgentRepository` 의 전용 쿼리만 쓴다([ADR-20261119 / image-gen-defaults](../../docs/adr/ADR-20261119-image-gen-defaults.md))
 - 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
 **에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).
@@ -545,6 +546,17 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `generation_call_key` | 올린 호출의 session, `tool_call_id`, 그림 SHA-256 을 묶은 SHA-256 16진수. 유일 제약이 있어 같은 올리기가 다시 와도 한 행이다. 값이 있는 행이 만든 그림 행이다 |
 
 그림 행의 `path` 는 `generated/<제목>.<확장자>` 다. 제목이 파일 이름이라 보관 사본과 내려받기가 같은 제목을 쓴다. 칸은 `V20261105074416__chat_artifact_generated_image.sql` 이 갖는다.
+
+**「내 파일」 에 넣은 파일의 제목과 들어온 길, 내준 답도 같은 표의 컬럼이다**([ADR-20261119 / file-space-put](../../docs/adr/ADR-20261119-file-space-put.md)). 새 표를 두지 않는다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `vault_meta` | 제목과 설명의 JSON 을 주인의 데이터 key 로 암호화한 글. 보관 뿌리 행과, `artifact_write` 가 제목을 받은 결과물 행에 있다. 암호문의 자리는 사용자, 대화 번호, 경로로 묶는다. 평문으로 두지 않는다. 보관본을 지우면 비운다 |
+| `vault_meta_key_id` | 제목과 설명을 암호화한 `user_data_key.id` |
+| `vault_origin` | 보관 행이 들어온 길. `PUT` 은 넣기 도구가 대화 폴더에서, `PUT_WORKSPACE` 는 넣기 도구가 실행 공간에서 넣었다. 비어 있으면 자동 보관이나 「보관」 단추다. `PUT_WORKSPACE` 행의 `path` 는 실행 공간 안의 상대 경로라 대화 폴더의 같은 경로와 다른 파일이다 |
+| `vault_message_id` | 넣기 도구가 넣은 보관 뿌리 행을 내준 답 메시지. turn 이 끝날 때 채운다. 지우기 이력에도 남아 답 아래 줄이 지운 파일이라고 보인다 |
+
+컬럼은 `V20261105074419__chat_artifact_file_space.sql` 이 갖는다.
 
 **자동 보관의 작업 기록은 결과물 행 자신의 칸이다**(#530 PR 3). 새 표를 두지 않는다. 보관 사본 행은 이 칸이 비어 있다.
 

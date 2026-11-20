@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -911,7 +912,7 @@ class ChatAttachmentTurnTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            mock(GeneratedImageService.class));
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class));
     }
 
 

@@ -2,7 +2,7 @@
 
 사용자가 에이전트의 실행 공간에 있는 파일을 화면에서 열어 보는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`, `backend/src/main/java/com/bifos/assistant/chat/artifact/`, `web/src/components/files/`, `web/src/app/api/artifact-vault/`, `web/src/lib/artifact-vault-api.ts`
+covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`, `backend/src/main/java/com/bifos/assistant/chat/artifact/`, `web/src/components/files/`, `web/src/app/api/artifact-vault/`, `web/src/lib/artifact-vault-api.ts`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpFileSpaceTools.java`, `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpFileSpaceCalls.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/port/SandboxFiles.java`, `web/src/components/chat/artifact/put-files.tsx`, `web/src/lib/put-file.ts`
 
 ## 목록 페이지
 
@@ -143,8 +143,12 @@ CSV 와 TSV 의 줄 상한과 따옴표 처리는 `web/src/components/workspace/
 - 대화를 지워도 보관본은 남는다
 - 사용자당 5GiB 를 넘으면 새 보관만 거절하고 이미 보관한 것은 그대로 둔다. 자동 삭제는 없다
 - 본문은 사용자별 데이터 key 로 암호화해 둔다. 암호화를 쓸 수 없으면 평문으로 두지 않고 보관을 거절한다
-- HTML, CSS, 사진(PNG, JPEG, GIF, WebP)을 보관한다. HTML 과 CSS 가 상대 주소로 부르는 파일은 한 묶음으로 넣고, 부르지 않는 파일은 넣지 않는다
-- 외부 주소, `data:` 주소, 대화 폴더 밖 주소, 빠진 파일, 받지 않는 형식, 상한(파일 하나 5MiB, 묶음 100MiB, 1,000파일)을 넘는 묶음은 통째로 거절하고 안내만 보인다. 일부만 보관하지 않는다
+- 대화의 「보관」 단추와 자동 보관은 HTML, CSS, 사진(PNG, JPEG, GIF, WebP)을 보관한다. HTML 과 CSS 가 상대 주소로 부르는 파일은 한 묶음으로 넣고, 부르지 않는 파일은 넣지 않는다
+- 보관함이 받는 형식은 그보다 넓다. 표(CSV, TSV, XLSX)와 문서(PDF, MD, TXT, DOCX, PPTX)도 받는다. 이 형식은 바이트로 받은 파일 하나를 넣는 길(`ArtifactVaultService.keep`)로만 들어오고 본문은 내려받기로만 준다. 형식 표는 `VaultFileType` 이 갖고, 이진 형식은 파일 머리 바이트가 형식과 맞아야 받는다
+- 에이전트는 MCP 도구 `file_space_put` 으로 작업 폴더(`/workspace/` 로 시작하는 경로)나 그 대화의 결과물 폴더의 파일을 요청자의 보관함에 넣는다. 작업 폴더는 origin 실행의 에이전트가 쓰는 실행 공간이고, 넣은 파일의 주인은 대화 요청자다. 대화 폴더의 HTML, CSS, 사진은 「보관」 단추와 같이 묶음으로, 그 밖의 형식과 작업 폴더의 파일은 파일 하나로 넣는다. 도구의 인자와 실패 결과는 [`mcp.md`](mcp.md) 의 「파일 공간에 넣는 도구」 가 갖는다
+- 넣은 파일은 turn 이 끝날 때 그 답에 묶여 답 아래에 파일 줄(제목, 종류, 크기, 「내려받기」, 「내 파일에서 보기」)로 보인다. 메시지 응답에는 `kind` 가 `FILE` 인 항목으로 나간다. 같은 답에 같은 경로의 HTML 줄이 있으면 파일 줄을 겹쳐 보이지 않는다. 다시 넣어 이미 있다고 나오면 줄이 그 답으로 옮겨진다. 내 파일에서 지우면 줄은 「내 파일에서 지운 파일이에요」 로 남는다
+- 보관본은 제목과 한 줄 설명을 가질 수 있다. 넣기 도구가 준 값이나, `artifact_write` 가 HTML 에 받은 값을 쓴다. 목록은 제목이 있으면 파일 이름 대신 제목을, 그 아래 설명을 보인다. 주인의 데이터 key 로 암호화해 두고 목록 응답에 풀어 준다. 같은 대화에서 제목이 겹치면 뒤에 번호를 붙인다. 같은 파일을 고쳐 다시 보관하면 번호가 늘지 않는다
+- 외부 주소, `data:` 주소, 대화 폴더 밖 주소, 빠진 파일, 받지 않는 형식, 상한(파일 하나 25MiB, 묶음 100MiB, 1,000파일)을 넘는 묶음은 통째로 거절하고 안내만 보인다. 일부만 보관하지 않는다
 - 보관하는 사이에 원본이 지워지거나 바뀌면 보관을 거절한다. 다시 누르면 지금 내용으로 보관한다
 - 같은 대화·경로·본문을 다시 보관해도 한 건이다. 파일을 고친 뒤 보관하면 새 보관본이 생긴다
 - 비서가 만든 그림은 답에 묶일 때 자동 보관의 대상이 된다([`generated-image.md`](generated-image.md)). 목록의 그림 줄은 제목 앞에 작은 그림을 보이고 이름에서 확장자를 뗀다. 대화의 「보관함에서 보기」 로 오면 주소의 `item` 이 가리킨 줄의 미리보기를 펼친 채 연다
@@ -167,6 +171,8 @@ sequenceDiagram
 
 보관본은 `chat_artifact` 의 `vault_user_id` 가 채워진 행이다. 컬럼은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `chat_artifact` 절이 갖는다.
 묶음은 뿌리 행과 그 뿌리를 `vault_bundle_id` 로 가리키는 행들이다.
+`McpFileSpacePutToolTest` 가 넣기 도구의 경로 판정, 그룹 공개 에이전트의 주인, 형식·크기·용량의 실패 결과, 되풀이, 먼저 살펴보기 규칙을 확인한다. `FileSpaceTurnTest` 가 답에 묶기와 `FILE` 항목, `artifact_write` 제목의 이동, 실행 입력의 단락을 본다. `WorkspaceSandboxFilesTest` 가 작업 폴더 읽기의 링크 규칙을 본다.
+`ArtifactVaultFileTypeTest` 가 새 형식의 보관과 내려받기, 파일 하나 상한, 제목의 암호화와 겹침 번호, 같은 파일의 되풀이를 확인한다.
 `ArtifactVaultTest` 가 암호문 저장, 남의 보관본 차단, 대화 정리 뒤의 보존, 용량 초과, 중복, 위변조를 확인한다.
 `ArtifactVaultBundleTest` 가 묶음의 상대 주소 따라가기, 부르지 않는 파일 제외, 부분 묶음 금지, 남의 묶음 차단, 대화 정리 뒤의 보존, 상한과 용량, 보관 중 원본 변경, 다른 대화로 가는 링크, 동시 요청 상한을 확인한다. 주소 찾기는 `ArtifactReferencesTest` 가 본다.
 
@@ -204,3 +210,5 @@ sequenceDiagram
 - 대화를 지울 때 「보관본도 함께 지우기」 선택지
 - HTML 이 부르는 사진 하나를 대화 화면에서 따로 보관하는 단추. 비서가 만든 그림은 크게 보기 화면에서 보관한다
 - 「보관 중」 이 끝나면 대화 화면을 스스로 고치기. 지금은 대화를 다시 열어야 바뀐다
+- 탭 없이 모든 파일을 한 목록으로 보이기, 찾기, 새 형식의 미리보기. [파일 공간 스펙](workspace/spec.md)의 PR2 가 더한다
+- 에이전트가 「내 파일」 을 찾는 도구와 작업 폴더 화면의 「내 파일로 가져오기」. 스펙의 PR3 이 더한다

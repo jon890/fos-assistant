@@ -160,6 +160,26 @@ class HermesToolsetRequestTest {
 
 
     @Test
+    @DisplayName("「그림 만들기」 를 켜는 쓰기는 이미지 서비스를 함께 넣으라는 칸을 보낸다")
+    void imageToolsetWriteAsksForTheImageService() throws Exception {
+        client.writeApiServer("kid", List.of("image_gen", "fos-assistant"), "u7");
+
+        assertThat(calls)
+            .singleElement()
+            .satisfies(call -> assertThat(new ObjectMapper().readValue(call.body(), Map.class))
+                .isEqualTo(Map.of(
+                    "profile",
+                    "kid",
+                    "config",
+                    Map.of("platform_toolsets", Map.of("api_server", List.of("image_gen", "fos-assistant"))),
+                    "sandbox_owner",
+                    "u7",
+                    "ensure_image_service",
+                    true)));
+    }
+
+
+    @Test
     @DisplayName("409 의 code 가 sandbox_unavailable 이면 실행 공간이 없다는 오류다")
     void conflictWithSandboxUnavailableCodeIsSandboxUnavailable() {
         status = 409;

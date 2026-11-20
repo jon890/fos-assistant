@@ -51,7 +51,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class McpToolService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
     private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(
         "this conversation does not exist",
         "could not store artifact",

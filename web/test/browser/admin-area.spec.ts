@@ -327,7 +327,7 @@ test("ADMIN 역할의 대화 화면 모델 단계 창에는 그룹 모델 설정
   );
   await page.goto("/new");
   await page.getByTestId("model-tier-picker").click();
-  const slider = page.getByTestId("model-tier-slider");
+  const slider = page.getByTestId("model-tier-list");
   await expect(slider.getByRole("radio", { name: "High" })).toBeVisible();
   await expect(page.getByRole("button", { name: "그룹 모델 설정" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "그룹 모델 설정" })).toHaveCount(0);

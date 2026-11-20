@@ -128,7 +128,8 @@ public class ArtifactVaultController {
 
 
     private static ResponseEntity<byte[]> body(ArtifactVaultContent content, boolean download) {
-        ContentDisposition disposition = (download
+        // 화면에서 열지 않는 형식(엑셀, PDF 등)은 요청과 상관없이 내려받기로만 준다.
+        ContentDisposition disposition = (download || !content.inline()
             ? ContentDisposition.attachment()
             : ContentDisposition.inline())
                 .filename(content.name(), StandardCharsets.UTF_8)
