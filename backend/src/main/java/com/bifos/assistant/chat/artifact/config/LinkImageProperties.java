@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param blockedHosts 받지 않을 소문자 DNS 이름. 그 아래 이름도 막는다
  * @param blockedCidrs 받지 않을 IP 대역(예: {@code 203.0.113.0/24})
+ * @param allowWithoutBlocklist 금지 목록이 비어도 받을지. 기본은 거짓이라 금지 목록이 비면 모든 링크를 막는다(닫힌 쪽). 개발과 테스트만 켠다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.artifact.link-image")
@@ -26,7 +27,8 @@ public record LinkImageProperties(
     Integer maxImageBytes,
     Integer maxHeaderBytes,
     List<String> blockedHosts,
-    List<String> blockedCidrs) {
+    List<String> blockedCidrs,
+    Boolean allowWithoutBlocklist) {
 
 
     private static final String PREFIX = "assistant.artifact.link-image.";
@@ -46,12 +48,19 @@ public record LinkImageProperties(
                 throw new IllegalStateException(PREFIX + "blocked-hosts must contain lowercase ASCII DNS names");
             }
         }
+        allowWithoutBlocklist = Boolean.TRUE.equals(allowWithoutBlocklist);
         blockedCidrs = blockedCidrs == null ? List.of() : List.copyOf(blockedCidrs);
         for (String cidr : blockedCidrs) {
             if (cidr == null || !cidr.matches("[0-9a-fA-F:.]+/[0-9]{1,3}")) {
                 throw new IllegalStateException(PREFIX + "blocked-cidrs must contain CIDR ranges");
             }
         }
+    }
+
+
+    /** 금지 목록이 비었고 그래도 받으라고 켜지 않았으면 참이다. 이때는 모든 링크를 막는다. */
+    public boolean blocksEverything() {
+        return blockedHosts.isEmpty() && blockedCidrs.isEmpty() && !allowWithoutBlocklist;
     }
 
 

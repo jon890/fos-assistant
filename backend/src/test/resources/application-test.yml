@@ -125,6 +125,9 @@ assistant:
     root: build/test-artifacts-${org.gradle.test.worker:0}
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
     agent-root: /agent-side/artifacts
+    link-image:
+      # 테스트의 바깥 웹은 대역이라 금지 목록 없이 받는다
+      allow-without-blocklist: true
   artifact-vault:
     # 검사가 뜰 때마다 자동 보관 훑기가 함께 돌지 않게 늦춘다. 검사는 그 메서드를 직접 부른다
     auto-retry-delay: 1h

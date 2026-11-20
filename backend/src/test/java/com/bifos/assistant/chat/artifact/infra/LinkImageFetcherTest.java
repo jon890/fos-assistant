@@ -151,6 +151,35 @@ class LinkImageFetcherTest {
 
 
     @Test
+    @DisplayName("금지 목록이 비었고 그래도 받으라고 켜지 않았으면 연결하지 않고 BLOCKED 다")
+    void blocksEverythingWithoutBlocklist() {
+        image("https://img.example.com/a.png", "image/png", PNG);
+        LinkImageFetcher fetcher = new LinkImageFetcher(
+            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, null, null, List.of(), List.of(), null),
+            this::resolve,
+            (address, host, request, c) -> {
+                throw new AssertionError("must not connect to " + host);
+            });
+
+        assertRejected(fetcher, "https://img.example.com/a.png", Reason.BLOCKED);
+    }
+
+
+    @Test
+    @DisplayName("닫히지 않은 meta 로 채운 2MiB 페이지도 제한 시간 안에 NO_IMAGE 로 끝난다")
+    void unclosedMetaFloodFinishesQuickly() {
+        html("https://shop.example.com/flood", "<meta ".repeat(2 * 1024 * 1024 / 6) + ">");
+        html("https://shop.example.com/flood-open", "<meta ".repeat(2 * 1024 * 1024 / 6));
+        LinkImageFetcher fetcher = fetcher(List.of(), List.of());
+
+        long started = System.nanoTime();
+        assertRejected(fetcher, "https://shop.example.com/flood", Reason.NO_IMAGE);
+        assertRejected(fetcher, "https://shop.example.com/flood-open", Reason.NO_IMAGE);
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
+    }
+
+
+    @Test
     @DisplayName("주소 모양, 내부망과 예약 주소, 풀리지 않는 이름, 금지 목록은 모두 BLOCKED 이고 연결하지 않는다")
     void blocksUnsafeAddressesBeforeConnecting() {
         dns.put("loop.example.com", new String[] {"127.0.0.1"});
@@ -218,7 +247,7 @@ class LinkImageFetcherTest {
         image("https://img.example.com/big.png", "image/png", big(64));
         pages.put("img.example.com/liar.png", response(200, Map.of("Content-Type", "image/png"), big(64)));
         LinkImageFetcher fetcher = new LinkImageFetcher(
-            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, 32, null, List.of(), List.of()),
+            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, 32, null, List.of(), List.of(), true),
             this::resolve,
             (address, host, request, c) -> respond(host, request));
 
@@ -239,7 +268,7 @@ class LinkImageFetcherTest {
         image("https://img.example.com/a.png", "image/png", PNG);
         html("https://shop.example.com/long", "x".repeat(4096) + "<meta property=\"og:image\" content=\"https://img.example.com/a.png\">");
         LinkImageFetcher fetcher = new LinkImageFetcher(
-            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, 1024, null, null, List.of(), List.of()),
+            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, 1024, null, null, List.of(), List.of(), true),
             this::resolve,
             (address, host, request, c) -> respond(host, request));
 
@@ -261,7 +290,7 @@ class LinkImageFetcherTest {
 
         CountDownLatch never = new CountDownLatch(1);
         LinkImageFetcher slow = new LinkImageFetcher(
-            new LinkImageProperties(null, null, Duration.ofMillis(200), null, null, null, null, List.of(), List.of()),
+            new LinkImageProperties(null, null, Duration.ofMillis(200), null, null, null, null, List.of(), List.of(), true),
             this::resolve,
             (address, host, request, c) -> {
                 try {
@@ -282,7 +311,7 @@ class LinkImageFetcherTest {
 
 
     private static LinkImageProperties properties(List<String> blockedHosts, List<String> blockedCidrs) {
-        return new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, null, null, blockedHosts, blockedCidrs);
+        return new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, null, null, blockedHosts, blockedCidrs, true);
     }
 
 

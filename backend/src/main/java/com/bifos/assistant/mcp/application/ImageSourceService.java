@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.ConversationLinks;
+import com.bifos.assistant.mcp.application.dto.GeneratedImageRequest;
 import com.bifos.assistant.mcp.application.dto.ImageSourceRef;
 import com.bifos.assistant.mcp.application.dto.ImageSourceResult;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
@@ -83,6 +84,10 @@ public class ImageSourceService {
             if (ref.link() != null) {
                 URI link = links.findSentLink(caller.user(), origin.conversationId(), ref.link())
                     .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "this link is not in the conversation"));
+                if (link.toASCIIString().length() > GeneratedImageRequest.MAX_LINK_CHARS) {
+                    // 받은 주소는 그림 올리기의 source_links 로 돌아온다. 그 상한을 넘으면 받아도 그림을 남기지 못하므로 받기 전에 막는다.
+                    throw new ApiException(ErrorCode.IMAGE_SOURCE_LINK_BLOCKED, "this link is too long");
+                }
                 return new ImageSourceResult(linkImages.read(link), link.toASCIIString());
             }
             GeneratedImageSource image = images.readByTitle(origin.conversationId(), ref.title());

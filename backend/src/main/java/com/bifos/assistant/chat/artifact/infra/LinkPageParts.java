@@ -21,7 +21,11 @@ import lombok.NoArgsConstructor;
 final class LinkPageParts {
     /** 대표 사진 meta 의 이름이다. 앞의 것이 먼저다. */
     private static final List<String> PREVIEW_NAMES = List.of("og:image", "og:image:secure_url", "twitter:image");
-    private static final Pattern META = Pattern.compile("<meta\\b[^>]*>", Pattern.CASE_INSENSITIVE);
+    /**
+     * meta 태그 하나의 길이 상한이다. 정규식으로 태그를 찾지 않는다. 닫히지 않는 {@code <meta} 가 많은 페이지에서 정규식이 입력 길이의 제곱으로
+     * 느려지고, 제한 시간이 지나도 {@code Matcher} 는 인터럽트를 보지 않아 받기 스레드를 붙잡는다.
+     */
+    static final int MAX_TAG_CHARS = 4096;
     private static final Pattern ATTRIBUTE = Pattern.compile(
         "([a-zA-Z_:][-a-zA-Z0-9_:.]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))");
     private static final Pattern ENTITY = Pattern.compile("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,6});");
@@ -33,31 +37,78 @@ final class LinkPageParts {
 
     /** 페이지 글에서 대표 사진 주소의 글을 찾는다. 엔티티는 푼다. 없으면 빈 값이다. */
     static Optional<String> previewImage(String html) {
+        String lower = html.toLowerCase(Locale.ROOT);
         String found = null;
         int rank = PREVIEW_NAMES.size();
-        Matcher meta = META.matcher(html);
-        while (meta.find()) {
-            String name = null;
-            String content = null;
-            Matcher attribute = ATTRIBUTE.matcher(meta.group());
-            while (attribute.find()) {
-                String key = attribute.group(1).toLowerCase(Locale.ROOT);
-                String value = attribute.group(2) != null
-                    ? attribute.group(2)
-                    : attribute.group(3) != null ? attribute.group(3) : attribute.group(4);
-                if (("property".equals(key) || "name".equals(key)) && name == null) {
-                    name = value.trim().toLowerCase(Locale.ROOT);
-                } else if ("content".equals(key) && content == null) {
-                    content = value;
-                }
+        int from = 0;
+        // 여기까지는 '>' 가 없다고 이미 본 자리다. 닫히지 않은 태그가 이어져도 같은 구간을 다시 훑지 않아 전체가 선형이다.
+        int noCloseUntil = 0;
+        while (true) {
+            int start = lower.indexOf("<meta", from);
+            if (start < 0) {
+                break;
             }
-            int index = name == null ? -1 : PREVIEW_NAMES.indexOf(name);
-            if (index >= 0 && index < rank && content != null && !content.isBlank()) {
-                found = content;
+            int afterName = start + "<meta".length();
+            from = afterName;
+            if (afterName < lower.length() && !isTagBoundary(lower.charAt(afterName))) {
+                continue;
+            }
+            // '>' 는 태그 길이 상한 안에서만 찾는다. 페이지 끝까지 찾으면 닫히지 않은 태그마다 끝까지 훑어 다시 제곱이 된다.
+            int limit = start + MAX_TAG_CHARS;
+            int end = indexWithin(lower, '>', Math.max(afterName, noCloseUntil), limit);
+            if (end < 0) {
+                noCloseUntil = Math.max(noCloseUntil, Math.min(lower.length(), limit));
+                continue;
+            }
+            from = end + 1;
+            Candidate candidate = candidate(html.substring(start, end + 1));
+            int index = candidate.name() == null ? -1 : PREVIEW_NAMES.indexOf(candidate.name());
+            if (index >= 0 && index < rank && candidate.content() != null && !candidate.content().isBlank()) {
+                found = candidate.content();
                 rank = index;
             }
         }
         return Optional.ofNullable(found).map(LinkPageParts::decodeEntities).map(String::trim);
+    }
+
+
+    private static int indexWithin(String text, char wanted, int from, int limit) {
+        int stop = Math.min(text.length(), limit);
+        for (int i = from; i < stop; i++) {
+            if (text.charAt(i) == wanted) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+    private static boolean isTagBoundary(char character) {
+        return Character.isWhitespace(character) || character == '>' || character == '/';
+    }
+
+
+    /** 길이 상한 안의 태그 하나에서 이름({@code property} 나 {@code name})과 {@code content} 를 읽는다. */
+    private static Candidate candidate(String tag) {
+        String name = null;
+        String content = null;
+        Matcher attribute = ATTRIBUTE.matcher(tag);
+        while (attribute.find()) {
+            String key = attribute.group(1).toLowerCase(Locale.ROOT);
+            String value = attribute.group(2) != null
+                ? attribute.group(2)
+                : attribute.group(3) != null ? attribute.group(3) : attribute.group(4);
+            if (("property".equals(key) || "name".equals(key)) && name == null) {
+                name = value.trim().toLowerCase(Locale.ROOT);
+            } else if ("content".equals(key) && content == null) {
+                content = value;
+            }
+        }
+        return new Candidate(name, content);
+    }
+
+
+    private record Candidate(String name, String content) {
     }
 
 

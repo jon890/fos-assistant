@@ -78,8 +78,10 @@ public class LinkImageFetcher {
         this.dnsResolver = dnsResolver;
         this.transport = transport;
         this.blockedCidrs = properties.blockedCidrs().stream().map(Cidr::parse).toList();
-        if (properties.blockedHosts().isEmpty() && properties.blockedCidrs().isEmpty()) {
-            log.warn("링크 사진 받기의 금지 목록이 비어 있다. 홈서버 자신에게 되돌아오는 요청을 막지 못한다");
+        if (properties.blocksEverything()) {
+            log.warn("링크 사진 받기의 금지 목록이 비어 있어 모든 링크를 막는다. 운영 설정에 금지 목록을 넣는다");
+        } else if (properties.blockedHosts().isEmpty() && properties.blockedCidrs().isEmpty()) {
+            log.warn("링크 사진 받기의 금지 목록 없이 받는다. 개발과 테스트에서만 쓴다");
         }
     }
 
@@ -179,6 +181,10 @@ public class LinkImageFetcher {
 
 
     private ArtifactSourceResponse request(URI uri, ArtifactSourceCancellation cancellation) {
+        if (properties.blocksEverything()) {
+            // 금지 목록이 비면 홈서버 자신에게 되돌아오는 요청을 막지 못한다. 열지 않고 막는다(닫힌 쪽이 기본).
+            throw reject(Reason.BLOCKED, "no_blocklist", uri == null ? null : uri.getHost(), null);
+        }
         String host;
         try {
             host = ArtifactSourceFetcher.checkSource(uri);

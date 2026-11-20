@@ -274,9 +274,11 @@ assistant:
       max-page-bytes: 2097152
       max-image-bytes: 20971520
       max-header-bytes: 65536
-      # 홈서버 자신에게 되돌아오는 호스트 이름과 IP 대역. 값은 운영 설정에서 넣는다. 비어 있으면 기동 로그에 경고한다
+      # 홈서버 자신에게 되돌아오는 호스트 이름과 IP 대역. 값은 운영 설정에서 넣는다.
+      # 둘 다 비면 모든 링크를 막는다(닫힌 쪽). 개발과 테스트만 allow-without-blocklist 를 켠다
       blocked-hosts: []
       blocked-cidrs: []
+      allow-without-blocklist: false
   artifact-vault:
     # 자동 보관을 기다리는 결과물을 다시 훑는 간격. 재시작 뒤와 일시 장애 뒤에 이어서 보관한다
     auto-retry-delay: 60s

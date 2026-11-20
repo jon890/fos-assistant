@@ -40,8 +40,12 @@ public record GeneratedImageRequest(
     private static final int MAX_ID_CHARS = 128;
     private static final int MAX_TITLE_CHARS = 500;
     private static final int MAX_PROMPT_CHARS = 32_000;
-    /** 참고한 링크 하나의 길이 상한과 개수 상한이다. 개수는 이미지 서비스가 받는 입력 장수(16)를 넘지 않는다. */
-    private static final int MAX_LINK_CHARS = 2048;
+    /**
+     * 참고한 링크 하나의 길이 상한과 개수 상한이다. 개수는 이미지 서비스가 받는 입력 장수(16)를 넘지 않는다.
+     *
+     * <p>받기 경로가 정해진 꼴(한글을 퍼센트 인코딩한 주소)로 바꾼 주소도 이 상한 안에서만 받는다. 받기는 되는데 올리기에서 막혀 그림을 잃지 않게 한다.
+     */
+    public static final int MAX_LINK_CHARS = 8192;
     private static final int MAX_LINKS = 16;
 
     /**
