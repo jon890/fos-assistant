@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.infra;
 
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
+import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -23,4 +24,8 @@ public interface MemoryCaptureRepository extends JpaRepository<MemoryCapture, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from MemoryCapture c where c.id = :id")
     Optional<MemoryCapture> findByIdForUpdate(@Param("id") Long id);
+
+
+    /** 그 항목을 남긴 마지막 기록 가운데 그 종류의 것이다. 제안을 받아들일 때 그 제안의 합치기 번호를 읽는다. */
+    Optional<MemoryCapture> findFirstByMemoryIdAndKindOrderByIdDesc(Long memoryId, MemoryCaptureKind kind);
 }

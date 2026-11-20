@@ -328,8 +328,10 @@ public class McpToolService {
         Long memoryId,
         String collection,
         boolean sensitive,
-        boolean archivable) {
-        return memoryRemember.remember(caller, title, content, summary, evidence, memoryId, collection, sensitive, archivable);
+        boolean archivable,
+        List<Long> replaces) {
+        return memoryRemember.remember(
+            caller, title, content, summary, evidence, memoryId, collection, sensitive, archivable, replaces);
     }
 
 

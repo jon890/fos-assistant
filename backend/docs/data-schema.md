@@ -831,6 +831,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `base_revision` 은 `CREATED` 면 저장한 때의 판 번호, `UPDATED` 면 고치기 전의 판 번호이고 `PROPOSED` 면 비어 있다
 - `previous_status` 는 기존 제안을 받아들인 `CREATED` 만 `PROPOSED` 이고 나머지는 비어 있다
 - `external_read` 는 기록을 남길 때 그 대화의 어느 실행이 바깥 글을 읽었는지다(「바로 저장 판정」 의 조건 4). 승인 카드가 이 값을 보인다. 이 컬럼이 생기기 전의 줄은 거짓이다
+- `replaced_memory_ids` 는 합치기에서 새 항목이 대신한 옛 항목 번호의 JSON 배열이다. 바로 저장은 실제로 대신한 번호, 제안은 받아들일 때 대신할 번호이고 받아들이면 실제로 대신한 번호로 고친다. 합치기가 아니면 `NULL` 이다. 옛 항목이 지워질 수 있어 외래 키를 걸지 않는다
 
 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다.
 `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이라 되돌리지 않는다.
@@ -842,7 +843,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id` 한 칸에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 동작은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억의 대체」 가 갖는다.
 
 - 칸이 차 있으면 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 빠진다. 「대체됨」 을 `memory` 의 상태로 두지 않는다. 사람이 보는 목록에는 남는다
-- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
+- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 `memory_remember` 의 합치기 하나이고 조건부 네이티브 UPDATE(`MemoryRepository.supersede`, `supersedeWithin`)로 쓴다. 그 전에는 `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
 - 대신한 새 항목을 지우거나 승인을 벗어나게 하면 그 항목이 대신한 옛 항목의 칸을 저장소 쿼리(`MemoryRepository.clearSupersededBy`)가 같은 트랜잭션에서 비운다. 외래 키가 없어 서비스가 비운다
 - `idx_memory_superseded_by` 는 새 항목을 지울 때 그 항목이 대신한 줄을 찾는 색인이다
 

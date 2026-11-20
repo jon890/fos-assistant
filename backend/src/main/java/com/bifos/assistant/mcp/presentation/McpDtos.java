@@ -7,6 +7,9 @@ import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -257,6 +260,7 @@ public final class McpDtos {
      * @param collection 둘 collection. 없거나 {@code null} 이면 null
      * @param sensitive 민감한 내용인가. 없거나 {@code null} 이면 null
      * @param archivable 자동 보관을 허락하는가. 없거나 {@code null} 이면 null
+     * @param replaces 새 기억이 대신할 옛 기억 번호. 없거나 {@code null} 이면 빈 목록
      */
     public record MemoryRememberArguments(
         String title,
@@ -266,12 +270,16 @@ public final class McpDtos {
         String collection,
         Boolean sensitive,
         Boolean archivable,
-        String summary) {
+        String summary,
+        List<Long> replaces) {
 
+
+        /** {@code replaces} 에 줄 수 있는 번호 수의 상한이다. */
+        static final int REPLACES_MAX = 10;
 
         /** 받는 인자 이름이다. 사용자와 범위, 바로 저장할지를 정하는 인자는 없다. */
         static final Set<String> FIELDS = Set.of(
-            "title", "content", "evidence", "memory_id", "collection", "sensitive", "archivable", "summary");
+            "title", "content", "evidence", "memory_id", "collection", "sensitive", "archivable", "summary", "replaces");
 
         /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
         static MemoryRememberArguments from(JsonNode arguments) {
@@ -286,7 +294,44 @@ public final class McpDtos {
                 optionalText(arguments, "collection"),
                 sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue(),
                 archivable == null || archivable.isNull() ? null : archivable.booleanValue(),
-                optionalText(arguments, "summary"));
+                optionalText(arguments, "summary"),
+                replaces(arguments.get("replaces")));
+        }
+
+
+        /**
+         * {@code replaces} 의 모양이 맞는가. 없거나 {@code null} 이거나, 1개부터 {@link #REPLACES_MAX} 개까지의 중복 없는 정수 배열이다.
+         * {@code memory_id} 와 함께 주면 어긋난다. 합치기는 새 기억을 만드는 길이다.
+         */
+        static boolean validReplaces(JsonNode arguments) {
+            JsonNode value = arguments.get("replaces");
+            if (value == null || value.isNull()) {
+                return true;
+            }
+            JsonNode memoryId = arguments.get("memory_id");
+            if (memoryId != null && !memoryId.isNull()) {
+                return false;
+            }
+            if (!value.isArray() || value.isEmpty() || value.size() > REPLACES_MAX) {
+                return false;
+            }
+            Set<Long> seen = new HashSet<>();
+            for (JsonNode node : value) {
+                if (!node.isIntegralNumber() || !node.canConvertToLong() || !seen.add(node.longValue())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+
+        private static List<Long> replaces(JsonNode value) {
+            if (value == null || value.isNull()) {
+                return List.of();
+            }
+            List<Long> ids = new ArrayList<>();
+            value.forEach(node -> ids.add(node.longValue()));
+            return List.copyOf(ids);
         }
 
 
@@ -300,7 +345,7 @@ public final class McpDtos {
         @Override
         public String toString() {
             return "MemoryRememberArguments[memoryId=" + memoryId + ", collection=" + collection + ", sensitive="
-                + sensitive + ", archivable=" + archivable + "]";
+                + sensitive + ", archivable=" + archivable + ", replaces=" + replaces + "]";
         }
     }
 

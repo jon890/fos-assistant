@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,8 @@ public class McpMemoryRemember {
     public static final int MEMORY_EVIDENCE_MAX = 500;
 
     private static final int MEMORY_TITLE_MAX = 200;
+    /** {@code replaces} 에 줄 수 있는 번호 수의 상한이다. 인자 모양은 {@code McpController} 가 본다. */
+    private static final int REPLACES_MAX = 10;
 
     /**
      * 바깥 글을 읽지 않는다고 보는 도구다. 실행이 이 밖의 도구를 시작했으면 {@code memory_remember} 를 바로 저장하지 않는다(ADR-20261007 / memory-remember).
@@ -73,6 +76,7 @@ public class McpMemoryRemember {
         + "금방 바뀌는 진행 중인 일(지원 현황, 예약)은 summary 를 주지 않는다. "
         + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고치고 summary 도 새 사실에 맞게 준다. "
         + "summary 를 빈 글로 주면 요약을 지운다. "
+        + "사용자가 기억 정리를 부탁하면 같은 주제의 기억을 하나로 합쳐 새로 남기고 replaces 에 대신할 옛 번호를 준다. replaces 는 memory_id 와 함께 주지 않는다. "
         + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. "
         + "기간이 있는 상태나 이미 지난 일이면 archivable 을 true 로 준다(예: 「이번 주 출장 중이다」). "
         + "생일, 알레르기처럼 변하지 않는 사실이나 판단이 서지 않으면 주지 않는다. 한 번의 답에서 3개까지 남긴다.";
@@ -113,7 +117,19 @@ public class McpMemoryRemember {
                     "sensitive",
                     Map.of("type", "boolean"),
                     "archivable",
-                    Map.of("type", "boolean")),
+                    Map.of("type", "boolean"),
+                    "replaces",
+                    Map.of(
+                        "type",
+                        "array",
+                        "items",
+                        Map.of("type", "integer"),
+                        "minItems",
+                        1,
+                        "maxItems",
+                        REPLACES_MAX,
+                        "uniqueItems",
+                        true)),
                 "required",
                 List.of("title", "content")));
     }
@@ -132,6 +148,7 @@ public class McpMemoryRemember {
      * @param memoryId 고칠 기존 항목 번호. 없으면 null
      * @param collection 둘 collection. 없으면 null
      * @param archivable 모델이 자동 보관을 허락했는가. 새 항목에만 적고 기존 항목을 고칠 때는 쓰지 않는다
+     * @param replaces 새 항목이 대신할 옛 항목 번호. 합치기가 아니면 빈 목록이다(docs/features/memory/spec.md 의 REQ6)
      */
     Map<String, Object> remember(
         McpCaller caller,
@@ -142,7 +159,8 @@ public class McpMemoryRemember {
         Long memoryId,
         String collection,
         boolean sensitive,
-        boolean archivable) {
+        boolean archivable,
+        List<Long> replaces) {
         AgentExecution origin = caller.originExecution();
         MemoryAccess access = memories.accessOf(origin.agentId());
         if (access.isEmpty()) {
@@ -184,26 +202,40 @@ public class McpMemoryRemember {
                 origin.conversationId(),
                 direct,
                 externalRead,
-                archivable));
+                archivable,
+                replaces));
         log.info(
             "memory remember userId={} executionId={} direct={} outcome={}",
             caller.user().id(),
             origin.id(),
             direct,
             remembered.outcome());
+        return resultOf(remembered);
+    }
+
+
+    /** 결과마다의 글과 {@code isError} 다. */
+    private static Map<String, Object> resultOf(MemoryRememberResult remembered) {
         return switch (remembered.outcome()) {
             case REMEMBERED -> result(
                 "기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다. 새 기억의 번호는 "
-                    + remembered.memoryId() + " 이다.",
+                    + remembered.memoryId() + " 이다." + replacedText(remembered, "대신했다"),
                 false);
             case UPDATED -> result("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.", false);
-            case PROPOSED -> result("제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.", false);
-            case ALREADY_KNOWN -> result("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.", false);
+            case PROPOSED -> result(
+                "제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다."
+                    + replacedText(remembered, "받아들이면 대신한다"),
+                false);
+            case ALREADY_KNOWN -> result(
+                "이미 같은 내용을 기억하고 있다. 새로 남기지 않았다." + replacedText(remembered, "대신했다"), false);
             case SUPERSEDED_BEFORE -> result(
-                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다.",
+                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다."
+                    + replacedText(remembered, "대신했다"),
                 true);
-            case ALREADY_PROPOSED -> result("같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다.", false);
-            case REJECTED_BEFORE -> result("사용자가 이 내용을 거절했다. 다시 남기지 않는다.", true);
+            case ALREADY_PROPOSED -> result(
+                "같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다." + replacedText(remembered, "받아들이면 대신한다"), false);
+            case REJECTED_BEFORE -> result(
+                "사용자가 이 내용을 거절했다. 다시 남기지 않는다." + replacedText(remembered, "대신했다"), true);
             case TOO_MANY -> result("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.", true);
             case COLLECTION_NOT_ALLOWED -> result("이 에이전트가 쓸 수 없는 collection 이다. collection 없이 다시 부른다.", true);
             case UPDATE_TARGET_NOT_FOUND -> result("고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.", true);
@@ -237,6 +269,27 @@ public class McpMemoryRemember {
             return false;
         }
         return !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
+    }
+
+
+    /**
+     * 합치기 결과를 결과 글 끝에 붙인다. 대신하지 못한 번호는 까닭 없이 번호만 알린다(docs/features/memory/spec.md 의 DECISION27). 합치기가 아니면 빈
+     * 글이다.
+     */
+    private static String replacedText(MemoryRememberResult remembered, String verb) {
+        StringBuilder text = new StringBuilder();
+        if (!remembered.replaced().isEmpty()) {
+            text.append(" 옛 기억(번호 ").append(ids(remembered.replaced())).append(")을 ").append(verb).append('.');
+        }
+        if (!remembered.notReplaced().isEmpty()) {
+            text.append(" 대신하지 못함: ").append(ids(remembered.notReplaced())).append('.');
+        }
+        return text.toString();
+    }
+
+
+    private static String ids(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(", "));
     }
 
 
