@@ -45,6 +45,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/components/ui/use-media-query";
 import { fetchMe, type ClientMe } from "@/lib/me-client";
+import { hasBrowserSession } from "@/lib/sign-out-client";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
 /** 좁은 화면 위 막대의 제목이다. 화면이 정하지 않았으면 `null` 이고 앱 이름을 보인다 */
@@ -331,11 +332,15 @@ export function AppShell({
   }, [role, signedIn]);
 
   // 로그아웃한 뒤 뒤로 가기로 돌아온 문서는 브라우저가 bfcache 에서 그대로 꺼낼 수 있다. 브라우저마다 달라
-  // 기대지 않고 다시 읽는다. 다시 읽은 page 가 세션을 확인해 로그인 화면으로 보낸다(docs/features/app-shell/design.md 의 「로그아웃」).
+  // 기대지 않고 세션을 확인해, 없거나 모르면 다시 읽는다. 다시 읽은 page 가 로그인 화면으로 보낸다.
+  // 세션이 있으면 다시 읽지 않아 쓰던 글과 스크롤이 남는다(docs/features/app-shell/design.md 의 「로그아웃」).
   useEffect(() => {
     if (!signedIn) return;
     const reloadRestored = (event: PageTransitionEvent) => {
-      if (event.persisted) window.location.reload();
+      if (!event.persisted) return;
+      void hasBrowserSession().then((present) => {
+        if (present !== true) window.location.reload();
+      });
     };
     window.addEventListener("pageshow", reloadRestored);
     return () => window.removeEventListener("pageshow", reloadRestored);

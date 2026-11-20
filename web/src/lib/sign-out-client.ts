@@ -11,3 +11,19 @@ export async function requestSignOut(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * 이 브라우저에 로그인 세션이 남아 있는지 Auth.js 의 세션 경로로 확인한다.
+ *
+ * <p>읽지 못하면 `null` 이다. bfcache 에서 돌아온 문서는 그때 다시 읽어, 모를 때 앞 사용자의 화면을 남기지 않는다.
+ */
+export async function hasBrowserSession(): Promise<boolean | null> {
+  try {
+    const response = await fetch("/api/auth/session", { cache: "no-store" });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { user?: unknown } | null;
+    return Boolean(body?.user);
+  } catch {
+    return null;
+  }
+}

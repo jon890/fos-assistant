@@ -66,21 +66,33 @@ for (const failure of ["500", "끊김"] as const) {
   });
 }
 
-test("bfcache 에서 돌아온 문서는 다시 읽는다", async ({ page }) => {
+test("bfcache 에서 돌아온 문서는 세션이 있으면 그대로 두고 없으면 다시 읽는다", async ({ context, page }) => {
+  type Marked = Window & { beforeReload?: boolean };
+  const restore = () => page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
   await page.goto("/new");
   await page.evaluate(() => {
-    (window as Window & { beforeReload?: boolean }).beforeReload = true;
+    (window as Marked).beforeReload = true;
   });
+  // 세션이 있으면 다시 읽지 않아 쓰던 글과 스크롤이 남는다.
+  const sessionRead = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/auth/session");
+  await restore();
+  await sessionRead;
+  expect(await page.evaluate(() => (window as Marked).beforeReload)).toBe(true);
+
+  // 로그아웃된 브라우저에서 돌아온 문서는 다시 읽고 로그인 화면으로 간다.
+  await context.clearCookies();
   const reloaded = page.waitForEvent("load");
-  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+  await restore();
   await reloaded;
-  expect(await page.evaluate(() => (window as Window & { beforeReload?: boolean }).beforeReload)).toBeUndefined();
+  await expect(page).toHaveURL(/\/signin$/);
 });
 
 test("다른 출처에서 보낸 로그아웃 요청은 거절하고 로그인은 그대로다", async ({ page }) => {
   await page.goto("/new");
-  const response = await page.request.post("/signout", { headers: { origin: "https://other.example" } });
-  expect(response.status()).toBe(403);
+  for (const origin of ["https://other.example", "null"]) {
+    const response = await page.request.post("/signout", { headers: { origin } });
+    expect(response.status(), origin).toBe(403);
+  }
   await page.goto("/new");
   await expect(page).toHaveURL(/\/new$/);
 });

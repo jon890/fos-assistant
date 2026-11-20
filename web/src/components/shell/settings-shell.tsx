@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useId } from "react";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { cn } from "cn";
+import { useMediaQuery } from "@/components/ui/use-media-query";
 import { useBackToChatHref } from "./back-to-chat";
 import { NavPending } from "./nav-pending";
 import { ScreenTransition } from "./screen-transition";
@@ -25,6 +26,8 @@ function SettingsGroupLinks({
   onList: boolean;
 }) {
   const labelId = useId();
+  // `/settings` 의 넓은 화면에서는 「에이전트」 본문이 보이므로 지금 화면으로 알린다. 휴대폰 목록 화면에는 지금 화면이 없다.
+  const wide = useMediaQuery("(min-width: 768px)") === true;
   return (
     <div role="group" aria-labelledby={labelId} className="flex flex-col gap-1">
       <p id={labelId} className="px-3 pt-2 pb-1 text-xs text-muted-foreground">
@@ -40,7 +43,7 @@ function SettingsGroupLinks({
           <Link
             key={link.href}
             href={link.href}
-            aria-current={current && !onList ? "page" : undefined}
+            aria-current={current && (!onList || wide) ? "page" : undefined}
             data-selected={current ? "true" : undefined}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground",

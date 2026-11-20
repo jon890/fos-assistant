@@ -10,6 +10,15 @@ import { signOut } from "@/auth";
  * `redirect("/signin")` 과 문서 이동이 겹치고, 배포 뒤 열려 있던 탭은 서버 동작을 찾지 못해 실패한다.
  * 세션 쿠키가 SameSite=Lax 라 다른 사이트가 보낸 POST 에는 쿠키가 붙지 않는다.
  */
+/** 출처 머리의 호스트다. 주소가 아닌 값(문자열 `null` 등)이면 `null` 이라 어떤 호스트와도 맞지 않는다. */
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   // 다른 사이트가 보낸 POST 에는 쿠키가 붙지 않지만, 응답의 쿠키 삭제는 적용될 수 있다.
   // 출처의 호스트가 이 요청의 호스트와 다르면 로그아웃시키지 않는다. 역방향 프록시 뒤에서는 `request.url` 이
@@ -18,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
   const origin = request.headers.get("origin");
   const host =
     request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (origin !== null && host !== null && new URL(origin).host !== host)
+  if (origin !== null && host !== null && originHost(origin) !== host)
     return new Response(null, { status: 403 });
   try {
     await signOut({ redirect: false });

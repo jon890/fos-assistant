@@ -32,6 +32,7 @@ test.describe("넓은 화면", () => {
     await expect(menu.getByRole("link", { name: "예약 작업" })).toHaveCount(0);
     await expect(menu.getByRole("link", { name: /^기억/ })).toHaveCount(0);
     await expect(menu.getByRole("link", { name: "에이전트", exact: true })).toHaveAttribute("data-selected", "true");
+    await expect(menu.getByRole("link", { name: "에이전트", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("main").getByRole("heading", { name: "에이전트", level: 1 })).toBeVisible();
     // 설정 틀에는 사이드바와 대화 목록이 없다.
     await expect(page.getByRole("complementary", { name: "사이드바" })).toHaveCount(0);
