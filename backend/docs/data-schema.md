@@ -19,7 +19,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「먼저 살펴보기 표」 | `proactive_check` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
-| 「암호화 key 표」 | `user_data_key` |
+| 「암호화 key 표」 | `user_data_key`, `server_secret` |
 
 ## 첨부 삭제 요청
 
@@ -82,6 +82,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `conversation` | `pending_messages` | 아직 |
+| `server_secret` | `sealed_value` | 함. 데이터 key 없이 KEK 로 바로 감싼다. 값이 비면 NULL 이다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)) |
 | `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
 | `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
@@ -109,6 +110,7 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+`server_secret` 은 사용자, 그룹, 에이전트 어디에도 속하지 않는 서버 비밀값이라 예외로 더했다(서버 비밀값 스펙 DECISION5, 사용자 2026-11-20).
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
 
 **예외: 웹 푸시 기기는 사용자와 1:N 이지만 `app_user.push_devices` 의 JSON 컬럼에 둔다.** 사용자가 새 테이블 대신 고른 것이다(2026-11-20). 사용자가 몇 명뿐이라 다른 사용자 줄에서 같은 주소를 `LIKE` 로 찾아도 몇 줄이고, 같은 주소가 두 사용자에게 남지 않는 것은 DB 의 유일 제약 대신 서버 안의 등록 잠금이 지킨다(서버 한 대 전제). 근거와 버린 대안은 [ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md) 가 갖는다.
@@ -226,7 +228,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 줄은 지우지 않는다. 실행 기록과 함께 남고, 내장 위임 결과의 맡긴 일과 결과 글과 그 key(`goal_preview`, `result_text`, `result_key_id`)만 비운다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다. 에이전트가 청한 기억 지우기는 카드에 보인 제목과 본문 앞부분이 승인 줄(`connector_action.args_json`)에도 남고 그 대화를 정리할 때 지워진다.
 그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
@@ -831,6 +833,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `base_revision` 은 `CREATED` 면 저장한 때의 판 번호, `UPDATED` 면 고치기 전의 판 번호이고 `PROPOSED` 면 비어 있다
 - `previous_status` 는 기존 제안을 받아들인 `CREATED` 만 `PROPOSED` 이고 나머지는 비어 있다
 - `external_read` 는 기록을 남길 때 그 대화의 어느 실행이 바깥 글을 읽었는지다(「바로 저장 판정」 의 조건 4). 승인 카드가 이 값을 보인다. 이 컬럼이 생기기 전의 줄은 거짓이다
+- `replaced_memory_ids` 는 합치기에서 새 항목이 대신한 옛 항목 번호의 JSON 배열이다. 바로 저장은 실제로 대신한 번호, 제안은 받아들일 때 대신할 번호이고 받아들이면 실제로 대신한 번호로 고친다. 합치기가 아니면 `NULL` 이다. 옛 항목이 지워질 수 있어 외래 키를 걸지 않는다
 
 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다.
 `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이라 되돌리지 않는다.
@@ -842,7 +845,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id` 한 칸에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 동작은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억의 대체」 가 갖는다.
 
 - 칸이 차 있으면 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 빠진다. 「대체됨」 을 `memory` 의 상태로 두지 않는다. 사람이 보는 목록에는 남는다
-- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
+- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 `memory_remember` 의 합치기 하나이고 조건부 네이티브 UPDATE(`MemoryRepository.supersede`, `supersedeWithin`)로 쓴다. 그 전에는 `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
 - 대신한 새 항목을 지우거나 승인을 벗어나게 하면 그 항목이 대신한 옛 항목의 칸을 저장소 쿼리(`MemoryRepository.clearSupersededBy`)가 같은 트랜잭션에서 비운다. 외래 키가 없어 서비스가 비운다
 - `idx_memory_superseded_by` 는 새 항목을 지울 때 그 항목이 대신한 줄을 찾는 색인이다
 
@@ -853,6 +856,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 사용자마다 플러그인 하나에 연결 하나를 둔다. 상태가 바뀌는 조건과 API 는 [플러그인 연결](../../docs/features/connector.md) 이 갖는다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). `(user_id, connector_id)` 가 유일하다.
 
 - `fields` 는 JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}` 다. 비밀 칸의 원문과 해시는 넣지 않는다. 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
+- 단추 연결의 `fields.auth` 에는 `method: "oauth"`, `provider`, `reconnectRequired` 를 저장할 수 있다. 수동 연결은 `auth` 가 없거나 `method: "manual"` 이다. 수동 연결을 다시 쓰면 이전 JSON 모양을 유지해 열의 길이 한도에 찬 행도 다시 쓸 수 있다. 토큰은 이 열에 두지 않는다
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
@@ -868,10 +872,11 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 - `mcp_server` 는 붙일 때 manifest 가 선언한 MCP 서버 이름이다. 운영자가 카탈로그에서 플러그인을 빼도 그 profile 에 설치된 서버 이름을 잃지 않게 둔다. 마이그레이션이 만든 옛 바인딩은 비어 있고 연결 확인과 관리자 반영 완료가 채운다
 - `install_attempt_id`는 nullable `BINARY(16)` UUID다. 설치 시작을 커밋할 때 새 값으로 바꾸고 현재 시도의 결과만 한 번 적용한 뒤 비운다. 기존 행은 null로 유지하며 상태를 바꾸거나 값을 채우는 마이그레이션은 하지 않는다
-- `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
+- `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치의 결과 트랜잭션 시각이다. 재시작 감지가 공유 gateway 기동 시각과 비교해 그 뒤에 뜬 gateway 면 반영 맞추기를 돌리고, 관리자가 목록을 본 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하는 데도 쓴다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
 - `cycle_phase` 와 `cycle_at` 은 그 서버만 껐다 켜는 단계와 그 시작 시각이다. `IDLE_WAIT` 는 주인의 실행이 비기를 기다리는 단계이고 `cycle_at` 은 기다림 상한의 기준이다. `OFF` 는 끈 뒤 다시 켜기를 기다리는 단계이고 `cycle_at` 은 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각이다. 껐다 켜기 중이 아니면 둘 다 비어 있다. 진행과 전이는 [연결 반영 자동화 설계](../../docs/features/connector/design.md) 가 갖는다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
-- `apply_failed_at` 은 자동 경로(반영 예정 확인, 껐다 켜기, 정의 어긋남 점검)가 실패한 시각이다. 있으면 자동 경로가 그 바인딩을 다시 집지 않는다. `READY` 와 사람이 시작한 설치(등록, 연결 확인, 관리자 반영 완료)가 실제로 나갈 때 비운다. 껐다 켜기 단계에서는 연결 확인이 설치를 보내지 않으므로 관리자 반영 완료가 비운다
+- `apply_failed_at` 은 자동 경로(반영 예정 확인, 껐다 켜기, 재시작 감지, 정의 어긋남 점검)가 실패한 시각이다. 있으면 자동 경로가 그 바인딩을 다시 집지 않는다. `READY` 와 사람이 시작한 설치(등록, 연결 확인, 관리자 반영 완료)가 실제로 나갈 때 비운다. 껐다 켜기 단계에서는 연결 확인이 설치를 보내지 않으므로 관리자 다시 확인이 비운다
+- `waiting_since` 는 자동 대기(재시작 대기, 껐다 켜기 단계, 반영 예정, 자동 반영 실패)가 시작된 시각이다. 비어 있을 때만 적고 단계가 바뀌어도 그대로 둔다. `admin_notified_at` 은 지금 대기에 그룹 관리자 알림을 보낸 시각이다. 알림 단계가 실패 표시가 있거나 `waiting_since` 에서 24시간이 지났고 이 칸이 빈 `PENDING` 바인딩에 한 번 알린다. `READY` 와 사람이 시작한 설치가 두 칸을 함께 비운다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
 - `skipped_skills` 는 마지막으로 성공한 설치가 답한 빠진 에이전트용 스킬의 JSON 글(`TEXT`)이다. 칸은 스킬 이름과 까닭 낱말 목록이고 없으면 NULL 이다. 설치 응답을 받을 때마다 덮어쓰고, 설치가 실패하면 옛 값을 둔다. 까닭 낱말은 대시보드가 정해 enum 으로 묶지 않는다([에이전트용 스킬 스펙](../../docs/features/agent-skill/spec.md) 의 REQ8). `event_watch_state` 와 같은 까닭으로 `JSON` 이 아니라 `TEXT` 다
 - `event_watch_enabled` 와 `event_watch_state` 는 사건 감지의 켜짐과 상태다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)). 같은 연결에서는 바인딩 하나만 켠다. 상태는 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`TEXT`)이고 끄면 비운다. 칸은 시간대, 확인 지점(결과를 다 쓴 마지막 조회를 시작한 Control Plane 시각), 겹침 구간에서 이미 본 식별자와 처음 본 시각, 마지막 확인 시각과 결과(`EventWatchResult`), 새 항목 수, 연결 문제의 연속 실패 수, 하루 실행 수와 그 날짜, 이번 연속 실패에 다시 연결 알림을 냈는지, 조용한 시간에 미룬 알림(실행 수, 새 항목 수, 알릴 수, 마지막 점검 대화 번호, 원천 이름과 항목 이름)이다. 항목의 제목과 본문은 없다. 뒤에 더한 칸이 없는 옛 글은 기본값으로 읽는다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 `ConnectorEventWatches` 의 조건부 update 만 쓴다. `updated_at` 은 바꾸지 않는다. H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 `TEXT` 로 둔다
@@ -1025,7 +1030,7 @@ action을 지우면 실행 내용도 지운다.
 알림 하나다([ADR-070](../../docs/adr/ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md)).
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
-`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 와 `CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
+`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_SECRETS`(관리자 「서버 비밀값」)만 `target_type` 을 채우고 `target_public_id` 를 비운다.
 `source_public_id` 는 알림을 만든 원인(승인 줄, 화면 넘기기를 적은 판정 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 
@@ -1142,6 +1147,19 @@ action을 지우면 실행 내용도 지운다.
 
 **이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.** 사용자를 지우는 흐름이 생기면 이 줄을 지워 본문을 없앤다.
 본문 칸 쪽은 이 표에 외래 키를 두지 않는다. 이 줄을 지우는 길을 막지 않기 위해서다.
+
+### server_secret
+
+서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
+결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
+
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
+- `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
+- `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)
+- `meta_json` 은 비밀이 아닌 부가 값이다. 원문이나 앞부분을 넣지 않는다
+- `updated_by` 는 바꾼 사용자 번호이고 외래 키가 없다. 기동 때 옛 설정에서 가져온 값이면 NULL 이다
+- KEK 를 바꾸면 `DataKeyRewrapper` 가 `user_data_key` 와 함께 이 표의 옛 KEK 줄도 다시 감싼다
 
 ## 옛 문서 경로
 

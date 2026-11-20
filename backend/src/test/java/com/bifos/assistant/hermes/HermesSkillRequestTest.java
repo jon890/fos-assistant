@@ -169,10 +169,14 @@ class HermesSkillRequestTest {
     @DisplayName("목록은 query profile 로 묻고 배열을 읽는다")
     void listAsksByQueryProfileAndReadsArray() {
         response = "[{\"name\":\"weekly-plan\",\"description\":\"이번 주 계획\",\"category\":\"agent\","
-            + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"}]";
+            + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"},"
+            + "{\"name\":\"note-review\",\"connector_id\":\"notes\",\"connector_title\":\"메모\"}]";
 
         assertThat(client.list("kid"))
-            .containsExactly(new HermesSkill("weekly-plan", "이번 주 계획", false), new HermesSkill("bare", "", true));
+            .containsExactly(
+                new HermesSkill("weekly-plan", "이번 주 계획", false),
+                new HermesSkill("bare", "", true),
+                new HermesSkill("note-review", "", true, "메모"));
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("GET");
             assertThat(call.path()).isEqualTo("/api/skills");

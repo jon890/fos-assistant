@@ -15,7 +15,7 @@ test("문항마다 id, 범주, 보낼 글, 보는 방식이 형식에 맞고 id 
     ids.add(question.id);
     assert.ok(CATEGORIES.includes(question.category), `${question.id} 의 범주`);
     assert.ok(question.messages.length > 0 && question.messages.every((text) => text.trim().length > 0), `${question.id} 의 글`);
-    assert.ok(["sources", "date", "none"].includes(question.check), `${question.id} 의 check`);
+    assert.ok(["sources", "date", "none", "photo-request"].includes(question.check), `${question.id} 의 check`);
     assert.equal(typeof question.compare, "boolean", `${question.id} 의 compare`);
   }
 });
@@ -30,6 +30,10 @@ test("범주마다 문항이 있고 사람 비교 문항은 범주마다 고르�
 
 test("날짜 문항은 하나이고 사람 비교 문항은 출처를 보는 문항이다", () => {
   assert.equal(file.questions.filter((question) => question.check === "date").length, 1);
+  // 그림 참고 사진을 받지 못하는 사례다(스펙 tool-fallback REQ7). 사람 비교에 넣지 않는다
+  const photo = file.questions.filter((question) => question.check === "photo-request");
+  assert.equal(photo.length, 1);
+  assert.equal(photo[0]!.compare, false);
   for (const question of file.questions.filter((item) => item.compare)) assert.equal(question.check, "sources", question.id);
 });
 

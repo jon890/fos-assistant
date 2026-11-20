@@ -58,6 +58,9 @@ VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-9000000
 INSERT INTO group_setting (group_id, setting_key, setting_value)
 VALUES (900000001, 'coverage-900000001', '{}');
 
+INSERT INTO server_secret (name, created_at)
+VALUES ('900000001', '2020-01-01 00:00:00');
+
 INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at, items_json, last_attempt_status, last_attempt_execution_id, last_attempt_started_at)
 VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '{"version":1,"items":[{"source":"coverage-900000001","resultKey":"coverage-900000001"}]}', 'RUNNING', 900000001, '2020-01-01 00:00:00');
 

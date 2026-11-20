@@ -1,11 +1,14 @@
 package com.bifos.assistant.connector.connection.application;
 
+import com.bifos.assistant.crypto.domain.SecretPrefix;
+import com.bifos.assistant.connector.connection.domain.ConnectionAuth;
 import com.bifos.assistant.connector.connection.domain.ConnectionFields;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.infra.ConnectionFieldsConverter;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -20,12 +23,6 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorValues {
-    /** 비밀 칸에서 저장하는 앞부분의 길이다. */
-    private static final int SECRET_PREFIX_LENGTH = 4;
-
-    /** 앞부분을 저장하는 비밀값의 최소 길이다. 이보다 짧으면 앞부분이 원문의 4분의 1 을 넘는다. */
-    private static final int SECRET_PREFIX_MIN_VALUE_LENGTH = 16;
-
     /** 비밀이 아닌 칸 값의 상한이다. 칸 값은 {@code fields} 열 하나에 JSON 으로 함께 들어간다. */
     private static final int MAX_STORED_VALUE_LENGTH = 500;
 
@@ -44,16 +41,32 @@ final class ConnectorValues {
      * 외부에 반영한 뒤 저장에서 실패하지 않도록 여기서 먼저 본다
      */
     static Map<String, String> validated(ConnectorManifest manifest, Map<String, String> values, boolean requireAll) {
+        return validated(manifest, values, requireAll, ConnectionAuth.MANUAL);
+    }
+
+
+    /**
+     * 단추 연결을 시작할 때 함께 받은 단추 밖 칸 값을 등록과 같이 검사한다. 단추가 대신하는 칸({@code oauth.fields})은 값이 오면 거절하고
+     * 필수 검사에서 뺀다.
+     */
+    static Map<String, String> validated(ConnectorManifest manifest, Map<String, String> values, ConnectionAuth auth) {
+        return validated(manifest, values, true, auth);
+    }
+
+
+    private static Map<String, String> validated(
+        ConnectorManifest manifest, Map<String, String> values, boolean requireAll, ConnectionAuth auth) {
+        List<String> replaced = auth.usesOAuth() ? manifest.oauth().fields() : List.of();
         Map<String, String> given = values == null ? Map.of() : values;
         Map<String, ConnectorField> fields = manifest.fields().stream().collect(Collectors.toMap(ConnectorField::key, field -> field));
-        if (!fields.keySet().containsAll(given.keySet())) {
+        if (!fields.keySet().containsAll(given.keySet()) || replaced.stream().anyMatch(given::containsKey)) {
             throw ConnectorErrors.invalid();
         }
         Map<String, String> accepted = new LinkedHashMap<>();
         for (ConnectorField field : manifest.fields()) {
             String value = given.get(field.key());
             if (value == null || value.isBlank()) {
-                if (requireAll && field.required()) {
+                if (requireAll && field.required() && !replaced.contains(field.key())) {
                     throw ConnectorErrors.invalid();
                 }
                 continue;
@@ -65,7 +78,7 @@ final class ConnectorValues {
             accepted.put(field.key(), value);
         }
         if (requireAll
-            && COLUMN.convertToDatabaseColumn(stored(manifest, accepted)).length() > ConnectorConnection.FIELDS_LENGTH) {
+            && COLUMN.convertToDatabaseColumn(stored(manifest, accepted, auth)).length() > ConnectorConnection.FIELDS_LENGTH) {
             throw ConnectorErrors.invalid();
         }
         return accepted;
@@ -92,10 +105,15 @@ final class ConnectorValues {
     /**
      * 저장할 칸 값이다.
      *
-     * <p>비밀 칸은 값이 {@value #SECRET_PREFIX_MIN_VALUE_LENGTH}자 이상일 때만 앞
-     * {@value #SECRET_PREFIX_LENGTH}자를 남긴다. 그보다 짧은 값은 앞부분이 원문의 큰 부분이라 아무것도 남기지 않는다.
+     * <p>비밀 칸은 {@link SecretPrefix} 가 정한 앞부분만 남긴다. 짧은 값은 아무것도 남기지 않는다.
      */
     static ConnectionFields stored(ConnectorManifest manifest, Map<String, String> accepted) {
+        return stored(manifest, accepted, ConnectionAuth.MANUAL);
+    }
+
+
+    /** 연결 방식을 함께 적은 저장할 칸 값이다. */
+    static ConnectionFields stored(ConnectorManifest manifest, Map<String, String> accepted, ConnectionAuth auth) {
         Map<String, String> values = new LinkedHashMap<>();
         Map<String, String> secretPrefixes = new LinkedHashMap<>();
         for (ConnectorField field : manifest.fields()) {
@@ -105,19 +123,13 @@ final class ConnectorValues {
             }
             if (!field.secret()) {
                 values.put(field.key(), value);
-            } else if (value.length() >= SECRET_PREFIX_MIN_VALUE_LENGTH) {
-                secretPrefixes.put(field.key(), secretPrefix(value));
+            } else {
+                String prefix = SecretPrefix.of(value);
+                if (prefix != null) {
+                    secretPrefixes.put(field.key(), prefix);
+                }
             }
         }
-        return new ConnectionFields(values, secretPrefixes);
-    }
-
-
-    /** 비밀값의 앞부분이다. 끝 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. */
-    private static String secretPrefix(String value) {
-        int end = Character.isHighSurrogate(value.charAt(SECRET_PREFIX_LENGTH - 1))
-            ? SECRET_PREFIX_LENGTH - 1
-            : SECRET_PREFIX_LENGTH;
-        return value.substring(0, end);
+        return new ConnectionFields(values, secretPrefixes, auth);
     }
 }

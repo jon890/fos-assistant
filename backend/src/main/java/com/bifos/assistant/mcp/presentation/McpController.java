@@ -6,6 +6,7 @@ import static com.bifos.assistant.mcp.presentation.McpRpc.invalidParams;
 import static com.bifos.assistant.mcp.presentation.McpRpc.response;
 import static com.bifos.assistant.mcp.presentation.McpRpc.text;
 
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
@@ -15,6 +16,9 @@ import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFileSpaceTools;
 import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.mcp.application.McpConnectorAttachTool;
+import com.bifos.assistant.mcp.application.McpFollowUpTools;
+import com.bifos.assistant.mcp.application.McpMemoryForgetTool;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpTaskTools;
@@ -55,7 +59,8 @@ import tools.jackson.databind.node.ObjectNode;
 @RestController
 @RequiredArgsConstructor
 public class McpController {
-    private static final String SEARCH_RESTART = "검색 순위가 앞 페이지와 달라졌습니다. cursor 없이 다시 검색하세요.";
+    private static final ToolFailureText SEARCH_RESTART = ToolFailureText.alternative(
+        "검색 순위가 앞 페이지와 달라졌습니다.", "cursor 없이 다시 검색한다");
     private static final String MEMORY_READ = "memory_read";
     private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
@@ -65,10 +70,10 @@ public class McpController {
     private static final String AGENT_DELEGATE = "agent_delegate";
     private static final String AGENT_STOP = "agent_stop";
     private static final String FOLLOW_UP_PROPOSE = "follow_up_propose";
-    private static final Set<String> FOLLOW_UP_PROPOSE_FIELDS = Set.of("title", "due_at", "waiting");
+    private static final Set<String> FOLLOW_UP_PROPOSE_FIELDS = Set.of("title", "due_at", "waiting", "requested");
     private static final String MEMORY_REMEMBER = "memory_remember";
     private static final String WAIT_SECONDS = "wait_seconds";
-    /** 먼저 살펴보기에서 읽기, 위임과 사람이 받아들여야 하는 할 일 제안을 받는다. */
+    /** 먼저 살펴보기에서 읽기, 위임, 사람이 받아들여야 하는 할 일 제안, 승인 카드만 띄우는 도구를 받는다. */
     private static final Set<String> CHECK_TREE_TOOLS = Set.of(
         MEMORY_READ,
         MEMORY_SEARCH,
@@ -79,13 +84,18 @@ public class McpController {
         FOLLOW_UP_PROPOSE,
         McpConnectorListTool.NAME,
         McpMediaObservationTools.LIST,
-        // 읽기와, 지우지 않고 승인 카드만 띄우는 지우기는 늘 받는다(스펙 service-concepts DECISION32).
+        // 읽기와, 바꾸지 않고 승인 카드만 띄우는 지우기와 붙이기는 늘 받는다(스펙 service-concepts DECISION32).
         McpTaskTools.LIST,
-        McpTaskTools.DELETE);
+        McpTaskTools.DELETE,
+        McpFollowUpTools.LIST, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE, FILE_SPACE_PUT);
-    /** 예약 작업을 바로 바꾸는 도구. 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(스펙 service-concepts DECISION32). */
-    private static final Set<String> CHECK_TREE_TASK_TOOLS = Set.of(McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE);
+    /**
+     * 요청자의 서비스 데이터를 바로 바꾸는 도구. 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(스펙 service-concepts
+     * DECISION32). 할 일 끝내기는 받더라도 살펴보기 트리에서는 상태를 바꾸지 않는다(스펙 REQ12).
+     */
+    private static final Set<String> CHECK_TREE_DIRECT_TOOLS = Set.of(
+        McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE, McpFollowUpTools.DONE);
 
     private final McpToolService tools;
     private final McpArtifactCalls artifactCalls;
@@ -98,6 +108,9 @@ public class McpController {
     private final McpApprovalResumeTool approvalResume;
     private final McpConnectorListTool connectorList;
     private final McpTaskCalls taskCalls;
+    private final McpFollowUpTools followUpTools;
+    private final McpMemoryForgetTool memoryForget;
+    private final McpConnectorAttachTool connectorAttach;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -141,7 +154,13 @@ public class McpController {
             Map.entry(McpTaskTools.CREATE, (caller, id, args) -> taskCalls.create(caller, id, args)),
             Map.entry(McpTaskTools.UPDATE, (caller, id, args) -> taskCalls.update(caller, id, args)),
             Map.entry(McpTaskTools.SET_STATE, (caller, id, args) -> taskCalls.setState(caller, id, args)),
-            Map.entry(McpTaskTools.DELETE, (caller, id, args) -> taskCalls.delete(caller, id, args)));
+            Map.entry(McpTaskTools.DELETE, (caller, id, args) -> taskCalls.delete(caller, id, args)),
+            Map.entry(McpFollowUpTools.LIST, this::listFollowUps),
+            Map.entry(McpFollowUpTools.DONE, this::finishFollowUp),
+            Map.entry(McpMemoryForgetTool.NAME, this::forgetMemory),
+            Map.entry(McpConnectorAttachTool.NAME, (caller, id, args) -> McpConnectorAttachTool.connectorOf(args)
+                .map(connector -> response(id, connectorAttach.attach(caller, connector)))
+                .orElseGet(() -> invalidParams(id, INVALID_ARGUMENTS))));
     }
 
 
@@ -183,7 +202,7 @@ public class McpController {
                                 buildProperties.getVersion())));
                 case "tools/list" -> response(id, Map.of("tools", tools.tools()));
                 case "tools/call" -> call(principal, id, request.path("params"));
-                default -> error(id, -32601, "Method not found");
+                default -> error(id, -32601, ToolFailureText.askUser("Method not found"));
             });
     }
 
@@ -202,7 +221,7 @@ public class McpController {
         String toolName = name.asString();
         ToolHandler handler = handlers.get(toolName);
         if (handler == null) {
-            return error(id, -32601, "Method not found");
+            return error(id, -32601, ToolFailureText.alternative("Method not found", "tools/list 에 있는 도구 이름으로 다시 부른다"));
         }
         JsonNode fosCtx = arguments.get(McpCallContext.FIELD);
         McpCaller caller;
@@ -231,7 +250,7 @@ public class McpController {
      * {@code file_space_put} 은 대화 인자가 없어 origin 실행의 대화로 본다.
      */
     private boolean writeAllowedInCheck(String toolName, ProactiveCheck check, McpCaller caller, JsonNode arguments) {
-        if (CHECK_TREE_TASK_TOOLS.contains(toolName)) {
+        if (CHECK_TREE_DIRECT_TOOLS.contains(toolName)) {
             return check.writesAllowed();
         }
         if (!CHECK_TREE_WRITE_TOOLS.contains(toolName) || !check.writesAllowed()) {
@@ -255,7 +274,7 @@ public class McpController {
     /** 역직렬화가 끝나기 전 실패도 원문과 cause를 공통 오류 로그로 보내지 않는다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> malformed() {
-        return ResponseEntity.ok(error(null, -32700, "Parse error"));
+        return ResponseEntity.ok(McpRpc.parseError());
     }
 
 
@@ -385,7 +404,7 @@ public class McpController {
 
 
     /**
-     * 인자는 {@code title}, {@code due_at}, {@code waiting} 셋만 받는다. 다른 키가 오면 인자 오류다.
+     * 인자는 {@code title}, {@code due_at}, {@code waiting}, {@code requested} 만 받는다. 다른 키가 오면 인자 오류다.
      *
      * <p>사용자와 대화를 인자로 받지 않는다(ADR-032). 모델은 쓰지 않는 선택 인자에 {@code null} 을 자주 보내므로 선택 인자의
      * {@code null} 은 없는 것으로 본다. 필수인 {@code title} 의 {@code null} 은 빠진 것이다.
@@ -394,12 +413,43 @@ public class McpController {
         if (!FOLLOW_UP_PROPOSE_FIELDS.containsAll(arguments.propertyNames())
             || !text(arguments, "title")
             || !nullOr(arguments, "due_at", JsonNode::isString)
-            || !nullOr(arguments, "waiting", JsonNode::isBoolean)) {
+            || !nullOr(arguments, "waiting", JsonNode::isBoolean)
+            || !nullOr(arguments, "requested", JsonNode::isBoolean)) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         FollowUpProposeArguments value = FollowUpProposeArguments.from(arguments);
         return response(
-            id, tools.proposeFollowUp(caller, value.title(), value.dueAt(), Boolean.TRUE.equals(value.waiting())));
+            id,
+            tools.proposeFollowUp(
+                caller, value.title(), value.dueAt(), Boolean.TRUE.equals(value.waiting()), Boolean.TRUE.equals(value.requested())));
+    }
+
+
+    /** 인자가 없는 도구다. */
+    private Map<String, Object> listFollowUps(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (!arguments.isEmpty()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, followUpTools.list(caller));
+    }
+
+
+    /** 인자는 비지 않은 글 {@code follow_up} 하나다. */
+    private Map<String, Object> finishFollowUp(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (arguments.size() != 1 || !text(arguments, "follow_up") || arguments.get("follow_up").asString().isBlank()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, followUpTools.done(caller, arguments.get("follow_up").asString()));
+    }
+
+
+    /** 인자는 정수 {@code memory_id} 하나다. */
+    private Map<String, Object> forgetMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
+        JsonNode memoryId = arguments.get("memory_id");
+        if (arguments.size() != 1 || memoryId == null || !memoryId.isIntegralNumber() || !memoryId.canConvertToLong()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, memoryForget.forget(caller, memoryId.longValue()));
     }
 
 
@@ -407,7 +457,7 @@ public class McpController {
      * 인자는 {@link MemoryRememberArguments#FIELDS} 만 받고 다른 키가 오면 인자 오류다(ADR-20261007 / memory-remember).
      *
      * <p>사용자와 범위를 인자로 받지 않는다. 바로 저장할지를 정하는 인자도 없다. 그 판정은 실행의 출처로 한다. 선택 인자의
-     * {@code null} 은 없는 것으로 본다.
+     * {@code null} 은 없는 것으로 본다. {@code replaces} 의 모양은 {@link MemoryRememberArguments#validReplaces} 가 본다.
      */
     private Map<String, Object> remember(McpCaller caller, JsonNode id, JsonNode arguments) {
         if (!MemoryRememberArguments.FIELDS.containsAll(arguments.propertyNames())
@@ -418,7 +468,8 @@ public class McpController {
             || !nullOr(arguments, "summary", JsonNode::isString)
             || !nullOr(arguments, "sensitive", JsonNode::isBoolean)
             || !nullOr(arguments, "archivable", JsonNode::isBoolean)
-            || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())) {
+            || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())
+            || !MemoryRememberArguments.validReplaces(arguments)) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         MemoryRememberArguments value = MemoryRememberArguments.from(arguments);
@@ -433,7 +484,8 @@ public class McpController {
                 value.memoryId(),
                 value.collection(),
                 Boolean.TRUE.equals(value.sensitive()),
-                Boolean.TRUE.equals(value.archivable())));
+                Boolean.TRUE.equals(value.archivable()),
+                value.replaces()));
     }
 
 

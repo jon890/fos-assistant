@@ -46,7 +46,13 @@ const KINDS: Record<
   page: { name: "페이지 읽기", tools: ["web_extract"] },
   memory: {
     name: "기억",
-    tools: ["memory_read", "memory_search", "memory_remember", "memory_link"],
+    tools: [
+      "memory_read",
+      "memory_search",
+      "memory_remember",
+      "memory_link",
+      "memory_forget",
+    ],
   },
   files: {
     name: "파일 작업",
@@ -73,7 +79,10 @@ const KINDS: Record<
     name: "결과물 저장",
     tools: ["artifact_write", "file_space_put"],
   },
-  "follow-up": { name: "할 일", tools: ["follow_up_propose"] },
+  "follow-up": {
+    name: "할 일",
+    tools: ["follow_up_propose", "follow_up_list", "follow_up_done"],
+  },
   skill: { name: "스킬", tools: ["skill_view", "skills_list", "skill_manage"] },
   draft: {
     name: "원고",
@@ -120,7 +129,10 @@ const KINDS: Record<
     name: "다른 에이전트",
     tools: ["agent_list", "agent_delegate", "agent_status", "agent_stop"],
   },
-  connections: { name: "외부 서비스 연결", tools: ["connector_list"] },
+  connections: {
+    name: "외부 서비스 연결",
+    tools: ["connector_list", "connector_attach"],
+  },
   "tool-search": {
     name: "도구 찾기",
     tools: ["tool_search", "tool_describe", "tool_call"],

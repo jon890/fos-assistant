@@ -59,7 +59,8 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
 | `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
 | `read_only_mounts` | 아니오 | 모든 실행 공간에 붙일 `<원본 절대 경로>:<컨테이너 절대 경로>` 목록. 읽기 전용으로만 붙는다 |
-| `profiles` | 예 | 격리할 named profile 이름을 키로 둔 객체. 아래 표의 설정을 값으로 받는다. 빈 객체면 모든 profile 의 실행 공간 도구 저장을 거절한다. `default` 는 등록할 수 없다 |
+| `profiles` | 예 | 별도 설정을 줄 named profile 이름을 키로 둔 객체. 빈 객체도 받는다. `default` 는 등록할 수 없다 |
+| `isolate_unlisted` | 아니오 | JSON 참 거짓 값. 기본은 `false` 다. `true` 면 목록 밖 named profile 이 공통 설정으로 격리된다. profile 전용 마운트와 env 는 비어 있다. [실행 공간 기본 정책](docs/adr/ADR-20261121-sandbox-default-policy.md) |
 
 `profiles[profile]` 은 다음 세 칸만 받는다.
 
@@ -83,7 +84,7 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 마운트 원본이나 대상이 `connector_output_root` 와 겹쳐도 같다. 다른 profile 의 출력이 보이기 때문이다.
 `skill_root` 는 `workspace_root`, `attachment_root`, `connector_output_root` 와 겹칠 수 없다. `skill_root` 가 있으면 Hermes 쪽 스킬 루트 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 도 있어야 하고 다른 경로 칸과 같은 형식 검사를 통과해야 한다. 그 경로가 `/workspace`, `/root`, `attachment_agent_root`, `connector_output_root` 와 겹치면 정책 전체를 읽지 못한 것으로 본다. 스킬 마운트의 대상이 그 경로다. 공통 또는 profile 별 마운트의 원본이 `skill_root` 와 겹치거나 대상이 Hermes 스킬 루트와 겹쳐도 정책 전체를 읽지 못한 것으로 본다. 다른 profile 의 스킬이 보이기 때문이다.
 스킬 마운트는 Hermes 쪽 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 이 링크 없는 디렉터리일 때만 붙인다. 없는 원본을 붙이면 Docker 가 빈 디렉터리를 만들거나 socket proxy 가 컨테이너 생성을 거절하기 때문이다. Control Plane 은 스킬을 처음 저장할 때 그 디렉터리를 만들고 에이전트를 지울 때까지 남긴다.
-`connector_output_root` 를 넣거나 빼면 등록된 profile 의 `terminal:` 이 바뀌어 다음 셸 저장에서 컨테이너 키가 바뀐다. 그 저장 전까지는 출력 디렉터리가 붙지 않는다.
+`connector_output_root` 를 넣거나 빼면 정책이 적용되는 profile 의 `terminal:` 이 바뀌어 다음 셸 저장에서 컨테이너 키가 바뀐다. 그 저장 전까지는 출력 디렉터리가 붙지 않는다.
 셸 저장과 사진 도구 옛 설치는 그 profile 의 출력 디렉터리를 링크 없이 만들지 못하면 409 로 거절한다. 바인딩 설치는 같은 실패를 빈 값으로 넘긴다.
 이 검사는 경로 조각 기준으로 한다. 다른 사용자의 workspace나 첨부를 공통 마운트로 보이게 하면 안 되기 때문이다.
 표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
@@ -97,9 +98,9 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 플러그인 설치에도 같은 검사를 적용한다.
 API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽기 전용으로 붙여 막는다. 실제 생성 시점의 검증은 Docker socket proxy가 맡는다.
 
-정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
-등록되지 않은 profile 의 셸 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. `terminal:` 은 바꾸지 않는다. local 로 켜지 않는다([ADR-20261120 / no-local-shell](../docs/adr/ADR-20261120-no-local-shell.md)).
-이미 docker 였다가 정책에서 빠진 profile 도 같다. Control Plane 은 기동할 때 이 `reason` 을 보고 그 에이전트의 실행 공간 도구를 끈다.
+유효한 정책이 profile 에 적용되면 plugin 은 아래 `terminal:` 전체를 쓴다.
+정책이 적용되지 않는 named profile 의 셸 저장은 409 `sandbox_unavailable` 이고 본문에 `reason: unlisted` 를 넣는다. `terminal:` 은 바꾸지 않는다. local 로 켜지 않는다([ADR-20261120 / no-local-shell](../docs/adr/ADR-20261120-no-local-shell.md)).
+이미 docker 를 쓰던 profile 에 정책이 더 이상 적용되지 않을 때도 같다. Control Plane 은 기동 점검 표시가 남은 에이전트에서만 이 `reason` 을 보고 실행 공간 도구를 끈다.
 정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 `reason` 없는 409 로 거절한다.
 요청 본문의 `require_sandbox` 는 옛 Control Plane 호환으로 받고 도구 저장의 판정은 바꾸지 않는다.
 
@@ -114,7 +115,7 @@ terminal:
   docker_mount_cwd_to_workspace: false
   docker_run_as_host_user: false
   docker_network: true
-  # network 가 없으면 망 인자만 뺀다. label 은 정책에 등록된 profile 이름으로 만든다.
+  # network 가 없으면 망 인자만 뺀다. label 은 실행할 profile 이름으로 만든다.
   docker_extra_args: ["--network=<profile 의 network>", "--label=fos-sandbox-profile=<profile>"]
   docker_volumes:
     - <workspace_root>/<sandbox_owner>:/workspace

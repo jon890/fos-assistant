@@ -169,6 +169,9 @@ v0.21.4 이후의 host singleton 과 multiplex 정책은 [「연동에 영향을
 
 상태 확인과 다시 시작 같은 운영 명령은 비공개 저장소 `fos-home-infra` 가 갖는다.
 
+재시작 감지는 gateway 가 다시 뜰 때 새 pid 로 뜬다는 것과, 대시보드 plugin 이 같은 컨테이너의 같은 pid 공간에서 그 pid 를 읽는다는 것에 기댄다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md)).
+plugin 은 기본 root 의 `gateway.pid` 를 정리 없는 `get_running_pid` 로 읽고 `/proc` 의 시작 시각을 답한다. pid 를 그대로 둔 채 다시 읽는 방식의 재시작으로 바뀌면 기동 시각이 바뀌지 않아 재시작 대기가 풀리지 않는다. Hermes 를 올릴 때 이 두 가지를 다시 본다. 기동 시각은 Hermes 컨테이너 커널의 시계이고 Control Plane 의 대기 시각과 비교하므로, 두 시계가 맞는다는 것(같은 호스트나 시간 동기화)도 전제다.
+
 `hermes gateway start` 로 띄운 프로세스는 s6 밖에서 돈다.
 포트는 응답하지만 컨테이너를 다시 띄우면 사라지고 s6 가 되살리지 않는다.
 
@@ -2556,7 +2559,7 @@ Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이�
 | 경로 | 결과 |
 | --- | --- |
 | API server `GET /v1/skills` | v0.21.5 에서 늘 500. `_handle_skills` 가 `_find_all_skills` 에 없는 인자 `include_editorial` 을 넘겨 `TypeError` 가 난다. 테스트는 그 함수를 mock 으로 바꿔 두어 잡지 못한다 |
-| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
+| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. 대시보드 plugin 은 Control Plane 의 요청에 profile 의 설치 소유 기록과 스킬 파일을 확인해 설치된 플러그인 스킬에만 `connector_id`, `connector_title` 을 더한다. 플러그인 이름을 읽을 수 없으면 id 를 제목으로 쓴다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
 | 대시보드 `GET /api/skills/content?name=&profile=` | `SKILL.md` 원문 |
 
 슬래시로 부를 수 있는 이름의 목록을 주는 HTTP 경로는 없다. 이름 규칙대로 계산한다.

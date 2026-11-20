@@ -27,6 +27,7 @@ from .image_source import (
     release as release_sources,
 )
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
+from .next_step import alternative, ask_user
 
 
 
@@ -40,10 +41,10 @@ REQUIRED_TOOLS = frozenset({"memory_read", "memory_search", "artifact_write", "f
 
 # 모델이 스킬을 만들고 고치는 도구다. Hermes `tools/skill_manager_tool.py` 가 이 이름으로 등록한다.
 SKILL_MANAGE_TOOL = "skill_manage"
-SKILL_MANAGE_MESSAGE = "이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다"
-DELEGATE_IMAGE_MESSAGE = "하위 에이전트에는 로컬 사진 경로를 넘길 수 없다. HTTP(S) 주소나 이미지 data URL 을 쓴다"
+SKILL_MANAGE_MESSAGE = ask_user("이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다")
+DELEGATE_IMAGE_MESSAGE = alternative("하위 에이전트에는 로컬 사진 경로를 넘길 수 없다", "HTTP(S) 주소나 이미지 data URL 로 바꿔 넘긴다")
 
-BLOCK_MESSAGE = (
+BLOCK_MESSAGE = ask_user(
     "fos-ctx: 이 호출의 run 맥락을 서명하지 못해 막았다. "
     "profile 의 MCP 토큰이나 session 정보가 없다."
 )

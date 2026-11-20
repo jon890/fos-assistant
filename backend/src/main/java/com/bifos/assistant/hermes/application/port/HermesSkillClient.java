@@ -16,7 +16,10 @@ public interface HermesSkillClient {
      *
      * @param enabled 전역 {@code skills.disabled} 만 반영한 값
      */
-    record HermesSkill(String name, String description, boolean enabled) {
+    record HermesSkill(String name, String description, boolean enabled, String connectorTitle) {
+        public HermesSkill(String name, String description, boolean enabled) {
+            this(name, description, enabled, null);
+        }
     }
 
 

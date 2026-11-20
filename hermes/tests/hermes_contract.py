@@ -105,6 +105,9 @@ SYMBOLS = {
     ("hermes_constants", "reset_hermes_home_override"): Call(positional=1),
     ("gateway.control_socket", "reload_gateway_plugins"): Call(
         positional=1, keywords=("profile_home",), returns="Optional[dict[str, Any]]"),
+    # 재시작 감지가 공유 gateway 의 pid 를 정리 없이 읽는다(ADR-20261120 / connector-auto-apply).
+    ("gateway.status", "get_running_pid"): Call(
+        positional=1, keywords=("cleanup_stale",), returns="Optional[int]"),
     # 도구와 실행 공간 설정
     ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="set[str]"),
     ("hermes_cli.tools_config", "_get_plugin_toolset_keys"): Call(),

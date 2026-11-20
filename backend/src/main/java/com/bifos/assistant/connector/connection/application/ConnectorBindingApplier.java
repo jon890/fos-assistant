@@ -12,18 +12,9 @@ import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
-import com.bifos.assistant.notification.application.NotificationService;
-import com.bifos.assistant.notification.domain.NotificationTarget;
-import com.bifos.assistant.notification.domain.type.NotificationKind;
-import com.bifos.assistant.notification.domain.type.NotificationTargetType;
-import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.user.application.port.SignInRevocation;
-import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@link ConnectorBindingService#resync} 가 갖는다.
  *
  * <p>정의 어긋남 점검도 맡는다(ADR-20261009 / connector-install-drift). manifest 가 바뀐 뒤 설치가 다시 보내지지 않아 설치 상태가
- * 어긋난 {@code READY} 바인딩을 찾아 반영 맞추기를 돌리고, 관리자가 할 일이 남으면 그 그룹 관리자에게 알린다. 점검 위치와 바인딩마다의
+ * 어긋난 {@code READY} 바인딩을 찾아 반영 맞추기를 돌린다. 관리자 알림은 {@link ConnectorBindingAlerts} 가 실패 표시와 대기 시각으로 보낸다. 점검 위치와 바인딩마다의
  * 연속 어긋남 횟수는 이 컴포넌트의 필드(JVM 메모리)다. Control Plane 이 한 대이고 예약 작업이 스레드 하나에서 차례로 돈다는
  * 전제다. 다시 띄우면 처음부터 센다.
  */
@@ -51,23 +42,22 @@ public class ConnectorBindingApplier {
     /** 연속 어긋남이 이 횟수에 이르면 설치를 다시 보내지 않고 {@code PENDING} 으로만 둔다. 같은 어긋남에 설치를 되풀이해 보내지 않는다. */
     private static final int DRIFT_STREAK_LIMIT = 3;
 
-    private static final String REINSTALLED_TITLE = "연결 설치를 다시 맞췄어요";
-
     private final ConnectorBindingService service;
     private final ConnectorBindingRepository bindings;
     private final AgentRepository agents;
-    private final AppUserRepository users;
     private final HermesConnectorClient connector;
     /** Spring Boot 가 transaction manager 로 만든 기본 설정이다. 바인딩마다 트랜잭션을 따로 연다. */
     private final TransactionTemplate transactions;
 
     private final Clock clock;
-    private final NotificationService notifications;
-    private final SignInRevocation access;
     private final ConnectorBindingProperties properties;
     private final ConnectorInstallAttempts attempts;
     /** 껐다 켜기 단계를 진행한다(ADR-20261120 / connector-auto-apply). 반영 예정 확인과 같은 주기에 돈다. */
     private final ConnectorBindingCycles cycles;
+    /** 공유 gateway 가 다시 뜬 뒤 재시작 대기 바인딩을 반영 맞춘다(ADR-20261120 / connector-auto-apply). 같은 주기에 돈다. */
+    private final ConnectorGatewayRestarts restarts;
+    /** 실패했거나 오래 남은 대기를 그룹 관리자에게 알린다(ADR-20261120 / connector-auto-apply). 같은 주기의 마지막에 돈다. */
+    private final ConnectorBindingAlerts alerts;
 
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
@@ -85,6 +75,8 @@ public class ConnectorBindingApplier {
     public void runScheduled() {
         applyDue();
         cycles.advance();
+        restarts.detect();
+        alerts.notifyDue();
     }
 
 
@@ -198,11 +190,10 @@ public class ConnectorBindingApplier {
      * 아니게 됐으면 연속 횟수를 지우고 건너뛴다. 잠금 확인이 실패하면 횟수를 그대로 두고 건너뛴다. 다시 맞춘 바인딩은 {@code READY} 가
      * 아니어서 다음 주기의 대상이 아니다. 다시 맞춰 {@code READY} 가 됐는데 이번에 처리하면 연속 {@value #DRIFT_STREAK_LIMIT} 번째
      * 어긋남이면 설치를 보내지 않고 {@code PENDING} 으로만 둔다. 연속 횟수는 반영 맞추기를 돌린 트랜잭션이 커밋된 뒤에만 올린다. 상한이라
-     * {@code PENDING} 으로 둔 트랜잭션이 커밋되면 횟수를 지워, 관리자 반영 완료로 다시 {@code READY} 가 된 뒤 어긋나면 1 부터 센다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
+     * {@code PENDING} 으로 둔 트랜잭션이 커밋되면 횟수를 지워, 관리자 다시 확인으로 다시 {@code READY} 가 된 뒤 어긋나면 1 부터 센다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
      *
-     * <p>재시작 대기나 {@code PENDING} 으로 남은 바인딩은 연결 사용자의 그룹마다 세고, 주기 끝에 그룹마다 따로 트랜잭션을 열어 차단되지
-     * 않은 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다. 알림은 바인딩 상태와
-     * 한 트랜잭션이 아니다. 알림을 만들지 못해도 바인딩 상태는 이미 커밋돼 관리자 목록에 보이므로 경고만 남긴다.
+     * <p>관리자 알림은 여기서 보내지 않는다. 연속 상한이나 카탈로그 실패로 {@code PENDING} 이 된 바인딩은 실패 표시가, 재시작 대기나 껐다
+     * 켜기가 된 바인딩은 대기 시각이 {@link ConnectorBindingAlerts} 의 대상이 된다(ADR-20261120 / connector-auto-apply).
      *
      * @return 반영 맞추기를 돌린 바인딩 수
      */
@@ -211,7 +202,6 @@ public class ConnectorBindingApplier {
         List<ReadyBinding> ready = bindings.findReadyAfter(BindingStatus.READY, driftCursor, PageRequest.of(0, batch));
         driftCursor = ready.size() < batch ? 0L : ready.get(ready.size() - 1).bindingId();
         int resynced = 0;
-        Map<Long, AdminTodo> todos = new LinkedHashMap<>();
         for (ReadyBinding candidate : ready) {
             ResyncOutcome reason;
             try {
@@ -236,18 +226,15 @@ public class ConnectorBindingApplier {
                     continue;
                 }
                 if (drifted.attempt() != null) {
-                    Optional<ResyncOutcome> outcome = service.execute(drifted.attempt());
-                    if (outcome.isEmpty()) {
+                    // 결과가 버려졌거나 그 사이 바인딩이 지워졌으면 세지 않는다.
+                    if (service.execute(drifted.attempt()).isEmpty() || !bindings.existsById(candidate.bindingId())) {
                         continue;
                     }
-                    drifted = transactions.execute(status -> summarize(candidate, outcome.get()));
-                    if (drifted == null) {
-                        continue;
-                    }
+                    drifted = new Drifted(true, true, null);
                 }
                 if (drifted.counted()) {
                     if (streak >= DRIFT_STREAK_LIMIT) {
-                        // 상한으로 PENDING 이 됐다. 관리자 반영 완료로 READY 가 된 뒤 다시 어긋나면 1 부터 센다.
+                        // 상한으로 PENDING 이 됐다. 관리자 다시 확인으로 READY 가 된 뒤 다시 어긋나면 1 부터 센다.
                         driftStreak.remove(candidate.bindingId());
                     } else {
                         driftStreak.put(candidate.bindingId(), streak);
@@ -256,9 +243,6 @@ public class ConnectorBindingApplier {
                 if (drifted.resynced()) {
                     resynced++;
                 }
-                if (drifted.adminTodo()) {
-                    todos.merge(drifted.groupId(), new AdminTodo(1, drifted.restartRequired()), AdminTodo::plus);
-                }
             } catch (RuntimeException ex) {
                 log.warn(
                     "connector binding {} failed at drift: {}",
@@ -266,7 +250,6 @@ public class ConnectorBindingApplier {
                     ex.getClass().getSimpleName());
             }
         }
-        todos.forEach(this::notifyAdmins);
         return resynced;
     }
 
@@ -278,7 +261,7 @@ public class ConnectorBindingApplier {
      */
     private Drifted resyncDriftedLocked(ReadyBinding candidate, int streak, List<ConnectorManifest> catalog) {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
-        AppUser owner = service.lockOwner(candidate.userId());
+        service.lockOwner(candidate.userId());
         boolean target = agents.findByIdForUpdate(candidate.agentId())
             .filter(found -> !found.isDeleted())
             .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
@@ -289,95 +272,26 @@ public class ConnectorBindingApplier {
             return null;
         }
         if (!target) {
-            return new Drifted(null, false, false, false, false, null);
+            return new Drifted(false, false, null);
         }
         Instant now = clock.instant();
-        if (streak >= DRIFT_STREAK_LIMIT) {
+        if (streak >= DRIFT_STREAK_LIMIT || catalog == null) {
             binding.pending(now);
             binding.markApplyFailed(now);
             bindings.save(binding);
-            return Drifted.pending(owner.groupId(), binding, true);
+            return new Drifted(false, streak >= DRIFT_STREAK_LIMIT, null);
         }
-        if (catalog == null) {
-            binding.pending(now);
-            binding.markApplyFailed(now);
-            bindings.save(binding);
-            return Drifted.pending(owner.groupId(), binding, false);
-        }
-        ConnectorBindingAttempt attempt = automatic(binding, manifest(catalog, candidate.connectorId()), now);
-        return new Drifted(owner.groupId(), false, false, binding.restartRequired(), false, attempt);
-    }
-
-
-    /** 설치 결과가 커밋된 뒤 관리자 알림에 필요한 현재 상태만 읽는다. */
-    private Drifted summarize(ReadyBinding candidate, ResyncOutcome outcome) {
-        ConnectorBinding binding = bindings.findById(candidate.bindingId()).orElse(null);
-        AppUser owner = users.findById(candidate.userId()).orElse(null);
-        if (binding == null || owner == null) {
-            return null;
-        }
-        // 껐다 켜기는 사람 없이 끝나므로 관리자에게 할 일을 남기지 않는다(ADR-20261120 / connector-auto-apply).
-        boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED
-            && outcome != ResyncOutcome.CYCLE_PENDING;
-        return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired(), true, null);
-    }
-
-
-    /** 한 그룹의 차단되지 않은 관리자마다 알림 한 건을 남긴다. 그룹마다 트랜잭션을 따로 연다. */
-    private void notifyAdmins(Long groupId, AdminTodo todo) {
-        String body = todo.restartRequired()
-            ? "커넥터 정의가 바뀌어 연결 " + todo.count() + "개를 다시 설치했어요. 공유 gateway 를 재시작한 뒤 「연결 반영 확인」에서 반영 완료를 눌러 주세요."
-            : "커넥터 정의가 바뀐 연결 " + todo.count() + "개의 반영을 확인하지 못했어요. 「연결 반영 확인」에서 반영 완료를 눌러 다시 확인해 주세요.";
-        try {
-            transactions.executeWithoutResult(status -> {
-                for (AppUser admin : users.findByGroupIdAndRole(groupId, UserRole.ADMIN)) {
-                    if (!access.revoked(admin.email())) {
-                        notifications.notify(
-                            admin.id(),
-                            NotificationKind.CONNECTOR_REINSTALLED,
-                            REINSTALLED_TITLE,
-                            body,
-                            new NotificationTarget(NotificationTargetType.ADMIN_CONNECTIONS, null));
-                    }
-                }
-            });
-        } catch (RuntimeException ex) {
-            log.warn(
-                "connector drift notification failed for group {}: {}",
-                groupId,
-                ex.getClass().getSimpleName());
-        }
+        return new Drifted(false, false, automatic(binding, manifest(catalog, candidate.connectorId()), now));
     }
 
 
     /**
      * 어긋난 바인딩 하나에 한 일이다.
      *
-     * @param groupId 잠근 연결 사용자의 그룹
      * @param resynced 반영 맞추기를 돌렸는가
-     * @param adminTodo 관리자가 할 일이 남았는가. 재시작 대기나 {@code PENDING} 으로 남았다
-     * @param restartRequired 재시작 대기인가
-     * @param attempt 커밋한 설치 입력. 설치를 보내지 않는 처리면 null
      * @param counted 연속 어긋남 횟수를 바꾸는가. 반영 맞추기를 돌렸으면 올리고, 연속 상한이라 {@code PENDING} 으로만 뒀으면 지운다
+     * @param attempt 커밋한 설치 입력. 설치를 보내지 않는 처리면 null
      */
-    private record Drifted(
-        Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired, boolean counted, ConnectorBindingAttempt attempt) {
-
-        /** 반영 맞추기를 돌리지 않고 {@code PENDING} 으로만 둔 바인딩이다. */
-        static Drifted pending(Long groupId, ConnectorBinding binding, boolean counted) {
-            return new Drifted(groupId, false, true, binding.restartRequired(), counted, null);
-        }
-    }
-
-    /**
-     * 한 그룹에서 관리자가 할 일이 남은 바인딩 수다.
-     *
-     * @param restartRequired 그 가운데 재시작 대기가 하나라도 있는가
-     */
-    private record AdminTodo(int count, boolean restartRequired) {
-
-        AdminTodo plus(AdminTodo other) {
-            return new AdminTodo(count + other.count, restartRequired || other.restartRequired);
-        }
+    private record Drifted(boolean resynced, boolean counted, ConnectorBindingAttempt attempt) {
     }
 }

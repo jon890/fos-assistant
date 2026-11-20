@@ -137,6 +137,8 @@ session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없�
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 `McpToolService.invalidContext()` 의 문구다.
+
+모델에게 가는 실패 글(도구 결과의 `isError` 참, JSON-RPC 인자 오류)은 「다음 방법: …」 이나 「사용자에게 바로 알린다.」 한 줄로 끝난다. 실패 결과 함수(`McpToolService.failure`, `jsonFailure`, `McpRpc.invalidParams`)가 `ToolFailureText` 만 받아 끝 줄 없는 글은 컴파일되지 않는다. JSON 실패는 같은 줄을 `next` 칸에 둔다. 기준은 [도구 실패 뒤 다른 방법 설계](tool-fallback/design.md) 의 「바꾸는 실패 글」 이다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
 까닭은 서버 로그에만 남는다. 압축 교체일 수 있는 경우(`DELEGATION_CONTEXT_UNAVAILABLE`), 등록이 없는 하위 에이전트(`SUBAGENT_SESSION_UNREGISTERED`), 중지된 origin(`ORIGIN_CANCELLED`)을 따로 남긴다.
 
@@ -167,15 +169,16 @@ fos-ctx 는 Hermes 의 `image_generate` 가 만든 그림을 `POST /internal/her
 
 ### Control Plane MCP
 
-Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기, 플러그인 목록 읽기, 예약 작업 다루기를 Control Plane 의 MCP 서버 하나가 맡는다.
+Memory 제목 검색과 본문 읽기, 기억 남기기와 지우기 청하기, 결과물 쓰기, 할 일 남기기와 끝내기, 다른 에이전트에게 맡기기, 플러그인 목록 읽기와 붙이기 청하기, 예약 작업 다루기를 Control Plane 의 MCP 서버 하나가 맡는다.
 서버 이름, 경로, 프로토콜 버전, 도구 목록은 `McpController` 와 `McpToolService` 가 갖는다. Hermes 는 이 서버의 도구를 `mcp__fos_assistant__<도구>` 로 보인다.
 
-**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_TASK_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
+**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_DIRECT_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
 
 - 제목 검색을 포함한 읽기와 위임 도구는 받는다. 플러그인 목록 읽기(`connector_list`)도 읽기라 받는다
 - 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 와 `file_space_put` 을 더 받는다. `file_space_put` 은 대화 인자가 없어 origin 실행의 대화가 점검 대화인지로 본다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
 - 예약 작업 목록(`task_list`)과, 지우지 않고 승인 카드만 띄우는 `task_delete` 는 늘 받는다. 바로 바꾸는 `task_create`, `task_update`, `task_set_state` 는 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(서비스 개념 스펙 DECISION32)
-- `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
+- `follow_up_propose` 와 챙기는 할 일을 읽는 `follow_up_list` 는 쓰기 도구 허용과 관계없이 받는다. 살펴보기의 할 일은 제안만 하고 사람이 받아들여야 챙긴다. 할 일을 끝내는 `follow_up_done` 은 쓰기 도구를 허용한 살펴보기만 받고, 받더라도 살펴보기 트리에서는 상태를 바꾸지 않는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
+- 지우지 않고 승인 카드만 띄우는 `memory_forget` 과, 붙이지 않고 승인 카드만 띄우는 `connector_attach` 는 늘 받는다
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`docs/features/proactive.md`](proactive.md) 의 「읽기 경계」).
@@ -186,7 +189,8 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `memory_search` | [`docs/features/memory.md`](memory.md) 의 「기억 검색의 구현 계약」. 현재 origin의 권한으로 제목과 일반 본문을 관련도 순으로 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`docs/features/agent-skill.md`](agent-skill.md) 의 「다른 에이전트에게 맡기기」 |
-| `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |
+| `follow_up_propose`, `follow_up_list`, `follow_up_done` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 와 [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」. 사용자가 직접 시킨 할 일만 바로 만들고 끝낸다 |
+| `memory_forget` | [서비스 개념 설계](service-concepts/design.md) 의 「PR3 할 일과 기억 도구」. 기억 지우기 승인 카드만 띄운다. 결과에 기억의 글이 없다 |
 | `content_draft_write`, `content_draft_read` | [원고 저장 계약](content-draft.md#mcp와-배치) |
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
 | `content_draft_image` | [만든 그림을 원고에 넣기](content-draft.md#만든-그림을-원고에-넣기) |
@@ -194,6 +198,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
 | `file_space_put` | 아래 「파일 공간에 넣는 도구」 |
 | `connector_list` | [서비스 개념 설계](service-concepts/design.md) 의 「`connector_list`」. 요청자의 플러그인마다 연결 상태, 이 에이전트에 붙은 상태, 연결 화면 링크를 준다. 결과는 바깥 글이 아니라 기억 바로 저장 판정의 내부 도구다 |
+| `connector_attach` | [서비스 개념 설계](service-concepts/design.md) 의 「PR4 연결 붙이기 승인 카드」. 요청자의 연결을 이 실행의 에이전트에 붙이는 승인 카드만 띄운다. 결과에 플러그인의 이름이 없고 기억 바로 저장 판정의 내부 도구다 |
 | `task_list`, `task_create`, `task_update`, `task_set_state`, `task_delete` | [서비스 개념 설계](service-concepts/design.md) 의 「PR2 예약 작업 도구」. 요청자의 일반 예약 작업만 다룬다. 지우기는 승인 카드만 띄운다. 결과는 기억 바로 저장 판정의 내부 도구다 |
 | `approval_resume` | [browser-cowork 설계](browser-cowork/design.md) 의 「PR4 이어 가기」. 호출한 대화의 사람 기다림 승인 하나를 같은 승인으로 한 번 더 실행한다 |
 
@@ -259,5 +264,5 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 - 인자는 `path`(필수), `title`, `description` 뿐이다. 대화와 사용자는 인자로 받지 않고 서명한 `_fos_ctx` 의 origin 실행에서 정한다
 - `path` 가 그 대화의 결과물 폴더 경로로 시작하거나 상대 경로면 결과물 폴더의 파일이다. `/workspace/` 로 시작하면 origin 실행의 에이전트가 쓰는 실행 공간(`Agent.sandboxOwner()`)의 파일이다. 그 밖의 절대 경로는 찾지 못한 것으로 답한다. `/workspace/` 가 아닌 경로에서 찾지 못하면 실패 글에 실행 공간에서 만든 파일은 `/workspace/` 경로로 다시 부르라는 안내를 덧붙인다. 실행 공간의 파일 도구가 결과물 폴더 경로에 쓴 파일은 Control Plane 에 보이지 않기 때문이다
 - 실행 공간은 Control Plane 이 읽기 전용으로 붙인 루트에서 링크를 따라가지 않고 읽는다. `mcp` 가 `workspace` 를 부르지 못해 `mcp.application.port.SandboxFiles` 를 `workspace` 가 구현한다
-- 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담는다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
+- 결과는 성공이면 `saved`, `already`, `title`, `message` 를 담은 글이다. 실패면 `isError` 이고 「파일 공간에 넣지 못했다」 로 시작해 까닭(`UNSUPPORTED_TYPE`, `TOO_LARGE`, `QUOTA_FULL`, `NOT_FOUND`, `UNAVAILABLE`)과 「사용자에게 넣었다고 말하지 않는다」 를 담고 끝 줄로 끝난다. 호스트 경로와 내부 번호는 결과와 로그에 담지 않는다
 - 보관 자리가 차 있으면 10초까지 기다린다

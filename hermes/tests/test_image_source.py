@@ -203,12 +203,14 @@ class LinkTest(ImageSourceFixture):
 
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
-                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
+                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 같은 인물의 다음 장면을",
+                     "  다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
             self.assertIn(line, decision["message"])
-        self.assertTrue(decision["message"].endswith("사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."))
+        # 줄마다 끝 줄이 붙고 글 전체는 마지막 문제의 끝 줄로 끝난다(tool-fallback 스펙 REQ3)
+        self.assertTrue(decision["message"].endswith("사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"))
 
     def test_attachment_received_but_link_failed_blocks_and_forgets(self):
         """첨부는 받았어도 링크 하나를 못 받으면 막고, 받은 첨부 사본을 지우며 링크를 기억하지 않는다."""
@@ -287,7 +289,7 @@ class PromptFrameTest(ImageSourceFixture):
             session_id=base.VECTOR_SESSION, tool_call_id="call_1")
 
         self.assertEqual(decision["action"], "block")
-        self.assertIn("link:shop.example.com/goods/1: 링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다. "
+        self.assertIn("link:shop.example.com/goods/1: 링크를 열지 못했다. 쇼핑몰이 막았을 수 있다. "
                       "같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
                       "image_generate 를 다시 부르고", decision["message"])
         self.assertNotIn("generated:공원의 가족:", decision["message"])
@@ -305,7 +307,7 @@ class PromptFrameTest(ImageSourceFixture):
             session_id=base.VECTOR_SESSION, tool_call_id="call_1")
 
         self.assertEqual(decision["action"], "block")
-        self.assertIn("generated:공원의 가족: 지웠거나 보관 기간이 지나 쓸 수 없다. 같은 인물의 다음 장면을 그리던 중이면 "
+        self.assertIn("generated:공원의 가족: 지웠거나 보관 기간이 지나 쓸 수 없다\n  다음 방법: 같은 인물의 다음 장면을 그리던 중이면 "
                       "이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고", decision["message"])
         self.assertIn("attachment:13: 지웠거나 보관 기간이 지나 쓸 수 없다\n", decision["message"])
         self.assertEqual(self.copied(), [])
@@ -318,7 +320,9 @@ class RejectTest(ImageSourceFixture):
         self.assertEqual(decision["action"], "block")
         for line in lines:
             self.assertIn(line, decision["message"])
-        self.assertTrue(decision["message"].endswith("사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."))
+        self.assertTrue(decision["message"].startswith("fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없어 그림을 만들지 않았다."))
+        last = decision["message"].rsplit("\n", 1)[-1].strip()
+        self.assertTrue(last.startswith("다음 방법: ") or last == "사용자에게 바로 알린다.", decision["message"])
 
     def test_paths_urls_and_data_urls_are_blocked_without_asking(self):
         """경로, 주소, data URL 은 Control Plane 에 묻지 않고 막는다. 실행 공간의 다른 대화 사진을 읽지 못한다."""

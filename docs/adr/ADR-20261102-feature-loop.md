@@ -83,7 +83,7 @@ docs-consolidate 는 채택한 공통 규칙을 「기존 계약 또는 `docs/co
 순서는 이렇다.
 
 1. 작성자가 Draft PR 을 연다.
-2. Draft CI 가 통과하면 최신 main 을 merge 한다.
+2. Draft CI 가 통과한다. main 은 충돌이 났거나 머지 큐·코디네이터가 요청할 때만 합친다.
 3. 위 표대로 검증한다. 독립 verify 는 인수 조건별 증거와 코드, 문서 검토를 받는다. 이것이 Draft 의 독립 리뷰이고 별도 리뷰 에이전트는 띄우지 않는다.
 4. 검증을 통과해야 Ready 로 올린다.
 5. Ready 뒤 GitHub 의 `claude-review` 가 한 번 더 본다. 그 지적은 한 번에 반영한다.

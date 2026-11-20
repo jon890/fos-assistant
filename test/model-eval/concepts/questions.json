@@ -149,16 +149,37 @@
       }
     },
     {
+      "id": "memory-forget-card",
+      "concept": "memory",
+      "messages": [
+        "우리 집 강아지 이름은 초코야. 기억해 둬",
+        "방금 말한 강아지 이름 기억은 지워 줘"
+      ],
+      "expect": {
+        "tools": [
+          "memory_forget"
+        ],
+        "includes": [
+          "승인"
+        ],
+        "absent": [
+          "지웠어요",
+          "지웠습니다"
+        ]
+      }
+    },
+    {
       "id": "followup-add",
       "concept": "follow_up",
       "messages": [
         "다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬"
       ],
       "expect": {
-        "includes": [
-          "지금 볼 것",
-          "/now",
-          "할 일"
+        "tools": [
+          "follow_up_propose"
+        ],
+        "linkPrefixes": [
+          "/now"
         ],
         "absent": [
           "어느 앱"
@@ -169,17 +190,27 @@
       "id": "followup-done",
       "concept": "follow_up",
       "messages": [
-        "병원 예약하기 그거 끝냈어. 할 일에서 지워 줘"
+        "다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬",
+        "병원 예약하기 그거 끝냈어"
+      ],
+      "expect": {
+        "tools": [
+          "follow_up_done"
+        ],
+        "linkPrefixes": [
+          "/now"
+        ]
+      }
+    },
+    {
+      "id": "followup-self",
+      "concept": "follow_up",
+      "messages": [
+        "내 할 일 목록은 어디서 봐?"
       ],
       "expect": {
         "linkPrefixes": [
           "/now"
-        ],
-        "absent": [
-          "지웠어요",
-          "지웠습니다",
-          "끝냄으로 바꿨어요",
-          "끝냄으로 바꿨습니다"
         ]
       }
     },
@@ -199,6 +230,24 @@
         "absent": [
           "연결했어요",
           "연결했습니다"
+        ]
+      }
+    },
+    {
+      "id": "connection-attach",
+      "concept": "connection",
+      "messages": [
+        "{connectorTitle} 연결 마쳤어. 이 에이전트에서 쓰게 해 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/connections/{connectorId}"
+        ],
+        "absent": [
+          "연결했어요",
+          "연결했습니다",
+          "붙였어요",
+          "붙였습니다"
         ]
       }
     },

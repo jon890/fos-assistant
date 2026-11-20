@@ -102,6 +102,12 @@ assistant:
       apply-cron: "-"
       # 정의 어긋남 점검도 끈다. 검사는 resyncDrifted 를 직접 부른다
       drift-cron: "-"
+    oauth:
+      # 예약 갱신도 끈다. 검사는 refreshDue 를 직접 부른다
+      refresh-cron: "-"
+    ops:
+      # 운영 값이 아니다. 재시작 조회 검사 전용 토큰이다
+      token: test-ops-token
   proactive-check:
     # 아래 hermes.run-timeout(1s) 보다 짧아야 기동한다. 살펴보기 turn 을 돌리는 검사는 두 값을 함께 올린다
     max-duration: 500ms

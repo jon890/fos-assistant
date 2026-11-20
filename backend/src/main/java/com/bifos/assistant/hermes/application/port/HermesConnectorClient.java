@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.util.List;
 import java.util.Map;
@@ -152,7 +153,13 @@ public interface HermesConnectorClient {
      *
      * @param ownerBrowser {@link #call} 과 같다
      */
-    CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser);
+    default CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
+        return callWithVault(connectorId, tool, vault, ownerBrowser, null);
+    }
+
+
+    /** OAuth 확인은 대기 또는 본 연결의 토큰 통로 주소를 확인 도구의 환경에 함께 넣는다. */
+    CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser, VaultAccess oauth);
 
 
     /**

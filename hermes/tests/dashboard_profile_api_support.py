@@ -120,6 +120,10 @@ class ProfileApiRouteTest(unittest.TestCase):
         gateway = types.ModuleType("gateway")
         control = types.ModuleType("gateway.control_socket")
         gateway.control_socket = control
+        cls.gateway_status = types.ModuleType("gateway.status")
+        gateway.status = cls.gateway_status
+        # 공유 gateway 가 떠 있지 않다. 기동 시각 검사는 이 함수를 바꿔 끼운다.
+        cls.gateway_status.get_running_pid = lambda pid_path=None, cleanup_stale=True: None
         responses = types.ModuleType("starlette.responses")
         hermes = types.ModuleType("hermes_cli")
         hermes.dashboard_auth = auth
@@ -140,6 +144,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             "starlette.responses": responses,
             "gateway": gateway,
             "gateway.control_socket": control,
+            "gateway.status": cls.gateway_status,
         }
         # 실패 분기는 예외를 로그로 남긴다. 검사 출력에는 결과만 둔다.
         logging.disable(logging.CRITICAL)
@@ -196,7 +201,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         cls.profiles.profile_exists = lambda name: (cls.root / name).is_dir()
         cls.profiles.delete_profile = delete_profile
         cls.profiles.NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
-        responses.JSONResponse = lambda body, status_code: types.SimpleNamespace(
+        responses.JSONResponse = lambda body, status_code=200, headers=None: types.SimpleNamespace(
             status_code=status_code, body=body
         )
 
@@ -553,6 +558,19 @@ class ProfileApiRouteTest(unittest.TestCase):
         mcp["mcpServers"][server]["env"][name] = "${%s}" % name
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
+    def declare_oauth(self, connector, server="demo", oauth=None):
+        """시험 플러그인 사본이 단추 연결(`oauth`)을 선언하게 한다(docs/features/connector-oauth/design.md 의 「선언」).
+
+        기본은 GitHub 선언이고 비밀 칸 `token` 을 단추로 채우며 통로 주소를 `DEMO_TOKEN_URL` 로 받는다.
+        """
+        oauth = oauth or {"provider": "github", "fields": ["token"], "token_env": "DEMO_TOKEN_URL"}
+        declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
+        declared["oauth"] = oauth
+        (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((connector / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"][server]["env"][oauth["token_env"]] = "${%s}" % oauth["token_env"]
+        (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+
     def declare_owner_browser(self, connector, server="demo", name="DEMO_BROWSER_URL"):
         """시험 플러그인 사본이 브라우저 중계 주소를 받는 env 를 선언하게 한다(ADR-20261008 browser-gateway-token)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
@@ -605,7 +623,15 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request("/api/profiles", "POST", token="valid",
                             body=body if body is not None else {"name": "alice", "no_skills": True})
 
-    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None, full_response=False):
+    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None,
+                full_response=False, *, skills_payload=None):
+        response = asyncio.run(self.send(
+            path, method, token, cookie, body, query_profiles, query, skills_payload=skills_payload))
+        return response if full_response else response.status_code
+
+    async def send(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None,
+                   *, skills_payload=None):
+        """미들웨어를 한 번 거친 응답이다. 요청 둘을 한 이벤트 루프에서 함께 보낼 때 쓴다."""
         pairs = [("profile", value) for value in query_profiles] + list((query or {}).items())
 
         class QueryParams:
@@ -633,6 +659,12 @@ class ProfileApiRouteTest(unittest.TestCase):
             authenticated = getattr(current.state, "token_authenticated", False)
             if not (authenticated or current.cookie):
                 return types.SimpleNamespace(status_code=401)
+            if path == "/api/skills" and method == "GET" and skills_payload is not None:
+                async def body_iterator():
+                    yield json.dumps(skills_payload).encode("utf-8")
+
+                return types.SimpleNamespace(status_code=200, headers={}, body=skills_payload,
+                                             body_iterator=body_iterator())
             if path == "/api/profiles" and method == "POST":
                 # 처리기 흉내. 실패 응답이면 아무것도 만들지 않는다.
                 if self.handler_status < 400:
@@ -658,8 +690,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                 target.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return types.SimpleNamespace(status_code=204 if authenticated else 200)
 
-        response = asyncio.run(self.gate(request, call_next))
-        return response if full_response else response.status_code
+        return await self.gate(request, call_next)
 
     def assert_rolled_back(self, status, deleted=("alice",)):
         self.assertEqual(status, 500)

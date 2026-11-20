@@ -174,7 +174,7 @@ class McpArtifactWriteToolTest {
 
         assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
         assertThat(rejected.path("result").path("content").get(0).path("text").asString())
-            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.");
         assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
     }
 
@@ -205,7 +205,7 @@ class McpArtifactWriteToolTest {
             .as("아이의 대화에 쓴 결과: %s", refused)
             .isTrue();
         assertThat(refused.path("result").path("content").get(0).path("text").asString())
-            .isEqualTo("결과물을 저장할 수 없습니다.");
+            .isEqualTo("결과물을 저장할 수 없습니다.\n다음 방법: 다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다");
         assertThat(store.resolveInside(kids.id(), kidsPath)).isEmpty();
     }
 
@@ -232,7 +232,7 @@ class McpArtifactWriteToolTest {
             .as("부모를 중지한 뒤 쓴 결과: %s", refused)
             .isTrue();
         assertThat(refused.path("result").path("content").get(0).path("text").asString())
-            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.");
         assertThat(store.resolveInside(own.id(), path)).isEmpty();
     }
 
@@ -353,10 +353,10 @@ class McpArtifactWriteToolTest {
         JsonNode url = body(invalidUrl);
 
         assertThat(extension.path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(extension.path("error").path("data").asString()).isEqualTo("허용하지 않은 확장자입니다.");
-        assertThat(path.path("error").path("data").asString()).isEqualTo("경로 형식이 올바르지 않습니다.");
-        assertThat(large.path("error").path("data").asString()).isEqualTo("파일 크기가 5MB를 초과했습니다.");
-        assertThat(url.path("error").path("data").asString()).isEqualTo("주소 형식이 올바르지 않습니다.");
+        assertThat(extension.path("error").path("data").asString()).isEqualTo("허용하지 않은 확장자입니다.\n다음 방법: 경로, 확장자, 크기를 고쳐 다시 부른다");
+        assertThat(path.path("error").path("data").asString()).isEqualTo("경로 형식이 올바르지 않습니다.\n다음 방법: 경로, 확장자, 크기를 고쳐 다시 부른다");
+        assertThat(large.path("error").path("data").asString()).isEqualTo("파일 크기가 5MB를 초과했습니다.\n다음 방법: 경로, 확장자, 크기를 고쳐 다시 부른다");
+        assertThat(url.path("error").path("data").asString()).isEqualTo("주소 형식이 올바르지 않습니다.\n다음 방법: 경로, 확장자, 크기를 고쳐 다시 부른다");
         assertThat(path.toString()).doesNotContain("private.html");
         assertThat(url.toString()).doesNotContain("private=value", "image.png");
     }
@@ -474,7 +474,7 @@ class McpArtifactWriteToolTest {
                 .as("결과: %s", result)
                 .isTrue();
             assertThat(result.path("result").path("content").get(0).path("text").asString())
-                .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
+                .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.\n사용자에게 바로 알린다.");
             assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
         } finally {
             checks.delete(saved);
@@ -509,7 +509,7 @@ class McpArtifactWriteToolTest {
                 .get(0)
                 .path("text")
                 .asString())
-                    .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
+                    .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.\n사용자에게 바로 알린다.");
             assertThat(store.resolveInside(other.id(), path)).as("다른 대화의 파일").isEmpty();
         } finally {
             checks.delete(saved);

@@ -88,7 +88,7 @@ class McpAgentToolsTest {
     private static final String SHARED = "tools-shared";
     private static final String PRIVATE_A = "tools-private-a";
     private static final String TARGET = "tools-target";
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
     private static final String GROUP_CODE = "tools-group";
     private static final String OWN_A_CODE = "tools-own-a";
     private static final String OWN_B_CODE = "tools-own-b";
@@ -1503,7 +1503,7 @@ class McpAgentToolsTest {
         JsonNode result = body(response).path("result");
         assertThat(result.path("isError").asBoolean()).as("실패 결과: %s", result).isTrue();
         JsonNode failure = json.readTree(result.path("content").get(0).path("text").asString());
-        assertThat(failure.propertyNames()).containsExactly("code", "message");
+        assertThat(failure.propertyNames()).containsExactly("code", "message", "next");
         assertThat(failure.path("code").asString()).as("실패 결과: %s", failure).isEqualTo(code);
     }
 

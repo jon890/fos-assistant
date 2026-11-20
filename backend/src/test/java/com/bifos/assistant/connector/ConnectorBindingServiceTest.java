@@ -27,6 +27,8 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
+import com.bifos.assistant.connector.connection.application.ConnectorBrowserBindings;
+import com.bifos.assistant.browser.application.GatewaySecretService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
@@ -37,6 +39,7 @@ import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
@@ -69,6 +72,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -215,6 +219,12 @@ class ConnectorBindingServiceTest {
 
     @Autowired
     BrowserGatewayTokens tokens;
+
+    @Autowired
+    ConnectorBrowserBindings browserBindings;
+
+    @Autowired
+    GatewaySecretService gatewaySecrets;
 
 
     @BeforeEach
@@ -769,6 +779,76 @@ class ConnectorBindingServiceTest {
         assertThat(connection.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(service.bind(owner, agent.code(), PLAIN).bound()).isTrue();
         verify(connector).bindConnector(agent.hermesProfile(), PLAIN, connection.vault(), agent.sandboxOwner(), null);
+    }
+
+
+    @Test
+    @DisplayName("브라우저 플러그인 바인딩 전체 다시 설치는 READY 와 재시작 대기 바인딩을 모두 새 비밀의 표식으로 다시 보내고 다른 플러그인은 건드리지 않는다")
+    void reinstallsEveryBrowserBindingOnly() {
+        CurrentUser first = user(UserRole.MEMBER, 1L);
+        CurrentUser second = user(UserRole.MEMBER, 1L);
+        Agent firstAgent = agent(first, AgentVisibility.PRIVATE);
+        Agent secondAgent = agent(second, AgentVisibility.PRIVATE);
+        connect(first, BROWSER, Map.of());
+        connect(second, BROWSER, Map.of());
+        connect(first, PLAIN, Map.of());
+        service.bind(first, firstAgent.code(), BROWSER);
+        // 두 번째 바인딩은 재시작 없이 반영되는 설치로 붙여 READY 로 만든다.
+        when(connector.bindConnector(eq(secondAgent.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(false, false));
+        service.bind(second, secondAgent.code(), BROWSER);
+        service.bind(first, firstAgent.code(), PLAIN);
+        List<ConnectorBinding> browserRows = bindings.findAllById(bindings.findIdsByConnectorIdIn(Set.of(BROWSER)));
+        assertThat(browserRows).extracting(ConnectorBinding::restartRequired).containsExactlyInAnyOrder(true, false);
+        assertThat(browserBindings.count()).hasValue(2);
+        String oldAddress = tokens.bindingAddress(browserRows.get(0).id()).orElseThrow();
+        gatewaySecrets.regenerate(1L);
+        String newAddress = tokens.bindingAddress(browserRows.get(0).id()).orElseThrow();
+        assertThat(newAddress).isNotEqualTo(oldAddress);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false));
+        clearInvocations(connector);
+
+        BrowserBindingReinstall result = browserBindings.reinstallAll();
+
+        assertThat(result).isEqualTo(new BrowserBindingReinstall(2, 2, 0, false));
+        verify(connector, times(2)).bindConnector(anyString(), eq(BROWSER), anyString(), anyString(), anyString());
+        verify(connector).bindConnector(anyString(), eq(BROWSER), anyString(), anyString(), eq(newAddress));
+        verify(connector, never()).bindConnector(anyString(), eq(PLAIN), anyString(), anyString(), nullable(String.class));
+        assertThat(bindings.findAllById(bindings.findIdsByConnectorIdIn(Set.of(BROWSER)))).hasSize(2)
+            .allSatisfy(binding -> assertThat(binding.restartRequired()).isTrue());
+    }
+
+
+    @Test
+    @DisplayName("한 바인딩의 다시 설치가 실패해도 다음 바인딩으로 가고 실패 수에 센다")
+    void reinstallContinuesAfterOneFailure() {
+        CurrentUser first = user(UserRole.MEMBER, 1L);
+        CurrentUser second = user(UserRole.MEMBER, 1L);
+        Agent firstAgent = agent(first, AgentVisibility.PRIVATE);
+        Agent secondAgent = agent(second, AgentVisibility.PRIVATE);
+        connect(first, BROWSER, Map.of());
+        connect(second, BROWSER, Map.of());
+        service.bind(first, firstAgent.code(), BROWSER);
+        service.bind(second, secondAgent.code(), BROWSER);
+        when(connector.bindConnector(eq(firstAgent.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenThrow(new IllegalStateException("dashboard down"));
+
+        BrowserBindingReinstall result = browserBindings.reinstallAll();
+
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.restartPending()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("플러그인 목록을 읽지 못하면 다시 설치는 예외 없이 그렇다고 돌려주고 수는 비어 있다")
+    void reinstallReportsUnavailableCatalog() {
+        when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
+
+        assertThat(browserBindings.reinstallAll()).isEqualTo(new BrowserBindingReinstall(0, 0, 0, true));
+        assertThat(browserBindings.count()).isEmpty();
     }
 
 

@@ -21,6 +21,7 @@ import urllib.request
 
 from .context import CTX_VERSION, _read_token, logger, root_session, signing_key
 from .tool_guard import guard_url
+from .next_step import ask_user
 
 TOOL = "image_generate"
 VERSION = "v1-generated-image"
@@ -40,8 +41,8 @@ MAX_TITLE_CHARS = 200
 MAX_PROMPT_CHARS = 30_000
 
 SAVED_MESSAGE = "그림을 대화에 저장했다. 사용자의 화면에 자동으로 보인다. 답에 파일 경로나 MEDIA: 를 쓰지 않는다."
-FAILED_MESSAGE = ("그림을 만들었지만 대화에 저장하지 못했다. 사용자에게 그림을 보여 주지 못했다고 알리고 "
-                  "잠시 뒤 다시 부탁하라고 안내한다.")
+FAILED_MESSAGE = ask_user("그림을 만들었지만 대화에 저장하지 못했다. 사용자에게 그림을 보여 주지 못했다고 알리고 "
+                          "잠시 뒤 다시 부탁하라고 안내한다.")
 
 _titles: dict = {}
 _titles_lock = threading.Lock()

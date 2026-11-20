@@ -17,8 +17,10 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingAlerts;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingCycles;
+import com.bifos.assistant.connector.connection.application.ConnectorGatewayRestarts;
 import com.bifos.assistant.connector.connection.application.ConnectorInstallAttempts;
 import com.bifos.assistant.connector.connection.config.ConnectorBindingProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
@@ -37,17 +39,13 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
-import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.Notification;
-import com.bifos.assistant.notification.domain.type.NotificationKind;
-import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -102,8 +100,8 @@ class ConnectorBindingDriftTest {
     /** manifest 가 바뀌어 그 커넥터 항목만 {@code configured} 가 거짓인 설치 상태다. */
     private static final ConnectorState DRIFTED = new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND);
 
-    private static final String RESTART_BODY = "공유 gateway 를 재시작한 뒤";
-    private static final String CONFIRM_ONLY_BODY = "반영을 확인하지 못했어요";
+    /** 자동 반영 실패 알림의 본문 조각이다. 문구는 {@code ConnectorBindingAlerts} 가 갖는다. */
+    private static final String FAILED_BODY = "자동으로 반영하지 못했어요";
 
     @Autowired
     ConnectorBindingService service;
@@ -139,10 +137,10 @@ class ConnectorBindingDriftTest {
     ConnectorBindingCycles cycles;
 
     @Autowired
-    NotificationService notifications;
+    ConnectorGatewayRestarts restarts;
 
     @Autowired
-    SignInRevocation access;
+    ConnectorBindingAlerts alerts;
 
     @Autowired
     HermesConnectorClient connector;
@@ -218,7 +216,7 @@ class ConnectorBindingDriftTest {
 
 
     @Test
-    @DisplayName("같은 profile 의 READY 바인딩 가운데 설치가 어긋난 하나만 다시 설치하고 차단되지 않은 관리자에게만 재시작 안내를 알린다")
+    @DisplayName("같은 profile 의 READY 바인딩 가운데 설치가 어긋난 하나만 다시 설치하고 자동으로 끝날 재시작 대기는 관리자에게 알리지 않는다")
     void reinstallsOnlyDriftedBindingAndNotifiesActiveAdmins(CapturedOutput output) {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
 
@@ -232,16 +230,9 @@ class ConnectorBindingDriftTest {
         assertThat(drifted.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(drifted.restartRequired()).as("재시작 대기").isTrue();
         assertThat(reload(plain).status()).isEqualTo(BindingStatus.READY);
-        List<Notification> sent = notificationsOf(admin.id());
-        assertThat(sent).hasSize(1);
-        Notification notice = sent.get(0);
-        assertThat(notice.kind()).isEqualTo(NotificationKind.CONNECTOR_REINSTALLED);
-        assertThat(notice.title()).isEqualTo("연결 설치를 다시 맞췄어요");
-        assertThat(notice.body()).contains("연결 1개").contains(RESTART_BODY);
-        assertThat(notice.targetType()).isEqualTo(NotificationTargetType.ADMIN_CONNECTIONS);
-        assertThat(notice.targetPublicId()).isNull();
-        assertThat(notificationsOf(revokedAdmin.id())).as("차단된 관리자").isEmpty();
-        assertThat(notificationsOf(owner.id())).as("MEMBER 역할 사용자").isEmpty();
+        assertThat(drifted.waitingSince()).as("24시간을 세는 대기 시각").isNotNull();
+        assertThat(alerts.notifyDue()).isZero();
+        assertThat(notificationsOf(admin.id())).isEmpty();
         assertThat(output.getAll()).contains("connector " + DEMO + " drifted: NOT_INSTALLED");
     }
 
@@ -297,7 +288,7 @@ class ConnectorBindingDriftTest {
 
 
     @Test
-    @DisplayName("다시 맞춘 바인딩은 READY 가 아니어서 다음 점검이 설치를 다시 보내지 않고 알림도 늘지 않는다")
+    @DisplayName("다시 맞춘 바인딩은 READY 가 아니어서 다음 점검이 설치를 다시 보내지 않고 알림도 만들지 않는다")
     void doesNotReinstallAgainOnNextRun() {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
         applier.resyncDrifted();
@@ -308,12 +299,13 @@ class ConnectorBindingDriftTest {
         verify(connector, never())
             .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
-        assertThat(notificationsOf(admin.id())).hasSize(1);
+        alerts.notifyDue();
+        assertThat(notificationsOf(admin.id())).isEmpty();
     }
 
 
     @Test
-    @DisplayName("다시 보낸 설치가 바뀐 것이 없다고 답하고 probe 가 실패하면 PENDING 이고 알림은 반영 완료만 안내한다")
+    @DisplayName("다시 보낸 설치가 바뀐 것이 없다고 답하고 probe 가 실패하면 실패 표시가 남고 관리자에게 다시 확인을 알린다")
     void asksOnlyForConfirmWhenProbeFailsAfterReinstall() {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED, INSTALLED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
@@ -325,9 +317,11 @@ class ConnectorBindingDriftTest {
         ConnectorBinding drifted = reload(demo);
         assertThat(drifted.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(drifted.restartRequired()).isFalse();
+        assertThat(drifted.applyFailedAt()).as("자동 반영 실패").isNotNull();
+        assertThat(alerts.notifyDue()).isEqualTo(1);
         List<Notification> sent = notificationsOf(admin.id());
         assertThat(sent).hasSize(1);
-        assertThat(sent.get(0).body()).contains(CONFIRM_ONLY_BODY).doesNotContain(RESTART_BODY);
+        assertThat(sent.get(0).body()).contains(FAILED_BODY).contains("「다시 확인」");
     }
 
 
@@ -343,6 +337,7 @@ class ConnectorBindingDriftTest {
         ConnectorBinding drifted = reload(demo);
         assertThat(drifted.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(drifted.applyDueAt()).as("반영 예정 시각").isNotNull();
+        alerts.notifyDue();
         assertThat(notificationsOf(admin.id())).isEmpty();
     }
 
@@ -383,14 +378,15 @@ class ConnectorBindingDriftTest {
         verify(connector, times(2))
             .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(alerts.notifyDue()).isEqualTo(1);
         List<Notification> sent = notificationsOf(admin.id());
         assertThat(sent).hasSize(1);
-        assertThat(sent.get(0).body()).contains(CONFIRM_ONLY_BODY);
+        assertThat(sent.get(0).body()).contains(FAILED_BODY);
     }
 
 
     @Test
-    @DisplayName("상한으로 PENDING 이 된 바인딩이 관리자 반영 완료로 READY 가 된 뒤 다시 어긋나면 1 부터 세어 설치를 다시 보낸다")
+    @DisplayName("상한으로 PENDING 이 된 바인딩이 관리자 다시 확인으로 READY 가 된 뒤 다시 어긋나면 1 부터 세어 설치를 다시 보낸다")
     void countsFromOneAfterLimitPendingBindingBecomesReadyAgain() {
         // 앞 세 주기는 상한 시험과 같다. 네 번째 주기는 READY 로 되돌린 뒤 어긋난 읽기와 다시 보낸 뒤 맞는 읽기다.
         when(connector.readConnector(agent.hermesProfile(), DEMO))
@@ -463,7 +459,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("한 주기에 읽는 수가 1 이면 READY 바인딩을 번호 순으로 하나씩 보고 끝까지 읽은 뒤 처음으로 돌아간다")
     void readsOneBindingPerRunWhenBatchIsOne() {
-        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1, Duration.ofMinutes(10)));
+        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1, Duration.ofMinutes(10), Duration.ofHours(24)));
 
         // 바인딩 번호는 DEMO 가 앞이다. 준비에서 단언했다.
         for (String expected : List.of(DEMO, PLAIN)) {
@@ -484,7 +480,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("drift-batch 가 1 미만이면 설정을 만들지 못해 기동이 멈춘다")
     void rejectsDriftBatchBelowOne() {
-        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0, Duration.ofMinutes(10)))
+        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0, Duration.ofMinutes(10), Duration.ofHours(24)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("drift-batch");
     }
@@ -492,7 +488,7 @@ class ConnectorBindingDriftTest {
 
     private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
         return new ConnectorBindingApplier(
-            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings, attempts, cycles);
+            service, bindings, agents, connector, transactions, clock, settings, attempts, cycles, restarts, alerts);
     }
 
 

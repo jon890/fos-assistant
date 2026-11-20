@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.connection.application.dto;
 
+import com.bifos.assistant.connector.connection.domain.ConnectionAuth;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
@@ -17,6 +18,7 @@ import java.util.Map;
  * @param undeclaredTools 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 가 선언하지 않은 수
  * @param listedTools 표준 플러그인 연결의 마지막 확인에서 MCP 서버가 낸 도구 수. 표준 플러그인이 아니거나 확인하기 전이면 null
  * @param readOnlyTools 그 가운데 읽기 표시({@code readOnlyHint})가 참인 도구 수. {@code listedTools} 와 함께 null 이다
+ * @param auth 연결 방식과 다시 연결 필요 상태
  */
 public record ConnectionSnapshot(
     String connectorId,
@@ -27,10 +29,12 @@ public record ConnectionSnapshot(
     List<BoundAgentSummary> bindings,
     int undeclaredTools,
     Integer listedTools,
-    Integer readOnlyTools) {
+    Integer readOnlyTools,
+    ConnectionAuth auth) {
 
     public ConnectionSnapshot {
         bindings = List.copyOf(bindings);
+        auth = auth == null ? ConnectionAuth.MANUAL : auth;
     }
 
 
@@ -43,7 +47,7 @@ public record ConnectionSnapshot(
         Instant checkedAt,
         List<BoundAgentSummary> bindings,
         int undeclaredTools) {
-        this(connectorId, status, secretPrefixes, values, checkedAt, bindings, undeclaredTools, null, null);
+        this(connectorId, status, secretPrefixes, values, checkedAt, bindings, undeclaredTools, null, null, null);
     }
 
 
@@ -58,6 +62,7 @@ public record ConnectionSnapshot(
             bindings.stream().map(BoundAgentSummary::from).toList(),
             connection.undeclaredTools(),
             listed == null ? null : listed.tools().size(),
-            listed == null ? null : listed.readOnlyCount());
+            listed == null ? null : listed.readOnlyCount(),
+            connection.fields().auth());
     }
 }

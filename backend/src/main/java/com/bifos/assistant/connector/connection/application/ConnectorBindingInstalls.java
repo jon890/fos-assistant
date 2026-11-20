@@ -18,6 +18,7 @@ import com.bifos.assistant.hermes.application.port.HermesConnectorClient.Connect
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import java.time.Clock;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,8 @@ public class ConnectorBindingInstalls {
     private final HermesConnectorClient connector;
     private final ConnectorBindingProperties properties;
     private final BrowserGatewayTokens tokens;
+    /** 재시작 대기 시각을 결과 트랜잭션 시각으로 적는다. */
+    private final Clock clock;
 
 
     /** 설치를 그 방식대로 한 번 보내고 대시보드의 답을 돌려준다. 엔티티를 외부 호출로 넘기지 않는다. */
@@ -100,16 +103,19 @@ public class ConnectorBindingInstalls {
      * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면
      * 반영 예정 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
      *
+     * <p>재시작 대기 시각은 {@code restartSince}(결과 트랜잭션 시각)다. plugin 이 파일을 다 쓰고 답한 뒤라, 이 시각보다 늦게 뜬 공유
+     * gateway 는 새 파일을 읽었다. 재시작 감지가 이 시각과 gateway 기동 시각을 비교한다(ADR-20261120 / connector-auto-apply).
+     *
      * @return 재시작이나 반영 예정을 기다려야 해 지금 반영을 확인할 수 없는가
      */
-    private boolean record(ConnectorBinding binding, InstallResult installed, Instant now) {
+    private boolean record(ConnectorBinding binding, InstallResult installed, Instant now, Instant restartSince) {
         // 빠진 에이전트용 스킬은 설치 응답마다 덮어쓴다. 껐다 켜기 단계와 상관없다.
         binding.recordSkippedSkills(installed.skippedSkills().stream()
             .map(skipped -> new SkippedSkill(skipped.name(), skipped.reasons()))
             .toList());
         // 껐다 켜기의 단계는 보낸 요청이 아니라 답이 정한다(ADR-20261120 / connector-auto-apply). 끈 채 남았다는 답이 아니면 켜진 것이다.
         if (installed.cycleOff()) {
-            binding.installed(installed.pluginUpdated(), now);
+            binding.installed(installed.pluginUpdated(), now, restartSince);
             binding.clearApplyDue();
             binding.cycledOff(now);
             return true;
@@ -125,7 +131,7 @@ public class ConnectorBindingInstalls {
             return true;
         }
         boolean restart = installed.restartRequired() || installed.pluginUpdated();
-        binding.installed(restart, now);
+        binding.installed(restart, now, restartSince);
         if (restart && binding.cyclePhase() == CyclePhase.IDLE_WAIT) {
             // 재시작이 껐다 켜기를 덮는다.
             binding.clearCycle();
@@ -135,7 +141,7 @@ public class ConnectorBindingInstalls {
             binding.scheduleApply(now.plus(properties.applyDelay()));
             return true;
         }
-        // 재시작 대기는 관리자 반영 완료가 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
+        // 재시작 대기는 재시작 감지나 관리자 다시 확인이 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
         if (restart) {
             binding.clearApplyDue();
         }
@@ -150,8 +156,9 @@ public class ConnectorBindingInstalls {
     /** 현재 시도에만 설치와 probe 결과를 적는다. 이 단계는 연결의 revision을 바꾸지 않는다. */
     void record(ConnectorBinding binding, ConnectorBindingAttempt attempt, ConnectorInstallResult result) {
         Instant now = binding.updatedAt().isAfter(attempt.startedAt()) ? binding.updatedAt() : attempt.startedAt();
+        Instant resultAt = clock.instant();
         if (result.installed() != null) {
-            record(binding, result.installed(), now);
+            record(binding, result.installed(), now, resultAt.isAfter(now) ? resultAt : now);
         }
         if (result.undeclaredTools() != null) {
             binding.connection().recordUndeclaredTools(result.undeclaredTools());
@@ -161,9 +168,11 @@ public class ConnectorBindingInstalls {
         } else {
             binding.pending(now);
             // 켜기는 같은 설치를 다시 보낼 뿐이라 실패해도 여기서 표시하지 않는다. 횟수 상한은 ConnectorBindingCycles 가 센다.
-            if (attempt.automatic() && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
+            boolean failing = attempt.automatic() || attempt.resumedFailure();
+            if (failing && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
                 binding.markApplyFailed(now);
             }
+            binding.trackWaiting(now);
         }
     }
 

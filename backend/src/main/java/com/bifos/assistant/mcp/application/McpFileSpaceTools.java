@@ -9,6 +9,7 @@ import com.bifos.assistant.mcp.application.port.SandboxFiles;
 import com.bifos.assistant.mcp.application.port.SandboxFiles.SandboxFile;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -40,7 +41,7 @@ public class McpFileSpaceTools {
      * 실행 공간 밖 경로에서 찾지 못했을 때 덧붙이는 안내다. 결과물 폴더는 실행 공간에 붙어 있지 않아, 실행 공간의 파일 도구로 그 경로에 쓴
      * 파일은 Control Plane 이 찾지 못한다(2026-11-20 운영에서 확인). 호스트 경로는 담지 않는다.
      */
-    static final String WORKSPACE_HINT = " 셸·파일 도구가 실행 공간에서 돌아 만든 파일이면 그 파일을 /workspace/ 아래에 두고 그 /workspace/ 경로로 다시 부른다.";
+    static final String WORKSPACE_HINT = "셸·파일 도구가 실행 공간에서 돌아 만든 파일이면 그 파일을 /workspace/ 아래에 두고 그 /workspace/ 경로로 다시 부른다";
 
     private final ArtifactPutFiles putFiles;
     private final SandboxFiles sandboxFiles;
@@ -53,7 +54,7 @@ public class McpFileSpaceTools {
         TOO_LARGE("파일이 25MB 상한을 넘는다"),
         QUOTA_FULL("사용자의 파일 공간 용량이 찼다. 사용자가 「내 파일」 에서 파일을 지워야 한다"),
         NOT_FOUND("파일을 찾지 못했다. 파일이 없거나 폴더, 링크이거나 경로가 틀렸다"),
-        UNAVAILABLE("지금은 넣을 수 없다. 잠시 뒤 다시 한다");
+        UNAVAILABLE("지금은 넣을 수 없다");
 
 
         private final String text;
@@ -71,13 +72,13 @@ public class McpFileSpaceTools {
         Long userId = caller.user().id();
         if (conversationId == null) {
             // 대화 밖 실행은 넣은 파일을 묶을 답이 없다. 다른 도구와 같은 맥락 오류로 답한다(설계의 「file_space_put 도구」).
-            return McpToolService.result(McpToolService.INVALID_CONTEXT, true);
+            return McpToolService.failure(McpToolService.INVALID_CONTEXT);
         }
         // 실행 공간 경로로 부른 것이 아니면 찾지 못했을 때 /workspace/ 로 다시 부르라고 안내한다
         String hint = path.startsWith(WORKSPACE_PREFIX) ? "" : WORKSPACE_HINT;
         try {
             ArtifactKept kept = keep(origin, userId, conversationId, path, title, description);
-            return McpToolService.result(success(kept), false);
+            return McpToolService.success(success(kept));
         } catch (ApiException ex) {
             return failure(caller, reasonOf(ex), hint);
         } catch (RuntimeException ex) {
@@ -128,10 +129,14 @@ public class McpFileSpaceTools {
     private static Map<String, Object> failure(McpCaller caller, Reason reason, String hint) {
         log.info(
             "file space put refused userId={} executionId={} reason={}", caller.user().id(), caller.executionId(), reason);
-        return McpToolService.result(
-            "파일 공간에 넣지 못했다. 까닭: " + reason.name() + ". " + reason.text + "."
-                + (reason == Reason.NOT_FOUND ? hint : "") + " 사용자에게 넣었다고 말하지 않는다.",
-            true);
+        String message = "파일 공간에 넣지 못했다. 까닭: " + reason.name() + ". " + reason.text + ". 사용자에게 넣었다고 말하지 않는다.";
+        return McpToolService.failure(switch (reason) {
+            case UNSUPPORTED_TYPE -> ToolFailureText.alternative(message, "받는 형식의 파일로 만들어 다시 부른다");
+            case TOO_LARGE -> ToolFailureText.alternative(message, "파일을 25MB 아래로 줄이거나 나눠서 다시 부른다");
+            case QUOTA_FULL -> ToolFailureText.askUser(message);
+            case NOT_FOUND -> ToolFailureText.alternative(message, hint.isEmpty() ? "경로를 고쳐 다시 부른다" : hint);
+            case UNAVAILABLE -> ToolFailureText.alternative(message, McpToolService.SERVER_FAILURE_NEXT);
+        });
     }
 
 

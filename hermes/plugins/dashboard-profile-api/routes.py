@@ -71,17 +71,20 @@ from .connector_run import (
 )
 from .connector_snapshot import _connector_snapshot_request
 from .connector_events import _connector_events_request
+from .gateway_status import GATEWAY_PATH, _gateway_response
 
 from .connector_vault import (
     VAULT_ROUTES,
     _connector_vault_request,
 )
+from .connector_oauth import OAUTH_ACTIONS, OAUTH_PREFIX, _connector_oauth_request
 
 from .env import (
     _check_env_delete,
     _check_env_update,
 )
 
+from .skill_list import _with_skill_owners
 from .profiles import (
     _check_profile_create,
     _check_skill_toggle,
@@ -262,6 +265,8 @@ def _install_gate() -> bool:
             raise
         if written is not None and response.status_code >= 400:
             _restore_config(checked[0], checked[1], written)
+        if request.url.path == "/api/skills" and response.status_code == 200:
+            return await _with_skill_owners(request.query_params.getlist("profile")[0], response)
         if request.url.path == "/api/env" and response.status_code < 400:
             body = await _json_object(request)
             # 그 key 를 칸으로 가진 플러그인다. 기본 key 는 여기 걸리지 않는다.
@@ -293,6 +298,13 @@ def _install_gate() -> bool:
         if snapshot is not None:
             return await _connector_snapshot_request(request, snapshot.group(1))
 
+        if path == GATEWAY_PATH and method == "GET":
+            # 공유 gateway 의 기동 시각이다. 파일을 쓰지 않으므로 profile 쓰기 잠금을 잡지 않는다.
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(_gateway_response)
+
         defaults_match = MODEL_DEFAULTS_RE.match(path) if method == "GET" else None
         if defaults_match is not None:
             principal, _ = seam.authenticate_token(request)
@@ -312,9 +324,17 @@ def _install_gate() -> bool:
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
-            # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다.
-            async with PROFILE_WRITE_LOCK:
-                return await _connector_vault_request(request)
+            # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다. 보관 파일 잠금을 먼저 잡으므로
+            # 본문을 읽은 뒤 요청 처리가 두 잠금을 잡는다. 설치는 전역 잠금만 잡아 순서가 거꾸로 되지 않는다.
+            return await _connector_vault_request(request, PROFILE_WRITE_LOCK)
+
+        oauth_action = path[len(OAUTH_PREFIX):] if path.startswith(OAUTH_PREFIX) else None
+        if oauth_action is not None and oauth_action in OAUTH_ACTIONS and method == "POST":
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            # 보관 파일 잠금만 잡고 서비스를 부른다. 본 보관 파일을 쓰는 commit 만 그 뒤 전역 잠금을 잡는다.
+            return await _connector_oauth_request(request, oauth_action, PROFILE_WRITE_LOCK)
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None

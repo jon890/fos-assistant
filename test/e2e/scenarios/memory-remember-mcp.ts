@@ -15,7 +15,7 @@ const AGENT_CODE = "memory-remember-mcp";
 const REMEMBERED = "기억했다";
 const PROPOSED = "제안으로 남겼다";
 /** 요청자를 정하지 못한 MCP 호출이 받는 도구 결과 문구다. */
-const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
 const DIRECT_TEXT = "다른 사람은 홍길동이야. 기억해 줘";
 const DIRECT_TITLE = "기억 검사 별칭 홍길동";

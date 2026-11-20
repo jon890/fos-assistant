@@ -19,7 +19,7 @@ type MemoryView = {
 type AgentToken = { id: number; token: string };
 
 /** 요청자를 정하지 못한 MCP 호출이 받는 도구 결과 문구다. 이유를 가리지 않고 같다. */
-const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
 /** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
 export const MEMORY_CONTEXT_TURNS = 4;
@@ -494,7 +494,7 @@ export const memoryScenario: Scenario = {
       const denied = await mcp("memory_read", { id: target.id });
       expect(
         denied.result.isError &&
-          denied.result.content[0]?.text === "Memory 항목을 읽을 수 없습니다.",
+          denied.result.content[0]?.text === "Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다",
         "권한 철회 뒤에도 본문을 읽었다",
       );
     } finally {

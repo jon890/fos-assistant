@@ -8,6 +8,8 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
+import java.util.Set;
+import com.bifos.assistant.shared.util.ToolFailureText;
 
 /**
  * 에이전트가 주문 상한을 읽고 바꾸는 MCP 도구다(ADR-20261015 / financial-user-limits).
@@ -27,18 +29,34 @@ public class McpFinancialLimitTools {
         "daily_amount_usd");
     /** 0 이상, 소수 6자리까지의 십진 글이다. */
     public static final String DECIMAL = "^[0-9]{1,14}(\\.[0-9]{1,6})?$";
+    /** 상한을 바꾸지 못한 상태다. */
+    private static final Set<String> UNCHANGED = Set.of("unavailable", "above_maximum", "no_financial_connection", "closed");
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final FinancialLimitRequests requests;
 
 
     public Map<String, Object> read(McpCaller caller) {
-        return McpToolService.result(JSON.writeValueAsString(requests.read(caller.user())), false);
+        return McpToolService.success(JSON.writeValueAsString(requests.read(caller.user())));
     }
 
 
     public Map<String, Object> change(McpCaller caller, String name, String value) {
-        return McpToolService.result(JSON.writeValueAsString(requests.change(caller.user(), caller.originExecution().id(), name, value)),
-            false);
+        return McpToolService.success(JSON.writeValueAsString(withNext(requests.change(caller.user(), caller.originExecution().id(), name, value))));
+    }
+
+
+    /**
+     * 바꾸지 못한 결과에 바로 알림 끝 줄을 {@code next} 칸으로 더한다. 결제 상한과 승인, 연결은 사용자가 정한다
+     * (docs/features/tool-fallback/spec.md 의 REQ2, REQ3). {@code isError} 는 지금처럼 거짓이다.
+     */
+    static Map<String, Object> withNext(Map<String, Object> result) {
+        Object status = result.get("status");
+        if (!UNCHANGED.contains(status)) {
+            return result;
+        }
+        Map<String, Object> body = new LinkedHashMap<>(result);
+        body.put("next", ToolFailureText.askUser(String.valueOf(status)).endLine());
+        return body;
     }
 
 

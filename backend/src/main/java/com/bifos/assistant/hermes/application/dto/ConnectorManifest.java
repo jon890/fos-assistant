@@ -24,6 +24,7 @@ import tools.jackson.databind.JsonNode;
  * @param defaultToolPolicy {@code tools} 에 없는 도구의 처리. {@code "ask"} 만 있고 선언하지 않았거나 {@code deny} 이거나 옛 대시보드
  * plugin 이 이 칸을 내지 않으면 null 이며, 그때는 선언하지 않은 도구를 거절한다. {@code schema: 2} 에서만 뜻이 있다
  * @param eventWatch 사건 감지 선언(ADR-20261105 / event-watch). 선언하지 않았거나 옛 대시보드 plugin 이면 null
+ * @param oauth 단추 연결 선언. 선언하지 않았거나 읽을 수 없으면 null
  */
 public record ConnectorManifest(
     String id,
@@ -44,7 +45,8 @@ public record ConnectorManifest(
     ConnectorSnapshotDeclaration snapshot,
     ConnectorUnknownErrors unknownErrors,
     String defaultToolPolicy,
-    ConnectorEventWatch eventWatch) {
+    ConnectorEventWatch eventWatch,
+    ConnectorOAuthDeclaration oauth) {
 
 
     /** 선언하지 않은 도구를 호출마다 묻는 {@link #defaultToolPolicy} 값이다. */
@@ -57,6 +59,19 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** 단추 연결 선언을 모르는 기존 생성자다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256,
+        ConnectorSnapshotDeclaration snapshot, ConnectorUnknownErrors unknownErrors, String defaultToolPolicy,
+        ConnectorEventWatch eventWatch) {
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, snapshot,
+            unknownErrors, defaultToolPolicy, eventWatch, null);
     }
 
 

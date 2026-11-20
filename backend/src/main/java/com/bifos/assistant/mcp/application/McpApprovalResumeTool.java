@@ -22,7 +22,7 @@ public class McpApprovalResumeTool {
 
 
     public Map<String, Object> resume(McpCaller caller) {
-        return McpToolService.result(resumes.resume(caller.user(), caller.originExecution().conversationId()), false);
+        return McpToolService.success(resumes.resume(caller.user(), caller.originExecution().conversationId()));
     }
 
 

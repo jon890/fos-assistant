@@ -96,7 +96,7 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
 
   const menu = await openAdminMenu(page, testInfo);
   await expect(menu.locator("section > p")).toHaveText(["살펴보기", "비서 설정", "사용자와 자원"]);
-  await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간"]);
+  await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간", "서버 비밀값"]);
   await expect(menu.getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
 });
@@ -238,7 +238,7 @@ test("연결 반영 확인은 관리자 영역에 있고 일반 외부 서비스
   await expect(page.getByTestId("connector-admin-panel")).toHaveCount(0);
 });
 
-test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 재시작이 필요 없는 바인딩은 반영 중이고 다시 확인하는 반영 완료 단추가 있다", async ({ context, page }, testInfo) => {
+test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 갓 붙인 바인딩은 자동 반영 중이며 다시 확인 단추가 없다", async ({ context, page }, testInfo) => {
   // mobile 과 desktop 이 같은 Control Plane 을 쓰므로 project 마다 다른 사용자를 둔다.
   const owner = { email: `admin-bindings-${testInfo.project.name}@example.com`, name: `반영 확인 사용자 ${testInfo.project.name}` };
   await setSession(context, owner);
@@ -262,12 +262,10 @@ test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 재시�
     await expect(rows).toHaveCount(2);
     const first = rows.filter({ hasText: `에이전트 ${codes[0]}` });
     const second = rows.filter({ hasText: `에이전트 ${codes[1]}` });
-    await expect(first).toContainText("반영 중");
-    await expect(second).toContainText("반영 중");
-    // 예약 확인이 실패해 남은 줄도 관리자가 다시 확인할 수 있도록 단추가 있고, 재시작을 요구하지 않는다.
+    // 자동 반영이 실패하지 않았고 대기가 24시간을 넘지 않은 줄은 관리자가 누를 것이 없다(스펙 DECISION16).
     for (const row of [first, second]) {
-      await expect(row.getByRole("button", { name: "반영 완료" })).toBeVisible();
-      await expect(row).toContainText("몇 분이 지나도 남아 있으면 눌러 다시 확인해요.");
+      await expect(row).toContainText("자동 반영 중");
+      await expect(row.getByRole("button", { name: "다시 확인" })).toHaveCount(0);
       await expect(row).not.toContainText("재시작한 뒤 눌러 주세요");
     }
   } finally {

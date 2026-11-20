@@ -1,4 +1,5 @@
 import {
+  bindingStateLabel,
   connectionCall,
   type BindingStatus,
   type ConnectionStatus,
@@ -17,6 +18,8 @@ export type AgentConnectionView = {
   bound: boolean;
   status: BindingStatus | null;
   restartRequired: boolean;
+  /** 자동 반영이 실패했다. 관리자가 다시 확인하기 전에는 바뀌지 않는다. */
+  applyFailed: boolean;
   toolCount: number;
   skills: string[];
   skippedSkills: SkippedSkill[];
@@ -40,12 +43,10 @@ export function hasShellOrFileTool(enabled: readonly string[]): boolean {
   return enabled.some((name) => SHELL_OR_FILE_TOOLSETS.includes(name));
 }
 
-/** 줄의 상태를 화면 말로 바꾼다. 붙었지만 아직 쓸 수 있다고 확인되지 않았으면 붙이는 중이다. */
+/** 줄의 상태를 화면 말로 바꾼다. 붙었지만 아직 쓸 수 있다고 확인되지 않았으면 붙이는 중이고, 자동 반영이 실패했으면 반영 실패다. */
 export function agentConnectionLabel(view: AgentConnectionView): string {
   if (!view.bound) return "붙지 않음";
-  return view.status === "READY" && !view.restartRequired
-    ? "붙음"
-    : "붙이는 중";
+  return bindingStateLabel(view);
 }
 
 export const listAgentConnections = (code: string) =>

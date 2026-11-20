@@ -286,6 +286,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 붙이려는 연결이 값이 확인돼 쓸 수 있는 상태가 아니거나 보관 파일에 값이 없다(ADR-083). */
     CONNECTOR_NOT_CONNECTED(HttpStatus.CONFLICT),
+    /** 그 플러그인의 OAuth 앱 값이나 토큰 통로 주소가 없어 단추 연결을 시작할 수 없다(ADR-20261120 / connector-oauth). */
+    CONNECTOR_OAUTH_NOT_CONFIGURED(HttpStatus.CONFLICT),
     /** 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌해 붙이기를 거절했다. 아무것도 바뀌지 않았다. */
     CONNECTOR_BIND_CONFLICT(HttpStatus.CONFLICT),
     /** 커넥터가 연결 하나를 에이전트 하나에만 붙이라고 선언했고 그 연결이 이미 다른 에이전트에 붙어 있다. 먼저 뗀다. */
@@ -298,6 +300,8 @@ public enum ErrorCode {
      * <p>재시작한 뒤에 들어온 설치는 떠 있는 gateway 가 아직 보지 못했기 때문이다.
      */
     CONNECTOR_RESTART_AGAIN(HttpStatus.CONFLICT),
+    /** 재시작 대기 줄의 다시 확인인데 그 대기 뒤에 공유 gateway 가 아직 다시 뜨지 않았다. 옛 값으로 {@code READY} 가 되는 것을 막는다. */
+    CONNECTOR_RESTART_NOT_DONE(HttpStatus.CONFLICT),
     /** 관리자 반영 완료가 다시 읽은 설치에서 켜짐, configured, 정책 hook, 방식 가운데 하나가 맞지 않음을 봤다. */
     CONNECTOR_INSTALL_MISMATCH(HttpStatus.CONFLICT),
     /** 관리자 반영 완료의 probe 가 실패했거나 도구를 내지 않았거나, 옛 바인딩의 켜진 내장 도구가 선언과 다르다. */
@@ -363,6 +367,8 @@ public enum ErrorCode {
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     /** 서버에 웹 푸시 VAPID 키가 없어 기기를 등록받지 않는다(ADR-20261120 / web-push). */
     PUSH_NOT_CONFIGURED(HttpStatus.CONFLICT),
+    /** KEK 가 설정되지 않아 서버 비밀값을 저장할 수 없다. 원문으로 두는 길은 없다(ADR-20261120 / server-secret). */
+    SECRET_STORE_UNAVAILABLE(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 

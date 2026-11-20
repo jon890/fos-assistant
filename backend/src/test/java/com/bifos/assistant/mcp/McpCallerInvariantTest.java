@@ -32,7 +32,7 @@ import tools.jackson.databind.node.ObjectNode;
 @BackendIntegrationTest
 class McpCallerInvariantTest {
     private static final String PROFILE = "caller-invariant";
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
     @LocalServerPort
     int port;
@@ -147,6 +147,10 @@ class McpCallerInvariantTest {
         arguments.put("agent_status", json.createObjectNode().put("execution_id", 1));
         arguments.put("agent_stop", json.createObjectNode().put("execution_id", 1));
         arguments.put("follow_up_propose", json.createObjectNode().put("title", "할 일 검사 7391"));
+        arguments.put("follow_up_list", json.createObjectNode());
+        arguments.put("follow_up_done", json.createObjectNode().put("follow_up", "할 일 검사 7391"));
+        arguments.put("memory_forget", json.createObjectNode().put("memory_id", 1));
+        arguments.put("connector_attach", json.createObjectNode().put("connector", "demo-notes"));
         arguments.put("content_draft_write", json.createObjectNode());
         arguments.put("content_draft_read", json.createObjectNode());
         arguments.put("content_draft_image", json.createObjectNode());

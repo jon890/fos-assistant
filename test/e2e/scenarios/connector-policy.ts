@@ -26,6 +26,7 @@ const AGENDA_PREFIX = `mcp__${AGENDA_CONNECTOR.mcp_server}__`;
 /** Gmail 필터 id 처럼 32자 이상의 영숫자 식별자다. 식별자로 선언하지 않은 칸에서는 가려진다. */
 const LONG_ID = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
+/** 판정 줄 검사는 답에서 판정 글의 첫 줄만 읽는다. 끝 줄은 다음 줄에 있어 비교하지 않는다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 
 /** 연결을 붙인 에이전트에게 도구 호출 한 줄을 보내고 대역이 답한 판정 줄을 돌려준다. */
