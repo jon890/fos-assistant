@@ -15,6 +15,8 @@ import com.bifos.assistant.connector.approval.application.dto.ConnectorGrantView
 import com.bifos.assistant.connector.action.application.dto.PendingApproval;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
+import com.bifos.assistant.connector.action.domain.ControlPlaneActions;
+import com.bifos.assistant.connector.action.application.ControlPlaneApprovals;
 import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
@@ -66,6 +68,7 @@ public class ConnectorActionService {
     private final ConnectorActionRepository actions;
     private final ConnectorFinancialApproval financialApproval;
     private final FinancialLimitChanges limitChanges;
+    private final ControlPlaneApprovals controlPlane;
     private final ConnectorActionSignals signals;
     private final ConnectorApprovalBrowser approvalBrowser;
 
@@ -93,6 +96,7 @@ public class ConnectorActionService {
         ConnectorActionBodies bodies,
         ConnectorFinancialApproval financialApproval,
         FinancialLimitChanges limitChanges,
+        ControlPlaneApprovals controlPlane,
         ConnectorApprovalBrowser approvalBrowser,
         PlatformTransactionManager transactionManager,
         Clock clock) {
@@ -100,6 +104,7 @@ public class ConnectorActionService {
         this.approvalBrowser = approvalBrowser;
         this.financialApproval = financialApproval;
         this.limitChanges = limitChanges;
+        this.controlPlane = controlPlane;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         this.details = new ConnectorActionDetails(actions, catalog, clock, connections);
         this.signals = new ConnectorActionSignals(events, notifications, conversations);
@@ -256,6 +261,16 @@ public class ConnectorActionService {
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
         var stored = actions.findByPublicId(actionId);
+        // Control Plane 동작의 줄(예약 작업 지우기 등)은 커넥터 실행이 아니다. 허락을 받지 않고 그 동작을 한 번 한다.
+        if (stored.isPresent() && ControlPlaneActions.owns(stored.get())) {
+            if (!user.id().equals(stored.get().userId())) {
+                throw ConnectorActionDetails.notFound();
+            }
+            if (grant != null || conversationGrant) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "control plane actions take no grant");
+            }
+            return controlPlane.approve(user, actionId);
+        }
         // 상한 변경 줄은 금융 주문 승인보다 먼저 가른다(ADR-20261015 / financial-user-limits). 허락을 받지 않는다.
         if (stored.isPresent() && FinancialLimitChanges.owns(stored.get())) {
             if (!user.id().equals(stored.get().userId())) {

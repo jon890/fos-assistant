@@ -2,6 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-07
+- **개정된 부분**: 표의 「뗀 서버 기록에 남은 이름을 다시 붙임」, 「이미 있던 서버의 정의나 그 서버의 `.env` 값」 행과 대안 기각의 「값 교체도 `enabled: false` 로 한 주기 끄고 되돌리는 것」 은 [ADR-20261120 / connector-auto-apply](ADR-20261120-connector-auto-apply.md) 가 대체한다. 그 경우 재시작 대신 그 서버만 껐다 켠다. `fos-ctx` 갱신의 재시작 대기는 남지만 관리자 대신 Control Plane 이 gateway 재기동을 알아채 확인한다
 - **결정**: 커넥터를 에이전트에 처음 붙이거나 스킬만 바뀐 설치는 공유 gateway 를 재시작하지 않는다.
   공유 gateway 가 `config.yaml` 의 `mcp_servers` 를 주기적으로 맞추는 동작에 반영을 맡긴다.
   Control Plane 은 설치한 시각에서 두 주기 뒤 그 바인딩의 반영 맞추기를 스스로 돌려 `READY` 로 둔다. 관리자 반영 완료를 기다리지 않는다.

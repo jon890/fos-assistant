@@ -1,6 +1,6 @@
 """기동 때 이미 붙은 로컬 바인딩을 실행기 정의로 다시 설치하고 profile `.env` 사본을 지운다(스펙 REQ7, DECISION10).
 
-순서와 까닭은 `docs/features/connector/design.md` 의 「기동 이관(REQ7, DECISION10)」 이 갖는다.
+순서와 까닭은 `hermes/plugins/dashboard-profile-api/README.md` 의 「기동 이관(REQ7, DECISION10)」 이 갖는다.
 `register` 가 보관 파일 이관 뒤, 경로를 감싸기 전에 부른다. 그래서 요청과 겹치지 않고 profile 쓰기 잠금이 필요 없다.
 보관 파일을 풀지 못하거나 설치가 거절한 바인딩은 옛 정의와 사본을 그대로 둔다. 값과 profile 이름, 경로는 로그에 싣지 않는다.
 """

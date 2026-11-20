@@ -523,10 +523,12 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request(path, method, token="valid", full_response=True, body=body,
                             query_profiles=[body["profile"]] if "profile" in body else ())
 
-    def bind(self, plugin=DEMO, vault="c1", profile="alice", enabled=True, owner=None, browser=None):
+    def bind(self, plugin=DEMO, vault="c1", profile="alice", enabled=True, owner=None, browser=None, cycle=None):
         body = {"profile": profile, "plugin": plugin, "enabled": enabled}
         if enabled:
             body["bind"] = {"vault": vault}
+            if cycle is not None:
+                body["bind"]["cycle"] = cycle
         if owner is not None:
             body["sandbox_owner"] = owner
         if browser is not None:

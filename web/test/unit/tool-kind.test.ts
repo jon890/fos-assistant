@@ -73,3 +73,16 @@ test("접힌 줄에 숫자 횟수와 내부 도구 이름이 없다", () => {
   );
   assert.doesNotMatch(label, /[0-9]|mcp__/);
 });
+
+test("그림을 만든 답은 「그 밖의 도구」 가 아니라 「그림 만들기」 다", () => {
+  assert.deepEqual(toolKind("image_generate"), { id: "image-gen", name: "그림 만들기" });
+  assert.equal(activitySummaryLabel([tool("web_search"), tool("image_generate")], "done"), "웹 검색 · 그림 만들기");
+});
+
+test("하위 에이전트를 만드는 도구와 하위 에이전트 사건은 같은 「도우미」 로 한 번만 적는다", () => {
+  assert.equal(activitySummaryLabel([tool("delegate_task"), { kind: "SUBAGENT" }], "done"), "도우미");
+});
+
+test("다른 에이전트에게 맡기는 Control Plane 도구는 연결된 서비스가 아니라 「다른 에이전트」 다", () => {
+  assert.equal(toolKind("mcp__fos_assistant__agent_delegate").name, "다른 에이전트");
+});

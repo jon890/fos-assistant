@@ -141,6 +141,10 @@ public class ConnectorActionListener {
 
     /** 사용자가 거절한 것과 시스템이 실행하지 않고 끝낸 것을 다른 글로 알린다. */
     private static String closureNotice(ConnectorActionResult closure) {
+        // 실행한 줄이 여기 오는 것은 Control Plane 동작의 줄뿐이다. 동작이 남긴 결과 글이 알림 줄이다.
+        if ((closure.status() == ActionStatus.SUCCEEDED || closure.status() == ActionStatus.FAILED) && closure.resultText() != null) {
+            return closure.resultText();
+        }
         String name = "「" + closure.title() + "」";
         if (closure.status() == ActionStatus.EXPIRED) {
             return name + " 요청이 승인 없이 만료됐어요";
