@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -95,6 +95,36 @@ test("모든 단계가 성공하면 실행 로그 폴더를 지운다", () => {
     assert.ok(match, result.stdout);
     assert.ok(!existsSync(match[1]));
     assert.ok(result.stdout.includes("빠른 검사를 모두 통과했다."));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+
+test("추적하지 않는 Markdown 만 경고하고 빠른 검사는 계속한다", () => {
+  const fixture = runCheck(false);
+  try {
+    execFileSync("git", ["init", "--quiet", fixture.directory]);
+    writeFileSync(join(fixture.directory, ".gitignore"), "ignored.md\n");
+    writeFileSync(join(fixture.directory, "tracked.md"), "추적한 문서\n");
+    execFileSync("git", ["-C", fixture.directory, "add", "tracked.md"]);
+    for (const file of ["new document.md", "ignored.md", "code.ts"]) {
+      writeFileSync(join(fixture.directory, file), "검사 표본\n");
+    }
+    // 파일 목록은 실제 Git 으로 확인하고, 나머지 검사 의존성은 기존 대역을 쓴다.
+    const git = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+    writeFileSync(join(fixture.bin, "git"),
+      `#!/bin/bash\nif [ "\${3}" = ls-files ]; then exec '${git}' "$@"; fi\nexit 0\n`, { mode: 0o755 });
+    const result = fixture.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /알림: 추적하지 않는 Markdown 파일/);
+    assert.ok(result.stdout.includes("new document.md"));
+    for (const file of ["tracked.md", "ignored.md", "code.ts"]) assert.ok(!result.stdout.includes(file));
+    assert.ok(result.stdout.includes("빠른 검사를 모두 통과했다."));
+    rmSync(join(fixture.directory, "new document.md"));
+    const withoutNewDocs = fixture.run();
+    assert.equal(withoutNewDocs.status, 0, withoutNewDocs.stderr);
+    assert.ok(!withoutNewDocs.stdout.includes("알림: 추적하지 않는 Markdown 파일"));
   } finally {
     rmSync(fixture.directory, { recursive: true, force: true });
   }
