@@ -35,6 +35,7 @@ hermes/connectors/<id>/
   scripts/check-bundle.ts   독립 빌드 두 번과 로컬 entry의 바이트 비교
   tests/<id>.test.ts        로컬 HTTP 대역으로 도는 검사
   skills/<이름>/SKILL.md    붙인 에이전트에 스킬로 설치된다
+  agent-skills/<이름>/      assistant.json 의 agent_skills 가 가리키는 일반 에이전트용 스킬. 선택
   README.md                 도구와 정책, 보안, 설정 안내, 실제 계정 확인
 .github/CODEOWNERS                      `/hermes/connectors/<id>/` 한 줄
 ```
@@ -154,6 +155,24 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파일을 셸 실행 공간에 넣는다. 붙인 profile 의 `.env` 에는 플러그인 값이 있다([ADR-086](../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
 지침은 매 turn 실리지 않고 모델이 그 스킬을 읽을 때 들어간다. `skills` 도구가 꺼진 에이전트는 읽지 못한다.
 스킬 이름이 그 에이전트의 다른 스킬이나 함께 붙은 플러그인의 스킬과 겹치면 붙이지 못하므로, 서비스를 알 수 있는 이름을 쓴다.
+
+#### 에이전트용 스킬
+
+Claude Code 에서는 보이지 않고 assistant 에이전트에만 설치할 스킬은 `assistant.json` 의 `agent_skills` 로 선언한다([ADR-20261120 / plugin-agent-skills](../docs/adr/ADR-20261120-plugin-agent-skills.md)). 요구와 결정은 [에이전트용 스킬 스펙](../../docs/features/agent-skill/spec.md) 이 갖는다.
+
+```json
+"agent_skills": {
+  "path": "./agent-skills",
+  "sandbox_env": { "<스킬 이름>": ["CLAUDE_PLUGIN_ROOT"] }
+}
+```
+
+- `path` 는 plugin 안의 링크 없는 디렉터리다. 파일, 앞머리, 상한 규칙은 위 스킬과 같고 `scripts/` 는 복사하지 않는다. `plugin.json` 의 스킬과 이름이 겹치면 카탈로그에서 빠진다
+- `sandbox_env` 는 선택이다. 키는 스킬 이름(앞머리 `name`, 없으면 디렉터리 이름)이고, 값은 그 스킬이 셸에서 실행기를 부를 때 필요한 env 이름이다. 운영 정책 `profiles[*].env` 가 받는 이름(`sandbox.py` 의 `SANDBOX_ALLOWED_ENV`)만 쓸 수 있다
+- 요구 env 가 없는 스킬은 붙이면 늘 설치된다. 요구 env 가 있는 스킬은 그 에이전트의 API 도구에 `terminal` 이 있고, 셸 설정이 docker 실행 공간이며, 셸 설정의 `docker_env` 가 그 이름을 모두 넘길 때만 설치된다. assistant 는 실행기와 비밀값을 셸에 넣지 않는다. 운영이 정책으로 붙인 것을 스킬 본문의 `${이름}` 으로 셸이 찾는다
+- 조건이 바뀌면 설치 상태 판정이 어긋남으로 보고 Control Plane 의 정의 어긋남 점검이 다시 설치해 맞춘다
+- 처음 붙일 때 그 에이전트의 다른 스킬과 이름이 겹치면 붙이지 못한다. 붙인 뒤 생긴 겹침(올린 스킬, 모델이 만든 스킬)은 그 에이전트용 스킬만 뺀다
+- 빠진 스킬과 까닭(`terminal_off`, `sandbox_unregistered`, `sandbox_env_missing`, `name_taken`)은 붙이기 응답의 `skipped_skills` 로 나온다
 
 스킬 파일의 크기와 개수 상한은 `connector_schema.py`가 갖고, 카탈로그가 상한과 경로·앞머리 조건을 확인한다. 바인딩은 스킬 파일을 복사하고 에이전트의 성격은 바꾸지 않는다.
 도구를 언제 쓰는지와 함께 아래를 적는다.

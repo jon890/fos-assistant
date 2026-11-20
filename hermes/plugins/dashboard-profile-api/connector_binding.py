@@ -18,6 +18,7 @@ from .common import (
     logger,
 )
 
+from .connector_agent_skills import NAME_TAKEN, _agent_skill_plan
 from .connector_launch import _launcher_server
 from .connector_remote import _is_remote
 from .connector_manifest import (
@@ -115,7 +116,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
 
     붙이기는 로컬 플러그인이면 실행기 정의(보관 파일 리비전 `revision`)를 쓰고 `.env` 의 칸 줄을 지운다. 원격이면 값을 `.env` 에 쓴다.
     그리고 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
-    plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
+    plugin 의 스킬을 그 profile 의 스킬로 복사한다. 에이전트용 스킬은 `_agent_skill_plan` 이 고른 것만 복사하고, 빠진 것은 응답의
+    `skipped_skills` 로 낸다(ADR-20261120 plugin-agent-skills). Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
     새로 붙이기는 그 profile 에서 정책 hook plugin 이 켜져 있어야 한다. 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다.
     이미 붙은 플러그인을 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
@@ -183,9 +185,17 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     # 떼면 지울 출력 디렉터리다. 설치 기록의 서버 정의에 그 모양으로 들어간 값만 본다.
     removed_outputs = []
 
+    # 붙이기 응답에 넣을 빠진 에이전트용 스킬이다. 떼기는 칸을 넣지 않는다(ADR-20261120 plugin-agent-skills).
+    skipped_field = {}
     if enabled:
         if manifest is None:
             raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+        agent_install, agent_skipped = _agent_skill_plan(profile_dir, saved, manifest, previous_skills)
+        # 처음 붙일 때 이름이 겹치는 에이전트용 스킬이 있으면 플러그인 스킬처럼 거절한다. 붙인 뒤 생긴 겹침은 그 스킬만 뺀다.
+        if owned is None and any(NAME_TAKEN in reasons for reasons in agent_skipped.values()):
+            raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
+        skipped_field = {"skipped_skills": [{"name": name, "reasons": reasons}
+                                            for name, reasons in sorted(agent_skipped.items())]}
         if owned is not None:
             mismatches = _entry_manifest_mismatches(plugin, owned)
             if mismatches:
@@ -268,10 +278,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         # 뗀 뒤에는 옛 정의와 견줄 수 없으므로 기록을 지우기 전에 재시작을 요구한다.
         restart = (previous is not None and (previous != server or env_changed
                    or (owned is not None and previous != owned["server"]))) or name in detached.values()
-        skills = sorted(manifest["skills"])
-        for skill in skills:
+        plugin_skills = [skill for skill in manifest["skills"] if skill not in (manifest.get("agent_skills") or {})]
+        for skill in plugin_skills:
             if (skills_dir / skill).exists() and skill not in previous_skills:
                 raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
+        skills = sorted(set(plugin_skills) | agent_install)
         state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
                          "mode": BIND_MODE, "vault": vault, "skills": skills}
         if guard is not None:
@@ -336,7 +347,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     targets.update(plugin_values)
     plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
     if all(originals[path] == value for path, value in targets.items()):
-        return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False}
+        return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False,
+                **skipped_field}
     backup = profile_dir / "connector-backups" / str(time.time_ns())
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
@@ -397,4 +409,4 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             except OSError:
                 pass
     return {"changed": True, "restart_required": restart, "plugin_updated": plugin_updated,
-            "reload_pending": not restart and not plugin_updated}
+            "reload_pending": not restart and not plugin_updated, **skipped_field}

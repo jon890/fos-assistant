@@ -486,6 +486,35 @@ class ProfileApiRouteTest(unittest.TestCase):
                                     values={"token": OTHER_VALUE, "scope": "a"}).status_code, 200)
         return demo, other
 
+    def agent_skill_fixture(self):
+        """`bind_fixture` 의 demo 플러그인에 에이전트용 스킬 둘을 더한다(ADR-20261120 plugin-agent-skills).
+
+        `demo-report` 는 요구 env 가 없고 `demo-runner` 는 셸이 `CLAUDE_PLUGIN_ROOT` 를 넘길 때만 설치된다.
+        테스트 플러그인은 옛 이름 `connector.json` 을 쓴다. `assistant.json` 을 함께 두면 거절된다.
+        """
+        demo, other = self.bind_fixture()
+        for directory, name in (("report", "demo-report"), ("runner", "demo-runner")):
+            skill = demo / "agent-skills" / directory
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: %s\ndescription: 검사\n---\n%s 본문\n" % (name, name),
+                                            encoding="utf-8")
+        declared = json.loads((demo / "connector.json").read_text(encoding="utf-8"))
+        declared["agent_skills"] = {"path": "./agent-skills", "sandbox_env": {"demo-runner": ["CLAUDE_PLUGIN_ROOT"]}}
+        (demo / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        return demo, other
+
+    def set_shell(self, terminal=True, docker=True, env=None, profile="alice"):
+        """그 profile 의 API 도구 목록과 셸 설정을 바꾼다. 셸 설정은 도구 저장이 운영 정책으로 쓰는 `terminal` 의 모양이다."""
+        config = yaml.safe_load((self.root / profile / "config.yaml").read_text(encoding="utf-8"))
+        allowed = [name for name in config["platform_toolsets"]["api_server"] if name != "terminal"]
+        if terminal:
+            allowed.append("terminal")
+        config["platform_toolsets"]["api_server"] = allowed
+        config["terminal"] = {"backend": "docker" if docker else "local"}
+        if env is not None:
+            config["terminal"]["docker_env"] = env
+        self.write_config(profile, config)
+
     def write_config(self, profile, config):
         (self.root / profile / "config.yaml").write_text(
             yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
