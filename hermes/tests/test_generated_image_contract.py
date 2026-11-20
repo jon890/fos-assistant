@@ -11,6 +11,7 @@ fos-ctx 는 Hermes 의 이름을 새로 import 하지 않지만 아래 동작에
 - 이미지 서비스를 profile 설정의 `image_gen.provider` 에서 읽고, 대시보드 plugin 이 넣는 서비스가 Hermes 에 있다
 - `image_generate` 가 바탕과 참고를 `image_url` 과 `reference_image_urls` 로 받고, 그 경로를 media cache(`cache/`) 안에서는 호스트에서
   읽으며, 이미지 서비스가 16장까지 받는다(ADR-20261120 / image-source)
+- `image_generate` 의 비율 값이 `landscape`, `square`, `portrait` 이고 빼면 `landscape` 다(스펙 generated-image REQ26)
 
 Hermes 없이 도는 검사는 plugin 의 값이 계약과 같은지만 본다.
 Hermes 소스 검사는 `HERMES_SOURCE` 를 줄 때만 돈다. `scripts/checks/check-hermes-contract.sh` 가 이 값을 준다.
@@ -123,6 +124,13 @@ class HermesImageSourceTest(unittest.TestCase):
         source = self.source(path)
         self.assertIn("%s = %d" % (name, limit), source)
         self.assertIn(call, source)
+
+    def test_aspect_ratios_and_default(self):
+        """비율은 `landscape`, `square`, `portrait` 셋이고 빼면 `landscape` 다. 그림 규칙이 이 값으로 비율을 늘 적게 한다."""
+        path, values, default = contract.IMAGE_ASPECT_RATIOS
+        source = self.source(path)
+        self.assertIn(values, source)
+        self.assertIn(default, source)
 
     def test_transform_hook_receives_args(self):
         """결과 hook 은 도구 인자를 `args` 로 받는다. plugin 이 여기서 지시문을 읽는다."""
