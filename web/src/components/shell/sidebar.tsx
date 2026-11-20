@@ -6,7 +6,6 @@ import { PanelLeftClose, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TooltipButton } from "@/components/ui/tooltip-button";
-import { NotificationBell } from "@/components/notification/notification-bell";
 import { AccountMenu } from "./account-menu";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
@@ -60,18 +59,14 @@ export function Sidebar({
       <div
         className={`mb-5 flex shrink-0 items-center justify-between gap-2 px-2 ${inDrawer ? "pr-10" : ""}`}
       >
-        {/* 알림 단추는 앱 이름 바로 옆에 둔다. 「지금 볼 것」 으로 합칠 때까지 머무는 자리다(spec 의 REQ7). */}
-        <span className="flex min-w-0 items-center gap-1">
-          <Link
-            href="/"
-            aria-label={`${appName} 홈`}
-            onClick={() => onNavigate("/")}
-            className="truncate text-base font-semibold"
-          >
-            {appName}
-          </Link>
-          <NotificationBell onNavigate={onNavigate} />
-        </span>
+        <Link
+          href="/"
+          aria-label={`${appName} 홈`}
+          onClick={() => onNavigate("/")}
+          className="min-w-0 truncate text-base font-semibold"
+        >
+          {appName}
+        </Link>
         <TooltipButton
           label="사이드바 접기"
           onClick={onCollapse}
