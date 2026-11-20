@@ -48,7 +48,7 @@ sequenceDiagram
 2. **붙인 플러그인의 도구 정의 때문에 입력이 크게 늘면 나눈다.** 도구 정의는 그 에이전트의 모든 turn 에 실린다. 에이전트 상세의 연결 목록이 보이는 도구 수를 기준으로 삼는다
 3. **그룹에 공개할 에이전트는 따로 둔다.** 연결은 비공개 에이전트에만 붙고, 연결이 붙은 에이전트는 그룹에 공개하지 못한다
 4. **성격, Memory, 대화 맥락을 따로 두고 싶을 때 나눈다**
-5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 실행 공간을 적용하지 않은 profile 의 터미널 도구는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 비밀값을 셸에서 떼어 놓는 것은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간이고, 운영 정책이 그 profile 에 적용된 뒤(목록에 있거나 `isolate_unlisted` 가 켜져 있다) 셸 도구를 다시 저장했거나 운영 일괄 반영을 거친 profile 에만 적용된다
+5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 실행 공간을 적용하지 않은 profile 의 터미널 도구는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 비밀값을 셸에서 떼어 놓는 것은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간이고, 운영 정책이 그 profile 에 적용된 뒤(`default` 가 아닌 named profile 이고, 목록에 있거나 `isolate_unlisted` 가 켜져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) 셸 도구를 다시 저장했거나 운영 일괄 반영을 거친 profile 에만 적용된다
 
 ## 에이전트 화면
 
@@ -152,7 +152,7 @@ sequenceDiagram
 | 요청한 내장 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 목록을 다시 읽고 관리자에게 알리라고 안내한다 |
 | Hermes 가 쓰기 없이 미분류 도구를 켰거나 미분류 도구만 더 켜졌다 | 적용 실패로 세지 않고 성공 응답에 그 이름을 따로 싣는다. 화면은 관리자에게 알리라고 경고한다 |
 | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸는데 운영의 실행 공간 정책이 없거나 잘못됐다 | plugin 의 409 `sandbox_unavailable` 이고 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 아무것도 바뀌지 않는다 |
-| 정책은 유효한데 이 profile 에 적용되지 않는다(목록에 없고 `isolate_unlisted` 가 꺼져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸면 409 `AGENT_SANDBOX_UNAVAILABLE` 이다. 사진 플러그인 설치도 409 다. local 로 켜지 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이면 그 도구를 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
+| 정책은 유효한데 이 profile 에 적용되지 않는다(`default` profile 이거나, 목록에 없고 `isolate_unlisted` 가 꺼져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸면 409 `AGENT_SANDBOX_UNAVAILABLE` 이다. 사진 플러그인 설치도 409 다. local 로 켜지 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이면 그 도구를 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
 | `image_gen` 을 켜거나 켠 채 다른 도구를 바꾼다 | 같은 쓰기에서 plugin 이 그 profile 에 이미지 서비스 설정을 넣는다. 이미 있는 설정은 그대로 둔다. 설정을 쓰지 못하거나 plugin 이 옛 버전이면 저장이 실패하고 아무것도 바뀌지 않는다. 화면은 저장 실패를 알린다([ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md)) |
 | 관리자가 기본 비서의 `image_gen` 을 끈다 | Control Plane 이 그 비서를 다시 켜지 않는다. 켜지기를 기다리던 비서를 사람이 켜도 더 기다리지 않는다 |
 | 실행 공간 도구가 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 격리한 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 정책 밖 profile 의 에이전트도 같다. 그런 에이전트의 셸은 기동 작업이 끈다. 셸·파일·사진 계열만 켜졌거나 주인이 그대로인 접근 변경은 막지 않는다 |
@@ -431,7 +431,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 ### 스크립트와 실행 공간
 
 `scripts/` 가 든 스킬은 스크립트를 사용자별 docker 실행 공간에서 돌릴 수 있는 에이전트에만 올라간다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
-조건은 셋이다. API 도구에 `terminal` 이 켜져 있고(Control Plane 이 저장 전에 본다), 실행 공간 정책이 그 profile 에 적용되고(목록에 있거나 `isolate_unlisted` 가 켜져 있다), 정책에 `skill_root` 가 있어야 한다(둘은 plugin 이 본다). 어기면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다.
+조건은 셋이다. API 도구에 `terminal` 이 켜져 있고(Control Plane 이 저장 전에 본다), 실행 공간 정책이 그 profile 에 적용되고(`default` 가 아닌 named profile 이고, 목록에 있거나 `isolate_unlisted` 가 켜져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)), 정책에 `skill_root` 가 있어야 한다(둘은 plugin 이 본다). 어기면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다.
 `scripts/` 아래 파일은 755, 나머지는 644 로 쓴다. 올리는 쪽이 준 실행 비트는 보지 않는다.
 
 plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 루트 경로 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다.

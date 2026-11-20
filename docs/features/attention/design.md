@@ -125,7 +125,7 @@ Hermes 는 이 기능에 닿지 않는다.
 | `web/src/app/signin/page.tsx` | `next` 를 받아 `redirectTo` 로 넘긴다. 디코딩한 값이 `/` 로 시작하고 `//`, `\`, 제어 문자가 없는 같은 사이트 경로만 받고 아니면 `/`. Auth.js 의 `redirectTo` 가 다른 출처를 거르는지도 테스트로 본다 | PR1 |
 | 이름 메뉴의 로그아웃 | 서비스 워커 구독이 있으면 해제 API 와 `unsubscribe()` 를 2초 안에서 기다린 뒤 지금처럼 `/signout` 을 부른다. 실패해도 로그아웃은 막지 않는다 | PR1 |
 
-열기 경로를 `/notifications` 아래에 두지 않는다. [화면 틀 PR4](../app-shell/spec.md) 가 `/notifications` 를 `redirect("/now?tab=notifications")` 로 「지금 볼 것」 의 알림 탭으로 넘기므로, 그 아래에 두면 열기가 그 넘김에 걸린다. `/n/<id>` 는 그 넘김과 상관없다.
+옛 `/notifications` 주소는 [화면 틀 PR4](../app-shell/spec.md) 대로 「지금 볼 것」 의 알림 탭(`/now?tab=notifications`)으로 넘긴다. 푸시가 여는 주소는 `/n/<id>` 다.
 
 ## 실패와 일관성
 

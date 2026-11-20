@@ -900,7 +900,7 @@ RF-21의 근거는 Hermes v0.21.5(태그 `v2026.9.24`)의 소스다.
 | 등록한 profile 의 셸, 파일 도구, `execute_code` 가 profile `.env`, 연결 보관 파일, 대응 파일, `fos-ctx` 설정에 닿지 않는다. 셸로 승인을 비켜 가는 세 길(토큰 직접 사용, 대응 파일 고치기, hook 끄기)이 막힌다 | 밖으로 나가는 요청을 막지 않는다. 승인 없이 부른 READ 결과를 셸이 인터넷으로 보낼 수 있다(RF-08) |
 | 다른 사용자의 `/workspace` 와 첨부가 보이지 않는다 | 같은 사용자의 에이전트끼리는 `/workspace` 를 함께 쓴다. 웹 도구가 없는 에이전트가 쓴 파일을 셸이 있는 다른 에이전트가 읽어 보낼 수 있다 |
 | `execute_code` 안에서 플러그인 도구를 부르지 못한다(RF-08a) | web 과 browser 도구는 컨테이너 밖 Hermes 프로세스에서 돈다. 실행 공간과 상관없이 RF-09, RF-10 이 남는다 |
-| 스킬 앞머리로 값을 넣는 길을 저장 때 막는다(RC-03) | 실행 공간 정책이 적용되지 않는 profile(목록에 없고 `isolate_unlisted` 가 꺼져 있다)은 실행 공간 도구를 켜지 못한다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)). 기존 Hermes 예약 작업은 local 로 돈다. 그곳에서는 RC-02 가 남는다 |
+| 스킬 앞머리로 값을 넣는 길을 저장 때 막는다(RC-03) | 실행 공간 정책이 적용되지 않는 profile(`default` profile 이거나, 목록에 없고 `isolate_unlisted` 가 꺼져 있다)은 실행 공간 도구를 켜지 못한다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)). 기존 Hermes 예약 작업은 local 로 돈다. 그곳에서는 RC-02 가 남는다 |
 | | 운영자가 읽기 전용으로 붙인 token 파일은 그 실행 공간에서 셸이 읽는다 |
 
 ### 운영 기본값을 검토한 결과
