@@ -45,6 +45,13 @@ assistant:
     active-kek-id: test-kek-1
     # 검사가 뜰 때마다 옛 줄 배치가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     backfill-cron: "-"
+  push:
+    # 운영 값이 아니다. 검사 전용 VAPID 키 쌍이다. 키가 꺼진 동작은 VapidKeys spy 로 본다
+    vapid-public-key: BJLSTJcZ6Dt9L9GyQVxTOYazbfg-9vZjgMEnL_1gq-El1cIpTfFKBUd77zAwz97o3a9KYJ8LUYTHPIEnhbAuE9Y
+    vapid-private-key-file: src/test/resources/push/test-vapid-private.key
+    subject: mailto:test@example.invalid
+    retry-delays: 10ms,20ms
+    retry-after-max: 50ms
   memory:
     embedding:
       # 주소를 비워 임베딩을 끈다. 켜는 검사는 가짜 클라이언트와 설정을 따로 준다
