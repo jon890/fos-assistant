@@ -34,7 +34,9 @@ public class AllowedUserResolver implements TokenUserResolver {
         if (signInRevocation.revoked(email)) {
             return Optional.empty();
         }
-        return Optional.of(provisioning.resolve(email, displayName));
+        AppUser user = provisioning.resolve(email, displayName);
+        // 평가 전용 사용자는 로그인하지 않는다. 그 주소로 서명된 토큰이 생겨도 매 요청에서 막는다(docs/features/agent-quality/design.md).
+        return user.evaluation() ? Optional.empty() : Optional.of(user);
     }
 
 

@@ -42,7 +42,7 @@
 
 ### 3. 관리자 사용자 목록 표시와 알림 제외
 
-`PersonAccessService.list` 의 항목에 `evaluation` 칸을 더하고 `admin/people/presentation/PeopleAdminDtos.java` 의 응답에 담는다. `AgentPendingToolsets.notice` 와 `resolveNotices` 가 주인이 평가 사용자면 건너뛴다.
+`PersonAccessService.list` 의 항목에 `evaluation` 칸을 더한다. 관리자 응답에 담는 일은 phase 4 가 한다. `AgentPendingToolsets.notice` 와 `resolveNotices` 가 주인이 평가 사용자면 건너뛴다.
 
 ### 4. 이 phase 를 검증하는 테스트
 
@@ -65,13 +65,12 @@ cd backend && ./gradlew archTest
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/quality/application/EvaluationUserService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/EvaluationUserStatus.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/quality/application/DeployCheckItems.java` | 신규 (평가 사용자 주소, 위임 대상 이름, 미리 넣는 기억 같은 고정 값) |
 | `backend/src/main/java/com/bifos/assistant/people/application/SignInPolicy.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/people/SignInPolicyTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/people/PersonActivityTest.java` | 수정 (PersonAccess 칸이 늘면 생성자 호출을 맞춘다) |
 | `backend/src/main/java/com/bifos/assistant/user/application/AllowedUserResolver.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/people/application/PersonAccessService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/people/application/dto/PersonAccess.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/admin/people/presentation/PeopleAdminDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentPendingToolsets.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/quality/application/EvaluationUserServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/user/application/AllowedUserResolverEvaluationTest.java` | 신규 |
