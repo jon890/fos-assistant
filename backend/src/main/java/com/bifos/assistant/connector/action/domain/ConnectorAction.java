@@ -258,6 +258,32 @@ public class ConnectorAction {
     }
 
 
+    /**
+     * 커넥터 연결 없이 Control Plane 이 하는 동작의 승인 줄이다({@link ControlPlaneActions}). 판정은 늘 승인을 받는 쓰기다.
+     *
+     * @param origin 요청한 실행. 카드는 그 실행의 대화에 뜬다
+     */
+    public static ConnectorAction controlPlane(
+        Long userId, AgentExecution origin, String toolName, String dedupeKey, String argsSha256, Instant now) {
+        ConnectorAction action = new ConnectorAction();
+        action.userId = Objects.requireNonNull(userId, "userId");
+        action.agentId = origin.agentId();
+        action.connectorId = ControlPlaneActions.CONNECTOR_ID;
+        action.toolName = Objects.requireNonNull(toolName, "toolName");
+        action.hermesTool = ControlPlaneActions.hermesTool(toolName);
+        action.risk = ToolRisk.WRITE;
+        action.approvalMode = ToolApproval.ALWAYS;
+        action.decision = ActionDecision.NEEDS_APPROVAL;
+        action.passed = false;
+        action.originExecutionId = origin.id();
+        action.conversationId = origin.conversationId();
+        action.dedupeKey = dedupeKey;
+        action.argsSha256 = argsSha256;
+        action.createdAt = now;
+        return action;
+    }
+
+
     /** 주문 상한 변경 승인 줄이라고 적는다. 저장하기 전에만 부른다. 저장한 뒤의 컬럼은 고치기에서 빠져 바뀌지 않는다. */
     public void recordLimitChange(FinancialLimitKind kind, BigDecimal requested, BigDecimal previous) {
         if (id != null || limitKind != null) {
