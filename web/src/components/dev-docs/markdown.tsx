@@ -174,7 +174,7 @@ export function DevDocMarkdown({
   return (
     <article className="min-w-0 text-sm leading-6">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
         rehypePlugins={[rehypeHeadingIds]}
         components={components}
       >
