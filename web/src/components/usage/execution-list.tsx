@@ -65,8 +65,8 @@ export function reasoningEffortLabel(execution: UsageExecution): string {
 }
 
 /** 실행 상세 경로다. 내부 값을 그리는 상세는 관리자 영역에만 있다. */
-export function executionPath(id: number, isAdmin: boolean): string {
-  return isAdmin ? `/admin/executions/${id}` : `/executions/${id}`;
+export function executionPath(id: number): string {
+  return `/admin/executions/${id}`;
 }
 
 /**
@@ -82,13 +82,10 @@ export function actualCostLabel(execution: UsageExecution): string {
 }
 
 /** 걸린 시간 칸에 적을 문구다. 끝나지 않은 실행은 빈 칸이다. */
-export function durationLabel(
-  execution: UsageExecution,
-  isAdmin: boolean,
-): string {
+export function durationLabel(execution: UsageExecution): string {
   return isRunning(execution)
     ? ""
-    : formatDurationFor(execution.latencyMs ?? 0, isAdmin);
+    : formatDurationFor(execution.latencyMs ?? 0, true);
 }
 
 /**
@@ -102,13 +99,11 @@ export function retryOfLabel(execution: UsageExecution): string {
     : `${execution.retryOfExecutionId}번 실행에 이어서 시작함`;
 }
 
-/** 실행 기록이다. 금액, 모델, 토큰 같은 내부 값은 `isAdmin` 일 때만 카드와 표가 그린다. */
+/** 관리자에게 실행 기록과 비용, 모델 정보를 카드와 표로 보인다. */
 export function ExecutionList({
   executions,
-  isAdmin,
 }: {
   executions: UsageExecution[];
-  isAdmin: boolean;
 }) {
   if (executions.length === 0) {
     return (
@@ -121,14 +116,10 @@ export function ExecutionList({
 
   return (
     <section aria-label="실행 기록">
-      <ExecutionTable executions={executions} isAdmin={isAdmin} />
+      <ExecutionTable executions={executions} />
       <div className="grid gap-3 md:hidden" data-testid="execution-cards">
         {executions.map((execution) => (
-          <ExecutionCard
-            key={execution.id}
-            execution={execution}
-            isAdmin={isAdmin}
-          />
+          <ExecutionCard key={execution.id} execution={execution} />
         ))}
       </div>
     </section>

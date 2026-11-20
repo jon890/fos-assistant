@@ -47,7 +47,11 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
+import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftImages;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +66,12 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 public abstract class ContentDraftJobFixture extends ContentDraftFixture {
     protected static final String CONNECTOR = "snapshot-test";
 
+    @Autowired
+    ContentDraftImages draftImages;
+    @Autowired
+    GeneratedImageService generatedImages;
+    @Autowired
+    ArtifactStore artifactStore;
     @Autowired
     protected ContentDraftSnapshots snapshots;
     @Autowired
@@ -175,8 +185,29 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
     }
 
 
+    /**
+     * 두 번째 사진 자리를 이 대화에서 만든 그림의 원고용 사본으로 둔다(스펙 generated-image REQ18). 그림의 원본 바이트를 돌려준다.
+     */
+    protected byte[] useGeneratedImageAsSecondPhoto() {
+        byte[] png = new byte[256];
+        Arrays.fill(png, (byte)83);
+        System.arraycopy(new byte[] {(byte)0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, 0, png, 0, 8);
+        generatedImages.save(conversation.id(), owner.id(), "call-" + UUID.randomUUID(), "글 머리 그림", "지시문", png);
+        var view = draftImages.attach(owner, conversation.id(), "글 머리 그림");
+        secondPhoto = attachments.findById(Long.parseLong(view.assetId())).orElseThrow();
+        return png;
+    }
+
+
+    /** 원고의 두 번째 사진 자리에 둔 첨부 번호다. */
+    protected Long secondPhotoId() {
+        return secondPhoto.id();
+    }
+
+
     @AfterEach
     void removeSave() {
+        artifactStore.deleteFolder(conversation.id());
         snapshotRows.deleteAll();
         actionRows.deleteAll();
         bindings.deleteById(binding.id());
