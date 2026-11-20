@@ -17,8 +17,8 @@
 - 바인딩 설치는 대시보드 plugin 의 `bind_connector`(`connector_binding.py`)가 profile 의 `config.yaml`, 소유 기록 `.fos-connectors.json`, `.env`, 뗀 서버 기록, 이름 대응, 스킬, `fos-ctx` 파일을 바꾸고 `restart_required`, `plugin_updated`, `reload_pending` 을 답한다.
   `restart_required` 는 이미 있던 서버의 정의나 `.env` 칸 값이 바뀌었거나 뗀 기록의 이름을 다시 붙였을 때 참이다. 로컬 플러그인의 값 교체는 실행기 정의의 보관 파일 리비전이 바뀌어 정의 변경으로 드러난다.
 - 소유 기록의 서버 정의는 모양이 엄격하다. 로컬은 키가 정확히 `command`, `args`, `env`, `enabled`(와 `tools`)이고 `enabled` 가 참이어야 하며, 원격도 `enabled` 가 참이어야 한다(`connector_state.py`, `connector_remote.py`). 한 항목이 어긋나면 그 profile 의 소유 기록 전체를 읽지 못한다. 설정의 서버가 소유 기록과 다르면 설치는 「운영자가 바꾼 서버」 로 거절한다(`connector_binding.py`).
-- Control Plane 은 `ConnectorInstallAttempts` 의 시작, 실행, 결과 세 단계로 설치를 보낸다. 결과 단계의 `ConnectorBindingInstalls` 가 `restart_required` 나 `plugin_updated` 가 참이면 `restart_required` 칸을 OR 로 누적하고 `restart_required_since` 를 시작 트랜잭션 시각으로 적는다. 둘 다 거짓이고 `reload_pending` 이면 `apply_due_at` 을 `apply-delay`(150초) 뒤로 적는다.
-- `ConnectorBindingApplier` 가 30초마다 `apply_due_at` 이 지난 바인딩을 반영 맞추기 하고, 10분마다 `READY` 바인딩의 정의 어긋남을 점검한다. 재시작 대기 바인딩은 관리자 반영 완료(`confirmApplied`, `afterRestart=true`)만 `READY` 로 만든다.
+- Control Plane 은 `ConnectorInstallAttempts` 의 시작, 실행, 결과 세 단계로 설치를 보낸다. 결과 단계의 `ConnectorBindingInstalls` 가 `restart_required` 나 `plugin_updated` 가 참이면 `restart_required` 칸을 OR 로 누적하고 `restart_required_since` 를 시작 트랜잭션 시각으로 적는다(PR2 가 결과 트랜잭션 시각으로 바꿨다). 둘 다 거짓이고 `reload_pending` 이면 `apply_due_at` 을 `apply-delay`(150초) 뒤로 적는다.
+- `ConnectorBindingApplier` 가 30초마다 `apply_due_at` 이 지난 바인딩을 반영 맞추기 하고, 10분마다 `READY` 바인딩의 정의 어긋남을 점검한다. 재시작 대기 바인딩은 관리자 반영 완료(`confirmApplied`, `afterRestart=true`)만 `READY` 로 만든다(PR2 의 재시작 감지 전).
 - 진행 중인 실행은 두 곳에 있다. 실행 기록 `agent_execution` 의 `RUNNING` 줄(`profile_name` 을 갖는다)과, `UserExecutionLimiter` 가 메모리에 쥔 turn 자리와 원격 종료 확인 자리다. 원격 종료 확인 자리는 실행 줄을 끝냈지만 Hermes 의 run 이 끝났는지 아직 모를 때다.
 - 대시보드와 공유 gateway 는 같은 컨테이너의 다른 프로세스다. Hermes 의 `gateway.status.get_running_pid(pid_path, cleanup_stale=False)` 가 gateway pid 를 정리 없이 읽고, 대시보드 자신의 gateway 상태 화면이 그렇게 부른다(v0.23.2 의 `hermes_cli/web_server_gateway.py`). 인자 없이 부르면 낡은 pid 파일과 잠금 파일을 지우는 정리를 할 수 있다.
 - gateway 의 MCP 설정 맞추기는 `enabled: false` 인 이름을 그 profile 의 그 서버만 끊는다(v0.23.2 의 `tools/mcp_tool_discovery.py`, [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 의 실측).
@@ -141,10 +141,10 @@
 
 1. 반영 예정 확인(지금 그대로, 껐다 켜기 단계는 건너뜀)
 2. 껐다 켜기 진행(PR1). 잠근 뒤 단계와 실패 표시가 그대로인지 다시 본다
-3. 재시작 감지(PR2). 실패 표시가 없고 단계가 비었으며 반영 예정 시각이 없는 재시작 대기 바인딩이 하나라도 있을 때만 `GET /api/gateway` 를 한 번 부른다. `started_at` 이 있으면 `restart_required_since < started_at - 2초` 인 바인딩마다 `resync(afterRestart=true)` 를 돌린다
+3. 재시작 감지(PR2). 실패 표시가 없고 단계가 비었으며 반영 예정 시각이 없거나 지난 재시작 대기 바인딩이 하나라도 있을 때만 `GET /api/gateway` 를 한 번 부른다. `started_at` 이 있으면 `restart_required_since < started_at - 2초` 인 바인딩마다 `resync(afterRestart=true)` 를 돌린다
 4. 24시간 알림(PR3). `waiting_since` 가 24시간 넘었고 `admin_notified_at` 이 빈 바인딩을 그룹별로 모아 알린다
 
-**`restart_required_since` 를 결과 트랜잭션 시각으로 바꾼다(PR2).** 지금은 시작 트랜잭션 시각이라 HTTP 를 보내기 전이다. 그 사이 gateway 가 다시 뜨면 옛 파일로 뜬 gateway 를 반영된 것으로 본다. 결과 트랜잭션은 plugin 이 파일을 다 쓰고 답한 뒤라 이 시각보다 늦게 뜬 gateway 는 새 파일을 읽었다. 2초는 `btime` 과 tick 의 정밀도를 덮는 여유다. 관리자 다시 확인의 `restartRequiredSince` 대조는 같은 칸을 그대로 쓰므로 바뀌지 않는다.
+**`restart_required_since` 를 결과 트랜잭션 시각으로 바꾼다(PR2).** PR2 전에는 시작 트랜잭션 시각이라 HTTP 를 보내기 전이다. 그 사이 gateway 가 다시 뜨면 옛 파일로 뜬 gateway 를 반영된 것으로 본다. 결과 트랜잭션은 plugin 이 파일을 다 쓰고 답한 뒤라 이 시각보다 늦게 뜬 gateway 는 새 파일을 읽었다. 2초는 `btime` 과 tick 의 정밀도를 덮는 여유다. 관리자 다시 확인의 `restartRequiredSince` 대조는 같은 칸을 그대로 쓰므로 바뀌지 않는다.
 
 ### 바쁜가
 
@@ -212,7 +212,7 @@ MySQL 의 새 칸은 Draft CI 의 `backend-mysql` 이 확인한다.
 | DECISION1 | 껐다 켜기를 누가 진행하나 | Control Plane 이 단계를 저장하고 예약 작업으로 끄기와 켜기를 따로 보낸다. plugin 은 요청받은 쓰기만 한다 | 작성자 | 「바쁜가」 확인(스펙 DECISION18)과 재시작 뒤 이어 하기가 Control Plane 에 있다. plugin 안의 타이머는 대시보드가 다시 뜨면 서버를 꺼진 채 남긴다 |
 | DECISION2 | 꺼진 상태를 두는 곳 | 설정의 서버 항목과 따로 둔 끄기 기록. 소유 기록은 바꾸지 않는다 | 작성자 | 소유 기록은 서버 정의의 `enabled` 가 참이어야 읽혀, 바꾸면 같은 profile 의 모든 바인딩과 이전 이미지가 멈춘다(`connector_state.py`) |
 | DECISION3 | gateway 재시작을 알아채는 방법 | plugin 이 정리 없는 `get_running_pid` 로 gateway pid 를 읽고 `/proc` 로 시작 시각을 구해 답하고, Control Plane 이 대기 시각과 비교한다 | 작성자 | Hermes core 를 고치지 않고, 대시보드도 같은 부름으로 gateway 상태를 본다. `fos-ctx` 가 적재 때 표식을 남기는 방법은 plugin 을 다시 읽을 때도 표식이 바뀌어 재시작으로 잘못 본다 |
-| DECISION4 | 재시작 감지의 시각 비교 | 결과 트랜잭션 시각인 `restart_required_since` 와 벽시계 기동 시각을 2초 여유로 비교한다. Control Plane 이 마지막으로 본 값을 저장하지 않는다 | 작성자 | 배포는 Control Plane 과 gateway 를 함께 다시 띄우므로, 메모리에 둔 이전 값과 비교하면 배포 때의 재시작을 놓친다. 시작 트랜잭션 시각은 파일을 쓰기 전이라 틀린다 |
+| DECISION4 | 재시작 감지의 시각 비교 | 결과 트랜잭션 시각인 `restart_required_since` 와 벽시계 기동 시각을 2초 여유로 비교한다. Control Plane 이 마지막으로 본 값을 저장하지 않는다. Control Plane 의 시계와 Hermes 컨테이너 커널의 시계가 맞는다는 전제다(같은 호스트나 시간 동기화) | 작성자 | 배포는 Control Plane 과 gateway 를 함께 다시 띄우므로, 메모리에 둔 이전 값과 비교하면 배포 때의 재시작을 놓친다. 시작 트랜잭션 시각은 파일을 쓰기 전이라 틀린다 |
 | DECISION5 | 운영 조회의 인증 | 새 서비스 Bearer 토큰 하나 | 작성자 | 사용자 JWT 를 운영 작업에 줄 수 없고, 기존 서비스 토큰은 용도가 달라 범위를 넓히지 않는다 |
 | DECISION6 | 재시작 판단의 자리 | 운영 정기 작업. Control Plane 은 수만 답한다 | 작성자 | 재시작 수단과 6시간 상한의 기록이 운영 쪽에 있고, Control Plane 에 재시작 권한을 주지 않는다 |
 | DECISION7 | 새 칸의 자리 | `agent_connector_binding` 의 칸 | 작성자 | 사용자 결정(2026-11-01) 「테이블은 늘리지 않는다」. 모두 바인딩 하나의 상태다 |
