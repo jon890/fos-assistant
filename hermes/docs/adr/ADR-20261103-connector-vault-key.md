@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-11-03
-- 스펙과 설계는 [`docs/features/connector/spec.md`](../../../docs/features/connector/spec.md), [`design.md`](../../../docs/features/connector/design.md) 가 갖는다.
+- 설계는 [`dashboard-profile-api/README.md`](../../plugins/dashboard-profile-api/README.md) 의 「보관 파일 암호화와 실행기 설계」 가 갖는다. 스펙은 git 이력의 `docs/features/connector/spec.md`(커밋 `d5a72ee4d`)에 있다.
 - [ADR-083](../../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) 의 「값의 원본은 보관 파일이다」 는 그대로다. 그 원본을 평문으로 두던 것을 이 결정이 바꾼다.
 
 ### 결정

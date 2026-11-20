@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import com.bifos.assistant.connector.connection.domain.type.CyclePhase;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +87,34 @@ class ConnectorBindingTest {
         binding.markRestartRequired(false);
 
         assertThat(binding.restartRequired()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("껐다 켜기는 처음 시각을 지키고 OFF 로 처음 넘어갈 때만 시각을 바꾸며 ready 가 단계와 실패 표시를 비운다")
+    void cycleKeepsFirstTimesAndReadyClearsCycleAndFailure() {
+        ConnectorBinding binding = ConnectorBinding.pending(agent(), connection(), "demo", CREATED);
+
+        binding.needCycle(CREATED);
+        binding.needCycle(LATER);
+        assertThat(binding.cyclePhase()).isEqualTo(CyclePhase.IDLE_WAIT);
+        assertThat(binding.cycleAt()).as("기다림 상한은 처음 시각에서 센다").isEqualTo(CREATED);
+
+        binding.cycledOff(LATER);
+        binding.cycledOff(LATEST);
+        assertThat(binding.cyclePhase()).isEqualTo(CyclePhase.OFF);
+        assertThat(binding.cycleAt()).as("다시 켜는 때는 처음 꺼진 시각에서 센다").isEqualTo(LATER);
+
+        binding.needCycle(LATEST);
+        assertThat(binding.cyclePhase()).as("꺼진 단계를 기다림으로 되돌리지 않는다").isEqualTo(CyclePhase.OFF);
+
+        binding.markApplyFailed(LATEST);
+        assertThat(binding.applyFailedAt()).isEqualTo(LATEST);
+        binding.ready(LATEST);
+
+        assertThat(binding.cyclePhase()).isNull();
+        assertThat(binding.cycleAt()).isNull();
+        assertThat(binding.applyFailedAt()).isNull();
     }
 
 

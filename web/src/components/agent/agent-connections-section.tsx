@@ -32,6 +32,7 @@ import {
 } from "@/lib/agent-connection";
 
 import { isAwaitingApply } from "@/lib/binding-poll";
+import { installedSkills, skippedSkillMessages } from "@/lib/skipped-skill";
 import { boundReadiness } from "@/lib/connector-onboarding";
 
 type Props = {
@@ -44,6 +45,14 @@ type Props = {
   /** 붙거나 떨어진 뒤 이 에이전트에 붙은 연결이 있는지 알린다. 도구 절의 위험 안내가 받는다. */
   onBoundChange(bound: boolean): void;
 };
+
+/** 뗀 줄이다. 붙인 뒤의 상태와 빠진 스킬을 함께 비운다. */
+const UNBOUND = {
+  bound: false,
+  status: null,
+  restartRequired: false,
+  skippedSkills: [],
+} satisfies Partial<AgentConnectionView>;
 
 const BLOCKED_MESSAGES: Record<AgentConnectionBlock, string> = {
   AGENT_NOT_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
@@ -156,11 +165,27 @@ function ConnectionRow({
             외부 서비스 연결에서 연결을 확인해 주세요.
           </p>
         ) : null}
-        {view.skills.length > 0 && skillsOff ? (
+        {installedSkills(view.skills, view.skippedSkills).length > 0 &&
+        skillsOff ? (
           <p className="mt-1 text-xs text-muted-foreground">
             지침을 쓰려면 스킬 도구를 켜세요.
           </p>
         ) : null}
+        {view.skippedSkills.map((skipped) => (
+          <div
+            key={skipped.name}
+            data-testid="agent-connection-skipped-skill"
+            className="mt-1 text-xs text-muted-foreground"
+          >
+            <p>
+              <span className="font-medium break-all">{skipped.name}</span>{" "}
+              스킬은 함께 설치되지 않았어요.
+            </p>
+            {skippedSkillMessages(skipped.reasons).map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        ))}
       </div>
       <div className="flex items-center gap-2">
         <Badge
@@ -284,7 +309,7 @@ export function AgentConnectionsSection({
       setError(result.message);
       return;
     }
-    replace({ ...view, bound: false, status: null, restartRequired: false });
+    replace({ ...view, ...UNBOUND });
   }
 
   function cancel() {

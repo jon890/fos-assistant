@@ -358,6 +358,14 @@ function safeAgentConnection(value: unknown) {
     restartRequired: bool(item.restartRequired),
     toolCount: count(item.toolCount),
     skills: list(item.skills ?? []).map(text),
+    // 옛 Control Plane 은 이 칸을 내지 않는다. 없으면 빈 목록이다.
+    skippedSkills: list(item.skippedSkills ?? []).map((entry) => {
+      const skipped = record(entry);
+      return {
+        name: text(skipped.name),
+        reasons: list(skipped.reasons).map(text),
+      };
+    }),
   };
 }
 

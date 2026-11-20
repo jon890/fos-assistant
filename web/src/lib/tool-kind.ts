@@ -19,6 +19,19 @@ export type ToolKindId =
   | "draft"
   | "order-limit"
   | "approval"
+  | "image-gen"
+  | "video-gen"
+  | "browser"
+  | "computer"
+  | "schedule"
+  | "todo"
+  | "clarify"
+  | "speech"
+  | "history"
+  | "discord"
+  | "agents"
+  | "connections"
+  | "tool-search"
   | "helper"
   | "connector"
   | "other";
@@ -26,7 +39,7 @@ export type ToolKindId =
 export type ToolKind = { id: ToolKindId; name: string };
 
 const KINDS: Record<
-  Exclude<ToolKindId, "helper" | "connector" | "other">,
+  Exclude<ToolKindId, "connector" | "other">,
   { name: string; tools: string[] }
 > = {
   search: { name: "웹 검색", tools: ["web_search"] },
@@ -37,24 +50,83 @@ const KINDS: Record<
   },
   files: {
     name: "파일 작업",
-    tools: ["terminal", "read_file", "write_file", "patch", "search_files"],
+    tools: [
+      "terminal",
+      "process_manage",
+      "execute_code",
+      "read_file",
+      "write_file",
+      "patch",
+      "search_files",
+    ],
   },
-  image: { name: "사진 보기", tools: ["vision_analyze"] },
+  image: {
+    name: "사진 보기",
+    tools: [
+      "vision_analyze",
+      "attachment_inspect",
+      "list_media_observations",
+      "record_media_observation",
+    ],
+  },
   artifact: {
     name: "결과물 저장",
     tools: ["artifact_write", "file_space_put"],
   },
   "follow-up": { name: "할 일", tools: ["follow_up_propose"] },
-  skill: { name: "스킬", tools: ["skill_view"] },
+  skill: { name: "스킬", tools: ["skill_view", "skills_list", "skill_manage"] },
   draft: {
     name: "원고",
-    tools: ["content_draft_preview", "content_draft_save"],
+    tools: [
+      "content_draft_write",
+      "content_draft_read",
+      "content_draft_image",
+      "content_draft_preview",
+      "content_draft_save",
+    ],
   },
   "order-limit": {
     name: "주문 상한",
     tools: ["order_limit_read", "order_limit_change"],
   },
   approval: { name: "승인한 작업", tools: ["approval_resume"] },
+  "image-gen": { name: "그림 만들기", tools: ["image_generate"] },
+  "video-gen": {
+    name: "영상 만들기",
+    tools: ["video_generate", "xai_video_edit", "xai_video_extend"],
+  },
+  browser: {
+    name: "브라우저",
+    tools: ["browser_exec", "browser_cdp", "browser_dialog", "browser_vault"],
+  },
+  computer: { name: "화면 조작", tools: ["computer_use"] },
+  schedule: {
+    name: "예약 작업",
+    tools: [
+      "cronjob_manage",
+      "task_list",
+      "task_create",
+      "task_update",
+      "task_set_state",
+      "task_delete",
+    ],
+  },
+  todo: { name: "작업 목록", tools: ["todo_list"] },
+  clarify: { name: "되묻기", tools: ["clarify"] },
+  speech: { name: "음성 만들기", tools: ["text_to_speech"] },
+  history: { name: "지난 대화 찾기", tools: ["session_search"] },
+  discord: { name: "Discord", tools: ["discord", "discord_admin"] },
+  agents: {
+    name: "다른 에이전트",
+    tools: ["agent_list", "agent_delegate", "agent_status", "agent_stop"],
+  },
+  connections: { name: "외부 서비스 연결", tools: ["connector_list"] },
+  "tool-search": {
+    name: "도구 찾기",
+    tools: ["tool_search", "tool_describe", "tool_call"],
+  },
+  // 하위 에이전트 사건(`SUBAGENT`)과 그것을 만드는 도구가 같은 종류다.
+  helper: { name: "도우미", tools: ["delegate_task"] },
 };
 
 const BY_TOOL = new Map<string, ToolKind>(
@@ -65,7 +137,7 @@ const BY_TOOL = new Map<string, ToolKind>(
   ),
 );
 
-export const HELPER_KIND: ToolKind = { id: "helper", name: "도우미" };
+export const HELPER_KIND: ToolKind = { id: "helper", name: KINDS.helper.name };
 
 /** 도구 하나의 종류다. */
 export function toolKind(
