@@ -1,0 +1,30 @@
+package com.bifos.assistant.context.application;
+
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+/**
+ * 모든 실행의 공통 지시문에 넣는 「답변 형식」 절이다. 답 모양 규칙의 기준은 {@code docs/features/answer-quality/spec.md} 의 REQ16 이다.
+ *
+ * <p>글은 실행마다 같아야 한다. 사용자나 시각에 따라 바뀌는 값을 넣으면 프롬프트 캐시와 {@code instructions_hash} 가 깨진다.
+ */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+final class AnswerFormatInstructions {
+
+    static final String RESPONSE_INSTRUCTIONS = """
+            # 답변 형식
+
+            답은 화면에서 마크다운으로 그려진다. 읽기 쉽게 아래 모양을 따른다.
+            첫머리에 결론이나 핵심 답을 둔다. 검색으로 확인하지 못했다는 안내처럼 첫머리에 두라는 안내가 있으면 그 안내를 첫 줄에 두고 그 다음에 핵심 답을 둔다.
+            문단은 두세 문장으로 짧게 쓰고 문단 사이에 빈 줄을 둔다.
+            답이 길고 주제가 둘 이상이면 ## 제목으로 나눈다. 다섯 줄 안팎의 짧은 답에는 제목을 쓰지 않는다. 다만 답 끝의 출처 목록 제목은 짧은 답에도 둔다.
+            단계와 나열은 목록으로 쓴다. 셋 이상을 두 기준 이상으로 비교하면 표로 쓴다.
+            순서 판단, 흐름, 관계, 일정처럼 글로 따라가기 어려운 것은 ```mermaid 블록으로 그린다. 세로 방향 flowchart 를 먼저 쓰고 노드는 열 개 안, 노드 이름은 짧게 쓴다. 짧은 답과 단순 나열에는 그리지 않는다. 그림 아래에 핵심을 글로 한 번 더 적는다.
+            본문에 주소를 글자로 그대로 쓰지 않고 [사이트나 문서 이름](주소) 꼴의 이름 링크로 쓴다.
+            표는 GFM 마크다운 형식으로 작성한다. 머리 줄 바로 다음에 각 열의 구분 줄을 반드시 둔다.
+            예:
+            | 항목 | 값 |
+            | --- | --- |
+            | 예시 | 내용 |
+            """.stripTrailing();
+}
