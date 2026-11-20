@@ -101,6 +101,29 @@ test("답을 만드는 동안 한 줄이 검색과 검색어에서 페이지 읽
   }
 });
 
+test("도는 동안 플러그인 도구는 「서비스 이름 · 도구 제목」 으로 보인다", async ({
+  page,
+  hermes,
+}) => {
+  const input = "작업 과정 플러그인 도는 줄 검사";
+  await script(input, [
+    { event: "tool.started", tool: "mcp__demo__list_scopes", preview: "{}" },
+    { event: SCRIPT_PAUSE_EVENT },
+  ]);
+  try {
+    await send(page, input);
+    const live = page.locator(
+      '[data-testid="activity-block"][data-mode="live"]',
+    );
+    await expect(live.getByTestId("activity-current")).toHaveText(
+      "검사용 메모 · 범위 목록 보기",
+    );
+    await expect(live).not.toContainText("mcp__");
+  } finally {
+    await hermes.releaseLongActivity();
+  }
+});
+
 test.describe("움직임을 줄이지 않은 기기", () => {
   test.use({ reducedMotion: "no-preference" });
 
@@ -158,7 +181,7 @@ test("끝난 답의 접힌 줄은 쓴 종류를 셋까지 잇고 플러그인 �
   await expect(items).toHaveCount(6);
   await expect(items.nth(0)).toContainText("가습기 추천");
   await expect(items.nth(2)).toContainText("검사용 메모 · 범위 목록 보기");
-  // 제목을 선언하지 않은 도구는 서비스 이름만 보인다.
+  // 선언에 없는 도구도 서버 이름으로 플러그인을 찾으면 서비스 이름만 보인다.
   await expect(items.nth(3).locator("span.break-words")).toHaveText(
     "검사용 메모",
   );
