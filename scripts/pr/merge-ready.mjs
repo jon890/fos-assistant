@@ -18,7 +18,8 @@
 // refs/pull/N/merge 는 main 이 움직이면 GitHub 가 다시 만들어 그때의 base 를 git 에서 읽을 수 없다.
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const VERDICT = { READY: "머지 가능", WAIT: "대기", REMERGE: "main 다시 합치기 필요", BLOCKED: "막힘" };
@@ -52,10 +53,16 @@ export function loadRules(run = realRun) {
   try {
     const common = run("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
     if (common.status !== 0) return DEFAULT_RULES;
-    const file = join(dirname(common.stdout.trim()), ".orch", "config.json");
-    const queue = JSON.parse(readFileSync(file, "utf8")).queue ?? {};
+    // orch 와 같은 위치 규칙이다. ORCH_DIR 이 있으면 그곳(~ 로 시작하면 홈, 상대경로면 주 checkout 기준), 없으면 <주 checkout>/.orch.
+    const root = dirname(common.stdout.trim());
+    const env = process.env.ORCH_DIR;
+    const expanded = env === "~" ? homedir() : env?.startsWith("~/") ? join(homedir(), env.slice(2)) : env;
+    const dir = !expanded ? join(root, ".orch") : isAbsolute(expanded) ? expanded : join(root, expanded);
+    const queue = JSON.parse(readFileSync(join(dir, "config.json"), "utf8")).queue ?? {};
+    const isRule = (value) => typeof value === "string" || (Array.isArray(value) && value.every((item) => typeof item === "string"));
     return {
-      sharedPaths: Array.isArray(queue.shared_paths) ? queue.shared_paths : DEFAULT_RULES.sharedPaths,
+      // shared_paths 와 shared_groups 의 값은 정규식 문자열 하나이거나 그 목록이다(orch 설정 형식).
+      sharedPaths: isRule(queue.shared_paths) ? queue.shared_paths : DEFAULT_RULES.sharedPaths,
       sharedGroups: queue.shared_groups && typeof queue.shared_groups === "object" ? queue.shared_groups : DEFAULT_RULES.sharedGroups,
     };
   } catch {

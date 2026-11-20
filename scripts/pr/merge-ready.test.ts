@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "./merge-ready.mjs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DEFAULT_RULES, EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, loadRules, remergeReasons } from "./merge-ready.mjs";
 
 const REQUIRED = ["unit", "backend"];
 const ok = (name: string) => ({ name, state: "SUCCESS", startedAt: "2026-10-12T01:00:00Z" });
@@ -270,4 +273,37 @@ test("PR 번호가 없거나 숫자가 아니면 종료 코드 2 로 끝난다",
   assert.match(out[0], /사용법/);
   const result = spawnSync("node", ["scripts/pr/merge-ready.mjs"], { encoding: "utf8" });
   assert.equal(result.status, EXIT.LOOKUP);
+});
+
+// loadRules 가 읽는 설정 위치를 임시 폴더로 바꿔 보인다. git 호출은 주 checkout 을 임시 폴더로 돌려주는 대역이다.
+function rulesFrom(queue: object, where: "default" | "env") {
+  const root = mkdtempSync(join(tmpdir(), "merge-ready-"));
+  const dir = where === "env" ? join(root, "custom-orch") : join(root, ".orch");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.json"), JSON.stringify({ queue }));
+  const before = process.env.ORCH_DIR;
+  if (where === "env") process.env.ORCH_DIR = dir;
+  else delete process.env.ORCH_DIR;
+  try {
+    return loadRules(() => ({ status: 0, stdout: `${join(root, ".git")}\n`, stderr: "" }));
+  } finally {
+    if (before === undefined) delete process.env.ORCH_DIR;
+    else process.env.ORCH_DIR = before;
+  }
+}
+
+test("설정의 shared_paths 가 문자열이어도 읽는다", () => {
+  const rules = rulesFrom({ shared_paths: "^custom/" }, "default");
+  assert.match(remergeReasons(["a.ts"], ["custom/policy.txt"], rules)[0], /공용 경로/);
+});
+
+test("ORCH_DIR 이 가리키는 설정을 문자열과 배열 모두 읽는다", () => {
+  for (const shared_paths of ["^custom/", ["^custom/"]]) {
+    const rules = rulesFrom({ shared_paths }, "env");
+    assert.match(remergeReasons(["a.ts"], ["custom/policy.txt"], rules)[0], /공용 경로/);
+  }
+});
+
+test("설정 파일이 없으면 기본값을 쓴다", () => {
+  assert.equal(loadRules(() => ({ status: 1, stdout: "", stderr: "" })), DEFAULT_RULES);
 });

@@ -190,7 +190,7 @@ verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전�
 등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
-머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
+머지 직전에 필수 검사가 통과해야 한다. 최신 main 을 포함한 head 의 통과가 기본이고, 아래 조건이면 직전 CI 결과를 쓴다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
 CI 뒤 main 에 들어온 커밋이 이 PR 과 같은 파일을 고치지 않았고, 빌드와 의존성 파일, `test/repo/`, CI 판정 파일을 건드리지 않았고, 마이그레이션 같은 한 묶음의 파일을 PR 과 main 이 둘 다 바꾸지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
 필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `--match-head-commit` 으로 머지하고, 이력을 한 줄로 합치지 않는다.
 머지한 뒤에는 위 「작업 단위」 의 정리를 한다.
