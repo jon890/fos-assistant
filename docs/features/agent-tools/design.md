@@ -96,7 +96,7 @@
 
 | ID | 경계와 환경 |
 | --- | --- |
-| REQ1 | plugin 단위 테스트(정책 밖 profile 의 셸 저장이 `require_sandbox` 없이도 409 `unlisted`, `terminal:` 이 바뀌지 않음, 정책 무효는 `reason` 없음). Control Plane 단위 테스트(기동 작업이 `unlisted` 에서만 셸 계열을 빼고 다시 쓰고, `reason` 없는 409 와 다른 실패는 건너뜀). 운영 배포 뒤 셸이 켜진 에이전트의 `terminal.backend` 확인은 운영 저장소가 한다 |
+| REQ1 | plugin 테스트(`test_dashboard_profile_api_sandbox_policy.py`: 정책 밖 profile 의 셸 저장이 `require_sandbox` 없이도 409 `unlisted`, `terminal:` 이 바뀌지 않음, 정책 무효와 디렉터리 실패는 `reason` 없음). Control Plane 테스트(`AgentSandboxSweepTest`: 기동 작업이 `unlisted` 에서만 셸 계열을 빼고 다시 쓰고, `reason` 없는 409 와 다른 실패는 다시 시도. `HermesToolsetRequestTest`: 409 의 `reason` 해석). 운영 배포 뒤에는 코디네이터가 Control Plane 기동 로그의 「실행 공간 도구를 다시 저장했다 outcomes=… unfinished=…」 를 읽고, unfinished 가 0 이 아니면 다음 주기의 「다시 봤다 unfinished=0」 까지 기다린 뒤, 모든 profile 의 `terminal.backend` 와 `platform_toolsets.api_server` 를 읽기 전용으로 대조한다. 셸 계열이 켜진 profile 은 모두 docker 이고 local 인 profile 은 셸 계열이 꺼져 있어야 한다. 읽는 명령은 운영 저장소가 갖는다 |
 | REQ2 | plugin 단위 테스트(칸이 참이면 목록 밖 profile 이 공통 설정의 docker, 거짓이거나 없으면 409 `unlisted`, `default` 는 격리하지 않음, 목록의 profile 은 자기 칸). 운영 반영 뒤 왕복 확인 |
 | REQ5, REQ9 | Control Plane 단위 테스트(`MEMBER` 주인이 셸 계열을 켜고 끔, 만들기와 관리자 등록 뒤 기본 도구 적용), 화면 단위 테스트와 브라우저 테스트(확인 창 없음) |
 | REQ8 | MySQL 마이그레이션 테스트와 다시 시도 작업 단위 테스트 |
