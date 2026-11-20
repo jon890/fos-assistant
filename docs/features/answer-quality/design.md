@@ -33,6 +33,12 @@
 | REQ12 | PR3 이 설계한다 |
 | REQ13 | PR3 이 설계한다. PR1 의 평가 명령은 질문 하나에 메시지를 여럿 보낼 수 있는 모양으로 두어 PR3 이 여러 turn 질문을 더할 수 있게 한다 |
 | REQ14 | PR4 가 한다. PR1 의 평가 명령이 모델 칸을 인자로 받는 것이 그 준비다 |
+| REQ15 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
+| REQ16 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
+| REQ17 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
+| REQ18 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
+| REQ19 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
+| REQ20 | PR5 가 한다. 아래 「PR5 답 모양」 의 요구사항 연결 |
 
 ## 책임과 경계
 
@@ -146,3 +152,53 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | --- | --- | --- | --- |
 | 평가를 운영 왕복으로 돌리고 규칙으로 판정 | architecture | 필요 없음. [ADR-20261020 / blog-photo-eval](../../adr/ADR-20261020-blog-photo-eval.md) 의 틀을 그대로 따른다 | 기능 파일 [`answer-quality.md`](../answer-quality.md) |
 | 검색 서비스 선택 | operations | 평가 숫자가 나온 뒤 그 결과와 함께 ADR 로 남긴다. PR1 머지 때는 값이 정해지지 않았다 | 계약 문서와 기능 파일 |
+
+## PR5 답 모양
+
+스펙 REQ15부터 REQ20 과 DECISION20부터 DECISION30(확인 2026-11-20)의 설계다. API, 사건, 테이블은 바뀌지 않는다.
+
+### 요구사항 연결
+
+| ID | 해결 방법 |
+| --- | --- |
+| REQ15 | `ContextAssembler.SEARCH_INSTRUCTIONS` 의 「출처」 문장을 `### 출처` 와 `- [기관 · 문서 이름](주소)` 꼴, 주소를 글자로 쓰지 않기, 목록 안 한 번으로 바꾼다 |
+| REQ16 | `AnswerFormatInstructions.RESPONSE_INSTRUCTIONS`(모든 실행 공통)에 답 모양 규칙을 더한다. 표 구분 줄 규칙과 예시는 그대로 둔다. `ContextAssembler` 가 파일 길이 상한을 넘어 이 글을 따로 뗐다 |
+| REQ17 | 채팅 마크다운 부품에 글 안의 줄바꿈 한 번을 `br` 로 바꾸는 작은 rehype 플러그인을 더한다. 코드 안과 블록 사이는 건드리지 않는다. 흐림 플러그인이 글자의 원문 위치로 구간을 찾으므로 그 뒤에 돈다 |
+| REQ18 | 채팅 마크다운 부품에 제목, 인용, 구분선, 굵은 글자 요소와 본문 글자 토큰을 더한다. 작업 과정 블록은 `density="compact"` 로 지금 크기와 간격을 쓴다. 출처 절은 rehype 플러그인이 최상위의 글이 「출처」 인 제목부터 다음 제목 앞까지를 `section` 하나로 감싸고 그 `section` 에 모양을 준다 |
+| REQ19 | 개발 문서의 `MermaidBlock` 과 `mermaidRenderId` 를 공용 자리로 옮겨 두 마크다운 부품이 함께 쓴다. remark 플러그인이 닫는 줄이 없는 코드 블록에 `data-open` 을 달고, 채팅 부품은 `streaming` 이면서 그 표시가 있으면 코드로 둔다. 부품 묶음은 `density` 와 `streaming` 으로 고정해 흐르는 동안 그림이 다시 붙지 않게 한다 |
+| REQ20 | `score.ts` 에 형식 판정 순수 함수를 더하고 `QuestionScore` 에 선택 칸으로 둔다. 보고서 표와 요약에 낸다. 통과 판정(`scoreSet` 의 `outcome`)은 이 칸을 읽지 않는다 |
+
+### 책임과 경계
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `context/application/AnswerFormatInstructions` | 「답변 형식」 절 글 |
+| `context/application/ContextAssembler` | 「최신 정보와 출처」 절 글과 범위마다 절을 잇는 순서 |
+| `web/src/components/ui/mermaid-block.tsx`, `web/src/lib/mermaid.ts` | 옮긴 Mermaid 그리기와 id 만들기. 개발 문서와 채팅이 함께 쓴다 |
+| `web/src/components/chat/markdown.tsx` | 채팅 마크다운 부품, 플러그인 순서 |
+| `web/src/components/chat/markdown-components.tsx` | 요소마다의 모양과 `density` 묶음, mermaid 와 코드 블록 고르기 |
+| `web/src/components/chat/code-block.tsx` | 코드 블록 칠하기. 파일 길이 기준을 지키려고 옮겼다 |
+| `web/src/components/chat/markdown-plugins.ts` | 줄바꿈 한 번, 출처 절 감싸기, 닫히지 않은 블록 표시. node 테스트가 읽도록 `.ts` 로 둔다 |
+| `web/src/components/chat/answer-body.tsx` | 흐르는 중인지를 마크다운 부품에 넘긴다 |
+| `web/src/app/globals.css` | 본문 글자 토큰(`--text-answer`) |
+| `test/model-eval/answer/score.ts` | 형식 판정과 보고서 칸 |
+| `docs/features/answer-quality.md`, `docs/features/chat.md` | 지금 동작 |
+
+새 의존은 더하지 않는다. `remark-breaks` 는 같은 일을 하는 스무 줄 남짓이라 직접 쓴다. Mermaid 는 이미 의존에 있다.
+
+### 실패와 일관성
+
+- Mermaid 원문이 틀리면 원문 코드와 「그림을 그리지 못했어요」 가 보인다(지금 개발 문서와 같다). `securityLevel: "strict"` 와 react-markdown 의 HTML 불신 기본값(rule-57)은 그대로다
+- 흐르는 중에 닫히지 않은 블록을 그리려 하면 매 글자마다 실패한다. 그래서 닫는 줄이 없으면 그리지 않는다. 답이 끝나면 닫는 줄이 없어도 그려 본다(스펙 REQ19)
+- 지침 글이 바뀌어 `instructions_hash` 가 한 번 바뀐다. 같은 날 같은 기억이면 다시 같아진다
+- 줄바꿈 한 번을 살리면 이전 답에서 문단 안에서 줄을 감은 곳도 줄이 바뀐다. 스펙 DECISION21 이 감수했다
+
+### 검증 전략
+
+| ID | 어디서 확인하나 |
+| --- | --- |
+| REQ15, REQ16 | backend 단위 테스트(`ContextAssemblerTest`): 지침에 출처 꼴 문장과 답 모양 규칙이 들고, 예약 작업과 먼저 살펴보기에도 답 모양이 든다 |
+| REQ17, REQ19 | web node 테스트(`chat-markdown-plugins.test.ts`): 운영 답의 출처 블록 모양에 `<br>` 가 들고, 코드와 블록 사이는 그대로이며, 출처 절이 `section` 으로 감싸지고, 닫히지 않은 블록에 `data-open` 이 붙는다 |
+| REQ18, REQ19 | 브라우저 테스트(`chat.spec.ts`, 넓은 화면과 휴대폰): 제목 18px, 본문 15px, 출처 절 14px, 줄바꿈 `br`, mermaid 그림과 실패 문구, 그림이 화면 폭 안에 있다 |
+| REQ20 | `score.ts` 단위 테스트: 목록 꼴, 맨 주소, 반복, 긴 문단 판정과 보고서 칸 |
+| 모두 | 배포 뒤 확인 7: 출처 있는 답 하나를 넓은 화면과 휴대폰에서 보고 평가를 다시 돈다 |

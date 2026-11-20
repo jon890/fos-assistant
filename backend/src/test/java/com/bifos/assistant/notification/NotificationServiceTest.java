@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -66,6 +67,9 @@ class NotificationServiceTest {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    @Autowired
+    ApplicationEventPublisher events;
 
     private final List<NotificationEvent> aliceEvents = new CopyOnWriteArrayList<>();
     private final List<NotificationEvent> bobEvents = new CopyOnWriteArrayList<>();
@@ -247,7 +251,7 @@ class NotificationServiceTest {
         // Linux 의 시스템 시계는 나노초까지 주지만 칸은 DATETIME(6) 이다. 그 시계를 고정해 macOS 에서도 재현한다.
         Instant nanos = Instant.parse("2026-10-01T00:00:00.123456789Z");
         contextClock.set(nanos);
-        NotificationService nanoService = new NotificationService(notifications, hub, Clock.fixed(nanos, ZoneOffset.UTC), transactionManager);
+        NotificationService nanoService = new NotificationService(notifications, hub, Clock.fixed(nanos, ZoneOffset.UTC), transactionManager, events);
         Instant micros = Instant.parse("2026-10-01T00:00:00.123456Z");
 
         Notification created = transactions.execute(
