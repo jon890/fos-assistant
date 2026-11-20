@@ -132,8 +132,9 @@ test("할 일의 출처는 상태와 독립적으로 에이전트 제안이면 �
   assert.equal(originText(item({ followUp: null })), null);
 });
 
-test("더 있는 항목은 실패면 실행 기록으로, 내 차례면 글만 낸다", () => {
-  assert.deepEqual(moreText(card("failures", { moreCount: 2 })), { text: "2개 더 있어요", href: "/usage?tab=executions" });
+test("더 있는 항목은 사용량 링크 없이 수만 알린다", () => {
+  assert.deepEqual(moreText(card("failures", { moreCount: 2 })), { text: "2개 더 있어요", href: null });
+  assert.deepEqual(moreText(card("delegated", { moreCount: 3 })), { text: "3개 더 있어요", href: null });
   assert.deepEqual(moreText(card("needs_me", { moreCount: 1 })), { text: "1개 더 있어요", href: null });
 });
 

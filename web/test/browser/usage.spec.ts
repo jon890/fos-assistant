@@ -1,12 +1,9 @@
 // 코드 규칙: rule-61. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import type { Page } from "../../node_modules/@playwright/test/index.js";
-import { encode } from "../../node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
-import { filledTierProvider, readGroupModelTiers, saveGroupModelTiers } from "./helpers.ts";
-import { AUTH_SECRET, CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL, WEB_BASE_URL } from "./settings.ts";
-
-const SESSION_COOKIE = "authjs.session-token";
+import { filledTierProvider, isolatedUser, readGroupModelTiers, saveGroupModelTiers } from "./helpers.ts";
+import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(): Promise<string> {
   return new SignJWT({ name: "브라우저 테스트" })
@@ -135,39 +132,35 @@ test("고아 실행은 중간에 끊겼다고 보인다", async ({ page }, testI
     { headers: { Authorization: `Bearer ${await controlPlaneToken()}` } },
   );
   expect(orphan.ok()).toBeTruthy();
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
 
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("중간에 중단됨", { exact: true }).first()).toBeVisible();
 });
 
-test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, page }) => {
-  const token = await encode({
-    salt: SESSION_COOKIE,
-    secret: AUTH_SECRET,
-    token: { sub: "empty@example.com", email: "empty@example.com", name: "빈 사용자" },
+for (const [tab, emptyText] of [
+  ["executions", "아직 실행 기록이 없어요"],
+  ["skills", "아직 부른 스킬이 없어요."],
+]) {
+  test(`관리자 ${tab} 탭에 기록이 없으면 빈 상태를 보인다`, async ({ context, page }, testInfo) => {
+    const user = isolatedUser(testInfo, `empty-usage-${tab}`);
+    const created = await page.request.post(`${CONTROL_PLANE_BASE_URL}/api/v1/test-support/usage/admin-user`, {
+      headers: { Authorization: `Bearer ${await controlPlaneToken()}` },
+      data: { email: user.email, displayName: user.name },
+    });
+    expect(created.ok()).toBeTruthy();
+    await setSession(context, user);
+    await page.goto(`/admin/usage?tab=${tab}`);
+    await expect(page.getByText(emptyText, { exact: true })).toBeVisible();
   });
-  await context.addCookies([{
-    name: SESSION_COOKIE,
-    value: token,
-    url: WEB_BASE_URL,
-    httpOnly: true,
-    sameSite: "Lax",
-  }]);
+}
 
-  const provision = await page.request.get("/api/agents");
-  expect(provision.ok()).toBeTruthy();
-
-  await page.goto("/usage?tab=executions");
-  await expect(page.getByText("아직 실행 기록이 없어요", { exact: true })).toBeVisible();
-});
-
-test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다", async ({
+test("막힌 모델로 실행하면 모델을 쓸 수 없다는 응답을 받는다", async ({
   page,
   context,
   hermes,
   isolatedMember,
-}, testInfo) => {
+}) => {
   // 칸을 고르면 그 사용자의 기본 칸도 바뀐다. 관리자 세션의 기본 칸을 남기지 않도록 따로 만든 사용자로 고른다.
   const blockedProvider = await filledTierProvider(page, "HIGH");
   await setSession(context, isolatedMember);
@@ -193,12 +186,6 @@ test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다
     } finally {
       await hermes.clearBlockedProviders();
     }
-
-    await page.goto("/usage?tab=executions");
-    const records = page.getByTestId(
-      testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
-    );
-    await expect(records.getByText("모델을 쓸 수 없음").first()).toBeVisible();
   } finally {
     const removed = await page.request.delete(`/api/agents/${agentCode}`);
     expect(removed.status()).toBe(204);
@@ -221,7 +208,7 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
     await hermes.clearBusy();
   }
 
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
@@ -342,37 +329,18 @@ test("모델이 스킬을 읽은 대화는 스킬 탭에 보이고 누르면 그
   expect(latest.ok()).toBeTruthy();
   const [{ id: executionId, conversationId }] = (await latest.json()) as { id: number; conversationId: string }[];
 
-  await page.goto("/usage?tab=skills");
+  await page.goto("/admin/usage?tab=skills");
   const row = skillRow().filter({ hasText: "shopping" });
   await expect(row.getByText(`${before + 1}회`, { exact: true })).toBeVisible();
   await row.getByRole("link").click();
   await expect(page).toHaveURL(new RegExp(`/chat/${conversationId}$`));
 
-  await page.goto("/usage?tab=executions");
-  const link = page.locator(`a[href="/executions/${executionId}"]`);
+  await page.goto("/admin/usage?tab=executions");
+  const link = page.locator(`a[href="/admin/executions/${executionId}"]`);
   const executionRow = testInfo.project.name === "mobile"
     ? link.locator("xpath=ancestor::article")
     : link.locator("xpath=ancestor::tr");
   await expect(executionRow.getByTestId("execution-skills")).toHaveText("스킬 shopping");
-});
-
-test("스킬을 부른 적이 없으면 스킬 탭이 빈 상태를 보인다", async ({ context, page }) => {
-  const token = await encode({
-    salt: SESSION_COOKIE,
-    secret: AUTH_SECRET,
-    token: { sub: "empty@example.com", email: "empty@example.com", name: "빈 사용자" },
-  });
-  await context.addCookies([{
-    name: SESSION_COOKIE,
-    value: token,
-    url: WEB_BASE_URL,
-    httpOnly: true,
-    sameSite: "Lax",
-  }]);
-  expect((await page.request.get("/api/agents")).ok()).toBeTruthy();
-
-  await page.goto("/usage?tab=skills");
-  await expect(page.getByText("아직 부른 스킬이 없어요.", { exact: true })).toBeVisible();
 });
 
 const RAW_COMMAND = "ls-원본-명령";
@@ -397,12 +365,12 @@ function terminalTreeFixture() {
 }
 
 /**
- * `MEMBER` 역할 사용자의 사용량 화면에는 금액, 모델, effort, 문맥 글자 수 같은 내부 값이 없어야 한다.
+ * `MEMBER` 역할 사용자의 작업 과정에는 금액, 모델, effort, 문맥 글자 수 같은 내부 값이 없어야 한다.
  *
  * <p>씨 뿌린 에이전트는 관리자 소유의 비공개라, 전용 사용자로 로그인해 자기 에이전트를 만들고 그것으로 실행을 만든다.
  * mobile 과 desktop 이 같은 Control Plane 을 쓰므로 project 마다 다른 사용자다. 만든 에이전트는 검사가 끝나면 지운다.
  */
-test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
+test.describe("MEMBER 역할 사용자의 작업 과정", () => {
   const AGENT_NAME = "숙제 비서";
 
   function memberOf(projectName: string) {
@@ -424,23 +392,26 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     }
   });
 
-  test("사용량 요약에 먼저 알리기 지표 절이 없다", async ({ page }) => {
-    await page.goto("/usage");
-    await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "먼저 알리기" })).toHaveCount(0);
+  test("사용자 사용량 주소와 탭은 404이고 설정에는 사용량 링크가 없다", async ({ page }) => {
+    for (const suffix of ["", "?tab=executions", "?tab=skills", "?tab=fingerprints", "/executions"]) {
+      const response = await page.goto(`/usage${suffix}`);
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole("navigation", { name: "사용량 탭" })).toHaveCount(0);
+    }
+    await page.goto("/settings");
+    await expect(page.getByRole("link", { name: "사용량", exact: true })).toHaveCount(0);
   });
 
-  test("실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다", async ({ page }, testInfo) => {
+  test("대화의 작업 과정과 실행 상세에 내부 값이 없다", async ({ page }) => {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
     const agentCode = ((await created.json()) as { code: string }).code;
 
-    // 자식이 달린 실행을 먼저 만든다. 부모가 끝나면 그 자식은 바로 확인 중으로 세어지므로,
-    // 아래에서 문구가 없는 것이 자식이 없어서가 아니라 역할 때문임을 구분한다.
-    const withChild = await page.request.post("/api/chat/stream", {
-      data: { text: "자식 완료 사건 없음 검사", agentCode: agentCode },
+    const sent = await page.request.post("/api/chat", {
+      data: { text: "실행 상세 가림 검사", agentCode },
     });
-    expect(withChild.ok()).toBeTruthy();
+    expect(sent.ok()).toBeTruthy();
+    const { executionId } = (await sent.json()) as { executionId: number };
 
     // 대화에서 보내야 도구 사건이 실린 실행이 생긴다.
     await page.goto("/new");
@@ -458,32 +429,12 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     await expect(block.getByText(RAW_RESULT)).toHaveCount(0);
     await page.unroute("**/api/usage/executions/*/tree");
 
-    await page.goto("/usage?tab=executions");
-    const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
-    await expect(records).toBeVisible();
-    await expect(records.getByText(AGENT_NAME, { exact: true }).first()).toBeVisible();
-    await expect(records.getByText("성공", { exact: true }).first()).toBeVisible();
-    for (const hidden of ["USD", "example-model", "effort", "문맥", "가격 없음"]) {
-      await expect(records, `실행 기록에 「${hidden}」 이 보인다`).not.toContainText(hidden);
+    await page.goto(`/executions/${executionId}`);
+    await expect(page.getByRole("heading", { name: AGENT_NAME, exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "설정 메뉴" })).toHaveCount(0);
+    for (const hidden of ["USD", "example-model", "effort"]) {
+      await expect(page.getByRole("main")).not.toContainText(hidden);
     }
-    await expect(records.getByTestId("execution-cost")).toHaveCount(0);
-    await expect(records.getByTestId("execution-effort")).toHaveCount(0);
-    // 걸린 시간은 밀리초가 아니라 초로 보인다.
-    await expect(records.getByTestId("execution-duration").first()).toHaveText(/^(1초 미만|\d+초|\d+분 \d+초)$/);
-
-    await page.goto("/usage");
-    await expect(page.getByText("이번 달에 비서와 한 일을 모아 보여 드려요.", { exact: true })).toBeVisible();
-    await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
-    await expect(page.getByText("금액을 확인하지 못한 도우미")).toHaveCount(0);
-    await expect(page.getByText("API 가격")).toHaveCount(0);
-    await expect(page.getByRole("main")).not.toContainText("USD");
-    await expect(page.getByTestId("breakdown-axis")).toHaveCount(0);
-    await expect(usageTabs(page).getByRole("link")).toHaveText(["요약", "실행 기록", "스킬"]);
-
-    // 설정별 사용량 탭의 주소로 와도 요약이 열린다.
-    await page.goto("/usage?tab=fingerprints");
-    await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("fingerprint-section")).toHaveCount(0);
+    await expect(page.getByTestId("execution-context-sources")).toHaveCount(0);
   });
 });

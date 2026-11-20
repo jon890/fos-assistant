@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftBinding
 import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftSnapshotInput;
 import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftRevisionStatus;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.attachment.infra.AttachmentFingerprint;
 import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
@@ -32,6 +33,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -148,8 +150,11 @@ public class ContentDraftSnapshotInputs {
         ContentDraftInput input) throws IOException {
         var resolved = new HashMap<Long, ObjectNode>();
         var order = new HashMap<Long, Integer>();
-        attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId).stream()
-            .filter(it -> it.messageId() != null).forEach(it -> order.put(it.id(), order.size() + 1));
+        var rows = attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId);
+        rows.stream().filter(it -> it.messageId() != null).forEach(it -> order.put(it.id(), order.size() + 1));
+        // 원고용 그림 사본은 사진 순번이 없다. compiler 스키마가 요구하는 값이라 보낸 사진 뒤에 첨부 번호 순서로 잇는다.
+        rows.stream().filter(it -> it.messageId() == null && it.isDraftImageCopy())
+            .sorted(Comparator.comparing(ChatAttachment::id)).forEach(it -> order.put(it.id(), order.size() + 1));
         for (var link : links) {
             var value = resolveAsset(user, conversationId, link, input, order);
             var previous = resolved.putIfAbsent(link.attachmentId(), value);
@@ -187,8 +192,7 @@ public class ContentDraftSnapshotInputs {
         }
         var value = json.createObjectNode().put("assetId", link.attachmentId().toString())
             .put("sourceFingerprint", link.sourceFingerprint()).put("fileName", attachment.storedName())
-            .put("photoDir", properties.agentRoot().replaceAll("/+$", "") + "/users/"
-                + AttachmentStore.userDirectoryKey(user.id()) + "/" + conversationId)
+            .put("photoDir", AttachmentStore.agentConversationDirectory(properties.agentRoot(), user.id(), conversationId))
             .put("ordinal", order.get(link.attachmentId()));
         if (link.observationId() != null) {
             var observation = observations.findById(link.observationId()).orElseThrow(ContentDraftSnapshotInputs::stale);

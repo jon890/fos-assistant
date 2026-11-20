@@ -29,6 +29,11 @@ type Props = {
   tier: ModelTierCode | null;
   disabled: boolean;
   onChange(mode: "TIER", tier: ModelTierCode): Promise<ModelTierSaveResult>;
+  /**
+   * 저장 실패 안내를 보일지 알린다. 안내는 부르는 쪽이 단추 줄 밖에 그린다. 입력창 아래 줄 안에 그리면 좁은 폭에서
+   * 줄이 늘어나 「＋」 와 보내기가 밀린다(docs/features/app-shell/spec.md 의 REQ8).
+   */
+  onFailedChange(failed: boolean): void;
 };
 
 type LoadState =
@@ -66,12 +71,12 @@ export function ModelTierPicker({
   tier,
   disabled,
   onChange,
+  onFailedChange,
 }: Props) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [open, setOpen] = useState(false);
   /** 저장하는 동안 먼저 보이는 칸이다. 저장이 끝나면 비우고 대화에 적힌 칸을 다시 보인다 */
   const [draft, setDraft] = useState<ModelTierCode | null>(null);
-  const [failed, setFailed] = useState(false);
   const pending = useRef<ModelTierCode | null>(null);
   const saving = useRef(false);
   const groupName = useId();
@@ -103,7 +108,7 @@ export function ModelTierPicker({
 
   async function choose(next: ModelTierCode) {
     setDraft(next);
-    setFailed(false);
+    onFailedChange(false);
     pending.current = next;
     if (saving.current) return;
     saving.current = true;
@@ -113,7 +118,7 @@ export function ModelTierPicker({
       const result = await onChange("TIER", target);
       if (result !== "saved") {
         pending.current = null;
-        if (result === "failed") setFailed(true);
+        if (result === "failed") onFailedChange(true);
         break;
       }
       // 서버가 같은 트랜잭션에서 사용자 기본 칸도 바꿨다. 같은 화면에서 새 대화를 열어도 이 칸에서 시작한다.
@@ -186,15 +191,6 @@ export function ModelTierPicker({
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-      {failed ? (
-        <p
-          role="alert"
-          data-testid="model-picker-error"
-          className="px-2 text-xs text-destructive"
-        >
-          모델 단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
-        </p>
-      ) : null}
     </div>
   );
 }

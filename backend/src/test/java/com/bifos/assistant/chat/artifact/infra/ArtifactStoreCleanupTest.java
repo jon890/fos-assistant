@@ -10,7 +10,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
@@ -134,8 +133,7 @@ class ArtifactStoreCleanupTest {
 
     private ArtifactStore store(ArtifactCleanupProbe probe) {
         ArtifactProperties properties = new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null);
-        ArtifactAtomicMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        return new ArtifactStore(properties, false, mover, probe);
+        return new ArtifactStore(properties, probe);
     }
 
 

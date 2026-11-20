@@ -17,7 +17,7 @@ async function createConversation(page: Page, title: string): Promise<string> {
 }
 
 test.describe("넓은 화면", () => {
-  test("/settings 는 묶음 넷과 일곱 줄을 보이고 에이전트가 골라진 채 열린다", async ({ page }, testInfo) => {
+  test("/settings 는 설정 묶음과 메뉴를 보이고 에이전트가 골라진 채 열린다", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "mobile", "넓은 화면 사례다");
     await page.goto("/settings");
     const menu = settingsMenu(page);
@@ -25,7 +25,7 @@ test.describe("넓은 화면", () => {
     for (const [group, links] of [
       ["비서", ["에이전트"]],
       ["연결", ["외부 서비스 연결", "내 브라우저"]],
-      ["내 데이터", ["파일 공간", "사용량"]],
+      ["내 데이터", ["파일 공간"]],
       ["도움말", ["개발 문서", "데이터 보관 안내"]],
     ] as const)
       await expect(menu.getByRole("group", { name: group }).getByRole("link")).toHaveText([...links]);
@@ -45,9 +45,7 @@ test.describe("넓은 화면", () => {
     await expect(settingsMenu(page).getByRole("link", { name: "외부 서비스 연결" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: "외부 서비스 연결", level: 1 })).toBeVisible();
 
-    // 실행 하나의 화면은 사용량의 실행 기록에서 여므로 「사용량」 이 골라진다. 없는 실행이어도 틀은 같다.
-    await page.goto("/executions/999999999");
-    await expect(settingsMenu(page).getByRole("link", { name: "사용량" })).toHaveAttribute("aria-current", "page");
+
   });
 
   test("로그인한 사용자의 데이터 보관 안내는 설정 틀 안에 보이고 로그인 안내가 없다", async ({ page }, testInfo) => {

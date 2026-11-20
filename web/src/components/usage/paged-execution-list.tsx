@@ -14,10 +14,8 @@ import {
 /** 초기 목록 아래에 이전 실행 기록을 이어 붙인다. */
 export function PagedExecutionList({
   initialPage,
-  isAdmin,
 }: {
   initialPage: UsageExecutionPage;
-  isAdmin: boolean;
 }) {
   const [page, setPage] = useState(initialPage);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +45,7 @@ export function PagedExecutionList({
 
   return (
     <div className="space-y-3">
-      <ExecutionList executions={page.items} isAdmin={isAdmin} />
+      <ExecutionList executions={page.items} />
       {error ? (
         <Notice variant="error" role="alert">
           {error}

@@ -399,7 +399,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 `execution_skill_use` 한 표에 둔다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md)).
 출처 `COMMAND` 는 커맨드로 turn 을 시작할 때 적고, 출처 `MODEL` 은 실행 사건의 `skill_view` 호출에 스킬 이름이 실려 있을 때 적는다. 이름은 가리기 전 미리보기에서 꺼내 이름 규칙으로 검증하고, 가린 `detail` 에서는 읽지 않는다(ADR-047).
 위임의 하위 실행은 이름이 실리지 않아 기록되지 않는다. 연결을 붙인 에이전트의 대화 turn 은 기록된다.
-사용자는 자기 호출만 보고(`GET /api/v1/usage/skills`), 관리하는 사람은 스킬 목록의 `usage` 로 합계만 본다. 누가 어느 대화에서 불렀는지는 보지 않는다.
+호출 기록은 계속 남긴다. 관리자는 `/admin/usage` 의 스킬 탭에서 자기 호출을 보고(`GET /api/v1/usage/skills`), 스킬 목록의 `usage` 로 합계를 본다. 합계에서는 누가 어느 대화에서 불렀는지 보이지 않는다.
 
 ### 스킬을 저장할 때
 

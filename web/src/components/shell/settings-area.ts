@@ -1,7 +1,6 @@
 import {
   BookOpen,
   Bot,
-  ChartColumn,
   FolderOpen,
   Globe,
   Plug,
@@ -28,10 +27,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   },
   {
     label: "내 데이터",
-    links: [
-      { href: "/files", label: "파일 공간", icon: FolderOpen },
-      { href: "/usage", label: "사용량", icon: ChartColumn },
-    ],
+    links: [{ href: "/files", label: "파일 공간", icon: FolderOpen }],
   },
   {
     label: "도움말",
@@ -53,8 +49,7 @@ function under(pathname: string, href: string): boolean {
  */
 export function isSettingsArea(pathname: string, hasSession: boolean): boolean {
   if (pathname === "/privacy") return hasSession;
-  if (under(pathname, SETTINGS_PATH) || under(pathname, "/executions"))
-    return true;
+  if (under(pathname, SETTINGS_PATH)) return true;
   return SETTINGS_GROUPS.some((group) =>
     group.links.some(
       (link) => link.href !== "/privacy" && under(pathname, link.href),
@@ -63,12 +58,10 @@ export function isSettingsArea(pathname: string, hasSession: boolean): boolean {
 }
 
 /**
- * 경로에서 골라진 줄의 주소를 정한다. `/settings` 는 처음 보이는 「에이전트」 이고, 실행 하나의 화면은
- * 사용량의 실행 기록에서 여므로 「사용량」 이다(관리자 틀의 `selected()` 와 같은 관례).
+ * 경로에서 골라진 줄의 주소를 정한다. `/settings` 는 처음 보이는 「에이전트」 다.
  */
 export function selectedSettingsHref(pathname: string): string | null {
   if (under(pathname, SETTINGS_PATH)) return "/agents";
-  if (under(pathname, "/executions")) return "/usage";
   for (const group of SETTINGS_GROUPS)
     for (const link of group.links)
       if (under(pathname, link.href)) return link.href;
