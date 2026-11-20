@@ -1,6 +1,6 @@
 # 비서가 만든 이미지 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지), PR3(REQ15 부터 REQ17 까지), PR4(REQ18, REQ19)를 설계한다. PR2 의 설계는 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이, PR3 의 설계는 「PR3: 지금 대화의 사진과 그림을 바탕으로 고치기」 절이, PR4 의 설계는 「PR4: 만든 그림을 블로그 원고에 넣기」 절이 갖는다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지), PR3(REQ15 부터 REQ17 까지), PR4(REQ18, REQ19), PR5(REQ20 부터 REQ23 까지)를 설계한다. PR2 의 설계는 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이, PR3 의 설계는 「PR3: 지금 대화의 사진과 그림을 바탕으로 고치기」 절이, PR4 의 설계는 「PR4: 만든 그림을 블로그 원고에 넣기」 절이, PR5 의 설계는 「PR5: 사용자가 보낸 링크의 사진」 절이 갖는다. PR6 의 요구사항은 그 PR 을 시작할 때 절을 더한다.
 
 ## 요구사항 연결
 
@@ -25,6 +25,13 @@
 | REQ17 | 실행 입력의 그림 규칙에 고치기 규칙과 그 대화의 그림 제목 목록을 더한다 |
 | REQ18 | 모델이 `content_draft_image` 에 그림 제목을 주면 Control Plane 이 그 그림의 사진 첨부 사본을 같은 대화에 만들고 첨부 번호와 파일 이름을 돌려준다. 모델은 그 값을 원고의 사진 자리에 쓰고, 미리보기와 원고 저장, 네이버 임시저장은 사진과 같은 길로 그 사본을 쓴다 |
 | REQ19 | 그림 파일이 보관 기간 정리로 지워졌으면 사본을 만들지 않고 `IMAGE_SOURCE_GONE` 과 고정 안내를 돌려준다. 이미 만든 사본은 사진 첨부라 사진의 보관 기간과 삭제 규칙을 그대로 따른다 |
+| REQ20 | 모델이 바탕이나 참고에 `link:<사용자가 보낸 주소>` 를 적는다. fos-ctx 는 PR3 의 받기 경로로 같은 가리킴을 보내고, Control Plane 이 주소를 열어 사진이면 그대로, 웹 페이지면 대표 사진(`og:image`)을 받아 원본 바이트로 돌려준다 |
+| REQ21 | Control Plane 이 origin 실행의 대화에서 요청자가 보낸 사용자 메시지에 그 주소가 있는지 먼저 본다. 받을 때는 넘어가는 주소마다 https, 공개 IP, 사진 형식, 20MiB 를 검사하고 까닭마다 다른 오류 코드를 낸다. fos-ctx 가 그 코드를 가리킴별 까닭 글로 바꿔 호출을 막는다 |
+| REQ22 | fos-ctx 가 그 호출에 쓴 링크를 기억했다가 그림 올리기에 함께 보낸다. Control Plane 은 그림 행의 새 칸에 지시문과 같은 방식으로 암호화해 두고 메시지 응답으로 내보낸다. 화면이 「그림 지시문 보기」 안에 링크로 그린다 |
+| REQ23 | Control Plane 은 받은 바이트를 저장하지 않고 응답으로만 준다. fos-ctx 의 사본은 PR3 과 같이 결과 hook 이 지운다 |
+| REQ24 | PR6 이 설계한다. 방향은 실행 입력의 그림 규칙(`IMAGE_RULES`) 글을 고치는 것이다 |
+| REQ25 | REQ24 와 같은 PR 이 함께 설계한다 |
+| REQ26 | REQ24 와 같은 PR 이 함께 설계한다 |
 
 ## 책임과 경계
 
@@ -393,6 +400,98 @@ Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 �
 
 마이그레이션은 칸 하나를 더하기만 한다. 옛 행은 모두 NULL 이라 지금과 같다.
 
+## PR5: 사용자가 보낸 링크의 사진
+
+근거와 기각한 대안은 [ADR-20261120 / link-image-source](../../adr/ADR-20261120-link-image-source.md) 가 갖는다. PR3 의 받기 길(가리킴, fos-ctx 의 hook, 받기 경로)을 그대로 쓰고 가리킴 하나를 더한다.
+
+### 책임
+
+| 모듈 | 맡는 것 |
+| --- | --- |
+| `hermes/plugins/fos-ctx` | `link:` 가리킴을 받아들이고 PR3 과 같이 받기 경로로 보낸다. 응답 머리의 정규화한 주소를 사본과 함께 기억했다가 그림 올리기에 보낸다. 새 오류 코드를 까닭 글로 바꾸고, 「주소는 쓰지 않는다」 는 막는 글(`NOT_REFERENCE`)을 `link:` 를 포함하는 글로 고친다. README 의 「그림을 고칠 사진을 받는다」 절을 고친다 |
+| `backend` 의 `mcp` | 가리킴을 풀고, 링크면 그 대화의 사용자 메시지에 있는지 확인한 뒤 `chat.artifact` 의 application 서비스에 받기를 맡긴다. `chat.artifact.infra` 를 직접 부르지 않는다 |
+| `backend` 의 `chat.conversation` | 그 대화에서 요청자가 보낸 사용자 메시지의 본문을 풀어 준다 |
+| `backend` 의 `chat.artifact` | 바깥 주소에서 대표 사진을 받는다(`ArtifactSourceFetcher` 의 DNS 고정 전송과 공개 IP 판정을 같이 쓰고, 응답 해석을 넘기기와 겹치는 머리에 맞게 고친다). 그림 행에 쓴 링크를 저장하고 메시지 응답에 내보낸다. 그림 규칙의 주소 줄을 고친다 |
+| `web` | 「그림 지시문 보기」 안에 참고한 링크를 그린다 |
+
+### 가리킴
+
+`link:<주소>` 를 더한다. 주소는 사용자가 보낸 글자 그대로이고 2,048자까지다. `ImageSourceRef` 의 길이 상한은 가리킴 종류마다 둔다(첨부와 제목은 지금처럼 300자). PR3 의 두 가리킴과 한 호출에 섞어 쓰고, 합친 16장 상한과 같은 가리킴 한 번만 받기도 같다.
+
+### 대화에 있는 링크인가
+
+origin 실행의 대화에서 역할이 사용자이고 보낸 사람이 요청자인 메시지의 본문을 풀어 본다. 스펙 DECISION43 의 범위만 같은 주소로 본다.
+
+- 메시지를 공백으로 나눈 낱말 하나를 주소 하나로 본다. 낱말 앞의 여는 괄호와 따옴표, 끝의 문장 부호, 조각을 떼고 앞의 `https://` 나 `http://` 만 뗀다. 낱말 가운데의 다른 주소(추적 링크 안의 주소)는 주소로 보지 않는다
+- 가리킨 주소와 그 낱말을 퍼센트 인코딩을 푼 글로 비교하고 호스트만 대소문자를 가리지 않는다
+- 낱말 전체가 같거나, 낱말을 주소에 쓸 수 있는 ASCII 문자(RFC 3986 의 unreserved, reserved, `%`)가 아닌 첫 문자에서 자른 앞부분이 같을 때만 맞는다. 한글 조사가 바로 붙은 「…/123의 양말」 은 앞부분으로, 한글 경로를 그대로 붙여 넣은 주소는 낱말 전체로 맞는다. `a.com/x` 는 `a.com/xyz` 나 `a.com/x%20y` 와 맞지 않는다
+- 맞지 않으면 PR3 과 같은 `IMAGE_SOURCE_UNKNOWN` 이다. 다른 대화와 다른 사용자의 링크가 같은 응답이다
+
+맞으면 Control Plane 이 받을 주소를 정해진 꼴로 만든다(스펙 DECISION44). `https://` 를 붙이고, 호스트를 소문자로(국제 도메인은 punycode), 경로와 쿼리의 ASCII 밖 문자를 UTF-8 퍼센트 인코딩으로 바꾼다. 이 주소가 그림 올리기의 링크 상한(8,192자)을 넘으면 받지 않고 `IMAGE_SOURCE_LINK_BLOCKED` 로 막는다. 받아도 올리기에서 막혀 그림을 잃기 때문이다. 이 주소로 받고, 200 응답 머리 `X-Image-Source-Link` 로 fos-ctx 에 돌려준다. 그림에 남기고 화면에 보이는 값도 이 주소라 늘 `https://` 로 시작하는 링크가 된다.
+
+### 바깥 주소에서 받기
+
+새 받기 객체가 `chat.artifact.infra` 에 생긴다. `ArtifactSourceFetcher` 의 허용 주소 목록만 빼고 나머지 검사를 같이 쓴다.
+
+| 단계 | 하는 일 |
+| --- | --- |
+| 주소 검사 | https, 포트 443, 사용자 정보와 조각 없음, 호스트 형식(IP 글자 금지). 기존 `validate` 와 같다 |
+| 이름 풀기 | 모든 주소가 공개 IP 여야 하고 금지 목록에 없어야 한다(`isPublic` 과 아래 금지 목록). 그중 하나에 그 IP 를 고정해 연결하고 SNI 와 `Host` 는 원래 이름이다. DNS 를 다시 풀어 내부망으로 바꾸는 틈을 막는다. 이름이 풀리지 않는 것과 내부망으로 풀리는 것은 같은 오류 코드다 |
+| 넘기기 | 301, 302, 303, 307, 308 의 `Location` 을 현재 주소 기준으로 풀어 위 두 단계를 다시 한다. 5번까지다 |
+| 페이지 | `text/html` 이면 앞 2MiB 만 읽어 대표 사진 meta 를 찾는다. 정규식으로 태그를 찾지 않고 `<meta` 를 직접 훑으며, 닫는 `>` 는 태그 길이 상한(4,096자) 안에서만 찾고 이미 훑은 구간은 다시 훑지 않는다. 닫히지 않은 `<meta` 가 많은 페이지에서 정규식이 길이의 제곱으로 느려지고 제한 시간이 지나도 스레드를 붙잡기 때문이다. 순서는 `og:image`, `og:image:secure_url`, `twitter:image` 이고 `property` 와 `name` 을 모두 받으며 속성 순서와 따옴표 종류를 따지지 않는다. `content` 값의 HTML 엔티티(`&amp;` 등)를 푼다. 상대 주소는 최종 페이지 주소로 풀고 `//` 는 https 로 푼다. 사진 주소를 같은 단계로 받는다. 페이지에서 페이지로는 한 번만 간다 |
+| 사진 | `image/png`, `image/jpeg`, `image/webp`, `image/gif` 이고 머리 바이트가 그 형식이어야 한다. 20MiB 를 넘으면 읽기를 멈춘다 |
+
+- 요청 머리에 `Accept`(사진 네 형식과 `text/html`), 일반 브라우저 꼴의 `User-Agent`, `Accept-Encoding: identity` 를 둔다. 쿠키와 인증 머리는 보내지 않는다. 전송 인터페이스에 머리를 넘기는 칸을 더한다
+- **응답 해석을 고친다.** 지금 `ArtifactSourceSocketTransport.parse` 는 200 이 아니면 머리를 읽지 않고 같은 머리가 두 번 오면 버린다. 상태 코드와 머리를 늘 읽어 돌려주고, 겹치면 안 되는 머리(`content-type`, `content-length`, `transfer-encoding`, `content-encoding`, `location`)만 겹칠 때 거절하고 나머지(`set-cookie` 등)는 버린다. 머리 상한은 링크 받기에서 64KiB 다. 스티커 받기는 지금처럼 200 이 아니면 거절하고 넘기기를 따라가지 않는다. 그 동작을 지키는 회귀 테스트를 둔다
+- 링크 하나의 전체 제한 시간은 10초다. fos-ctx 의 한 호출 예산(15초) 안에서 끝나게 한다. 링크 받기는 스티커 받기와 따로 자기 실행기(동시 4개)와 상한을 갖는다. 넘으면 받지 못한 것으로 답한다
+- **금지 목록.** 공개 IP 라도 홈서버 자신에게 되돌아오는 요청(공유기를 돌아 들어오는 요청)은 막아야 한다. 받지 않을 호스트 이름과 IP 대역을 설정 값으로 받아 넘어가는 주소마다 이름 풀기 단계에서 검사한다. 실제 값은 운영 저장소가 갖는다. 둘 다 비면 모든 링크를 막는다(닫힌 쪽이 기본). 개발과 테스트만 `allow-without-blocklist` 로 연다
+- 값(제한 시간, 넘기기 횟수, 페이지 상한, 머리 상한, 금지 목록)은 설정 값이고 기본값은 위와 같다. 허용 주소 목록 설정(`assistant.artifact.source.allowed-hosts`)은 이 받기에 쓰지 않는다
+
+### 받기 경로의 새 응답
+
+PR3 의 `POST /internal/hermes/image-source` 에 오류 코드를 더한다. 200 의 모양은 같다.
+
+| 까닭 | 응답 | fos-ctx 가 모델에게 주는 글 |
+| --- | --- | --- |
+| 대화의 사용자 메시지에 없는 주소 | 422 `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다 |
+| https 가 아니거나 이름이 풀리지 않거나 내부망 주소, 금지 목록, 금지 목록이 비어 있음, 넘기기 5번 초과, 받을 주소가 상한을 넘음 | 422 `IMAGE_SOURCE_LINK_BLOCKED` | 열 수 없는 주소다 |
+| 사진 형식이 아니고 대표 사진도 없다. 대표 사진이 네 형식이 아니다(AVIF, SVG 등) | 422 `IMAGE_SOURCE_LINK_NO_IMAGE` | 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다 |
+| 20MiB 초과 | 422 `IMAGE_SOURCE_LINK_TOO_LARGE` | 사진이 너무 크다 |
+| 연결 실패, 200 이 아닌 답(대표 사진 주소의 403 포함), 제한 시간, 동시 받기 초과 | 502 `IMAGE_SOURCE_LINK_FAILED` | 링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다 |
+
+막는 글의 끝맺음은 PR3 과 같다(스펙 REQ21, DECISION32). 로그에는 호스트와 까닭만 남기고 경로와 쿼리는 남기지 않는다.
+
+### 쓴 링크를 그림에 남기기
+
+- fos-ctx 는 `prepare` 에서 받은 `link:` 가리킴마다 응답 머리 `X-Image-Source-Link` 의 주소를 사본과 같은 `(session_id, tool_call_id)` 로 기억한다. 결과 hook 의 올리기 meta 에 `source_links`(주소 목록, 쓴 순서)를 넣는다
+- 서명은 `source_links` 가 있을 때만 메시지 끝에 줄 하나(주소를 줄바꿈으로 이은 글의 SHA-256)를 더한다. 없으면 지금 메시지 그대로라 링크 없는 그림은 옛 쪽과 새 쪽이 서로 통한다. 옛 Control Plane 은 줄이 더 붙은 서명을 거절한다. 옛 서버는 `link:` 받기부터 막으므로, 받기와 올리기 사이에 Control Plane 을 되돌린 경우만 그림이 저장되지 않는다. 이것은 감수한다
+- Control Plane 은 `chat_artifact` 에 새 칸 `generation_source_links`(LONGTEXT, 주소를 줄바꿈으로 이은 글)와 `generation_source_links_key_id` 를 더한다. 링크는 지시문과 같은 `OwnedTextCipher.seal` 로 따로 봉하고 그 key 번호를 자기 칸에 둔다. `seal` 은 key 를 고를 수 없어, 두 번 부르는 사이 key 가 바뀌어도 각자 자기 key 번호로 풀리게 한다. AAD 는 지시문의 AAD 에 `:links` 를 붙인다. 암호화가 꺼져 있으면 평문이고, `seal` 이 실패하면 지시문과 같이 평문으로 내려 저장하지 않는다. 링크가 없으면 두 칸 모두 비운다. 새 표를 만들지 않는다(사용자 결정 2026-11-01)
+- 메시지 응답의 그림 항목에 `sourceLinks`(문자열 배열, 없으면 빈 배열)를 더한다. 보관본에는 넣지 않는다(스펙 DECISION18 과 같은 까닭)
+- 대화를 지우면 행과 함께 지워진다
+
+### 화면
+
+`PromptDetails` 가 지시문 아래에 「참고한 링크」 와 주소 목록을 그린다. 주소마다 `target="_blank"`, `rel="noopener noreferrer"` 의 링크다. 링크 주소는 받은 그대로이고, 보이는 글자만 퍼센트 인코딩을 풀어 사용자가 보낸 주소에 가깝게 보인다(스펙 DECISION46). 지시문이 비어도 링크가 있으면 접힌 칸을 보인다. 저장된 값은 늘 `https://` 로 시작한다(「대화에 있는 링크인가」). 그렇지 않은 값이 오면 방어로 링크를 만들지 않고 글자로만 보인다.
+
+### 실행 입력의 그림 규칙
+
+`IMAGE_RULES` 의 바탕과 참고 줄(지금 「파일 경로나 인터넷 주소는 쓰지 않는다」)을 아래 뜻으로 고치고 줄을 더한다. 줄 수를 세는 머리 문장도 함께 고친다. 「주소를 쓰지 말라」 와 「`link:` 로 적으라」 가 함께 남지 않게 한다.
+
+- 바탕과 참고에는 `attachment:`, `generated:`, `link:` 가리킴만 쓰고 파일 경로나 맨 주소는 쓰지 않는다
+- 사용자가 이 대화에 보낸 링크(상품 페이지나 사진 주소)의 사진을 바탕이나 참고로 쓸 때는 `link:<사용자가 보낸 주소 그대로>` 로 적는다. 검색이나 페이지에서 찾은 주소는 쓰지 않는다
+- 링크를 쓸 수 없다는 결과를 받으면 어느 링크를 왜 쓸 수 없는지와 사진을 직접 올리는 방법을 답한다
+
+### 실패와 일관성(PR5)
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 새 fos-ctx 에 옛 Control Plane | `link:` 를 받은 옛 서버는 `IMAGE_SOURCE_UNKNOWN` 으로 답하고 fos-ctx 가 막는다. 링크 없는 그림은 그대로다 |
+| 옛 fos-ctx 에 새 Control Plane | 모델이 `link:` 를 적으면 옛 fos-ctx 가 가리킴이 아니라고 막는다. 플러그인을 먼저 배포한다 |
+| 받기와 그림 사이에 메시지가 지워진다 | 이미 받은 사본으로 만든다. PR3 과 같다 |
+| 쇼핑몰이 자동 요청을 막는다 | `IMAGE_SOURCE_LINK_FAILED` 로 막고 사진을 직접 올리라고 알린다. 우회하지 않는다 |
+
+마이그레이션은 칸을 더하기만 한다. 배포 순서는 fos-ctx 를 먼저 올린다.
+
 ## 실패와 일관성
 
 | 무엇 | 어떻게 되나 |
@@ -429,6 +528,14 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | REQ17 | 실행 입력을 만드는 기존 테스트에서 고치기 규칙과 그림 제목 줄을 본다 |
 | REQ18 | `ContentDraftImagesTest` 가 사본이 그림과 바이트가 같고 그 번호로 원고를 저장하는지, 같은 그림을 두 번 넣어도 사본이 하나인지, 사본이 사진 순번과 사진 참조 목록, 보내지 않은 사진 수, 메시지 묶기에 나오지 않는지 본다. `ContentDraftSnapshotsTest` 가 snapshot 입력에서 사본이 사진과 같은 폴더의 파일이고 그 파일이 그림과 같은지, `ContentDraftImageToolTest` 가 MCP 결과를 본다. `ContentDraftJobLoopbackTest` 가 사본을 넣은 원고를 승인해 합성 worker 가 가짜 네이버에 올린 바이트의 지문이 그림과 같은지 본다 |
 | REQ19 | `ContentDraftImagesTest` 가 보관 기간 정리로 파일을 지운 그림은 사본이 있어도 `IMAGE_SOURCE_GONE` 이고 사본을 만들지 않는지, 이미 넣은 원고는 그림 파일을 지운 뒤에도 남아 사본 번호로 고쳐 저장되고 사진의 보관 기간이 지나면 쓸 수 없는지 본다. `ContentDraftImageToolTest` 가 모델이 받는 고정 안내를 본다 |
+| REQ20, REQ21 의 받기 | `ImageSourceEndpointTest` 에 링크 사례를 더한다. 가짜 DNS 와 가짜 전송으로 사진 주소, 대표 사진이 있는 페이지, 상대 주소와 `//` 주소, 넘기기를 받는다. 대화에 없는 주소, 다른 사용자의 메시지에만 있는 주소, 경계가 맞지 않는 주소가 `IMAGE_SOURCE_UNKNOWN` 인지 본다 |
+| 응답 해석 | `ArtifactSourceSocketTransport` 단위 테스트. 3xx 의 `Location`, 겹친 `set-cookie` 를 받고 겹친 `content-length` 와 `location` 을 거절하는지, 스티커 받기가 3xx 와 404 를 지금처럼 거절하는지 본다 |
+| 대화 확인의 경계 | 받기 통합 테스트. `https://` 없이 쓴 주소, 한글 조사가 붙은 주소, 끝에 마침표가 붙은 주소, 퍼센트 인코딩이 다른 주소가 맞고, 더 긴 주소의 앞부분은 맞지 않는지 본다. 받는 주소와 `X-Image-Source-Link` 가 정해진 꼴인지 본다 |
+| REQ21 의 보안 | 받기 객체의 단위 테스트로 고정한다. 금지 목록의 이름과 대역, 넘기기 끝에서 금지 목록으로 가는 주소, 엔티티가 든 대표 사진 주소와 `name="og:image"` 도 본다. http, IP 글자, 사용자 정보, 443 밖 포트, 내부망과 예약 주소로 풀리는 이름, 넘기기 끝의 내부망 주소, 6번째 넘기기, 사진이 아닌 형식과 머리 바이트가 틀린 사진, SVG, 20MiB 초과, 2MiB 를 넘는 페이지, 제한 시간이 모두 거절되는지 본다. 허용 주소 목록이 비어도 공개 주소는 받는지 본다 |
+| REQ20, REQ21 의 hook | `hermes/tests/test_image_source.py` 에 `link:` 가 받아들여지고, 새 오류 코드마다 까닭 글이 나오고, 첨부와 섞어 쓰는 사례를 더한다 |
+| REQ22 | fos-ctx 의 올리기 테스트가 `source_links` 와 서명을, Control Plane 의 올리기 통합 테스트가 칸의 암호화와 메시지 응답의 `sourceLinks` 를, 화면 단위 테스트가 링크 목록과 `rel` 을 본다. 서명 확인 값은 두 쪽이 같은 값을 쓴다 |
+| REQ23 | 받기 통합 테스트에서 받은 뒤 대화의 첨부와 결과물 폴더, 보관함에 새 파일이 없는지 본다. 사본 지우기는 PR3 의 hook 테스트가 이미 본다 |
+| REQ20 의 지침 | 실행 입력을 만드는 기존 테스트에서 링크 줄을 본다 |
 
 실제 이미지 서비스로 한 장을 만드는 왕복은 배포 뒤 운영에서 확인한다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」).
 
@@ -456,6 +563,14 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | DECISION15 | 그림을 원고에 넣는 길 | 원고에 넣을 때 그 그림의 사진 첨부 사본을 같은 대화에 만든다 | 작성자 | [ADR-20261120 / generated-image-draft](../../adr/ADR-20261120-generated-image-draft.md). 원고의 사진 판정, 두 지문, worker 의 사진 폴더 규칙을 바꾸지 않는다 |
 | DECISION16 | 사본을 만드는 때 | 모델이 부르는 도구 `content_draft_image` 가 만든다 | 작성자 | 초안 미리보기(`render_draft`)가 원고 저장보다 먼저 돌아 파일 이름이 그때 필요하다. 원고 저장의 `assetId` 에 제목을 받으면 미리보기에서 그림을 보이지 못한다 |
 | DECISION17 | 사본을 사진 목록에서 빼는 방법 | `chat_attachment` 의 새 칸 `source_artifact_id` 하나와 비운 `message_id` | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 메시지에 묶지 않으면 사진 순번과 화면, 사진 참조 목록이 이미 빼므로 고칠 곳이 적다 |
+| DECISION18 | 링크 사진을 넘기는 길 | PR3 의 받기 경로에 `link:` 가리킴을 더하고 Control Plane 이 받는다 | 작성자 | [ADR-20261120 / link-image-source](../../adr/ADR-20261120-link-image-source.md). 링크가 대화에 있는지는 메시지를 가진 Control Plane 만 판정한다 |
+| DECISION19 | 바깥 주소의 받기 | 기존 `ArtifactSourceFetcher` 의 DNS 고정 전송과 공개 IP 판정을 같이 쓰고 허용 주소 목록만 뺀 새 받기 객체. 실행기와 상한은 따로 갖는다 | 작성자 | 내부망 차단을 두 벌로 만들지 않는다. 허용 목록은 스티커 받기의 규칙으로 남긴다 |
+| DECISION20 | 대표 사진을 찾는 방법 | HTML 앞 2MiB 에서 `og:image`, `og:image:secure_url`, `twitter:image` 의 meta 만 찾는다. HTML 파서 의존성을 더하지 않는다 | 작성자 | 공유용 대표 사진(스펙 DECISION35)은 meta 하나다. 페이지 전체를 해석할 까닭이 없다 |
+| DECISION21 | 쓴 링크를 두는 곳 | `chat_artifact` 의 새 칸 둘(링크와 그 key 번호), 지시문과 같은 방식으로 암호화 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 링크는 사용자 메시지에서 온 글이라 메시지와 같이 암호화한다. 지시문 글에 섞으면 REQ5 의 「이미지 도구에 넘긴 지시문과 같은 글」 이 깨진다 |
+| DECISION22 | 링크 하나의 제한 시간 | 10초, 설정 값 | 작성자 | fos-ctx 한 호출의 받기 예산 15초 안에서 도구 판정과 다른 가리킴이 함께 끝나야 한다 |
+| DECISION23 | 홈서버 자신에게 되돌아오는 요청 | 설정 값 금지 목록(호스트 이름과 IP 대역)을 넘어가는 주소마다 검사한다. 값은 운영 저장소가 갖는다 | 작성자 | 허용 목록을 빼면 공개 IP 판정만 남아, 홈서버의 공개 주소로 풀리는 링크가 공유기를 돌아 내부 서비스에 닿는다 |
+| DECISION24 | 받고 남기는 주소의 꼴 | Control Plane 이 대화에서 맞춘 주소를 https, 소문자 호스트, ASCII 퍼센트 인코딩으로 바꿔 받고 응답 머리로 돌려준다 | 작성자 | 모델이 적은 글자 그대로 받으면 한글 경로가 깨지고 대문자 호스트가 막힌다. 화면 링크(스펙 DECISION46)가 늘 https 주소가 된다 |
+| DECISION25 | 기존 응답 해석의 변경 | 상태와 머리를 늘 읽고, 겹치면 안 되는 머리만 겹칠 때 거절한다. 스티커 받기의 거절 동작은 그대로다 | 작성자 | 지금 해석은 넘기기를 읽지 못하고 여러 줄의 `set-cookie` 를 버려 상품 페이지 대부분에서 실패한다 |
 
 ## 결정 기록 연결
 
@@ -465,5 +580,7 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | DECISION3, DECISION4, DECISION5, DECISION6 | architecture | 필요 없음. 기존 결정(ADR-027, 새 표 금지)을 따르는 선택이다 | 이 설계 |
 | DECISION7, DECISION8, DECISION9, DECISION10 | architecture | [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md) | 이 설계의 「PR2」, [`agent-skill.md`](../agent-skill.md) 의 「에이전트 도구」 |
 | DECISION11, DECISION12, DECISION14 | architecture | [ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md) | 이 설계의 「PR3」, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
+| DECISION18, DECISION19, DECISION23 | architecture | [ADR-20261120 / link-image-source](../../adr/ADR-20261120-link-image-source.md) | 이 설계의 「PR5」, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
+| DECISION20, DECISION21, DECISION22, DECISION24, DECISION25 | architecture | 필요 없음. 기존 결정(새 표 금지, 데이터 암호화)을 따르는 선택이다 | 이 설계의 「PR5」 |
 | DECISION13 | architecture | 필요 없음. 기존 첨부 번호와 순번 규칙([`attachment.md`](../attachment.md))을 따른다 | 이 설계의 「PR3」 |
 | DECISION15, DECISION16, DECISION17 | architecture | [ADR-20261120 / generated-image-draft](../../adr/ADR-20261120-generated-image-draft.md) | 이 설계의 「PR4」, [`content-draft.md`](../content-draft.md) |

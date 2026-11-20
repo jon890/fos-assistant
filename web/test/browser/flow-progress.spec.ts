@@ -120,7 +120,7 @@ test("사건 없는 자식은 저장된 줄에서 빼고 머리는 수 없이 �
   await block.getByTestId("activity-toggle").click();
   await expect(block.locator('[data-kind="subagent"]')).toHaveCount(1);
   // 머리의 한 줄은 수를 그리지 않고, 도구와 도우미를 모두 썼다는 문장만 보인다.
-  await expect(block.getByTestId("activity-toggle")).toContainText("찾아보고 도우미와 함께 정리했어요");
+  await expect(block.getByTestId("activity-toggle")).toContainText("그 밖의 도구 · 도우미");
   await expect(block.getByTestId("activity-toggle")).not.toContainText(/[0-9]/);
 });
 
@@ -135,7 +135,7 @@ test("병렬 도우미가 거꾸로 끝나도 저장된 줄의 시간이 맞고 
     .locator('[data-testid="activity-block"][data-mode="saved"]')
     .last();
   await expect(block).toBeVisible({ timeout: 30_000 });
-  await expect(block.getByTestId("activity-toggle")).toContainText("찾아보고 도우미와 함께 정리했어요");
+  await expect(block.getByTestId("activity-toggle")).toContainText("그 밖의 도구 · 도우미");
   await block.getByTestId("activity-toggle").click();
   const agents = block.locator('[data-kind="subagent"]');
   await expect(agents).toHaveCount(2);
@@ -218,7 +218,7 @@ for (const { durationMs, duration } of [
   await expect(block).toBeVisible({ timeout: 30_000 });
   const toggle = block.getByTestId("activity-toggle");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(toggle).toHaveText("작업 과정: 찾아보고 도우미와 함께 정리했어요");
+  await expect(toggle).toHaveText("작업 과정: 그 밖의 도구 · 도우미");
   // 접힌 내용은 높이가 움직이도록 그려 두고 숨긴다. 걸린 시간이 없는 경우에는 그 줄이 아예 없다.
   await expect(block.getByTestId("activity-duration")).toBeHidden();
   await expectNoInternalValues(block);

@@ -24,7 +24,7 @@ test("ADMIN 의 이름 메뉴는 이름 아래 설정, 관리자 화면, 화면 
   expect(tops).toEqual([...tops].sort((a, b) => a - b));
 
   await menu.getByRole("menuitem", { name: "관리자 화면" }).click();
-  await expect(page).toHaveURL(/\/admin\/people$/);
+  await expect(page).toHaveURL(/\/admin$/);
 });
 
 test("MEMBER 역할의 이름 메뉴에는 관리자 화면이 없다", async ({ context, page }, testInfo) => {
