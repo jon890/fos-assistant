@@ -71,7 +71,7 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
         bridge.createContext("/api", this::plugin);
         bridge.start();
         String base = "http://127.0.0.1:" + bridge.getAddress().getPort();
-        python = new ProcessBuilder("python3", "../test/e2e/financial/guard_plugin_http.py", base, token)
+        python = new ProcessBuilder("bun", "../test/e2e/financial/guard_plugin_http.ts", base, token)
             .redirectError(ProcessBuilder.Redirect.INHERIT).start();
         var ready = threads.submit(() -> new BufferedReader(new InputStreamReader(python.getInputStream())).readLine());
         String line = ready.get(30, TimeUnit.SECONDS);

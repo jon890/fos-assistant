@@ -118,7 +118,7 @@ class HttpContentDraftSnapshotClientTest {
     @Test
     @DisplayName("현재 Python catalog producer와 실제 TS compiler golden을 HTTP로 decode한다")
     void decodesActualPythonCatalogAndCompilerGolden() throws Exception {
-        var process = new ProcessBuilder("python3", "../test/support/content-snapshot-python-fixture.py")
+        var process = new ProcessBuilder("bun", "../test/support/content-snapshot-python-fixture.ts")
             .redirectError(ProcessBuilder.Redirect.DISCARD).start();
         try {
             byte[] output = process.getInputStream().readNBytes(524289);

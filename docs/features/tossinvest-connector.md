@@ -881,7 +881,7 @@ ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서
 | --- | --- |
 | `backend/src/test/.../connector/approval/application/FinancialConditionalProducerRoundTripTest.java` | H2 에서 저장·승인·claim·전송과 실패 주입을 본다 |
 | `FinancialConditionalProducerMysqlRoundTripTest.java` (같은 패키지) | 위 검사 가운데 `@MysqlCase` 를 단 claim 소비, 같은 의도 차단, 동시 승인을 실제 MySQL 에서 다시 돈다 |
-| `test/e2e/financial/conditional_plugin_http.py` | `conditional-entry.ts --generate` 의 설치 원본을 실제 plugin 으로 띄우고, support·claim 은 Spring 으로 보낸다. 금융 목적지와 현재 원주문을 바꾸는 대역도 맡는다 |
+| `test/e2e/financial/conditional_plugin_http.ts` | `conditional-entry.ts --generate` 의 설치 원본을 실제 plugin 으로 띄우고, support·claim 은 Spring 으로 보낸다. 금융 목적지와 현재 원주문을 바꾸는 대역도 맡는다 |
 
 검사가 지키는 결론이다.
 
