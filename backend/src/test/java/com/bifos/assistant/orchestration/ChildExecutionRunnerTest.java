@@ -356,6 +356,8 @@ class ChildExecutionRunnerTest {
         String instructions = stub().received().getFirst().instructions();
         assertThat(instructions).contains("아빠는 국수를 맵지 않게 먹는다");
         assertThat(instructions).contains("GFM", "| --- | --- |");
+        // 맡긴 실행도 서비스 개념 목록을 받는다(스펙 service-concepts REQ1)
+        assertThat(instructions).contains("# 이 서비스의 기능", "/tasks/new");
         assertThat(instructions).doesNotContain("엄마는 고수를 먹지 않는다");
         // 자식의 답은 사람이 아니라 흐름이 읽으므로 묻는 형식 안내를 붙이지 않는다.
         assertThat(instructions).doesNotContain(AskFormat.GUIDE);

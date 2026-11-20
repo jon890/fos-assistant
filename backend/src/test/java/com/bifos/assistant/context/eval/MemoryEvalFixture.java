@@ -126,7 +126,7 @@ final class MemoryEvalFixture {
         Long owner = userOf(filler.owner()).id();
         List<Memory> rows = new ArrayList<>();
         for (int n = 1; n <= filler.count(); n++) {
-            rows.add(Memory.accepted(
+            rows.add(withSummary(Memory.accepted(
                 MemoryScope.USER,
                 owner,
                 null,
@@ -134,7 +134,7 @@ final class MemoryEvalFixture {
                 "가".repeat(filler.contentChars()),
                 MemoryPlacement.core(MemoryRetrieval.SEARCH),
                 owner,
-                at));
+                at), null));
         }
         return rows;
     }
@@ -152,7 +152,7 @@ final class MemoryEvalFixture {
                 ownerId, seed.collection(), seed.documentKey(), seed.title(), body, at);
         }
         return switch (seed.status()) {
-            case ACCEPTED ->
+            case ACCEPTED -> withSummary(
                 Memory.accepted(
                     seed.scope(),
                     ownerId,
@@ -161,7 +161,8 @@ final class MemoryEvalFixture {
                     body,
                     placement,
                     group ? firstUserIdOfGroup(seed.group()) : ownerId,
-                    at);
+                    at),
+                seed.summary());
             case PROPOSED -> Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
             case REJECTED -> {
                 Memory proposed = Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
@@ -169,6 +170,23 @@ final class MemoryEvalFixture {
                 yield proposed;
             }
         };
+    }
+
+
+    /**
+     * 사례가 적은 요약을 적는다. 적지 않았으면 배포 때 이관(설계 「이관(PR1)」)과 같은 규칙으로, 꺼내는 방식이 {@code SEARCH} 인 개인 사실의
+     * 본문이 200자 이하일 때 요약 = 본문으로 둔다. 평문으로 적고 뒤의 암호화 이관이 함께 옮긴다.
+     */
+    private static Memory withSummary(Memory memory, String summary) {
+        if (summary != null) {
+            memory.fillSummary(summary, null);
+        } else if (memory.scope() == MemoryScope.USER
+            && memory.entryType() == MemoryEntryType.MEMORY
+            && memory.retrieval() == MemoryRetrieval.SEARCH
+            && memory.content().length() <= Memory.SUMMARY_MAX) {
+            memory.fillSummary(memory.content(), null);
+        }
+        return memory;
     }
 
 

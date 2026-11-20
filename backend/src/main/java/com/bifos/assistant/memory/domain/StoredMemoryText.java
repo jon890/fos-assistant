@@ -8,10 +8,11 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
  * <p>revision 은 원래 기억의 번호를 {@code memoryId} 로 든다. 그래서 같은 기억의 줄과 revision 은 같은 AAD 를 쓴다.
  *
  * @param ownerId {@code USER} 면 주인 사용자 번호, {@code GROUP} 이면 그룹 번호
+ * @param summary 저장된 요약. {@code NULL} 은 이관 전 줄이다
  * @param dataKeyId 데이터 key 번호. 비어 있으면 평문이다
  */
 public record StoredMemoryText(
-    Long memoryId, MemoryScope scope, Long ownerId, String title, String content, Long dataKeyId) {
+    Long memoryId, MemoryScope scope, Long ownerId, String title, String content, String summary, Long dataKeyId) {
 
     /** 저장된 글을 로그에 남기지 않는다. */
     @Override

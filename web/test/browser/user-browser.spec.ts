@@ -3,7 +3,7 @@ import type {
   Route,
 } from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
-import { clickAndWaitForResponse } from "./helpers.ts";
+import { clickAndWaitForResponse, openAdminMenu } from "./helpers.ts";
 
 type Status = "STOPPED" | "STARTING" | "RUNNING" | "STOPPING" | "FAILED";
 
@@ -231,7 +231,7 @@ test("외부 서비스 연결 화면에서 내 브라우저로 간다", async ({
   await expect(page.getByRole("heading", { name: "내 브라우저" })).toBeVisible();
 });
 
-test("관리자는 브라우저 목록에서 켜진 브라우저를 끈다", async ({ page }) => {
+test("관리자는 브라우저 목록에서 켜진 브라우저를 끈다", async ({ page }, testInfo) => {
   const rows = [
     {
       id: 1,
@@ -260,10 +260,11 @@ test("관리자는 브라우저 목록에서 켜진 브라우저를 끈다", asy
   await page.goto("/admin/browsers");
 
   await expect(
-    page.getByRole("navigation", { name: "관리자 메뉴" }).getByRole("link", {
+    (await openAdminMenu(page, testInfo)).getByRole("link", {
       name: "브라우저",
     }),
   ).toHaveAttribute("aria-current", "page");
+  if (testInfo.project.name === "mobile") await page.keyboard.press("Escape");
   const first = page.getByTestId("admin-browser").filter({ hasText: "사용자A" });
   const second = page.getByTestId("admin-browser").filter({ hasText: "사용자B" });
   await expect(first.getByText("켜져 있어요")).toBeVisible();

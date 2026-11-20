@@ -81,13 +81,9 @@ assistant:
     # pending_steer 를 주지 않아 쓴다(docs/features/hermes-upgrade/design.md 의 「결과 칸 채우기」)
     terminal-event-read-timeout: 5s
   context:
-    max-chars: 8000
     index-budget-ratio: 4
     result-stale-after: 6h
-    # 항상 층과 색인 층 사이의 개인 사실 구역 예산이다. 0 이면 구역을 끈다
-    facts-max-chars: 2000
-    # 개인 사실 구역 후보가 될 수 있는 본문의 최대 글자 수다
-    facts-item-max-chars: 200
+    # 기억 전체 상한과 요약 구역 예산은 관리자가 그룹 설정으로 바꾼다(MemoryContextSettings)
     search:
       # 질문과 관련된 기억 구역에 싣는 항목 수. 0 이면 구역을 끈다
       max-items: 3

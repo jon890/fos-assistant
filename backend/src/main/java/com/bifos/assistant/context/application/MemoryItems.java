@@ -50,6 +50,12 @@ final class MemoryItems {
     }
 
 
+    /** 요약 구역의 한 줄이다. 번호를 남겨 바뀐 사실을 {@code memory_id} 로 고치게 한다. */
+    static String summaryLine(Memory memory) {
+        return "- [" + memory.id() + "] " + oneLine(memory.title()) + ": " + oneLine(memory.summary());
+    }
+
+
     /** 줄바꿈을 공백 하나로 바꾼다. 모델이 정한 제목이나 본문이 지시문에 머리 줄을 끼우지 못하게 한다. */
     static String oneLine(String text) {
         return LINE_BREAK.matcher(text).replaceAll(" ");

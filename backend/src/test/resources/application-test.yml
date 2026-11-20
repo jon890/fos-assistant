@@ -41,8 +41,6 @@ assistant:
     # 꺼진 동작은 SteerServiceTest 가 설정을 끈 서비스로 본다
     steer:
       enabled: true
-  context:
-    max-chars: 8000
   data-encryption:
     # 운영 값이 아니다. 검사 전용 KEK 파일이다
     kek-file: src/test/resources/data-encryption/test-kek.keys
