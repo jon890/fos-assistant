@@ -1,0 +1,55 @@
+{
+  "name": "control-plane-revoke",
+  "description": "단추 연결의 「연결 다시 확인」 강제 갱신, 해제 때 서비스 쪽 허락 취소, 서명 비밀 새로 만들기",
+  "pr_scope": "Control Plane 이 단추 연결을 다시 확인할 때 먼저 갱신하고, 해제할 때 서비스 쪽 허락을 취소하며, 관리자가 서명 비밀을 새로 만들 수 있게 한다.",
+  "deferred": [
+    {
+      "what": "웹 연결 단추와 돌아오는 화면, 해제 뒤 안내와 링크, 서버 비밀값 화면의 OAuth 앱 줄과 서명 비밀 줄, 알림 이동",
+      "why": "화면이 부를 Control Plane API 가 먼저 필요하다",
+      "after": "이 PR 머지"
+    },
+    {
+      "what": "Gmail 단추 연결(스펙 PR2)",
+      "why": "실제 GitHub 연결을 먼저 확인한다",
+      "after": "웹 PR 배포와 GitHub 연결 확인"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/connector-oauth/spec.md",
+  "design": "docs/features/connector-oauth/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ6",
+    "REQ7",
+    "REQ8"
+  ],
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ7"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ8"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ6"
+      ]
+    }
+  ]
+}
