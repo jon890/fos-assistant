@@ -146,6 +146,9 @@ public class TaskAgentRequests implements TaskRequests {
     public TaskToolResult requestDelete(CurrentUser user, Long originExecutionId, String ref) {
         return withTarget(user, ref, taskId -> {
             Map<String, Object> summary = lookup.summary(user, taskId);
+            if (summary == null) {
+                return TaskToolResult.failed("not_found", "그런 예약 작업이 없다. task_list 로 확인한다.");
+            }
             Map<String, String> args = new LinkedHashMap<>();
             args.put("task", String.valueOf(summary.get("title")));
             args.put("next_run", summary.get("next_run") == null ? "없음" : String.valueOf(summary.get("next_run")));

@@ -71,7 +71,7 @@ public class McpTaskTools {
         return List.of(
             definition(LIST,
                 "요청자의 예약 작업 목록을 읽는다. 작업마다 id, title, state(ACTIVE 켜짐, PAUSED 멈춤), schedule, next_run, notify, link 를 준다. "
-                    + "에이전트의 매일 깨우기는 없다. 매일 깨우기를 바꿔 달라고 하면 그 에이전트 화면 /agents/<code> 링크로 안내한다.",
+                    + "에이전트의 매일 깨우기는 없다. 매일 깨우기를 바꿔 달라고 하면 그 에이전트 화면 /agents/<code> 링크로 안내한다. " + FAILURE_RULE,
                 Map.of(), List.of()),
             definition(CREATE,
                 "사용자가 정한 시각이나 주기마다 일을 해 달라고 하면(「매일 아침 7시에 날씨 알려 줘」, 「매시간 확인해서 알려 줘」) 예약 작업을 바로 만든다. "

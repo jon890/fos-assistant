@@ -80,7 +80,10 @@ public class ControlPlaneApprovals {
         String dedupeKey = Sha256.hex("fos-control-plane:" + toolName + ":" + user.id() + ":" + originExecutionId + ":" + target);
         var existing = actions.findByDedupeKey(dedupeKey);
         if (existing.isPresent()) {
-            return new ControlPlaneApprovalRequest(existing.get().publicId(), false, existing.get().status());
+            // 기한이 지났는데 아직 만료 처리 전인 줄은 만료로 알린다. 기다리는 카드처럼 안내하지 않는다.
+            ConnectorAction found = existing.get();
+            boolean lapsed = found.status() == ActionStatus.PENDING && !found.expiresAt().isAfter(clock.instant());
+            return new ControlPlaneApprovalRequest(found.publicId(), false, lapsed ? ActionStatus.EXPIRED : found.status());
         }
         String argsJson = JSON.writeValueAsString(new LinkedHashMap<>(args));
         Instant now = clock.instant();
