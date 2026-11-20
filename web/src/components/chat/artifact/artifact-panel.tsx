@@ -61,7 +61,7 @@ export function ArtifactPanel({
     { state: "idle" | "busy" | "done" } | { state: "error"; message: string }
   >({ state: "idle" });
 
-  /** 이 결과물을 내 보관함에 암호화해 둔다. 대화를 지워도 남고, `/files` 의 「보관한 결과물」 에서 본다. */
+  /** 이 결과물을 내 보관함에 암호화해 둔다. 대화를 지워도 남고, `/files` 의 「내 파일」 에서 본다. */
   async function keep() {
     setVault({ state: "busy" });
     try {

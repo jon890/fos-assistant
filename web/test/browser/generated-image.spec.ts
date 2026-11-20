@@ -108,17 +108,17 @@ test("그림을 누르면 크게 보이고 내려받는 파일 이름이 제목�
   await expect(viewer.getByRole("button", { name: "보관" })).toHaveCount(0);
 });
 
-test("보관한 그림은 보관 상태가 보이고 크게 보기에 보관 단추 대신 보관함 링크가 있다", async ({ page }) => {
+test("보관한 그림은 보관 상태가 보이고 크게 보기에 보관 단추 대신 내 파일 링크가 있다", async ({ page }) => {
   await openWithImages(page, [image("수채화 고양이", { autoVault: "DONE", vaultItemId: 12 })]);
 
   await expect(page.getByTestId("generated-image").getByTestId("artifact-auto-vault")).toHaveText("보관 완료");
   await page.getByRole("button", { name: "수채화 고양이 크게 보기" }).click();
   const viewer = page.getByTestId("generated-image-viewer");
-  await expect(viewer.getByRole("link", { name: "보관함에서 보기" })).toHaveAttribute("href", "/files?tab=vault&item=12");
+  await expect(viewer.getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute("href", "/files?item=12");
   await expect(viewer.getByRole("button", { name: "보관" })).toHaveCount(0);
 });
 
-test("보관 기간이 지난 그림은 안내와 보관함 링크가 보이고 지시문은 남으며 답에 남은 경로는 보이지 않는다", async ({ page }) => {
+test("보관 기간이 지난 그림은 안내와 내 파일 링크가 보이고 지시문은 남으며 답에 남은 경로는 보이지 않는다", async ({ page }) => {
   await openWithImages(
     page,
     [image("오래된 그림", { deleted: true, vaultItemId: 12 }), image("지운 그림", { deleted: true })],
@@ -128,9 +128,9 @@ test("보관 기간이 지난 그림은 안내와 보관함 링크가 보이고 
   const answer = page.getByTestId("assistant-message").last();
   const images = answer.getByTestId("generated-image");
   await expect(images.nth(0)).toContainText("보관 기간이 지나 대화에서는 볼 수 없어요.");
-  await expect(images.nth(0).getByRole("link", { name: "보관함에서 보기" })).toHaveAttribute("href", "/files?tab=vault&item=12");
+  await expect(images.nth(0).getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute("href", "/files?item=12");
   await expect(images.nth(0).getByRole("img")).toHaveCount(0);
-  await expect(images.nth(1).getByRole("link", { name: "보관함에서 보기" })).toHaveCount(0);
+  await expect(images.nth(1).getByRole("link", { name: "내 파일에서 보기" })).toHaveCount(0);
   await images.nth(0).getByText("그림 지시문 보기").click();
   await expect(images.nth(0).getByText(PROMPT)).toBeVisible();
 
@@ -139,25 +139,26 @@ test("보관 기간이 지난 그림은 안내와 보관함 링크가 보이고 
   await expect(answer.getByTestId("assistant-body")).not.toContainText("/cache/generated/images/");
 });
 
-test("보관함 목록의 그림 줄은 제목과 작은 그림을 보이고 주소가 가리킨 줄의 그림 전체가 펼쳐진다", async ({ page }) => {
-  await page.route("**/api/artifact-vault", (route) => route.request().method() === "GET"
-    ? route.fulfill({ status: 200, json: { items: [
-      { id: 12, path: "generated/수채화 고양이.png", byteSize: PNG.length, fileCount: 1, vaultedAt: "2026-11-19T05:30:00Z" },
-      { id: 13, path: "초안/index.html", byteSize: 120, fileCount: 1, vaultedAt: "2026-11-19T05:31:00Z" },
-    ] } })
-    : route.continue());
+test("내 파일의 그림 줄은 제목과 작은 그림을 보이고 주소가 가리킨 그림의 미리보기가 열린다", async ({ page }) => {
+  const items = [
+    { id: 12, path: "generated/수채화 고양이.png", byteSize: PNG.length, fileCount: 1, vaultedAt: "2026-11-19T05:30:00Z", kind: "IMAGE" },
+    { id: 13, path: "초안/index.html", byteSize: 120, fileCount: 1, vaultedAt: "2026-11-19T05:31:00Z", kind: "DOCUMENT" },
+  ];
+  await page.route((url) => url.pathname === "/api/artifact-vault", (route) =>
+    route.fulfill({ status: 200, json: { items, nextCursor: null, usedBytes: 0, quotaBytes: 5 * 1024 ** 3, full: false } }));
+  await page.route("**/api/artifact-vault/12", (route) => route.fulfill({ status: 200, json: items[0] }));
   await page.route("**/api/artifact-vault/12/content*", (route) =>
     route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
 
   await page.goto("/files?tab=vault&item=12");
-  const items = page.getByTestId("vault-item");
-  await expect(items).toHaveCount(2);
-  await expect(items.nth(0)).toContainText("수채화 고양이");
-  await expect(items.nth(0)).not.toContainText("수채화 고양이.png");
-  await expect(items.nth(0).getByTestId("vault-thumbnail")).toBeVisible();
-  await expect(items.nth(1).getByTestId("vault-thumbnail")).toHaveCount(0);
-  // 주소의 item 이 가리킨 줄은 미리보기가 펼쳐진 채 열린다.
-  await expect(items.nth(0).getByTestId("vault-image")).toBeVisible();
-  await expect.poll(() => items.nth(0).getByTestId("vault-image").evaluate((img) => (img as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
+  const rows = page.getByTestId("my-file");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("수채화 고양이");
+  await expect(rows.nth(0)).not.toContainText("수채화 고양이.png");
+  await expect(rows.nth(0).getByTestId("my-file-thumbnail")).toBeVisible();
+  await expect(rows.nth(1).getByTestId("my-file-thumbnail")).toHaveCount(0);
+  // 주소의 item 이 가리킨 그림은 미리보기가 열린 채 열린다.
+  const image = page.getByTestId("my-file-preview").getByTestId("my-file-image");
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
 });
