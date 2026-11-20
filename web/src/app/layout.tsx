@@ -5,6 +5,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { connection } from "next/server";
 import { appName } from "@/lib/app-name";
 import { readMe } from "@/lib/me";
+import { auth } from "@/auth";
 import "./globals.css";
 
 const pretendard = localFont({
@@ -31,6 +32,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const me = await readMe();
+  // Auth.js 의 세션 확인은 Control Plane 을 부르지 않는다. 로그인 없이 연 `/privacy` 도 그대로 공개 화면이다.
+  const session = await auth();
 
   return (
     <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
@@ -40,6 +43,7 @@ export default async function RootLayout({
             role={me?.role ?? null}
             displayName={me?.displayName}
             appName={appName()}
+            hasSession={Boolean(session?.user?.email)}
           >
             {children}
           </AppShell>

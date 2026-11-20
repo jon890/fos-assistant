@@ -2,33 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState } from "react";
-import {
-  BookOpen,
-  Bot,
-  Brain,
-  CalendarClock,
-  ChartColumn,
-  FolderOpen,
-  Globe,
-  Plug,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Brain, CalendarClock } from "lucide-react";
 import { fetchMemories } from "@/lib/memory-api";
 import { NavPending } from "./nav-pending";
 
+/**
+ * 사이드바에 남긴 화면 메뉴다. 자주 여는 두 화면만 둔다(docs/features/app-shell/spec.md 의 DECISION1).
+ * 나머지 화면은 이름 메뉴의 「설정」 이 연다.
+ */
 const LINKS = [
-  { href: "/agents", label: "에이전트", icon: Bot },
-  { href: "/connections", label: "외부 서비스 연결", icon: Plug },
   { href: "/tasks", label: "예약 작업", icon: CalendarClock },
   { href: "/memory", label: "기억", icon: Brain },
-  { href: "/usage", label: "사용량", icon: ChartColumn },
-] as const;
-
-/** 「고급」 묶음의 링크다. 매일 쓰지 않는 일반 화면이라 위 메뉴와 나눈다(에이전트가 쓰는 자리를 들여다보는 화면과 개발 문서). */
-const ADVANCED_LINKS = [
-  { href: "/files", label: "파일 공간", icon: FolderOpen },
-  { href: "/browser", label: "내 브라우저", icon: Globe },
-  { href: "/dev-docs", label: "개발 문서", icon: BookOpen },
 ] as const;
 
 function isCurrent(pathname: string, href: string): boolean {
@@ -43,8 +28,6 @@ function linkClass(current: boolean): string {
 
 export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
   const pathname = usePathname();
-  // 사이드바가 넓은 화면과 좁은 화면의 시트에 함께 그려져도 묶음 이름의 id 가 겹치지 않게 한다.
-  const advancedId = useId();
   const [proposalCount, setProposalCount] = useState(0);
   useEffect(() => {
     void fetchMemories()
@@ -86,29 +69,6 @@ export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
           <NavPending />
         </Link>
       ))}
-      {/* 「고급」 은 링크가 아니라 묶음의 이름이다. 낭독기는 아래 링크를 이 이름의 묶음으로 읽는다. 접고 펴지 않는다. */}
-      <div
-        role="group"
-        aria-labelledby={advancedId}
-        className="mt-2 flex flex-col gap-1"
-      >
-        <p id={advancedId} className="px-3 py-1 text-xs text-muted-foreground">
-          고급
-        </p>
-        {ADVANCED_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            onClick={() => onNavigate(link.href)}
-            aria-current={isCurrent(pathname, link.href) ? "page" : undefined}
-            className={`ml-3 ${linkClass(isCurrent(pathname, link.href))}`}
-          >
-            <link.icon aria-hidden="true" className="size-4 shrink-0" />
-            {link.label}
-            <NavPending />
-          </Link>
-        ))}
-      </div>
     </nav>
   );
 }

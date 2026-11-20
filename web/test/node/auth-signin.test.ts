@@ -16,6 +16,7 @@ test.afterEach(() => {
 });
 
 type AuthConfig = {
+  providers: unknown[];
   callbacks: {
     signIn: (input: {
       profile?: { email?: string | null };
@@ -57,7 +58,13 @@ async function loadAuth(
         },
       };
     if (name === "next-auth/providers/google")
-      return { __esModule: true, default: () => ({ id: "google" }) };
+      return {
+        __esModule: true,
+        default: (options: Record<string, unknown>) => ({
+          id: "google",
+          options,
+        }),
+      };
     if (name === "@/lib/control-plane")
       return { isSignInAllowed: async () => true };
     if (name === "@/lib/signin-activity") return { recordSignIn: record };
@@ -99,4 +106,12 @@ test("허용 판정 callback은 활동을 기록하지 않고 이벤트 실패�
     config.events.signIn({ user: { email: "user@example.com" } }),
     /record failed/,
   );
+});
+
+test("Google 로그인은 늘 계정 고르기 화면을 먼저 보인다", async () => {
+  const config = await loadAuth(async () => {});
+  const google = config.providers[0] as {
+    options: { authorization?: { params?: { prompt?: string } } };
+  };
+  assert.equal(google.options.authorization?.params?.prompt, "select_account");
 });

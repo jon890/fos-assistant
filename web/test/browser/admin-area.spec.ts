@@ -9,6 +9,7 @@ import {
 } from "./fixtures.ts";
 import { FAKE_USAGE } from "../../../test/e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
+import { openAccountMenu } from "./helpers.ts";
 
 /** 화면 높이(모바일 844px)를 넘길 만큼의 대화 수다. 사이드바는 첫 쪽으로 30개를 읽는다. */
 const CONVERSATION_COUNT = 30;
@@ -25,14 +26,14 @@ async function createConversation(page: Page): Promise<string> {
   return ((await created.json()) as { conversationId: string }).conversationId;
 }
 
-/** 일반 화면의 사이드바에서 관리자 입구를 눌러 관리자 영역으로 들어간다. */
+/** 일반 화면의 이름 메뉴에서 「관리자 화면」 을 눌러 관리자 영역으로 들어간다. */
 async function enterAdminArea(page: Page, testInfo: TestInfo): Promise<void> {
-  await openSidebar(page, testInfo);
+  await openAccountMenu(page, testInfo);
   await page.getByTestId("admin-entry").click();
   await expect(page).toHaveURL(/\/admin\/people$/);
 }
 
-test("대화가 화면 높이보다 많아도 관리자 입구는 뷰포트 안에 있다", async ({ page }, testInfo) => {
+test("대화가 화면 높이보다 많아도 관리자 입구가 있는 이름 메뉴 단추는 뷰포트 안에 있다", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   for (let index = 0; index < CONVERSATION_COUNT; index += 1) await createConversation(page);
 
@@ -44,21 +45,22 @@ test("대화가 화면 높이보다 많아도 관리자 입구는 뷰포트 안�
   const overflow = await list.evaluate((element) => element.scrollHeight - element.clientHeight);
   expect(overflow, "대화 목록이 화면 높이를 넘지 않았다").toBeGreaterThan(0);
 
-  await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "계정 메뉴" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("link", { name: /^기억/ })).toBeInViewport({ ratio: 1 });
 });
 
-test("화면 높이가 360px 여도 관리자 입구는 뷰포트 안에 있고 메뉴는 그 안에서 스크롤한다", async ({ page }, testInfo) => {
+test("화면 높이가 360px 여도 이름 메뉴 단추는 뷰포트 안에 있고 메뉴는 그 안에서 스크롤한다", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 390, height: 360 });
   await page.goto("/new");
   await openSidebar(page, testInfo);
 
-  await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "계정 메뉴" })).toBeInViewport({ ratio: 1 });
 
-  // 메뉴 구역이 줄어들어도 마지막 링크까지 스크롤해 닿을 수 있고, 그 뒤에도 입구는 그대로 보인다.
-  const lastLink = page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "개발 문서", exact: true });
+  // 메뉴 구역이 줄어들어도 마지막 링크까지 스크롤해 닿을 수 있고, 그 뒤에도 이름 메뉴 단추는 그대로 보인다.
+  const lastLink = page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: /^기억/ });
   await lastLink.scrollIntoViewIfNeeded();
   await expect(lastLink).toBeInViewport();
-  await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "계정 메뉴" })).toBeInViewport({ ratio: 1 });
 });
 
 test("MEMBER 역할에는 관리자 입구가 없고 관리자 영역의 주소는 홈으로 넘어간다", async ({ context, page }, testInfo) => {
@@ -66,8 +68,10 @@ test("MEMBER 역할에는 관리자 입구가 없고 관리자 영역의 주소�
 
   await page.goto("/new");
   await openSidebar(page, testInfo);
-  // 맨 아래 줄이 그려진 뒤에 입구가 없는지 본다.
-  await expect(page.getByText("가족 사용자", { exact: true })).toBeVisible();
+  // 이름이 그려진 뒤에 메뉴를 열어 입구가 없는지 본다.
+  await expect(page.getByRole("button", { name: "계정 메뉴" })).toHaveText("가족 사용자");
+  await openAccountMenu(page, testInfo);
+  await expect(page.getByRole("menuitem", { name: "설정" })).toBeVisible();
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 
   await page.goto("/admin/people");

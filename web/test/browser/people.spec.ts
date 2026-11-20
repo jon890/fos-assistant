@@ -1,5 +1,5 @@
 import { expect, setSession, test, HOME_URL } from "./fixtures.ts";
-import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
+import { clickAndWaitForResponse, isolatedUser, openAccountMenu } from "./helpers.ts";
 import type {
   Page,
   TestInfo,
@@ -127,6 +127,8 @@ test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않�
   await setSession(context, isolatedUser(testInfo, "member"));
 
   await page.goto("/new");
+  await openAccountMenu(page, testInfo);
+  await expect(page.getByRole("menuitem", { name: "설정" })).toBeVisible();
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 
   await page.goto("/admin/people");
