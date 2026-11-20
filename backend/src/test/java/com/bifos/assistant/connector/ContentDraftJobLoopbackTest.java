@@ -24,24 +24,54 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Spring RANDOM_PORT의 실제 authorize HTTP와 분리된 Bun worker·CDP 마우스/파일 명령을 연결한다. */
 class ContentDraftJobLoopbackTest extends ContentDraftJobFixture {
+    private static final String GENERATED_IMAGE_CASE = "uploadsGeneratedImageCopyLikePhotos";
     private final JsonMapper loopbackJson = JsonMapper.builder().build();
+    /** 지금 테스트의 이름이다. 부모의 준비가 이 클래스의 {@code @BeforeEach} 보다 먼저 돌아 생성자에서 받는다. */
+    private final String testName;
+    private byte[] generatedImage;
+
+
+    ContentDraftJobLoopbackTest(TestInfo info) {
+        this.testName = info.getTestMethod().map(Method::getName).orElse("");
+    }
 
 
     @Override
     protected void prepareSavePhotos() {
-        useDistinctSecondPhoto();
+        if (GENERATED_IMAGE_CASE.equals(testName)) {
+            generatedImage = useGeneratedImageAsSecondPhoto();
+        } else {
+            useDistinctSecondPhoto();
+        }
+    }
+
+
+    @Test
+    @DisplayName("원고에 넣은 그림 사본을 사진처럼 가짜 네이버에 올리고 올린 바이트가 그림과 같다")
+    void uploadsGeneratedImageCopyLikePhotos() throws Exception {
+        exercise("normal", ContentDraftJobStatus.SUCCEEDED, 1, 2, false);
+
+        var manifest = starter.started().getFirst().snapshot().path("assetManifest");
+        assertThat(manifest.get(1).path("assetId").stringValue()).isEqualTo(secondPhotoId().toString());
+        assertThat(manifest.get(1).path("sourceFingerprint").stringValue())
+            .as("worker 는 올린 바이트의 지문이 이 값과 같아야 올린다")
+            .isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(generatedImage)));
     }
 
 

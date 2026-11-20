@@ -81,6 +81,16 @@ public class ChatAttachment extends CreatedAtEntity {
     @Getter
     private Instant deletionRequestedAt;
 
+    /**
+     * 만든 그림을 블로그 원고에 넣으려고 만든 사본이면 그 그림 행 번호다(ADR-20261120 / generated-image-draft).
+     *
+     * <p>사본은 메시지에 묶지 않는다. 그래서 대화 화면과 사진 순번, 실행 입력의 사진 참조 목록에 나오지 않는다.
+     * 사용자가 올린 사진이면 비어 있다.
+     */
+    @Column(name = "source_artifact_id")
+    @Getter
+    private Long sourceArtifactId;
+
 
     private ChatAttachment(
         Long conversationId,
@@ -108,6 +118,30 @@ public class ChatAttachment extends CreatedAtEntity {
         Instant expiresAt) {
         return new ChatAttachment(
             conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
+    }
+
+
+    /**
+     * 만든 그림의 원고용 사본을 만든다. 올린 사람은 대화 주인이고 메시지에는 묶지 않는다. 디스크 이름은 번호를 받은 뒤 채운다.
+     */
+    public static ChatAttachment draftImageCopy(
+        Long conversationId,
+        Long ownerUserId,
+        Long sourceArtifactId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        Instant expiresAt) {
+        ChatAttachment copy = new ChatAttachment(
+            conversationId, ownerUserId, originalName, contentType, byteSize, expiresAt);
+        copy.sourceArtifactId = sourceArtifactId;
+        return copy;
+    }
+
+
+    /** 만든 그림을 원고에 넣으려고 만든 사본인가. 사본은 사용자가 보낸 사진으로 세지 않는다. */
+    public boolean isDraftImageCopy() {
+        return sourceArtifactId != null;
     }
 
 

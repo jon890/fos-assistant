@@ -53,7 +53,7 @@
 | --- | --- |
 | `/signin`, 로그인하지 않은 `/privacy` | 로그인 전 화면 |
 | `/admin` 아래 | 관리자 틀(그대로) |
-| `/settings`, `/agents`, `/connections`, `/browser`, `/files`, `/usage`, `/dev-docs` 와 그 아래, `/executions/{id}`, 로그인한 `/privacy` | 설정 틀 |
+| `/settings`, `/agents`, `/connections`, `/browser`, `/files`, `/dev-docs` 와 그 아래, 로그인한 `/privacy` | 설정 틀 |
 | 그 밖(`/`, `/new`, `/chat/{id}`, `/now`, `/tasks`, `/memory`, `/notifications` 등) | 사이드바 틀 |
 
 `/privacy` 에 로그인했는지는 레이아웃이 `auth()` 로 읽어 `AppShell` 에 `hasSession` 으로 넘긴다. Auth.js 의 세션 확인은 Control Plane 을 부르지 않는다. `/privacy` page 는 레이아웃의 값을 받지 못하므로 스스로 `auth()` 를 불러, 로그인한 사용자에게는 「로그인 화면으로」 단추와 「로그인 전에」 문장을 그리지 않는다.
@@ -66,10 +66,10 @@
 | --- | --- |
 | 비서 | 에이전트(`/agents`) |
 | 연결 | 외부 서비스 연결(`/connections`), 내 브라우저(`/browser`) |
-| 내 데이터 | 파일 공간(`/files`), 사용량(`/usage`) |
+| 내 데이터 | 파일 공간(`/files`) |
 | 도움말 | 개발 문서(`/dev-docs`), 데이터 보관 안내(`/privacy`) |
 
-골라진 줄은 경로의 접두로 정한다. `/settings` 는 「에이전트」, `/executions/{id}` 는 「사용량」 이다. 관리자 틀의 `selected()` 와 같은 꼴이다.
+골라진 줄은 경로의 접두로 정한다. `/settings` 는 「에이전트」 다. 실행 상세는 설정 틀 밖에서 보인다.
 `/settings` 에서 「에이전트」 의 골라진 표시는 넓은 화면에서만 보이게 `md:` 클래스로 둔다. 휴대폰의 목록 화면에는 지금 화면이 없기 때문이다. `aria-current` 는 `/settings` 에서 붙이지 않는다.
 
 ### 설정 틀의 배치
@@ -122,7 +122,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | --- | --- | --- |
 | REQ1, REQ2, REQ7 | 브라우저 테스트(넓은 화면, 360px, 낮은 높이 640×320) | 사이드바 줄의 차례와 없는 줄, 대화가 많을 때와 낮은 높이에서 이름 줄이 보이는지, 서랍의 같은 줄, 앱 이름 옆 알림 단추가 서랍 닫기 단추와 겹치지 않는지 |
 | REQ3 | 브라우저 테스트 | `ADMIN` 과 `MEMBER` 역할의 메뉴 줄, 360px 에서 손가락으로 밝기 값을 바꾸고 새로 고친 뒤 남는지, 역할 읽기 실패 때 메뉴와 로그아웃, 키보드로 열고 `Esc` 로 닫기 |
-| REQ4, REQ5 | 노드 테스트(`settings-area.ts` 의 경로 판정과 골라진 줄)와 브라우저 테스트 | `/settings` 의 두 폭, 저장한 `/connections` 주소, `/executions/{id}` 의 골라진 줄, 로그인한 `/privacy`, 「대화로」 가 보던 대화로 돌아가는지 |
+| REQ4, REQ5 | 노드 테스트(`settings-area.ts` 의 경로 판정과 골라진 줄)와 브라우저 테스트 | `/settings` 의 두 폭, 저장한 `/connections` 주소, `/executions/{id}` 가 설정 틀 밖에서 열리는지, 로그인한 `/privacy`, 「대화로」 가 보던 대화로 돌아가는지 |
 | REQ6 | 브라우저 테스트, 노드 테스트 | 로그아웃 뒤 `/signin`, 뒤로 가기와 `/chat/{id}` 가 로그인 화면으로 가는지, `persisted` 인 `pageshow` 에 세션이 없을 때만 다시 읽는지, `/signout` 이 500 이거나 끊겼을 때 안내. 계정 고르기 값은 `test/node/auth-signin.test.ts` 의 방식(provider 를 가짜로 바꿔 끼움)으로 provider 설정을 본다 |
 
 ### 함께 고칠 문서
