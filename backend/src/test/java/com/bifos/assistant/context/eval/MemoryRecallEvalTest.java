@@ -1,5 +1,6 @@
 package com.bifos.assistant.context.eval;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -108,8 +109,9 @@ class MemoryRecallEvalTest {
     void measuresRecallAndKeepsBoundary() {
         clock.set(BASE);
         Map<String, Long> agentIds = fixture.createAgents();
-        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, clock);
-        ContextAssembler factsOff = TestContextAssemblers.of(memoryService, withFactsMaxChars(0), clock);
+        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, MemoryContextBudget.DEFAULTS, clock);
+        ContextAssembler factsOff = TestContextAssemblers.of(
+            memoryService, properties, new MemoryContextBudget(0, MemoryContextBudget.DEFAULT_MAX_CHARS), clock);
         // questionOff 는 질문을 넘기지 않는 지금까지의 조립이다. 질문으로 고른 구역이 놓친 사례를 줄였는지 견준다
         Map<String, Assembly> assemblies = new LinkedHashMap<>();
         assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
@@ -169,19 +171,6 @@ class MemoryRecallEvalTest {
     @FunctionalInterface
     private interface Assembly {
         AssembledContext assemble(CurrentUser user, Long agentId, String question);
-    }
-
-
-    /** 주입받은 설정에서 개인 사실 구역 예산만 바꾼다. 0 이면 구역을 끈다. */
-    private ContextProperties withFactsMaxChars(int factsMaxChars) {
-        return new ContextProperties(
-            properties.maxChars(),
-            properties.indexBudgetRatio(),
-            properties.resultStaleAfter(),
-            properties.memoryStaleAfter(),
-            properties.memoryCollectionStaleAfter(),
-            factsMaxChars,
-            properties.factsItemMaxChars());
     }
 
 

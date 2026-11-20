@@ -1,5 +1,6 @@
 package com.bifos.assistant.context.application;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.dto.ContextBodyMode;
 import com.bifos.assistant.context.application.dto.ContextItem;
@@ -225,7 +226,7 @@ class ContextAssemblerQuestionTest {
         memories.create(ADMIN, MemoryScope.GROUP, "늘 싣는 규칙", "가".repeat(150), true);
         Memory peanut = group("아이 간식 주의", "둘째는 땅콩 알레르기라 땅콩 들어간 음식은 먹으면 안 된다");
         ContextAssembler small = TestContextAssemblers.of(
-            memories, new ContextProperties(250, 4, null, null, Map.of(), 0, 200), clock);
+            memories, properties, new MemoryContextBudget(0, 250), clock);
 
         AssembledContext result = small.assemble(ADMIN, agentId, PEANUT_QUESTION);
 

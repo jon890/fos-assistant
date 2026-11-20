@@ -264,6 +264,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param group {@code GROUP} 항목의 그룹 이름
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
      * @param supersedes 이 항목이 대체하는 같은 사례의 옛 항목 key. 없으면 null
+     * @param summary 요약 줄. 없으면 배포 때 이관과 같은 규칙으로 정한다(짧은 개인 사실은 요약 = 본문)
      */
     record MemorySeed(
         String key,
@@ -278,7 +279,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         MemoryEntryType entryType,
         String documentKey,
         int updatedDaysAgo,
-        String supersedes) {
+        String supersedes,
+        String summary) {
 
         MemorySeed {
             scope = scope == null ? MemoryScope.USER : scope;
