@@ -189,6 +189,24 @@ public class UserExecutionLimiter {
 
 
     /**
+     * 모든 사용자가 지금 쥔 자리의 합이다. 운영 정기 작업이 공유 gateway 를 재시작해도 되는지 볼 때 쓴다(ADR-20261120 / connector-auto-apply).
+     *
+     * <p>turn 자리, 원격 종료 확인 자리, {@code RUNNING} 실행 줄을 모두 더한다. 대화 turn 의 루트 줄은 turn 자리와 겹쳐 실제보다 많이 세지만,
+     * 재기동 뒤 turn 자리 없이 남은 루트 줄도 놓치지 않는다. 많이 세면 재시작이 늦어질 뿐이고 적게 세면 도는 실행을 끊는다. 사용자 잠금을 잡지
+     * 않으므로 그 순간의 근사값이다. {@code RUNNING} 줄은 몇 개뿐이라 엔티티로 읽는다.
+     *
+     * <p>{@code RUNNING} 줄을 메모리 자리보다 먼저 읽는다. 실행을 끝내는 쪽은 원격 종료 확인 자리를 먼저 쥐고 줄을 끝내므로, 줄을 읽은 뒤
+     * 자리를 읽으면 그 사이에 넘어간 실행도 한쪽에는 잡힌다. 반대 차례면 둘 다 놓쳐 도는 실행이 있는데 0 을 답할 수 있다.
+     */
+    public int runningTotal() {
+        int rows = executions.findByStatus(ExecutionStatus.RUNNING).size();
+        int remote = remoteEndHolds.values().stream().mapToInt(Set::size).sum();
+        int turns = turnSlots.values().stream().mapToInt(Integer::intValue).sum();
+        return rows + remote + turns;
+    }
+
+
+    /**
      * Hermes 에서 끝났는지 모르는 run 의 자리를 그 run 이 끝날 때까지 쥔다(ADR-069).
      *
      * <p>가상 스레드 하나가 아직 중지를 보내지 않았으면 중지를 한 번 보내고, {@code lookupRun} 이 끝났다거나 그 run 을 모른다고
