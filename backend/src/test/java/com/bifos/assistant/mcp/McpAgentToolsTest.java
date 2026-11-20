@@ -799,6 +799,24 @@ class McpAgentToolsTest {
 
 
     @Test
+    @DisplayName("connector list 는 먼저 살펴보기 트리에서도 플러그인 목록을 배열로 돌려주고 인자가 있으면 인자 오류다")
+    void connectorListWorksInCheckTreeAndRejectsArguments() throws Exception {
+        String root = McpCallSigner.newRoot();
+        checkTurn(userA, root);
+        ObjectNode empty = json.createObjectNode();
+        empty.set("_fos_ctx", McpCallSigner.context(sharedToken, "connector_list", root));
+        ObjectNode extra = json.createObjectNode().put("id", "x");
+        extra.set("_fos_ctx", McpCallSigner.context(sharedToken, "connector_list", root));
+
+        JsonNode listed = json.readTree(resultText(send(sharedToken, toolCall("connector_list", empty))));
+        JsonNode rejected = body(send(sharedToken, toolCall("connector_list", extra)));
+
+        assertThat(listed.isArray()).as("결과: %s", listed).isTrue();
+        assertThat(rejected.path("error").path("code").asInt()).as("인자 오류: %s", rejected).isEqualTo(-32602);
+    }
+
+
+    @Test
     @DisplayName("도구 목록에 agent delegate 의 규격이 있다")
     void toolListHasAgentDelegateSpec() throws Exception {
         JsonNode listed = body(send(sharedToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))

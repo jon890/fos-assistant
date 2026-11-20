@@ -420,6 +420,8 @@ class ChatServiceTest {
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
         String sentInstructions = stub().received().getFirst().instructions();
         String commonInstructions = sentInstructions.substring(0, sentInstructions.indexOf("\n\n" + AskFormat.GUIDE));
+        // 대화 turn 도 서비스 개념 목록을 받는다(스펙 service-concepts REQ1)
+        assertThat(sentInstructions).contains("# 이 서비스의 기능", "/tasks/new", "/connections").doesNotContain("/usage");
         assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
         assertThat(execution.instructionsHash())
             .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());

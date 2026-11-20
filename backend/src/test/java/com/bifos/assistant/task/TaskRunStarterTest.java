@@ -240,7 +240,9 @@ class TaskRunStarterTest {
             .containsExactly("예약 작업 「" + TITLE + "」 을 시작했어요", INSTRUCTION, "정리한 답");
         assertThat(stub().received().getLast().instructions())
             .as("Hermes 에 간 지시")
-            .contains(TurnIntent.SCHEDULED_INSTRUCTION);
+            .contains(TurnIntent.SCHEDULED_INSTRUCTION)
+            .as("서비스 개념 목록(스펙 service-concepts REQ1)")
+            .contains("# 이 서비스의 기능", "/tasks/new");
         assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SUCCEEDED);
             assertThat(notification.title()).isEqualTo("「" + TITLE + "」 실행을 마쳤어요");
