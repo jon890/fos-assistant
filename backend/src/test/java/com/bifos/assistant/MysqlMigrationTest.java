@@ -1,4 +1,5 @@
 // 코드 규칙: rule-50. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
+// migration-test-prune: keep 지금 스키마와 운영 MySQL 설정의 차이를 본다. 버전은 늦게 들어온 낮은 버전을 흉내 내는 값이다
 package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
