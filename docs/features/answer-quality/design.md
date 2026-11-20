@@ -163,9 +163,9 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | --- | --- |
 | REQ15 | `ContextAssembler.SEARCH_INSTRUCTIONS` 의 「출처」 문장을 `### 출처` 와 `- [기관 · 문서 이름](주소)` 꼴, 주소를 글자로 쓰지 않기, 목록 안 한 번으로 바꾼다 |
 | REQ16 | `RESPONSE_INSTRUCTIONS`(모든 실행 공통)에 답 모양 규칙을 더한다. 표 구분 줄 규칙과 예시는 그대로 둔다 |
-| REQ17 | 채팅 마크다운 부품에 줄바꿈 한 번을 `break` 노드로 바꾸는 작은 remark 플러그인을 더한다. 코드와 인라인 코드는 `text` 노드가 아니라 건드리지 않고, GFM 표 칸에는 줄바꿈이 없다 |
+| REQ17 | 채팅 마크다운 부품에 글 안의 줄바꿈 한 번을 `br` 로 바꾸는 작은 rehype 플러그인을 더한다. 코드 안과 블록 사이는 건드리지 않는다. 흐림 플러그인이 글자의 원문 위치로 구간을 찾으므로 그 뒤에 돈다 |
 | REQ18 | 채팅 마크다운 부품에 제목, 인용, 구분선, 굵은 글자 요소와 본문 글자 토큰을 더한다. 작업 과정 블록은 `density="compact"` 로 지금 크기와 간격을 쓴다. 출처 절은 rehype 플러그인이 최상위의 글이 「출처」 인 제목부터 다음 제목 앞까지를 `section` 하나로 감싸고 그 `section` 에 모양을 준다 |
-| REQ19 | 개발 문서의 `MermaidBlock` 과 `mermaidRenderId` 를 공용 자리로 옮겨 두 마크다운 부품이 함께 쓴다. 채팅 부품은 `streaming` 을 받아, 흐르는 중이고 블록 원문이 닫는 줄로 끝나지 않으면 코드로 둔다 |
+| REQ19 | 개발 문서의 `MermaidBlock` 과 `mermaidRenderId` 를 공용 자리로 옮겨 두 마크다운 부품이 함께 쓴다. remark 플러그인이 닫는 줄이 없는 코드 블록에 `data-open` 을 달고, 채팅 부품은 `streaming` 이면서 그 표시가 있으면 코드로 둔다. 부품 묶음은 `density` 와 `streaming` 으로 고정해 흐르는 동안 그림이 다시 붙지 않게 한다 |
 | REQ20 | `score.ts` 에 형식 판정 순수 함수를 더하고 `QuestionScore` 에 선택 칸으로 둔다. 보고서 표와 요약에 낸다. 통과 판정(`scoreSet` 의 `outcome`)은 이 칸을 읽지 않는다 |
 
 ### 책임과 경계
@@ -174,8 +174,10 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | --- | --- |
 | `context/application/ContextAssembler` | 두 지침 글 |
 | `web/src/components/ui/mermaid-block.tsx`, `web/src/lib/mermaid.ts` | 옮긴 Mermaid 그리기와 id 만들기. 개발 문서와 채팅이 함께 쓴다 |
-| `web/src/components/chat/markdown.tsx` | 채팅 마크다운의 모양, `density`, `streaming` |
-| `web/src/components/chat/markdown-plugins.ts` | 줄바꿈 한 번과 출처 절 감싸기 플러그인. 파일 길이 기준을 지키려고 나눈다 |
+| `web/src/components/chat/markdown.tsx` | 채팅 마크다운 부품, 플러그인 순서 |
+| `web/src/components/chat/markdown-components.tsx` | 요소마다의 모양과 `density` 묶음, mermaid 와 코드 블록 고르기 |
+| `web/src/components/chat/code-block.tsx` | 코드 블록 칠하기. 파일 길이 기준을 지키려고 옮겼다 |
+| `web/src/components/chat/markdown-plugins.ts` | 줄바꿈 한 번, 출처 절 감싸기, 닫히지 않은 블록 표시. node 테스트가 읽도록 `.ts` 로 둔다 |
 | `web/src/components/chat/answer-body.tsx` | 흐르는 중인지를 마크다운 부품에 넘긴다 |
 | `web/src/app/globals.css` | 본문 글자 토큰(`--text-answer`) |
 | `test/model-eval/answer/score.ts` | 형식 판정과 보고서 칸 |
@@ -195,7 +197,7 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | ID | 어디서 확인하나 |
 | --- | --- |
 | REQ15, REQ16 | backend 단위 테스트(`ContextAssemblerTest`): 지침에 출처 꼴 문장과 답 모양 규칙이 들고, 예약 작업과 먼저 살펴보기에도 답 모양이 든다 |
-| REQ17, REQ18 | web node 단위 테스트: 운영 답의 출처 블록 원문을 그린 HTML 에 `<br>` 가 들고, 출처 절이 `section` 으로 감싸지며, 제목에 모양 클래스가 든다. 코드 블록 안 줄바꿈은 그대로다 |
-| REQ19 | web node 단위 테스트: 흐르는 중 닫히지 않은 mermaid 블록은 코드, 닫히면 그림 부품. 개발 문서 테스트가 옮긴 부품으로 그대로 통과한다 |
+| REQ17, REQ19 | web node 테스트(`chat-markdown-plugins.test.ts`): 운영 답의 출처 블록 모양에 `<br>` 가 들고, 코드와 블록 사이는 그대로이며, 출처 절이 `section` 으로 감싸지고, 닫히지 않은 블록에 `data-open` 이 붙는다 |
+| REQ18, REQ19 | 브라우저 테스트(`chat.spec.ts`, 넓은 화면과 휴대폰): 제목 18px, 본문 15px, 출처 절 14px, 줄바꿈 `br`, mermaid 그림과 실패 문구, 그림이 화면 폭 안에 있다 |
 | REQ20 | `score.ts` 단위 테스트: 목록 꼴, 맨 주소, 반복, 긴 문단 판정과 보고서 칸 |
 | 모두 | 배포 뒤 확인 7: 출처 있는 답 하나를 넓은 화면과 휴대폰에서 보고 평가를 다시 돈다 |
