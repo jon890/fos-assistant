@@ -75,7 +75,7 @@ provider 전환 사건은 대화의 작업 과정에 그리지 않는다. 예전
 
 **오류로 끝난 turn 도 블록을 지우지 않는다.** 그 화면에서는 그때까지 온 줄과 실패한 줄을 남긴 채 접힌 요약으로 바뀌고, 그 아래에 오류가 보인다.
 완료 사건이 없는 하위 에이전트는 「결과를 받지 못함」 으로, 나머지 끝나지 않은 줄은 「끝나지 않음」 으로 보인다.
-새로 고치면 저장된 답이 없어 블록도 없다. 그 실행의 기록은 사용량 화면의 트리에서 본다.
+새로 고치면 저장된 답이 없어 블록도 없다. 관리자는 그 실행의 기록을 관리자 사용량 화면의 트리에서 본다.
 
 ### 도구를 보이는 말
 
@@ -122,7 +122,7 @@ Control Plane 이 응답에서 빼고, 화면도 받은 것을 그대로 그리�
 | `EXECUTION_NOT_RUNNING` | 알리지 않고 곧 올 끝 사건을 기다린다 |
 | `MESSAGE_NOT_LATEST`, `DELIVERY_NOT_FOUND`, `DELIVERY_NOT_RETRYABLE` | 이력을 다시 읽는다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
-| `EXECUTION_NOT_FOUND` | 사용량 목록으로 되돌린다 |
+| `EXECUTION_NOT_FOUND` | 사용자 실행 상세는 지금 화면(`/now`)으로, 관리자 실행 상세는 관리자 사용량 목록으로 되돌린다 |
 | `PROACTIVE_CHECK_UNAVAILABLE` | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다([`docs/features/proactive.md`](proactive.md) 의 「시작 전 점검」) |
 
 **사용자가 보낸 요청이 `HERMES_BUSY` 나 `USER_BUSY` 를 받으면 Control Plane 은 다시 보내지 않는다.**
@@ -134,7 +134,7 @@ Control Plane 이 응답에서 빼고, 화면도 받은 것을 그대로 그리�
 
 ## 실행 하나를 다시 볼 때
 
-사용량 목록의 한 줄을 누르면 `/executions/{id}` 로 간다.
+대화의 작업 과정 패널에서 「전체 화면으로 보기」 를 누르거나 지금 화면의 맡긴 일을 열면 `/executions/{id}` 로 간다. 관리자 사용량 목록의 한 줄은 `/admin/executions/{id}` 로 간다.
 그 화면은 여는 순간 한 번 읽고 실시간으로 갱신하지 않는다. 돌고 있는 실행은 대화 화면이 이미 흘려 보이고, 이 화면은 끝난 뒤에 다시 보는 자리다.
 브라우저가 Control Plane 토큰을 갖지 않으므로 web 서버 라우트가 토큰을 만들어 트리를 읽는다.
 
