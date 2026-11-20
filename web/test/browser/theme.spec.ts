@@ -1,19 +1,21 @@
 import { parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
+import { openAccountMenu } from "./helpers.ts";
 
-test("밝기 단추로 어두움 모드를 고르고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
+test("이름 메뉴의 「화면 밝기」 에서 어둡게를 고르고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
   await page.goto("/new");
   await page.evaluate(() => localStorage.setItem("theme", "light"));
   await page.reload();
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
-  await page.getByRole("button", { name: /밝기 모드: 밝음/ }).click();
+  await openAccountMenu(page, testInfo);
+  await expect(page.getByRole("menuitemradio", { name: "밝게" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "어둡게" }).click();
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
 
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await expect(page.getByRole("button", { name: /밝기 모드: 어두움/ })).toBeVisible();
+  await openAccountMenu(page, testInfo);
+  await expect(page.getByRole("menuitemradio", { name: "어둡게" })).toHaveAttribute("aria-checked", "true");
 });
 
 // 외부 스크립트를 막는 시험은 SSR 그림을 확인하고 hydration을 기다리지 않는다.

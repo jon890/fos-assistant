@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { auth } from "@/auth";
 import { appName } from "@/lib/app-name";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,13 +47,18 @@ const sections = [
 export default async function PrivacyPage() {
   // 앱 이름은 빌드에 굳히지 않고 실행할 때의 환경에서 읽는다.
   await connection();
+  // 로그인한 사용자는 설정 틀 안에서 이 화면을 연다. 로그인 전 안내와 로그인 화면으로 가는 단추는 그리지 않는다.
+  // Auth.js 의 세션 확인은 Control Plane 을 부르지 않는다.
+  const signedIn = Boolean((await auth())?.user?.email);
   return (
     <article className="mx-auto w-full max-w-2xl space-y-6 pb-6">
       <header className="space-y-2">
         <p className="break-words text-sm text-muted-foreground">{appName()}</p>
         <h1 className="text-2xl font-semibold">데이터 보관 안내</h1>
         <p className="text-sm leading-6 text-muted-foreground">
-          로그인 전에 대화가 어디에 남고, 누가 읽을 수 있는지 확인해 주세요.
+          {signedIn
+            ? "대화가 어디에 남고, 누가 읽을 수 있는지 안내해요."
+            : "로그인 전에 대화가 어디에 남고, 누가 읽을 수 있는지 확인해 주세요."}
         </p>
       </header>
       <Card className="gap-6 p-6">
@@ -69,11 +75,13 @@ export default async function PrivacyPage() {
           </section>
         ))}
       </Card>
-      <Button asChild variant="outline">
-        <Link href="/signin" prefetch={false}>
-          로그인 화면으로
-        </Link>
-      </Button>
+      {signedIn ? null : (
+        <Button asChild variant="outline">
+          <Link href="/signin" prefetch={false}>
+            로그인 화면으로
+          </Link>
+        </Button>
+      )}
     </article>
   );
 }
