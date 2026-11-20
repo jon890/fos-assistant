@@ -9,16 +9,18 @@ import {
 import { OverviewCard } from "./overview-card";
 import { useOverviewRead } from "./use-overview-read";
 
-/** 사람 이름, 에이전트, 시각, 오류 코드를 한 줄로 적는다. 시각과 에이전트 대체 문구는 실행 기록 표와 같다. */
+/**
+ * 사람 이름, 에이전트, 시각, 오류 코드를 한 줄로 적는다. 시각과 에이전트 대체 문구는 실행 기록 표와 같다.
+ *
+ * <p>오류 코드 없이 상태만 실패인 실행은 실행 기록의 배지처럼 「실패」 로 적는다.
+ */
 function lineText(line: OverviewFailureLine): string {
   return [
     line.userName ?? "알 수 없음",
     agentLabel(line.agentName),
     formatWhen(line.startedAt),
-    line.errorCode,
-  ]
-    .filter((part) => part !== null)
-    .join(" · ");
+    line.errorCode ?? "실패",
+  ].join(" · ");
 }
 
 /**

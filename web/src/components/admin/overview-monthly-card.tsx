@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/notice";
 import { formatAmount } from "@/lib/format";
 import { readOverviewMonthly } from "@/lib/admin-overview-api";
 import { OverviewCard } from "./overview-card";
@@ -41,9 +42,9 @@ export function OverviewMonthlyCard() {
             </span>
           </p>
           {monthly.incomplete ? (
-            <p className="text-warning">
+            <Notice variant="warning">
               금액을 확인하지 못한 실행이 있어 실제보다 적을 수 있어요
-            </p>
+            </Notice>
           ) : null}
         </>
       )}

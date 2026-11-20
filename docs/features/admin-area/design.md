@@ -50,7 +50,7 @@
 
 **그룹 사용자.** `AppUserRepository.findByGroupIdOrderByIdAsc(Long)` 를 더하고 `UserDisplayNameService.namesInGroup(Long groupId)` 가 `Map<Long, String>`(번호 순)을 낸다. 꺼진 사용자도 들어간다. 그 사람이 이번 주에 겪은 실패와 이번 달 비용도 그룹의 기록이기 때문이다.
 
-**남의 실행.** 응답의 `mine` 은 실행의 사용자가 요청한 관리자일 때만 참이다. 웹은 `mine` 인 줄만 `/admin/executions/{id}` 링크로 그린다. 실행 상세 API(`/api/v1/usage/executions/{id}/tree`)는 지금처럼 남의 실행을 숨기므로 주소를 직접 열어도 열리지 않는다(DECISION10). 응답에 대화 번호, 도구 원본, 문맥 항목은 넣지 않는다.
+**남의 실행.** 응답의 `mine` 은 실행의 사용자가 요청한 관리자일 때만 참이다. 웹은 `mine` 인 줄만 `/admin/executions/{id}` 링크로 그린다. 실행 상세 API(`/api/v1/usage/executions/{id}/tree`)는 지금처럼 남의 실행을 숨기므로 주소를 직접 열어도 열리지 않는다(DECISION10). 응답에 대화 번호, 도구 원본, 문맥 항목은 넣지 않는다. 실행 번호는 화면이 줄을 구분하고 내 실행을 잇는 데 쓰며 남의 줄에서는 그리지 않는다(스펙 DECISION10).
 
 ### 웹
 
