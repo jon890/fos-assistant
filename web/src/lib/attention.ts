@@ -213,8 +213,7 @@ export function originText(item: AttentionItem): string | null {
 }
 
 /**
- * 상한을 넘어 빠진 항목의 안내다. 실패와 맡긴 일만 실행 기록으로 보낸다.
- * 내 차례는 여러 종류가 섞여 보낼 곳이 없고, 이어서 하기의 나머지 대화는 사이드바 목록에 있다.
+ * 상한을 넘어 빠진 항목의 수를 알린다. 사용자 실행 목록 화면이 없어 링크는 두지 않는다.
  *
  * @returns `moreCount` 가 0 이면 `null`
  */
@@ -222,11 +221,7 @@ export function moreText(
   card: AttentionCard,
 ): { text: string; href: string | null } | null {
   if (card.moreCount <= 0) return null;
-  const href =
-    card.key === "failures" || card.key === "delegated"
-      ? "/usage?tab=executions"
-      : null;
-  return { text: `${card.moreCount}개 더 있어요`, href };
+  return { text: `${card.moreCount}개 더 있어요`, href: null };
 }
 
 /**

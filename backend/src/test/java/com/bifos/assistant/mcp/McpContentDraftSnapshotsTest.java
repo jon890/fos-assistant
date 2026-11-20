@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftImages;
 import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpConnectorListTool;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,7 +80,7 @@ class McpContentDraftSnapshotsTest {
 
     @BeforeEach
     void setUp() {
-        var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftInputReader.class), guard, json);
+        var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftImages.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
         controller = new McpController(tools, mock(McpArtifactCalls.class), mock(McpFileSpaceCalls.class), callers, mock(McpMediaObservationTools.class), drafts, tool,
             mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), mock(McpConnectorListTool.class), checks,

@@ -36,6 +36,11 @@ public class McpFileSpaceTools {
     /** 자동 보관이 도는 동안 바로 거절되지 않게 보관 자리를 기다리는 시간이다. */
     private static final Duration WAIT = Duration.ofSeconds(10);
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /**
+     * 실행 공간 밖 경로에서 찾지 못했을 때 덧붙이는 안내다. 결과물 폴더는 실행 공간에 붙어 있지 않아, 실행 공간의 파일 도구로 그 경로에 쓴
+     * 파일은 Control Plane 이 찾지 못한다(2026-11-20 운영에서 확인). 호스트 경로는 담지 않는다.
+     */
+    static final String WORKSPACE_HINT = " 셸·파일 도구가 실행 공간에서 돌아 만든 파일이면 그 파일을 /workspace/ 아래에 두고 그 /workspace/ 경로로 다시 부른다.";
 
     private final ArtifactPutFiles putFiles;
     private final SandboxFiles sandboxFiles;
@@ -68,16 +73,18 @@ public class McpFileSpaceTools {
             // 대화 밖 실행은 넣은 파일을 묶을 답이 없다. 다른 도구와 같은 맥락 오류로 답한다(설계의 「file_space_put 도구」).
             return McpToolService.result(McpToolService.INVALID_CONTEXT, true);
         }
+        // 실행 공간 경로로 부른 것이 아니면 찾지 못했을 때 /workspace/ 로 다시 부르라고 안내한다
+        String hint = path.startsWith(WORKSPACE_PREFIX) ? "" : WORKSPACE_HINT;
         try {
             ArtifactKept kept = keep(origin, userId, conversationId, path, title, description);
             return McpToolService.result(success(kept), false);
         } catch (ApiException ex) {
-            return failure(caller, reasonOf(ex));
+            return failure(caller, reasonOf(ex), hint);
         } catch (RuntimeException ex) {
             log.warn(
                 "file space put failed userId={} executionId={} exceptionClass={}", userId, caller.executionId(),
                 ex.getClass().getSimpleName());
-            return failure(caller, Reason.UNAVAILABLE);
+            return failure(caller, Reason.UNAVAILABLE, hint);
         }
     }
 
@@ -117,11 +124,14 @@ public class McpFileSpaceTools {
     }
 
 
-    private static Map<String, Object> failure(McpCaller caller, Reason reason) {
+    /** @param hint 까닭이 {@link Reason#NOT_FOUND} 일 때만 덧붙인다 */
+    private static Map<String, Object> failure(McpCaller caller, Reason reason, String hint) {
         log.info(
             "file space put refused userId={} executionId={} reason={}", caller.user().id(), caller.executionId(), reason);
         return McpToolService.result(
-            "파일 공간에 넣지 못했다. 까닭: " + reason.name() + ". " + reason.text + ". 사용자에게 넣었다고 말하지 않는다.", true);
+            "파일 공간에 넣지 못했다. 까닭: " + reason.name() + ". " + reason.text + "."
+                + (reason == Reason.NOT_FOUND ? hint : "") + " 사용자에게 넣었다고 말하지 않는다.",
+            true);
     }
 
 
@@ -156,7 +166,8 @@ public class McpFileSpaceTools {
             "name", PUT,
             "description",
             "사용자의 파일 공간(내 파일)에 파일을 넣는다. path 가 /workspace/ 로 시작하면 작업 폴더(실행 공간)의 파일이고, 상대 경로나 "
-                + "이 대화의 결과물 폴더 경로면 그 폴더의 파일이다. 받는 형식은 그림(png, jpg, jpeg, gif, webp), 문서(html, css, md, txt, pdf, "
+                + "이 대화의 결과물 폴더 경로면 그 폴더의 파일이다. 셸·파일 도구가 실행 공간에서 돌면 넣을 파일을 /workspace/ 아래에 만들고 "
+                + "그 경로를 쓴다. 실행 공간에서 결과물 폴더 경로에 쓴 파일은 찾지 못한다. 받는 형식은 그림(png, jpg, jpeg, gif, webp), 문서(html, css, md, txt, pdf, "
                 + "docx, pptx), 표(csv, tsv, xlsx)이고 파일 하나는 25MB 까지다. title 에 짧은 한국어 제목, description 에 한 줄 설명을 붙인다. "
                 + "답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어가므로 넣지 않는다.",
             "inputSchema",

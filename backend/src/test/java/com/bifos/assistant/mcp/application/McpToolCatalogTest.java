@@ -26,6 +26,7 @@ class McpToolCatalogTest {
         var drafts = mock(McpContentDraftTools.class);
         when(drafts.writeDefinition()).thenReturn(Map.of("name", McpContentDraftTools.WRITE));
         when(drafts.readDefinition()).thenReturn(Map.of("name", McpContentDraftTools.READ));
+        when(drafts.imageDefinition()).thenReturn(Map.of("name", McpContentDraftTools.IMAGE));
         var snapshots = mock(McpContentDraftSnapshots.class);
         when(snapshots.previewDefinition()).thenReturn(Map.of("name", McpContentDraftSnapshots.PREVIEW));
         when(snapshots.saveDefinition()).thenReturn(Map.of("name", McpContentDraftSnapshots.SAVE));
@@ -47,7 +48,7 @@ class McpToolCatalogTest {
             .doesNotHaveDuplicates()
             .containsExactly("memory_read", "artifact_write", "agent_list", "agent_delegate", "agent_status",
                 "agent_stop", "follow_up_propose", McpMediaObservationTools.LIST, McpMediaObservationTools.RECORD,
-                McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
+                McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftTools.IMAGE, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
                 McpFinancialLimitTools.READ, McpFinancialLimitTools.CHANGE, McpApprovalResumeTool.NAME, McpFileSpaceTools.PUT, McpConnectorListTool.NAME, "memory_remember",
                 "memory_search");
         assertThat(first).contains(list, record, memory);
@@ -67,7 +68,7 @@ class McpToolCatalogTest {
         var catalog = new McpToolCatalog(properties,
             new McpMemoryRemember(null, null, null, null),
             new McpMediaObservationTools(null, null, null, null, null),
-            new McpContentDraftTools(null, null, null, null),
+            new McpContentDraftTools(null, null, null, null, null),
             new McpContentDraftSnapshots(null, null, null, null),
             new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
