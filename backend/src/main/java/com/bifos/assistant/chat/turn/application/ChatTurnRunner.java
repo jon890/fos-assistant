@@ -110,7 +110,9 @@ class ChatTurnRunner {
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
             AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked);
-            String input = artifacts.agentPreamble(conversation) + lead + agentInput.text();
+            // 셸·파일 도구가 실행 공간에서 돌면 넣을 파일을 /workspace/ 에 만들게 한다. 결과물 폴더는 실행 공간에 붙어 있지 않다
+            boolean sandboxed = agentTools.runsInSandbox(routed.agent());
+            String input = artifacts.agentPreamble(conversation, sandboxed) + lead + agentInput.text();
             // 사용자가 보낸 글만 질문으로 넘긴다. 자동 turn 의 글은 Control Plane 이 정한 것이라 기억을 고르는 데 쓰지 않는다
             AssembledContext context = contextAssembler.assemble(user, routed.agent().id(), questionOf(intent, text));
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-20261007 / memory-remember)

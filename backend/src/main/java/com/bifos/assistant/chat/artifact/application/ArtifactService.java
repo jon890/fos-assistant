@@ -63,15 +63,38 @@ public class ArtifactService {
      *
      * <p>첫 줄은 도구가 없어도 맞는 안내다. 사용자가 「파일 공간」 을 말했을 때 되묻지 않게 한다.
      */
-    static final String FILE_SPACE_RULES = "[파일 공간]\n"
-        + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
-        + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
-        + "아래 네 줄은 file_space_put 도구가 있을 때만 따른다.\n"
-        + "- 사용자에게 줄 파일(엑셀, PDF, 문서, CSV 등)을 만들었거나 사용자가 파일 공간에 넣어 달라고 하면 file_space_put 으로 넣는다."
-        + " 짧은 한국어 제목과 한 줄 설명을 붙인다.\n"
-        + "- 이미 들어 있는 것(자동으로 들어가는 HTML 과 그림, 결과가 already 인 것)은 다시 넣지 않고 이미 있다고 답한다.\n"
-        + "- 도구가 실패하면 넣었다고 답하지 않고 까닭을 알린다.\n"
-        + "- 다른 에이전트에게 맡긴 일에서 만든 파일은 그 파일을 만든 에이전트가 직접 넣는다. 맡길 때 넣어 달라고 함께 적는다.\n";
+    static final String FILE_SPACE_RULES = fileSpaceRules(false);
+
+    /**
+     * 셸·파일 도구가 실행 공간에서 도는 에이전트의 파일 공간 규칙이다.
+     *
+     * <p>결과물 폴더는 실행 공간에 붙어 있지 않다. 파일 도구로 그 경로에 쓰면 실행 공간 안의 같은 이름 경로에 써져 Control Plane 이 찾지
+     * 못한다(2026-11-20 운영에서 확인). 실행 공간에서 Control Plane 이 읽는 자리는 {@code /workspace/} 뿐이다.
+     */
+    static final String SANDBOX_FILE_SPACE_RULES = fileSpaceRules(true);
+
+    /** 실행 공간 에이전트에게 결과물 폴더 단락의 「파일 도구로 직접 쓴다」 대신 주는 줄이다. */
+    static final String SANDBOX_FOLDER_LINE = "파일 도구는 실행 공간에서 돌아 위 폴더에 쓴 파일이 이 서비스에 보이지 않는다. 위 폴더의 결과물은 artifact_write 로만 저장한다.\n";
+
+    private static final String FOLDER_FILE_TOOL_LINE = "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n";
+
+
+    private static String fileSpaceRules(boolean sandboxed) {
+        return "[파일 공간]\n"
+            + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
+            + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
+            + "아래 " + (sandboxed ? "다섯" : "네") + " 줄은 file_space_put 도구가 있을 때만 따른다.\n"
+            + "- 사용자에게 줄 파일(엑셀, PDF, 문서, CSV 등)을 만들었거나 사용자가 파일 공간에 넣어 달라고 하면 file_space_put 으로 넣는다."
+            + " 짧은 한국어 제목과 한 줄 설명을 붙인다.\n"
+            + (sandboxed
+                ? "- 넣을 파일은 /workspace/ 아래에 만들고 file_space_put 의 path 에 그 /workspace/ 경로를 그대로 쓴다."
+                    + " 위 결과물 폴더 경로에 만든 파일은 찾지 못한다.\n"
+                : "")
+            + "- 이미 들어 있는 것(자동으로 들어가는 HTML 과 그림, 결과가 already 인 것)은 다시 넣지 않고 이미 있다고 답한다.\n"
+            + "- 도구가 실패하면 넣었다고 답하지 않고 까닭을 알린다.\n"
+            + "- 다른 에이전트에게 맡긴 일에서 만든 파일은 그 파일을 만든 에이전트가 직접 넣는다. 맡길 때 넣어 달라고 함께 적는다.\n";
+    }
+
 
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
@@ -84,22 +107,24 @@ public class ArtifactService {
      *
      * <p>매 turn 붙인다. 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다. 사진 단락이 있으면 그 앞에 둔다.
      * 저장하는 메시지 본문에는 쓰지 않는다.
+     *
+     * @param sandboxed 이 에이전트의 셸·파일 도구가 실행 공간에서 도는가. 파일을 어디에 만들고 어떤 경로로 넣는지가 달라진다
      */
-    public String agentPreamble(Conversation conversation) {
+    public String agentPreamble(Conversation conversation, boolean sandboxed) {
         return "[결과물 폴더]\n"
             + store.agentFolder(conversation.id()) + "\n"
             + "대화 식별자: " + conversation.publicId() + "\n"
             // 조건 없이 「저장한다」 만 적으면 싼 모델이 요청과 상관없이 파일을 만든다(2026-09-29 gpt-6-luna 에서 확인).
             + "이 폴더는 사용자가 HTML 페이지나 이미지 같은 파일을 만들어 달라고 할 때만 쓴다. 그런 요청이 없으면 파일을 만들지 않고 답을 글로만 한다.\n"
             + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
-            + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
+            + (sandboxed ? SANDBOX_FOLDER_LINE : FOLDER_FILE_TOOL_LINE)
             + "artifact_write 에서는 HTML 과 CSS 는 content, HTML 이 부를 인터넷의 사진은 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
             + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
             // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
             + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
             + IMAGE_RULES
             + imageTitles(conversation.id())
-            + FILE_SPACE_RULES
+            + (sandboxed ? SANDBOX_FILE_SPACE_RULES : FILE_SPACE_RULES)
             + "\n"
             + SkillAgentNotice.PARAGRAPH;
     }
