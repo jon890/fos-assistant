@@ -1,6 +1,6 @@
 # 비서가 만든 이미지 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지)를 설계한다. PR2 의 설계는 아래 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이 갖는다. PR3 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ10 까지)과 PR2(REQ11 부터 REQ14 까지), PR3(REQ15 부터 REQ17 까지)을 설계한다. PR2 의 설계는 「PR2: 기본 비서에 켜기와 자동 설정, 사람이 없는 실행」 절이, PR3 의 설계는 「PR3: 지금 대화의 사진과 그림을 바탕으로 고치기」 절이 갖는다. PR4 의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
 
 ## 요구사항 연결
 
@@ -20,9 +20,9 @@
 | REQ12 | Control Plane 이 `image_gen` 이 든 도구 저장에 `ensure_image_service: true` 를 넣어 보내고, 대시보드 plugin 이 같은 쓰기에서 profile 설정의 `image_gen.provider` 를 넣는다. 쓰지 못하면 저장 전체가 실패한다 |
 | REQ13 | 켜지 못한 기본 비서는 기다리는 목록에 남고 `AgentPendingToolsets` 가 5분마다 다시 켠다. 실행 공간 정책 등록은 Control Plane 이 하지 못해 관리자 알림으로 남긴다. 사람의 도구 저장이 그 도구의 켜짐을 바꾸면 목록에서 뺀다 |
 | REQ14 | fos-ctx 가 이미 묻는 도구 판정(`/internal/hermes/tool-guard`)이 그 호출의 실행을 찾아 트리 루트의 「사람이 없는 실행」 표시가 참이면 `image_generate` 를 막는다. fos-ctx 는 바꾸지 않는다 |
-| REQ15 | PR3 이 설계한다. 방향은 `pre_tool_call` 이 `image_url` 과 `reference_image_urls` 의 사진 가리킴을 Control Plane 에 확인받아 그 대화의 사진과 만든 그림으로만 바꾸는 것이다 |
-| REQ16 | REQ15 과 같은 PR 이 함께 설계한다 |
-| REQ17 | REQ15 과 같은 PR 이 함께 설계한다 |
+| REQ15 | 모델이 `image_url` 과 `reference_image_urls` 에 `attachment:<첨부 번호>` 나 `generated:<제목>` 을 적는다. fos-ctx 의 `pre_tool_call` 이 하나씩 Control Plane 에서 받아 profile 의 media cache 에 사본으로 쓰고 인자를 그 경로로 바꾼다. 원본은 읽기만 한다 |
+| REQ16 | Control Plane 이 origin 실행의 사용자와 대화에서만 찾는다. 요청자가 보낸 그 대화의 사진과 그 대화의 그림 행만 내준다. 하나라도 받지 못하거나 가리킴이 아닌 값(경로, 주소, data URL)이 있으면 fos-ctx 가 호출을 막고 어느 것이 왜 안 되는지 적은 글을 모델에게 준다 |
+| REQ17 | 실행 입력의 그림 규칙에 고치기 규칙과 그 대화의 그림 제목 목록을 더한다 |
 | REQ18 | PR4 가 설계한다. 방향은 원고의 사진 자리가 첨부 번호와 함께 그 대화의 그림 행도 가리키게 하는 것이다 |
 | REQ19 | REQ18 과 같은 PR 이 함께 설계한다 |
 
@@ -232,6 +232,99 @@ Control Plane 이 스스로 하는 일은 앞의 둘을 일으키는 도구 저�
 | 켜고 목록을 비우는 사이 관리자가 끈다 | 행 잠금이 순서를 정한다. 주기 작업이 먼저면 관리자의 저장이 뒤에 끄고 목록은 이미 비어 있다 |
 | 기다리는 에이전트를 지웠다 | 주기 작업이 지운 에이전트를 보지 않는다 |
 
+## PR3: 지금 대화의 사진과 그림을 바탕으로 고치기
+
+근거와 기각한 대안은 [ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md) 가 갖는다.
+
+### Hermes 가 받는 것
+
+Hermes v0.23.2 의 `image_generate` 는 바탕 한 장 `image_url` 과 참고 목록 `reference_image_urls` 를 받는다. 이미지 서비스(openai-codex)는 둘을 이은 앞의 16장까지 `images/edits` 로 보내고 넘는 것은 말없이 버린다.
+값은 주소, data URL, 파일 경로 가운데 하나다. 실행 공간이 있는 profile 은 파일 경로를 그 profile 의 media cache(Hermes 홈의 `cache/` 아래) 안에서만 호스트에서 읽고, 나머지는 실행 공간 안에서 읽는다.
+**실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있다**([ADR-091](../../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)). 경로를 그대로 두면 다른 대화의 사진을 쓸 수 있어 REQ16 을 지키지 못한다.
+
+### 책임
+
+| 모듈 | 맡는 것 |
+| --- | --- |
+| `hermes/plugins/fos-ctx` | `image_generate` 의 두 인자를 읽어 가리킴만 받고, 하나씩 Control Plane 에서 받아 media cache 에 쓰고 인자를 바꾼다. 결과 hook 에서 그 사본을 지운다. 누구의 어느 대화인지는 정하지 않는다 |
+| `backend` 의 `mcp` | 서명한 호출 맥락에서 origin 실행의 사용자와 대화를 정하고 가리킴을 푼다 |
+| `backend` 의 `chat.attachment` | 요청자가 그 대화에 보낸 사진의 원본을 읽는다. 원본 조회 도구와 같은 판정이다 |
+| `backend` 의 `chat.artifact` | 그 대화의 그림 행을 제목으로 찾아 파일을 읽는다. 실행 입력에 고치기 규칙과 그림 제목 목록을 넣는다 |
+
+화면은 바꾸지 않는다. 고친 그림은 새 그림이라 PR1 의 길로 답에 보인다.
+
+### 가리킴
+
+| 값 | 뜻 |
+| --- | --- |
+| `attachment:<첨부 번호>` | 그 대화의 사진. 첨부 번호는 실행 입력의 사진 참조 목록이 주는 `attachment_id` 다(`attachment_inspect` 와 같은 번호) |
+| `generated:<제목>` | 그 대화에서 만든 그림. 제목은 결과물 파일 이름에서 확장자를 뗀 것이다 |
+
+두 인자의 값이 모두 가리킴이어야 한다. 경로, 주소, data URL 이 하나라도 있으면 막는다. 합쳐 16장을 넘으면 막고 줄여 달라고 알린다(스펙 DECISION25). 같은 가리킴이 두 번 오면 한 번만 받는다.
+16 은 Hermes 의 openai-codex plugin 의 `_MAX_REFERENCE_IMAGES` 다. 이 저장소가 정한 값이 아니라 계약 검사가 Hermes 를 올릴 때 다시 본다.
+
+### fos-ctx 의 hook
+
+| 때 | 하는 일 |
+| --- | --- |
+| `pre_tool_call`, 도구가 `image_generate` 이고 두 인자 가운데 하나라도 있다 | 도구 판정을 통과한 뒤 제목 줄 떼기와 함께 돈다. 가리킴을 차례로 받는다. 모두 받으면 `{"action": "modify", "args": {"image_url", "reference_image_urls", "prompt"?}}` 로 사본 경로를 넣는다. 하나라도 받지 못하면 받은 사본을 지우고 막는다 |
+| `transform_tool_result`, 도구가 `image_generate` | 그 호출의 사본을 지운 뒤 PR1 의 올리기를 한다 |
+
+- 사본은 Hermes 홈의 `cache/fos-image-sources/` 에 무작위 이름으로 쓴다. 실행 공간이 있는 profile 이 호스트에서 읽을 수 있는 자리다. 이미지 서비스가 바이트를 data URL 로 바꾸므로 Hermes 기록과 실행 사건에는 경로만 남는다
+- 사본마다 `(session_id, tool_call_id)` 를 기억해 결과 hook 이 지운다. 결과 hook 이 돌지 못한 사본은 다음 쓰기 때 1시간이 지난 것부터 지운다
+- 받기의 제한 시간은 한 호출의 모든 가리킴을 합쳐 15초다. Hermes 의 callback 제한(기본 30초) 안에서 도구 판정과 함께 끝내야 한다
+- `tool_call_id` 나 session 이 없는 호출(코드 실행 안의 호출)은 가리킴을 받지 못해 막는다
+
+막을 때 모델이 받는 글은 아래 뜻이다. 가리킴마다 까닭을 하나씩 적는다.
+
+| 까닭 | 글 |
+| --- | --- |
+| 가리킴이 아니다 | 바탕과 참고 사진에는 `attachment:<첨부 번호>` 나 `generated:<제목>` 만 쓴다 |
+| 16장을 넘는다 | 한 번에 쓸 수 있는 사진은 16장까지다. 사용자에게 줄여 달라고 한다 |
+| `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진이나 이 대화에서 만든 그림이 아니다 |
+| `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지나 쓸 수 없다 |
+| 그 밖의 답, 제한 시간 | 사진을 받지 못했다. 잠시 뒤 다시 부탁하라고 한다 |
+
+모든 막는 글은 「그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다」 로 끝난다(스펙 DECISION32).
+404 는 이 경로가 없는 옛 Control Plane 이다. 고치기를 아직 쓸 수 없다고 막는다. 가리킴 없이 경로를 받던 동작으로 돌아가지 않는다. 그 동작이 다른 대화의 사진을 읽을 수 있기 때문이다.
+
+### 받기 경로
+
+`POST /internal/hermes/image-source`. 인증은 `/mcp` 와 같은 profile 토큰이다.
+본문은 JSON `{"_fos_ctx": <도구 이름 image_generate 로 서명한 호출 맥락>, "source": "<가리킴>"}` 다. 맥락의 모양과 서명은 `/mcp` 와 같다.
+
+| 판정 | 응답 |
+| --- | --- |
+| 맥락이 맞지 않거나 origin 실행을 찾지 못하거나, origin 실행이나 그 트리의 루트가 중지됐거나, 대화 없는 실행이다 | 403 `MCP_CALL_CONTEXT_INVALID` |
+| 가리킴의 모양이 틀렸다. 그 대화에 없는 첨부 번호, 요청자가 보내지 않은 사진, 그 대화에 없는 제목이다 | 422 `IMAGE_SOURCE_UNKNOWN` |
+| 사진을 지웠거나 보관 기간이 지났다. 그림 파일이 보관 기간 정리로 지워졌다 | 410 `IMAGE_SOURCE_GONE` |
+| 받았다 | 200. 본문은 원본 바이트 그대로, `Content-Type` 은 그 형식, `Cache-Control: no-store` |
+
+- origin 판정은 PR1 의 올리기와 같다(`SessionOwnerResolver`). 맡긴 실행이 부모 turn 뒤에 돌기 때문에 끝난 origin 도 받는다
+- 사진은 `AttachmentService` 의 원본 조회 판정(그 대화, 요청자가 올리고 보낸 것, 지우지 않았고 보관 기간 안)을 그대로 쓰고 같은 20MiB 상한과 머리 바이트 검사를 한다
+- 그림은 그 대화의 그림 행 가운데 보관 사본이 아닌 행을 제목으로 찾는다. 대화 주인이 요청자가 아니면 `IMAGE_SOURCE_UNKNOWN` 이다. 상한은 PR1 의 올리기 상한이다
+- **이 경로는 404 를 내지 않는다.** 저장 중의 `*_NOT_FOUND` 는 `IMAGE_SOURCE_UNKNOWN` 으로 바꾼다. 남의 대화의 번호와 없는 번호가 같은 응답이라 번호를 훑어 남의 것을 알아내지 못한다
+
+### 실행 입력의 그림 규칙
+
+`ArtifactService.IMAGE_RULES` 에 아래 뜻의 줄을 더한다. 조건 줄(도구가 있고 사용자가 그림을 부탁했을 때만)은 그대로다.
+
+- 지금 대화의 사진이나 그림을 바탕으로 고칠 때는 바탕을 `image_url` 에, 참고를 `reference_image_urls` 에 가리킴으로 넣는다. 경로나 주소를 쓰지 않는다
+- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다. 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다
+- 쓸 수 없다는 결과를 받으면 그림 없이 어느 사진을 왜 쓸 수 없는지 답한다
+
+그 대화에 파일이 남은 그림이 있으면 단락 끝에 「이 대화에서 만든 그림: 「제목」, …」 줄을 둔다. 최근 20장까지다. 모델이 Hermes 기록을 압축한 뒤에도 제목을 안다.
+
+### 실패와 일관성(PR3)
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 새 fos-ctx 에 옛 Control Plane | 가리킴이 든 호출은 404 를 받아 막힌다. 가리킴이 없는 그림 만들기는 그대로다 |
+| 옛 fos-ctx 에 새 Control Plane | 모델이 가리킴을 적으면 Hermes 가 파일 경로로 읽다 실패하고 모델이 실패를 알린다. 플러그인을 먼저 배포한다 |
+| 받은 뒤 이미지 도구가 돌기 전에 사진이 지워진다 | 이미 받은 사본으로 만든다. 사본은 결과 hook 이 지운다 |
+| 결과 hook 이 돌지 못했다 | 사본이 media cache 에 남는다. 다음 받기가 1시간이 지난 사본을 지운다 |
+| 이미지 서비스가 입력 그림을 거절한다 | Hermes 의 오류 결과가 모델에게 가고 PR1 처럼 모델이 까닭을 답한다 |
+
 ## 실패와 일관성
 
 | 무엇 | 어떻게 되나 |
@@ -262,6 +355,10 @@ Control Plane 이 스스로 하는 일은 앞의 둘을 일으키는 도구 저�
 | REQ12 | `hermes/tests` 의 `test_dashboard_profile_api_image_service.py` 가 서비스 넣기, 덮어쓰지 않기, 실패 때 되돌리기를 본다. `HermesToolsetRequestTest` 가 Control Plane 이 보내는 본문을 본다 |
 | REQ13 | `AgentPendingToolsetsTest`. 실행 공간이 없을 때의 관리자 알림 한 건, 준비된 뒤 스스로 켜기, 관리자가 끈 뒤 다시 켜지 않기를 본다 |
 | REQ14 | `ToolGuardEndpointTest`. 사람이 없는 실행과 그 자식의 `image_generate` 가 막히고 사람이 보낸 turn 은 통과하는지 본다 |
+| REQ15, REQ16 의 받기 | `ImageSourceEndpointTest`. 사진 세 장과 만든 그림을 원본 바이트 그대로 받고 받은 뒤에도 원본이 같은지, 다른 대화와 다른 사용자의 사진, 지운 사진, 없는 제목, 지워진 그림이 거절되고 어느 것도 404 가 아닌지 본다 |
+| REQ15, REQ16 의 hook | `hermes/tests/test_image_source.py`. 가짜 Control Plane 으로 세 장을 받아 인자를 사본 경로로 바꾸는지, 하나라도 못 받으면 막고 사본을 지우는지, 가리킴이 아닌 값과 16장 초과, 옛 Control Plane 을 막는지, 결과 hook 이 사본을 지우는지 본다 |
+| REQ15 의 Hermes 쪽 | `hermes/tests/test_generated_image_contract.py`. 두 인자의 이름과 media cache 의 호스트 읽기, 16장 상한을 Hermes 소스에서 본다 |
+| REQ17 | 실행 입력을 만드는 기존 테스트에서 고치기 규칙과 그림 제목 줄을 본다 |
 
 실제 이미지 서비스로 한 장을 만드는 왕복은 배포 뒤 운영에서 확인한다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」).
 
@@ -282,6 +379,10 @@ Control Plane 이 스스로 하는 일은 앞의 둘을 일으키는 도구 저�
 | DECISION8 | 기다리는 상태를 두는 곳 | `agent` 의 새 칸 하나 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 재시작 뒤에도 남아야 한다 |
 | DECISION9 | 이미지 서비스 값을 갖는 곳 | 대시보드 plugin. Control Plane 은 넣으라는 표시만 보낸다 | 작성자 | 서비스가 하나다(스펙 DECISION5). 값이 두 곳에 생기지 않는다 |
 | DECISION10 | 사람이 없는 실행을 막는 자리 | 이미 있는 도구 판정 경로 | 작성자 | fos-ctx 가 `image_generate` 를 이미 묻고 요청에 도구 이름이 있다. plugin 을 바꾸지 않는다 |
+| DECISION11 | 바탕 사진을 이미지 도구에 넘기는 길 | 모델은 가리킴만 적고 fos-ctx 가 Control Plane 에서 받아 media cache 사본 경로로 바꾼다 | 작성자 | [ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md). 실행 공간의 경로를 그대로 두면 다른 대화의 사진을 쓸 수 있다 |
+| DECISION12 | 사본을 넘기는 모양 | data URL 이 아니라 파일 경로 | 작성자 | 고친 인자는 Hermes 의 도구 사건과 결과 hook 에 그대로 간다. 수 MB 의 base64 가 실행 사건으로 Control Plane 까지 흐르지 않게 한다 |
+| DECISION13 | 사진을 가리키는 번호 | 도구 인자는 첨부 번호(`attachment_id`), 지시문과 답은 대화 안의 순번 | 작성자 | 모델은 매 turn 사진 참조 목록에서 둘을 함께 받는다. 첨부 번호는 원본 조회 도구가 이미 쓰는 값이고 사람이 보는 글에는 순번을 쓴다(스펙 DECISION28) |
+| DECISION14 | 옛 Control Plane(404)에서 | 가리킴이 든 호출을 막는다 | 작성자 | 경로를 받던 동작으로 돌아가면 다른 대화의 사진을 읽을 수 있다. 막아도 가리킴 없는 그림 만들기는 그대로다 |
 
 ## 결정 기록 연결
 
@@ -290,3 +391,5 @@ Control Plane 이 스스로 하는 일은 앞의 둘을 일으키는 도구 저�
 | DECISION1, DECISION2 | architecture | [ADR-20261119 / generated-image](../../adr/ADR-20261119-generated-image.md) | 이 설계, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
 | DECISION3, DECISION4, DECISION5, DECISION6 | architecture | 필요 없음. 기존 결정(ADR-027, 새 표 금지)을 따르는 선택이다 | 이 설계 |
 | DECISION7, DECISION8, DECISION9, DECISION10 | architecture | [ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md) | 이 설계의 「PR2」, [`agent-skill.md`](../agent-skill.md) 의 「에이전트 도구」 |
+| DECISION11, DECISION12, DECISION14 | architecture | [ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md) | 이 설계의 「PR3」, [`fos-ctx` README](../../../hermes/plugins/fos-ctx/README.md) |
+| DECISION13 | architecture | 필요 없음. 기존 첨부 번호와 순번 규칙([`attachment.md`](../attachment.md))을 따른다 | 이 설계의 「PR3」 |
