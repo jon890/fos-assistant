@@ -88,6 +88,7 @@ export function MessageList({
   liveExecutionId = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   // 대화가 바뀌면 그리는 중에 「새 메시지」 표시를 지운다.
@@ -147,6 +148,18 @@ export function MessageList({
       setHasNewMessage(true);
     }
   }, [contentVersion, loading]);
+  // 받은 글이 그대로여도 답을 풀어 그리거나 이미지가 로드되면 실제 높이는 뒤늦게 늘어난다.
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const content = contentRef.current;
+    if (!element || !content || loading) return;
+    const observer = new ResizeObserver(() => {
+      if (shouldFollow.current) element.scrollTop = element.scrollHeight;
+    });
+    observer.observe(content);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [loading]);
   const scrollToBottom = () => {
     const element = scrollRef.current;
     if (!element) return;
@@ -174,7 +187,7 @@ export function MessageList({
         // relative 가 없으면 안쪽의 sr-only(absolute) 기준 상자가 스크롤 상자 바깥이 되어 바깥 main 의 스크롤 높이를 늘린다.
         className="relative h-full overflow-y-auto px-1 py-3"
       >
-        <div className="mx-auto w-full max-w-3xl">
+        <div ref={contentRef} className="mx-auto w-full max-w-3xl">
           {loading ? (
             <div aria-label="메시지를 읽는 중" className="flex flex-col gap-5">
               <Skeleton className="h-[4.25rem]" />
