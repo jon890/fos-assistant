@@ -6,7 +6,7 @@
 
 로그인한 사용자가 단추 연결을 시작해 로그인 주소를 받고, 돌아온 요청으로 연결을 만든다.
 
-**범위 외**: 「연결 다시 확인」 과 해제의 OAuth 갈래(다음 phase), 웹.
+**범위 외**: 「연결 다시 확인」 의 강제 갱신과 해제 때 서비스 쪽 허락 취소(다음 PR), 웹.
 
 ## 컨텍스트
 
@@ -51,6 +51,10 @@
 ### 3. 이 phase 를 검증하는 테스트
 
 `ConnectorOAuthFlowTest`(스프링 통합, MockMvc): 정상 연결과 대시보드 호출 순서, `MEMBER` 역할 사용자, 붙여 넣은 연결에서 단추로 바꾸기, 인수 검증 계획의 REQ5 실패 경로 전부, `setupAction=update` 의 `REAUTHORIZE`, commit 409(기존 연결 상태가 그대로), 다시 연결 필요인 연결을 다시 연결하면 `READY` 이고 끊김 알림이 읽음인 것, 정상 연결의 로그 출력(`OutputCaptureExtension`)에 access token 과 client secret 이 없는 것, 앱 값이 없을 때의 409 와 카탈로그 `ready`.
+
+### 4. 확인과 해제의 연결 고리
+
+단추 연결의 `check` 는 `VaultAccess.CURRENT` 로 확인 도구를 부른다. `disconnect` 는 연결을 `DISCONNECTED` 로 바꾸기 전에 `ConnectionOAuth.forget` 을 불러 메모리 칸과 끊김 알림을 정리한다. `ConnectorOAuthFlowTest` 가 확인 도구의 인자와 해제 뒤 통로의 404 를 본다.
 
 ## 검증
 

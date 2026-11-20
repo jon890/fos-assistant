@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -412,6 +413,34 @@ class ConnectorOAuthFlowTest {
             .andExpect(jsonPath("$.auth.reconnectRequired").value(false));
         assertThat(notificationsOf(owner)).hasSize(1).noneMatch(Notification::unread);
         assertThat(tokens.current(connection.id())).isPresent();
+    }
+
+
+    @Test
+    @DisplayName("단추 연결의 확인은 본 자리 토큰으로 확인 도구를 부르고 해제하면 통로가 닫히며 끊김 알림이 읽음이 된다")
+    void checkUsesCurrentTokenAndDisconnectClosesThePassage() throws Exception {
+        mvc.perform(complete(started("{\"repo\":\"me/notes\"}"), CODE, null, null)).andExpect(jsonPath("$.outcome").value("CONNECTED"));
+        ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), CONNECTOR).orElseThrow();
+        String mark = signer.currentUrl(connection.id()).orElseThrow().substring(TOKEN_BASE.length());
+
+        mvc.perform(post("/api/v1/connections/" + CONNECTOR + "/check"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("READY"))
+            .andExpect(jsonPath("$.auth.method").value("oauth"));
+        verify(hermes).callWithVault(CONNECTOR, "verify", connection.vault(), null, VaultAccess.CURRENT);
+
+        when(oauth.refresh(eq(connection.vault()), eq(CONNECTOR), any())).thenReturn(new Token(Outcome.GRANT_REVOKED, null, null));
+        tokens.refresh(connection.id(), null);
+        assertThat(notificationsOf(owner)).hasSize(1).allMatch(Notification::unread);
+
+        mvc.perform(delete("/api/v1/connections/" + CONNECTOR))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("DISCONNECTED"))
+            .andExpect(jsonPath("$.auth.method").value("manual"));
+        verify(hermes).deleteVault(connection.vault());
+        assertThat(tokens.current(connection.id())).isEmpty();
+        assertThat(notificationsOf(owner)).hasSize(1).noneMatch(Notification::unread);
+        mvc.perform(get(mark)).andExpect(status().isNotFound());
     }
 
 

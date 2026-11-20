@@ -50,7 +50,7 @@
 `GET /internal/connector-token/{표식}` 을 `connector/oauth/presentation/ConnectorTokenController` 에 둔다. `SecurityConfig` 의 `permitAll` 과 `ControlPlaneJwtFilter.shouldNotFilter` 에 그 접두사를 더한다. 응답은 `{access_token, expires_at}` 이고 `Cache-Control: no-store` 다.
 상태 코드는 설계 「토큰 통로 표식」 과 같다: 표식이 틀리면 401, 연결이 없거나 해제됐거나 단추 연결이 아니거나 갱신이 `missing` 이면 404, 다시 연결 필요면 409, 갱신이 `unavailable` 이나 `app_rejected` 면 503.
 현재 칸이 없거나 만료까지 1분이 남지 않았으면 그 자리에서 갱신한다.
-`ConnectorOAuthRefresher` 는 `assistant.connector.oauth.refresh-cron`(10분마다)으로 `findByStatus(READY)` 로 읽은 연결 가운데 단추 연결을 메모리에서 골라(`auth` 는 JSON 칸이라 쿼리로 고르지 못한다) 현재 칸이 없거나 15분 안에 만료되는 연결을 갱신한다. 한 연결의 실패는 다음 연결을 막지 않는다.
+`ConnectorOAuthTokens.refreshDue` 는 `assistant.connector.oauth.refresh-cron`(10분마다)으로 `findByStatus(READY)` 로 읽은 연결 가운데 단추 연결을 메모리에서 골라(`auth` 는 JSON 칸이라 쿼리로 고르지 못한다) 현재 칸이 없거나 15분 안에 만료되는 연결을 갱신한다. 한 연결의 실패는 다음 연결을 막지 않는다.
 
 ### 4. 이 phase 를 검증하는 테스트
 
@@ -70,11 +70,9 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*Connecto
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthSigner.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthTokens.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthAlerts.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthRefresher.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthApp.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthToken.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthMark.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthPassageAnswer.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthRefresh.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/dto/ConnectorOAuthState.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/presentation/ConnectorOAuthDtos.java` | 신규 |

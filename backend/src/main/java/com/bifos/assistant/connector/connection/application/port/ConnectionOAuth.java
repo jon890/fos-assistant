@@ -14,6 +14,6 @@ public interface ConnectionOAuth {
     boolean ready(ConnectorManifest manifest);
 
 
-    /** 값을 붙여 넣어 다시 등록했다. 메모리의 토큰을 지우고 끊김 알림을 읽음으로 바꾼다. 연결의 트랜잭션 안에서 부른다. */
+    /** 값을 붙여 넣어 다시 등록했거나 해제했다. 메모리의 토큰을 지우고 끊김 알림을 읽음으로 바꾼다. 연결의 트랜잭션 안에서 부른다. */
     void forget(ConnectorConnection connection);
 }

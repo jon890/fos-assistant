@@ -26,6 +26,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -80,8 +81,9 @@ public class ConnectorConnectionService {
      * 연결 확인의 앞 트랜잭션이 본 것이다. 확인 도구를 부를지 정한다.
      *
      * @param vault 확인 도구가 값을 읽을 보관 파일. 값이 보관 파일에 없거나 해제된 연결이면 null
+     * @param oauth 단추 연결이면 확인 도구가 토큰을 받을 본 자리. 붙여 넣은 연결이면 null
      */
-    private record Prepared(String vault, Instant revision) {
+    private record Prepared(String vault, Instant revision, VaultAccess oauth) {
     }
 
     /**
@@ -254,7 +256,7 @@ public class ConnectorConnectionService {
     private List<ConnectorBindingAttempt> apply(
         CurrentUser user, ConnectorManifest manifest, Consumer<ConnectorConnection> write, ConnectionFields fields, ListedTools listed) {
         AppUser owner = lock(user.id());
-        Instant now = clock.instant();
+        Instant now = now();
         ConnectorConnection connection = connections
             .findByUserIdAndConnectorId(owner.id(), manifest.id())
             .orElseGet(() -> connections.save(ConnectorConnection.pending(owner.id(), manifest.id(), now)));
@@ -291,7 +293,7 @@ public class ConnectorConnectionService {
         Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
-        Instant now = clock.instant();
+        Instant now = now();
         approvals.rejectPendingFor(connection, now);
         String step = STEP_DETACH;
         try {
@@ -306,6 +308,7 @@ public class ConnectorConnectionService {
             connections.save(connection);
             throw new ConnectorOperationFailure();
         }
+        oauth.forget(connection);
         connection.disconnected(now);
         return ConnectionSnapshot.from(connections.save(connection), List.of());
     }
@@ -334,7 +337,7 @@ public class ConnectorConnectionService {
             boolean verified = false;
             ListedTools listedTools = null;
             if (prepared.vault() != null && manifest.isPresent()) {
-                ConnectorVerified result = verifier.vault(user.id(), manifest.get(), prepared.vault(), null);
+                ConnectorVerified result = verifier.vault(user.id(), manifest.get(), prepared.vault(), prepared.oauth());
                 verifyFailure = result.failure();
                 listedTools = result.listed();
                 verified = verifyFailure == null;
@@ -367,9 +370,11 @@ public class ConnectorConnectionService {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, known);
         if (connection.status() == ConnectionStatus.DISCONNECTED) {
-            return new Prepared(null, connection.updatedAt());
+            return new Prepared(null, connection.updatedAt(), null);
         }
-        return new Prepared(connection.vaultStored() ? connection.vault() : null, connection.updatedAt());
+        return new Prepared(
+            connection.vaultStored() ? connection.vault() : null, connection.updatedAt(),
+            connection.fields().auth().usesOAuth() ? VaultAccess.CURRENT : null);
     }
 
 
@@ -391,7 +396,7 @@ public class ConnectorConnectionService {
         if (connection.status() == ConnectionStatus.DISCONNECTED || !connection.updatedAt().equals(revision)) {
             return new Checked(List.of(), null);
         }
-        Instant now = clock.instant();
+        Instant now = now();
         if (verifyFailure != null) {
             connection.pending(now);
             return new Checked(List.of(), verifyFailure);
@@ -429,7 +434,7 @@ public class ConnectorConnectionService {
         Map<Long, String> names = users.findAll().stream()
             .filter(user -> user.groupId().equals(admin.groupId()))
             .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
-        Instant now = clock.instant();
+        Instant now = now();
         return bindings.findByConnectionUserIdIn(List.copyOf(names.keySet())).stream()
             .map(binding -> AdminConnectionSnapshot.from(
                 binding, names.get(binding.connection().userId()), now))
@@ -482,5 +487,10 @@ public class ConnectorConnectionService {
         if (!admin.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
         }
+    }
+
+
+    private Instant now() {
+        return Instant.now(clock);
     }
 }

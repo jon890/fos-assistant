@@ -1,8 +1,13 @@
 {
   "name": "control-plane",
-  "description": "OAuth 단추 연결의 시작·돌아오기, 토큰 통로와 갱신, 다시 연결 필요 알림, 해제 때 취소",
-  "pr_scope": "Control Plane 이 단추 연결을 시작하고 끝내며, 토큰 통로로 유효한 토큰을 주고, 끊김을 알리고, 해제 때 제공자 허락을 취소한다.",
+  "description": "OAuth 단추 연결의 시작·돌아오기, 토큰 통로와 갱신, 다시 연결 필요 알림",
+  "pr_scope": "Control Plane 이 단추 연결을 시작하고 끝내며, 토큰 통로로 유효한 토큰을 주고, 끊김을 알린다.",
   "deferred": [
+    {
+      "what": "「연결 다시 확인」 이 갱신을 먼저 강제로 하는 것과 해제 때 서비스 쪽 허락 취소(REQ8), 취소 결과와 설정 주소 응답",
+      "why": "운영 코드 줄 수 상한(1,500줄)에 닿았다. 연결 쪽 port `ConnectionOAuth` 에 `refreshForCheck` 와 `revoke` 를 더하는 일이고, 취소는 바인딩을 모두 뗀 뒤 보관 파일을 지우기 직전에 한다",
+      "after": "이 PR 머지. 웹 PR 보다 먼저"
+    },
     {
       "what": "서명 비밀 「새로 만들기」 와 통로 주소 다시 쓰기",
       "why": "운영 코드 줄 수 상한 안에 연결 흐름을 먼저 넣는다. 처음 쓸 때 만드는 것은 이번 PR 에 있다",
@@ -30,12 +35,11 @@
     "REQ5",
     "REQ6",
     "REQ7",
-    "REQ8",
     "REQ9",
     "REQ11"
   ],
-  "total_phases": 3,
-  "current_phase": 3,
+  "total_phases": 2,
+  "current_phase": 2,
   "phases": [
     {
       "number": 1,
@@ -56,16 +60,6 @@
         "REQ5",
         "REQ9",
         "REQ11"
-      ]
-    },
-    {
-      "number": 3,
-      "file": "phase-03.md",
-      "execution_profile": "standard",
-      "requirements": [
-        "REQ7",
-        "REQ8",
-        "REQ9"
       ]
     }
   ]
