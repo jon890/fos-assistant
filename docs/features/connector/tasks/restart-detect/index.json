@@ -1,0 +1,52 @@
+{
+  "name": "restart-detect",
+  "description": "공유 gateway 재시작을 감지해 재시작 대기 바인딩을 스스로 반영 맞추고, 관리자 다시 확인이 재시작 여부를 확인한다",
+  "pr_scope": "스펙 DECISION9 의 PR2. 대시보드 plugin 의 gateway 기동 시각 조회, Control Plane 의 재시작 감지와 재시작 대기 줄의 다시 확인을 완성한다.",
+  "deferred": [
+    {
+      "what": "PR3: 운영 정기 작업이 쓸 조회(REQ5), 화면과 관리자 문구(REQ6, REQ7 의 단추 이름과 조건, REQ9), 24시간 알림(REQ8), fos-home-infra 요청 본문",
+      "why": "스펙 DECISION9 의 PR 순서",
+      "after": "이 PR 의 머지"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/connector/spec.md",
+  "design": "docs/features/connector/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ3",
+    "REQ4",
+    "REQ7"
+  ],
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ3",
+        "REQ4"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ3",
+        "REQ4"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ7"
+      ]
+    }
+  ]
+}
