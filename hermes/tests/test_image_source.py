@@ -24,6 +24,7 @@ PHOTOS = {
     "attachment:12": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x02" * 40),
     "attachment:13": ("image/jpeg", b"\xff\xd8\xff" + b"\x03" * 40),
     "generated:수채화 고양이": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x04" * 40),
+    "generated:공원의 가족": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x07" * 40),
     "link:shop.example.com/goods/1": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x05" * 40),
     "link:https://img.example.com/p.jpg": ("image/jpeg", b"\xff\xd8\xff" + b"\x06" * 40),
 }
@@ -263,14 +264,14 @@ class PromptFrameTest(ImageSourceFixture):
         received = self.tool_args({
             "prompt": prompt,
             "aspect_ratio": "landscape",
-            "reference_image_urls": ["generated:수채화 고양이", "link:shop.example.com/goods/1"],
+            "reference_image_urls": ["generated:공원의 가족", "link:shop.example.com/goods/1"],
         })
 
         self.assertNotIn("image_url", received, "앞 그림은 바탕이 아니라 참고다")
         self.assertEqual([body["source"] for body in (request["body"] for request in self.requests)],
-                         ["generated:수채화 고양이", "link:shop.example.com/goods/1"])
+                         ["generated:공원의 가족", "link:shop.example.com/goods/1"])
         self.assertEqual([pathlib.Path(path).read_bytes() for path in received["reference_image_urls"]],
-                         [PHOTOS["generated:수채화 고양이"][1], PHOTOS["link:shop.example.com/goods/1"][1]])
+                         [PHOTOS["generated:공원의 가족"][1], PHOTOS["link:shop.example.com/goods/1"][1]])
         self.assertEqual(received["prompt"].split("\n")[:4], person_lines)
         self.assertEqual(received["aspect_ratio"], "landscape")
         self.assertEqual(self.remembered_links(), ["https://shop.example.com/goods/1"])
