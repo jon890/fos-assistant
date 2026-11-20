@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application.dto;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.execution.application.dto.ConnectorToolName;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
 import com.bifos.assistant.usage.execution.domain.ToolDetailPolicy;
 import java.util.List;
@@ -26,6 +27,8 @@ import java.util.UUID;
  * @param deliveredResults 위임 결과 알림 줄의 {@code system} 사건이 싣는 그 줄이 전한 결과. 다른 사건은 null
  * @param steer {@code steer} 사건이 싣는 말풍선의 상태와 자식 종류. 다른 사건은 null
  * @param nativeResult Hermes 내장 위임 결과 알림 줄의 {@code system} 사건이 싣는 결과 상태. 다른 사건은 null
+ * @param connector 플러그인 도구의 {@code tool} 사건이 싣는 서비스 이름과 도구 제목. 플러그인 선언의 공개 정보라 누구에게나 싣는다.
+ * 다른 사건과 플러그인을 찾지 못한 도구는 null
  */
 public record ChatEvent(
     String type,
@@ -51,7 +54,19 @@ public record ChatEvent(
     DelegationLine delegation,
     List<DelegationLine> deliveredResults,
     SteerView steer,
-    NativeResultView nativeResult) {
+    NativeResultView nativeResult,
+    ConnectorToolName connector) {
+
+    public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
+        Long messageId, Long executionId, String code, String message,
+        String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
+        Long inputTokens, Long outputTokens, Boolean alreadyStreamed, Integer streamedPrefixLength, String interimId,
+        DelegationLine delegation, List<DelegationLine> deliveredResults, SteerView steer, NativeResultView nativeResult) {
+        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs,
+            failed, subagentId, goal, model, inputTokens, outputTokens, alreadyStreamed, streamedPrefixLength, interimId,
+            delegation, deliveredResults, steer, nativeResult, null);
+    }
+
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
         Long messageId, Long executionId, String code, String message,
@@ -114,24 +129,15 @@ public record ChatEvent(
 
 
     public static ChatEvent tool(String toolName, String detail, String phase, Long durationMs, Boolean failed) {
-        return new ChatEvent(
-            "tool",
-            null,
-            toolName,
-            detail,
-            null,
-            null,
-            null,
-            null,
-            null,
-            phase,
-            durationMs,
-            failed,
-            null,
-            null,
-            null,
-            null,
-            null);
+        return tool(toolName, detail, phase, durationMs, failed, null);
+    }
+
+
+    /** 플러그인 도구면 {@code connector} 에 서비스 이름과 도구 제목을 싣는다. */
+    public static ChatEvent tool(
+        String toolName, String detail, String phase, Long durationMs, Boolean failed, ConnectorToolName connector) {
+        return new ChatEvent("tool", null, toolName, detail, null, null, null, null, null, phase, durationMs, failed,
+            null, null, null, null, null, null, null, null, null, null, null, null, connector);
     }
 
 
@@ -189,7 +195,8 @@ public record ChatEvent(
             delegation,
             deliveredResults,
             steer,
-            nativeResult);
+            nativeResult,
+            connector);
     }
 
 

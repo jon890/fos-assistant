@@ -48,12 +48,19 @@ _titles_lock = threading.Lock()
 
 
 def sign_generated_image(key: str, root_session_id: str, session_id: str, tool_call_id: str,
-                         image_sha256: str, title: str, prompt: str) -> str:
-    """그림 올리기의 서명을 소문자 16진수로 돌려준다. key 는 `_fos_ctx` 와 같다. 제목과 지시문은 글 그대로가 아니라 SHA-256 을 넣는다."""
-    message = "\n".join([
+                         image_sha256: str, title: str, prompt: str, source_links=None) -> str:
+    """그림 올리기의 서명을 소문자 16진수로 돌려준다. key 는 `_fos_ctx` 와 같다. 제목과 지시문은 글 그대로가 아니라 SHA-256 을 넣는다.
+
+    참고한 링크가 있을 때만 주소를 줄바꿈으로 이은 글의 SHA-256 을 여덟째 줄로 더한다. 없으면 지금 일곱 줄 그대로다
+    (fos-assistant ADR-20261120 / link-image-source).
+    """
+    lines = [
         VERSION, root_session_id, session_id, tool_call_id, image_sha256,
         hashlib.sha256(title.encode("utf-8")).hexdigest(), hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-    ])
+    ]
+    if source_links:
+        lines.append(hashlib.sha256("\n".join(source_links).encode("utf-8")).hexdigest())
+    message = "\n".join(lines)
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -138,7 +145,7 @@ def _failed() -> str:
     return json.dumps({"success": False, "error": FAILED_MESSAGE}, ensure_ascii=False)
 
 
-def publish(args, result, session_id, tool_call_id):
+def publish(args, result, session_id, tool_call_id, source_links=None):
     """`image_generate` 의 성공 결과에서 그림을 올리고 모델이 받을 글을 돌려준다. 바꾸지 않을 결과면 None 이다.
 
     None 은 실패한 결과, 원격 주소, 캐시 폴더 밖 경로, 올리기 경로가 없는 옛 Control Plane(404)이다. 그 밖의 실패는 모두 경로 없는
@@ -178,8 +185,10 @@ def publish(args, result, session_id, tool_call_id):
         "v": CTX_VERSION, "root_session_id": root, "session_id": session_id, "tool_call_id": tool_call_id,
         "title": title, "prompt": prompt,
         "sig": sign_generated_image(signing_key(token), root, session_id, tool_call_id,
-                                    hashlib.sha256(image).hexdigest(), title, prompt),
+                                    hashlib.sha256(image).hexdigest(), title, prompt, source_links),
     }
+    if source_links:
+        meta["source_links"] = list(source_links)
     body, content_type = _multipart(meta, image)
     status, answer = _post(url, body, content_type, token)
     if status == 404:

@@ -291,9 +291,13 @@ export type ChildUsageObservation = {
 export type DemoScript = {
   input: string;
   output: string;
+  /** 차례로 흘릴 사건이다. `event` 가 {@link SCRIPT_PAUSE_EVENT} 인 줄에서 `releaseLongActivity` 를 기다린다. */
   events?: Record<string, unknown>[];
   pause?: boolean;
 };
+
+/** 대본 가운데서 멈추는 사건 이름이다. Hermes 에 없는 이름이라 화면으로 흐르지 않는다. */
+export const SCRIPT_PAUSE_EVENT = "__test.pause";
 
 export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson: string; via: "hook" | "execute" };
 

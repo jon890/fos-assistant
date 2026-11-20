@@ -1,4 +1,6 @@
 import type { DelegationLine } from "@/lib/delegation";
+import type { ConnectorToolName } from "@/lib/tool-label";
+import type { ActivityUse } from "@/lib/tool-kind";
 
 /**
  * Control Plane 이 대화 스트림으로 보내는 사건이다.
@@ -39,6 +41,8 @@ export type ChatEvent = {
   streamedPrefixLength?: number | null;
   interimId?: string | null;
   toolName?: string | null;
+  /** 플러그인 도구의 `tool` 사건이 싣는 서비스 이름과 도구 제목이다 */
+  connector?: ConnectorToolName | null;
   detail?: string | null;
   conversationId?: string | null;
   messageId?: number | null;
@@ -76,4 +80,6 @@ export type ActivitySummary = {
   toolCount: number;
   subagentCount: number;
   durationMs: number | null;
+  /** 쓴 도구와 도우미를 처음 쓴 차례로 한 번씩. 옛 Control Plane 은 보내지 않는다 */
+  uses?: ActivityUse[];
 };

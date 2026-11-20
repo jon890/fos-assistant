@@ -137,6 +137,19 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private Long generationPromptKeyId;
 
+    /**
+     * 그림을 만들 때 참고한 링크 주소를 줄바꿈으로 이은 글. {@link #generationSourceLinksKeyId} 가 있으면 암호문이다.
+     * 링크를 쓰지 않은 그림은 비어 있다(ADR-20261120 / link-image-source).
+     */
+    @Column(name = "generation_source_links", columnDefinition = "LONGTEXT")
+    @Getter
+    private String generationSourceLinks;
+
+    /** 참고한 링크를 암호화한 데이터 key 의 번호. 비어 있으면 평문이다. 지시문의 key 와 따로 둔다. */
+    @Column(name = "generation_source_links_key_id")
+    @Getter
+    private Long generationSourceLinksKeyId;
+
     /** 같은 올리기가 다시 와도 한 행이 되게 하는 값. 만든 그림 행에만 있다. */
     @Column(name = "generation_call_key", length = 64, columnDefinition = "CHAR(64)")
     @Getter
@@ -222,12 +235,23 @@ public class ChatArtifact extends CreatedAtEntity {
      *
      * @param prompt 저장할 지시문. 암호화했으면 암호문이다
      * @param promptKeyId 지시문을 암호화한 key 번호. 평문이면 null
+     * @param sourceLinks 참고한 링크를 저장할 글. 암호화했으면 암호문이다. 링크가 없으면 null
+     * @param sourceLinksKeyId 링크를 암호화한 key 번호. 평문이거나 링크가 없으면 null
      */
     public static ChatArtifact generatedImage(
-        Long conversationId, String path, long byteSize, String prompt, Long promptKeyId, String callKey) {
+        Long conversationId,
+        String path,
+        long byteSize,
+        String prompt,
+        Long promptKeyId,
+        String sourceLinks,
+        Long sourceLinksKeyId,
+        String callKey) {
         ChatArtifact image = new ChatArtifact(conversationId, null, path, byteSize);
         image.generationPrompt = prompt;
         image.generationPromptKeyId = promptKeyId;
+        image.generationSourceLinks = sourceLinks;
+        image.generationSourceLinksKeyId = sourceLinksKeyId;
         image.generationCallKey = callKey;
         return image;
     }

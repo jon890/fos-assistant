@@ -2,6 +2,8 @@ package com.bifos.assistant.usage.tree.application;
 
 import com.bifos.assistant.usage.execution.application.dto.ContextSourceRef;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
+import com.bifos.assistant.usage.execution.application.dto.ConnectorToolName;
+import com.bifos.assistant.usage.execution.application.port.ConnectorToolNames;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionEventView;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionNode;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionTree;
@@ -61,6 +63,7 @@ public class ExecutionTreeService {
     private final AgentService agents;
     private final SubagentUsageJobRepository jobs;
     private final ExecutionContextSourceRepository contextSources;
+    private final ConnectorToolNames connectorToolNames;
 
 
     /**
@@ -88,7 +91,13 @@ public class ExecutionTreeService {
 
         Map<Long, List<ExecutionEvent>> byExecution = eventsOf(used);
         Map<Long, List<ContextSourceRef>> sources = InternalValuePolicy.visibleTo(user) ? sourcesOf(used) : Map.of();
-        ExecutionNode rootNode = node(rootBranch, byExecution, usageStatuses(used, byExecution), sources, user);
+        Map<String, ConnectorToolName> toolNames = connectorToolNames.namesOf(byExecution.values().stream()
+            .flatMap(List::stream)
+            .filter(event -> event.eventType().isTool())
+            .map(ExecutionEvent::toolName)
+            .toList());
+        ExecutionNode rootNode = node(
+            rootBranch, byExecution, usageStatuses(used, byExecution), sources, toolNames, user);
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
     }
 
@@ -235,6 +244,7 @@ public class ExecutionTreeService {
         Map<Long, List<ExecutionEvent>> byExecution,
         Map<Long, Map<String, String>> usageStatuses,
         Map<Long, List<ContextSourceRef>> sources,
+        Map<String, ConnectorToolName> toolNames,
         CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
@@ -273,10 +283,11 @@ public class ExecutionTreeService {
                         ? null
                         : usageStatuses
                             .getOrDefault(execution.id(), Map.of())
-                            .get(event.hermesSessionId())))
+                            .get(event.hermesSessionId()),
+                    event.eventType().isTool() ? toolNames.get(event.toolName()) : null))
                 .toList(),
             branch.children().stream()
-                .map(child -> node(child, byExecution, usageStatuses, sources, viewer))
+                .map(child -> node(child, byExecution, usageStatuses, sources, toolNames, viewer))
                 .toList());
     }
 

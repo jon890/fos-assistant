@@ -69,6 +69,17 @@ public class TaskService {
      */
     @Transactional
     public TaskDetail create(CurrentUser user, TaskInput input) {
+        return create(user, input, null);
+    }
+
+
+    /**
+     * 작업을 만들고, 대화가 주어지면 {@code SINGLE} 작업의 결과를 그 대화에 쌓게 한다. 검사는 {@link #create(CurrentUser, TaskInput)} 와 같다.
+     *
+     * @param conversationId 결과를 쌓을 요청자의 대화. 없으면 null
+     */
+    @Transactional
+    public TaskDetail create(CurrentUser user, TaskInput input, Long conversationId) {
         Instant now = clock.instant();
         users.findByIdForUpdate(user.id())
             .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
@@ -81,6 +92,9 @@ public class TaskService {
         Task task = Task.create(
             user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
         task.chooseModelTier(input.modelTier());
+        if (conversationId != null) {
+            task.presetConversation(conversationId);
+        }
         MissedPolicy missed = missedOf(input);
         task.reschedule(schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next());
         task.changeMissedPolicy(missed);

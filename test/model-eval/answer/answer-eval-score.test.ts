@@ -5,6 +5,7 @@ import {
   collectAnswers,
   exitCode,
   failedQuestion,
+  formatCheck,
   linkState,
   markdown,
   mentionsDate,
@@ -267,4 +268,57 @@ test("나뉜 답의 출처를 메시지마다 모아 중복을 빼고 마지막 
   const result = scoreQuestion(question("split", "sources", true), answers, NOON, links, null);
   assert.deepEqual([result.passed, result.sourceLinks, result.openLinks, result.closedLinks], [true, 2, 1, 1]);
   assert.equal(scoreQuestion(question("date", "date"), answers, NOON, links, null).passed, true);
+});
+
+test("형식 참고 칸: 꼴을 지킨 답은 어긴 것이 없다", () => {
+  const answer = [
+    "환율은 1,400원이다. 어제보다 조금 올랐다([한국은행](https://example.org/a)).",
+    "",
+    "### 출처",
+    "",
+    "- [한국은행 · 기준 환율](https://example.org/a)",
+    "- [통계청 · 물가](https://example.org/b)",
+  ].join("\n");
+
+  assert.deepEqual(formatCheck(answer), { sourceListForm: true, bareUrls: 0, repeatedSources: 0, longParagraphs: 0 });
+});
+
+test("형식 참고 칸: 운영 답처럼 보통 줄 출처와 맨 주소는 어긴 것으로 센다", () => {
+  const answer = [
+    "열이 나면 물을 자주 먹인다. 옷은 얇게 입힌다. 해열제는 체중에 맞춘다. 경련이 있으면 119 에 전화한다.",
+    "",
+    "출처",
+    "NHS, 소아 발열 안내: https://www.nhs.uk/a/",
+    "NHS, 같은 안내: https://WWW.NHS.UK/a#top",
+    "[https://example.org/c](https://example.org/c)",
+  ].join("\n");
+
+  assert.deepEqual(formatCheck(answer), { sourceListForm: false, bareUrls: 3, repeatedSources: 1, longParagraphs: 1 });
+});
+
+test("형식 참고 칸: 코드 안의 주소와 목록·표는 세지 않고, 출처 절이 없으면 해당 없음이다", () => {
+  const answer = ["```", "curl https://example.org/x", "```", "", "- 하나. 둘. 셋. 넷.", "", "`https://example.org/y`"].join("\n");
+
+  assert.deepEqual(formatCheck(answer), { sourceListForm: null, bareUrls: 0, repeatedSources: 0, longParagraphs: 0 });
+});
+
+test("형식 참고 칸: 메시지가 여럿이면 수를 더하고 출처 절이 있는 메시지만 꼴을 본다", () => {
+  const check = formatCheck(["앞 메시지 https://example.org/a", "### 출처\n\n- [이름](https://example.org/b)"]);
+
+  assert.deepEqual(check, { sourceListForm: true, bareUrls: 1, repeatedSources: 0, longParagraphs: 0 });
+});
+
+test("형식 참고 칸은 세트 통과를 바꾸지 않고 칸이 없는 옛 결과도 보고서에 그린다", () => {
+  const fine = scoreQuestion(question("q1", "sources"), "### 출처\n\n- [이름](https://example.org/a)", NOON, new Map([["https://example.org/a", "open"]]), null);
+  const bad = scoreQuestion(question("q2", "sources"), "출처\nhttps://example.org/b", NOON, new Map([["https://example.org/b", "open"]]), null);
+  const { format: _dropped, ...old } = fine;
+  const set = scoreSet([bad, old], [], 2);
+
+  assert.equal(set.outcome, "PASS");
+  assert.equal(set.formatViolations, 1);
+  assert.equal(set.formatChecked, 1);
+  const report = markdown("", "", [bad, old], set, []);
+  assert.match(report, /형식 참고\(통과 기준 아님\): 어긴 문항 1\/1/);
+  assert.match(report, /\| q2 \| 어김 \| 1 \| 0 \| 0 \|/);
+  assert.match(report, /\| q1 \| - \| - \| - \| - \|/);
 });

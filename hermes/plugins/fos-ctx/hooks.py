@@ -21,7 +21,10 @@ from .context import (
 )
 from .handoff import report_handoff
 from .generated_image import TOOL as IMAGE_TOOL, _failed as image_upload_failed, publish as publish_image, strip_title
-from .image_source import FAILED as SOURCE_FAILED, message as source_message, prepare as prepare_sources, release as release_sources
+from .image_source import (
+    FAILED as SOURCE_FAILED, links_for as source_links_for, message as source_message, prepare as prepare_sources,
+    release as release_sources,
+)
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 
 
@@ -197,6 +200,8 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
     대응 파일의 서버와 맞는 도구의 결과에 화면 넘기기 칸이 있으면 감싸기 전에 Control Plane 에 알린다(`handoff.py`).
     """
     if tool_name == IMAGE_TOOL:
+        # 참고한 링크는 사본을 지우면 함께 잊으므로 먼저 읽어 둔다. 그림 올리기에 함께 보낸다.
+        links = source_links_for(session_id, tool_call_id)
         # 바탕 사진의 사본은 결과가 어떻든 지운다. 그 뒤 만든 그림을 올린다.
         try:
             release_sources(session_id, tool_call_id)
@@ -204,7 +209,7 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
             logger.warning("fos-ctx: 그림 바탕 사진의 사본을 지우지 못했다: %s", type(exc).__name__)
         # 만든 그림을 Control Plane 에 올리고 경로 없는 결과로 바꾼다. 예외를 던지면 Hermes 가 경로가 든 원래 결과를 모델에게 준다.
         try:
-            return publish_image(args, result, session_id or "", tool_call_id or "")
+            return publish_image(args, result, session_id or "", tool_call_id or "", source_links=links)
         except Exception as exc:  # noqa: BLE001 - 경로가 모델에게 가지 않게 정해 둔 글로 바꾼다
             logger.warning("fos-ctx: 만든 그림을 올리지 못했다: %s", type(exc).__name__)
             return image_upload_failed()

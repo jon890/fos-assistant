@@ -165,6 +165,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> overridables(context).forEach(OverridableLiveProperties::reset));
         attempt(failures, () -> context.getBean(StubHermesRunsClient.class).reset());
         attempt(failures, () -> context.getBean(RecordingContentDraftJobStarter.class).reset());
+        attempt(failures, () -> context.getBean(RecordingWebPushClient.class).reset());
         attempt(failures, () -> context.getBean(TestClock.class).reset());
         // H2는 지운 사용자와 데이터 key의 번호를 다시 쓸 수 있다. 앞 검사의 key 캐시가 새 사용자에게 남지 않게 비운다.
         attempt(failures, () -> context.getBean(DataKeyService.class).forgetCachedKeys());
@@ -183,6 +184,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(FailingAccessRevoker.class).reset());
         attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
         attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
+        attempt(failures, () -> context.getBean(FakeLinkImageWeb.class).reset());
         attempt(failures, () -> context.getBean(EchoCdpRelayConnector.class).reset());
         attempt(
             failures,

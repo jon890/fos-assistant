@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.action.application.dto.PendingApproval;
 import com.bifos.assistant.connector.action.domain.ActionDelivery;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
+import com.bifos.assistant.connector.action.domain.ControlPlaneActions;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
@@ -25,12 +26,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -135,7 +138,7 @@ public class ConnectorActionDetails {
 
     /** 그 대화에서 결과를 아직 전하지 않은 승인 줄이다. 실행을 보낸 뒤 끝난 것만이고 만든 순이다. */
     public List<ConnectorActionResult> undeliveredResults(Long conversationId) {
-        return undelivered(conversationId, EXECUTED);
+        return undelivered(conversationId, EXECUTED, action -> !ControlPlaneActions.owns(action));
     }
 
 
@@ -150,7 +153,7 @@ public class ConnectorActionDetails {
         }
         Map<UUID, ConnectorAction> found = new HashMap<>();
         actions.findByConversationIdAndUserIdAndPublicIdIn(conversationId, userId, actionIds).stream()
-            .filter(action -> EXECUTED.contains(action.status()))
+            .filter(action -> EXECUTED.contains(action.status()) && !ControlPlaneActions.owns(action))
             .forEach(action -> found.put(action.publicId(), action));
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actionIds.stream()
@@ -168,9 +171,15 @@ public class ConnectorActionDetails {
     }
 
 
-    /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
+    /**
+     * 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. Control Plane 동작의 줄은 실행한 결과도
+     * 다음 turn 으로 전하지 않고 알림 줄로만 남기므로 여기에 든다(스펙 service-concepts DECISION21).
+     */
     public List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
-        return undelivered(conversationId, CLOSED_WITHOUT_EXECUTION);
+        Set<ActionStatus> statuses = new HashSet<>(CLOSED_WITHOUT_EXECUTION);
+        statuses.addAll(EXECUTED);
+        return undelivered(conversationId, statuses,
+            action -> CLOSED_WITHOUT_EXECUTION.contains(action.status()) || ControlPlaneActions.owns(action));
     }
 
 
@@ -200,11 +209,13 @@ public class ConnectorActionDetails {
     }
 
 
-    private List<ConnectorActionResult> undelivered(Long conversationId, Set<ActionStatus> statuses) {
+    private List<ConnectorActionResult> undelivered(
+        Long conversationId, Set<ActionStatus> statuses, Predicate<ConnectorAction> kept) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actions
             .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
             .stream()
+            .filter(kept)
             .map(action -> resultOf(action, manifests))
             .toList();
     }
@@ -270,6 +281,11 @@ public class ConnectorActionDetails {
         ConnectorAction action, Optional<ConnectorManifest> manifest, boolean readOnlyMarked) {
         // 상한 변경 줄은 커넥터 도구가 아니라 선언이 없다. 제목과 식별자는 Control Plane 이 정한 정책에서 받는다.
         boolean limitChange = FinancialLimitChanges.owns(action);
+        if (ControlPlaneActions.owns(action)) {
+            // Control Plane 동작의 줄도 선언이 없다. 허락은 주지 않고 인자 이름표는 그 동작의 것이다.
+            return ConnectorActionView.from(action, ControlPlaneActions.policy(action.toolName()), false, false,
+                ControlPlaneActions.labels(action.toolName()), false);
+        }
         return ConnectorActionView.from(
             action,
             limitChange ? Optional.of(FinancialLimitChanges.POLICY)

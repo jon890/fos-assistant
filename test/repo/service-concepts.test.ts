@@ -58,7 +58,7 @@ test("개념 목록의 화면 주소는 모두 web/src/app 의 화면이다", ()
 
 test("개념 목록이 이름으로 부르는 Control Plane 도구는 모두 도구 목록에 있다", () => {
   const block = read(CONCEPTS);
-  const named = [...new Set([...block.matchAll(/\b([a-z]+(?:_[a-z]+)*_(?:list|propose|put|remember|delegate))\b/g)].map((match) => match[1]))];
+  const named = [...new Set([...block.matchAll(/\b([a-z]+(?:_[a-z]+)*_(?:list|propose|put|remember|delegate|create|delete))\b/g)].map((match) => match[1]))];
   const tools = mcpToolNames();
   assert.ok(named.length > 0, "도구 이름을 찾지 못했다");
   for (const name of named) assert.ok(tools.has(name), `${name} 도구가 없다`);
