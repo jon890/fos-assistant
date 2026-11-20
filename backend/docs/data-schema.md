@@ -93,6 +93,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `task` | `title`, `instruction` | 함. 옆 칸은 각각 `title_key_id`, `instruction_key_id`. 점검 작업의 지시문은 없어 옆 칸도 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `proactive_check` | `report_json` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `app_user` | `push_devices` | 안 함. 모델이 만든 글은 아니지만 웹 푸시 기기의 주소와 인증 값이 있어 운영 조회 계정에서 뺀다. 이 값만으로는 보낼 수 없고 VAPID 비밀 키는 데이터베이스 밖에 있다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)) |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
 MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
@@ -109,6 +110,8 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
+
+**예외: 웹 푸시 기기는 사용자와 1:N 이지만 `app_user.push_devices` 의 JSON 컬럼에 둔다.** 사용자가 새 테이블 대신 고른 것이다(2026-11-20). 사용자가 몇 명뿐이라 다른 사용자 줄에서 같은 주소를 `LIKE` 로 찾아도 몇 줄이고, 같은 주소가 두 사용자에게 남지 않는 것은 DB 의 유일 제약 대신 서버 안의 등록 잠금이 지킨다(서버 한 대 전제). 근거와 버린 대안은 [ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md) 가 갖는다.
 
 ## 마이그레이션 작성 규칙
 
@@ -326,6 +329,18 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
 **지금은 읽지도 쓰지도 않는다.** 「결과물 자동 보관」 스위치를 없애 자동 보관이 늘 돈다([파일 공간 스펙](../../docs/features/workspace/spec.md) REQ16). 칸을 지우는 마이그레이션은 되돌릴 수 없어 칸을 남겼다([설계](../../docs/features/workspace/design.md) DECISION11). 엔티티는 검사의 스키마가 같은 칸을 갖도록 넣기와 고치기에서 뺀 매핑만 둔다.
+
+#### 푸시 기기와 설정 컬럼
+
+`push_devices` 는 TEXT NULL 이고 웹 푸시 기기(브라우저 구독) 목록의 JSON 글이다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)). 비면 기기가 없다.
+모양은 `{"version":1,"devices":[{"id","endpoint","endpointHash","p256dh","auth","name","timeZone","registeredAt"}]}` 이고 읽고 쓰는 일은 `PushDevicesCodec` 과 `PushDeviceRepository` 가 한다.
+
+- `endpointHash` 는 주소의 SHA-256 소문자 hex 다. 다른 사용자 줄에서 같은 주소를 찾는 `LIKE` 와 화면의 「이 기기」 판정에 쓴다
+- 한 사용자의 기기는 `assistant.push.max-devices`(10)대까지다. 넘으면 `registeredAt` 이 가장 이른 기기를 뺀다
+- 주문 상한 컬럼처럼 엔티티의 넣기와 고치기에서 빼고 전용 쿼리로만 읽고 쓴다. 쓰는 쪽은 서버 안의 등록 잠금을 잡고 새 트랜잭션에서 바꿀 사용자 줄을 번호 순으로 잠그고 다시 읽은 뒤 쓴다
+- 이 칸만 바꾸는 쓰기는 일반 감사 `updated_at` 을 바꾸지 않는다. 백그라운드의 끊긴 구독 정리가 사용자의 마지막 변경 시각을 바꾸지 않게 한다
+- 모르는 버전이거나 깨진 글은 기기 없음으로 보지 않고 오류로 올린다. 없음으로 보면 다음 쓰기가 기기를 지운다
+- 관리자가 접근을 끄면 비운다. 사용자 정리는 줄째 지우므로 함께 사라진다
 
 ### allowed_person
 

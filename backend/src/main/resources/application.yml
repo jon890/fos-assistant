@@ -284,6 +284,12 @@ assistant:
     cleanup-cron: "0 30 4 * * *"
     # 사건이 없는 동안 알림 SSE 에 주석 줄을 보내는 간격. 앞단 프록시가 연결을 끊지 않게 한다
     stream-heartbeat: 20s
+  push:
+    # 웹 푸시 VAPID 키와 연락처(ADR-20261120 / web-push). 셋을 함께 채우거나 함께 비운다. 비우면 푸시가 꺼진 채 기동한다
+    vapid-public-key: ${ASSISTANT_PUSH_VAPID_PUBLIC_KEY:}
+    # 비밀 키 base64url 한 줄을 담은 파일의 경로. 비밀 키 값을 환경 변수나 데이터베이스에 두지 않는다
+    vapid-private-key-file: ${ASSISTANT_PUSH_VAPID_PRIVATE_KEY_FILE:}
+    subject: ${ASSISTANT_PUSH_SUBJECT:}
   task:
     # 발화기와 시작 단계가 도는 때(초 포함 6필드). 검사에서는 - 로 끈다
     dispatch-cron: "*/30 * * * * *"
