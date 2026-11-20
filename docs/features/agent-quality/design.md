@@ -215,7 +215,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 2. `GET /api/v1/admin/quality/checks/{publicId}` 를 1분마다 부르고, `status` 가 `PASSED` 나 `FAILED` 가 되면 멈춘다. 기다리는 상한은 기능 수에 10분을 곱하고 10분을 더한 값이다. 넘거나 Control Plane 이 응답하지 않으면 실패로 본다.
 3. `FAILED` 나 실패로 본 경우 파이프라인 알림을 보낸다. 되돌리기는 하지 않는다.
 4. 평가 전용 사용자의 Hermes profile 은 Control Plane 이 만든다. 운영 저장소는 profile 을 따로 만들지 않는다.
-5. 평가 사용자를 준비하기 전에 그 profile 을 실행 공간 정책과 첨부(`vision`) 정책에 등록한다. 그림 만들기와 사진 조회 도구는 등록된 profile 에서만 켜진다(ADR-20261119 / image-gen-defaults, ADR-091). 공유 gateway 를 다시 띄우는 배포 단계가 그 profile 도 포함하는지 확인한다.
+5. 평가 사용자를 준비하기 전에 그 profile 을 실행 공간 정책과 첨부(`vision`) 정책에 등록한다. 그림 만들기와 사진 조회 도구는 등록된 profile 에서만 켜진다([ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md), ADR-091). 공유 gateway 를 다시 띄우는 배포 단계가 그 profile 도 포함하는지 확인한다.
 
 ## 결정
 

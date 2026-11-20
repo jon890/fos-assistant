@@ -265,7 +265,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
-사용자 물리 삭제는 사용자 정리(ADR-20261101 / user-purge)가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
+사용자 물리 삭제는 사용자 정리([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md))가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
 접근 해제만으로는 사용자와 개인 데이터를 지우지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |

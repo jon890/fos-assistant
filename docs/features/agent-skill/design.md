@@ -95,7 +95,7 @@ PR2 는 이 설계를 다시 열지 않고 아래만 정한다. 정확한 칸과
 
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
-| DECISION1 | 새 칸 자리 | `assistant.json` 의 `agent_skills`. `plugin.json` 은 건드리지 않는다 | 작성자 | assistant 전용 정보는 `assistant.json` 하나에 둔다(ADR-20261026 / plugin-standard-format). Claude Code 가 이 디렉터리를 스킬로 읽지 않는다 |
+| DECISION1 | 새 칸 자리 | `assistant.json` 의 `agent_skills`. `plugin.json` 은 건드리지 않는다 | 작성자 | assistant 전용 정보는 `assistant.json` 하나에 둔다([ADR-20261026 / plugin-standard-format](../../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md)). Claude Code 가 이 디렉터리를 스킬로 읽지 않는다 |
 | DECISION2 | 빠진 스킬 기록 자리 | 소유 기록에 남기지 않고 판정 함수로 매번 계산해 응답으로 낸다 | 작성자 | 기록에 새 키를 더하면 되돌린 이미지가 그 profile 의 바인딩 쓰기를 모두 거절한다 |
 | DECISION3 | 판정 재료 | profile `config.yaml` 의 API 도구 목록, `terminal` 설정, 스킬 디렉터리. 운영 정책은 읽지 않는다 | 작성자 | spec DECISION17. profile 이름이 인자로 필요 없고, 정책이 없는 개발 환경에서 오류 로그가 늘지 않는다 |
 | DECISION4 | 카탈로그 `skills` 의 뜻 | 에이전트용 스킬까지 합친 이름 | 작성자 | Control Plane 을 고치지 않고 처음 붙이기의 겹침 검사를 넓힌다. 이 목록을 그대로 내거나 쓰는 곳은 「PR2 의 경계」 에 적었다. `agent_list` 의 할 수 있는 일은 올린 스킬만 보므로(`AgentCapabilitiesReader`) 바뀌지 않는다 |

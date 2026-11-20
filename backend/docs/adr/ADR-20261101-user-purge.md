@@ -17,9 +17,9 @@
 
 | 대상 | 정리 때 하는 일 |
 | --- | --- |
-| 대화(`conversation`)와 그 본문 | 그 사용자의 모든 대화를 지운 것으로 표시해 기존 대화 정리(ADR-20261008 / conversation-purge)가 Hermes session, 첨부, 결과물, 메시지를 지우게 한다 |
+| 대화(`conversation`)와 그 본문 | 그 사용자의 모든 대화를 지운 것으로 표시해 기존 대화 정리([ADR-20261008 / conversation-purge](ADR-20261008-conversation-purge.md))가 Hermes session, 첨부, 결과물, 메시지를 지우게 한다 |
 | 보관본(`chat_artifact` 의 `vault_user_id` 행) | 묶음 자식 행과 본문 없는 지우기 이력 행까지 지운다. 다른 사용자의 행은 건드리지 않는다. 본문을 푸는 key 를 지우기 전에 먼저 지운다 |
-| 비공개 에이전트 | 지운 것으로 표시해 기존 에이전트 정리(ADR-20261009 / agent-purge)가 7일 뒤 지운다 |
+| 비공개 에이전트 | 지운 것으로 표시해 기존 에이전트 정리([ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md))가 7일 뒤 지운다 |
 | 그룹에 공개한 에이전트 | 지우지 않고 `owner_user_id` 를 그룹의 관리자에게 넘긴다. 정리 대상 자신을 빼고, 허용 목록에서 켜진 `ADMIN` 가운데 `app_user.id` 가 가장 작은 사람에게 넘긴다. 셸이나 파일 도구가 켜져 있으면 주인을 바꾸지 않고 실패한다(ADR-086) |
 | 그룹 공용 기억 항목(`memory` 의 `scope = 'GROUP'`) | 지우지 않고 넘기지도 않는다. 이 줄은 `owner_user_id` 가 비어 있고 `group_id` 가 소유한다. 사용자 번호는 `accepted_by_user_id` 에 외래 키 없이 남을 뿐이라 사용자 줄을 지워도 막지 않는다 |
 | 개인 기억(`scope = 'USER'`)과 그 임베딩, 링크, 변경 이력 | 지운다 |
