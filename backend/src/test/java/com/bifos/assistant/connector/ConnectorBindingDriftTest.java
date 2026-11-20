@@ -269,6 +269,34 @@ class ConnectorBindingDriftTest {
 
 
     @Test
+    @DisplayName("설치가 반영된 상태여도 대시보드가 답한 빠진 스킬로 기록을 맞추고 칸이 없으면 지우지 않는다")
+    void syncsSkippedSkillsFromInstalledState() {
+        ConnectorState taken = new ConnectorState(
+            "p", true, true, false, true, HermesConnectorClient.MODE_BIND, null, false,
+            List.of(new HermesConnectorClient.SkippedSkill("demo-runner", List.of("name_taken"))));
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(taken);
+
+        applier.resyncDrifted();
+
+        assertThat(reload(demo).skippedSkills()).containsExactly(new SkippedSkill("demo-runner", List.of("name_taken")));
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
+        verify(connector, never())
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+
+        // 옛 대시보드는 칸을 내지 않는다. 그 응답으로 기록을 지우지 않는다.
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(INSTALLED);
+        applier.resyncDrifted();
+        assertThat(reload(demo).skippedSkills()).extracting(SkippedSkill::name).containsExactly("demo-runner");
+
+        // 빈 목록은 빠진 스킬이 없다는 답이라 기록을 비운다.
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(new ConnectorState(
+            "p", true, true, false, true, HermesConnectorClient.MODE_BIND, null, false, List.of()));
+        applier.resyncDrifted();
+        assertThat(reload(demo).skippedSkills()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("다시 보낸 설치가 실패하면 빠진 스킬의 옛 기록을 둔다")
     void failedReinstallKeepsSkippedSkills() {
         String recorded = "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]";

@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.connection.application.dto.CycleStep;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.DueBinding;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
+import com.bifos.assistant.connector.connection.domain.SkippedSkill;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
@@ -204,15 +205,17 @@ public class ConnectorBindingApplier {
         int resynced = 0;
         for (ReadyBinding candidate : ready) {
             ResyncOutcome reason;
+            HermesConnectorClient.ConnectorState state;
             try {
-                reason = ConnectorBindingInstalls.notInstalledReason(
-                    connector.readConnector(candidate.profile(), candidate.connectorId()));
+                state = connector.readConnector(candidate.profile(), candidate.connectorId());
+                reason = ConnectorBindingInstalls.notInstalledReason(state);
             } catch (RuntimeException ex) {
                 ConnectorBindingInstalls.warn("drift-check", candidate.connectorId(), ex);
                 continue;
             }
             if (reason == ResyncOutcome.READY) {
                 driftStreak.remove(candidate.bindingId());
+                syncSkippedSkills(candidate, state);
                 continue;
             }
             log.warn("connector {} drifted: {}", candidate.connectorId(), reason);
@@ -251,6 +254,41 @@ public class ConnectorBindingApplier {
             }
         }
         return resynced;
+    }
+
+
+    /**
+     * 대시보드가 지금 기준으로 답한 빠진 에이전트용 스킬을 바인딩 기록에 맞춘다.
+     *
+     * <p>이름 겹침은 설치 상태 판정이 어긋남으로 보지 않아 재설치가 없다. 설치 응답에서만 기록하면 그 겹침으로 빠진
+     * 스킬의 까닭이 어디에도 남지 않는다. 옛 대시보드 plugin 은 칸을 내지 않아 null 이므로 기록을 지우지 않는다.
+     * 기록이 이미 같으면 쓰지 않는다. 실패는 경고로 남기고 다음 바인딩으로 간다.
+     */
+    private void syncSkippedSkills(ReadyBinding candidate, HermesConnectorClient.ConnectorState state) {
+        if (state.skippedSkills() == null) {
+            return;
+        }
+        List<SkippedSkill> current = state.skippedSkills().stream()
+            .map(skipped -> new SkippedSkill(skipped.name(), skipped.reasons()))
+            .toList();
+        try {
+            transactions.executeWithoutResult(status -> {
+                service.lockOwner(candidate.userId());
+                agents.findByIdForUpdate(candidate.agentId());
+                bindings.findById(candidate.bindingId())
+                    .filter(binding -> binding.status() == BindingStatus.READY)
+                    .filter(binding -> !binding.skippedSkills().equals(current))
+                    .ifPresent(binding -> {
+                        binding.recordSkippedSkills(current);
+                        bindings.save(binding);
+                    });
+            });
+        } catch (RuntimeException ex) {
+            log.warn(
+                "connector binding {} failed to record skipped skills: {}",
+                candidate.bindingId(),
+                ex.getClass().getSimpleName());
+        }
     }
 
 
