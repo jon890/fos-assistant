@@ -51,7 +51,8 @@ class HttpHermesRunsClientCompatTest {
     private HermesRunTerminals terminals;
     private HttpHermesRunsClient client;
     /** 요청이 닿았을 때 답하기 전에 부른다. 답보다 먼저 일어나는 일을 흉내 낸다. */
-    private volatile Consumer<String> onArrival = key -> { };
+    private volatile Consumer<String> onArrival = key -> {
+    };
 
 
     @BeforeEach
