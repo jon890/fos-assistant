@@ -35,6 +35,8 @@ export function useMyFiles(filter: FileListFilter) {
   const [moreFailed, setMoreFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const generation = useRef(0);
+  // 지금 보이는 쪽을 읽은 조건의 번호다. 조건을 바꿔 첫 쪽을 다시 읽는 동안에는 옛 조건의 커서로 다음 쪽을 읽지 않는다.
+  const loaded = useRef(0);
   const { kind, q, conversation } = filter;
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function useMyFiles(filter: FileListFilter) {
         }
         const page = (await response.json()) as VaultList;
         if (current !== generation.current) return;
+        loaded.current = current;
         setItems(page.items);
         setNextCursor(page.nextCursor);
         setUsage(page);
@@ -61,8 +64,8 @@ export function useMyFiles(filter: FileListFilter) {
   }, [kind, q, conversation, attempt]);
 
   const loadMore = useCallback(async () => {
-    if (nextCursor === null || moreBusy) return;
     const current = generation.current;
+    if (nextCursor === null || moreBusy || loaded.current !== current) return;
     setMoreBusy(true);
     try {
       const response = await fetchVaultItems({

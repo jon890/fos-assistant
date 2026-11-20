@@ -133,7 +133,7 @@ public class ArtifactAutoVault {
      * 사용자가 「다시 보관」 을 누른 결과물을 지금 보관하고 끝난 상태를 준다. 대화 주인 확인은 부르는 쪽이 한다.
      *
      * <p>실패한 줄만 처음 차례로 되돌린다. 다른 상태면 그 상태를 그대로 준다. 사용자가 고른 것이라 지운 같은 보관본도 다시
-     * 만든다. 자동 보관을 꺼도 다시 보관할 수 있다.
+     * 만든다.
      */
     public ArtifactAutoVaultStatus retry(Long conversationId, Long messageId, String path) {
         ChatArtifact row = rows.findByMessageIdAndPathAndVaultUserIdIsNull(messageId, path)

@@ -3,8 +3,11 @@ package com.bifos.assistant.chat.artifact.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactKept;
+import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultQuery;
+import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -70,6 +73,9 @@ class ArtifactVaultListTest {
 
     @Autowired
     DataKeyService dataKeys;
+
+    @Autowired
+    ArtifactVaultMeta metas;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -174,6 +180,25 @@ class ArtifactVaultListTest {
 
         vault.delete(dad.id(), kept.item().id());
         assertThat(list(dad, "").get("usedBytes").asLong()).isEqualTo(before);
+    }
+
+
+    @Test
+    @DisplayName("남은 용량이 파일 하나 상한보다 작아지면 가득 찼다고 알린다")
+    void reportsFullWhenLessThanOneFileLeft() {
+        keep(budget, "a.txt", text("1234567890"), null, null);
+        long used = rows.sumVaultBytes(dad.id());
+        ArtifactVaultQuery all = new ArtifactVaultQuery(null, null, null, null, 30);
+
+        // 남은 용량이 상한과 같으면 아직 한 파일이 들어간다.
+        assertThat(finder(used + 10, 10).page(dad.id(), all).full()).isFalse();
+        assertThat(finder(used + 9, 10).page(dad.id(), all).full()).isTrue();
+    }
+
+
+    private ArtifactVaultFinder finder(long quotaBytes, long maxFileBytes) {
+        return new ArtifactVaultFinder(
+            rows, metas, conversations, new ArtifactVaultProperties(quotaBytes, maxFileBytes, null, null, null));
     }
 
 
