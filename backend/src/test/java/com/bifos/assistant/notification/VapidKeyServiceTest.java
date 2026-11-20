@@ -3,7 +3,18 @@ package com.bifos.assistant.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+
+import com.bifos.assistant.crypto.domain.ServerSecrets;
+import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.application.PushDeviceService;
+import com.bifos.assistant.notification.application.PushRegistrationLock;
+import com.bifos.assistant.notification.infra.PushDeviceRepository;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.bifos.assistant.notification.application.VapidKeyService;
 import com.bifos.assistant.notification.application.dto.PushRegistration;
 import com.bifos.assistant.notification.application.dto.VapidStatus;
@@ -45,6 +56,18 @@ class VapidKeyServiceTest {
 
     @Autowired
     VapidKeys keys;
+
+    @Autowired
+    PushDeviceRepository repository;
+
+    @Autowired
+    PushRegistrationLock lock;
+
+    @Autowired
+    NotificationService notificationService;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Autowired
     NotificationRepository notifications;
@@ -162,6 +185,25 @@ class VapidKeyServiceTest {
         }
         assertThat(keys.publicKeyBase64Url()).isEqualTo(before);
         assertThat(devices.list(alice)).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("값 쓰기가 거절되면(KEK 없음) 키도 기기도 그대로다")
+    void failedWriteKeepsKeyAndDevices() {
+        String before = keys.publicKeyBase64Url();
+        devices.register(alice, registration("https://fcm.googleapis.com/fcm/send/alice", before));
+        ServerSecrets failing = mock(ServerSecrets.class);
+        doThrow(new ApiException(ErrorCode.SECRET_STORE_UNAVAILABLE, "KEK is not configured"))
+            .when(failing).write(anyString(), anyString(), anyMap(), any());
+        VapidKeyService withoutKek = new VapidKeyService(failing, repository, lock, notificationService, transactionManager);
+
+        assertThatThrownBy(() -> withoutKek.regenerate(alice.id(), "mailto:ops@example.invalid"))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SECRET_STORE_UNAVAILABLE));
+
+        assertThat(keys.publicKeyBase64Url()).isEqualTo(before);
+        assertThat(devices.list(alice)).hasSize(1);
+        assertThat(resetNotices(alice)).isEmpty();
     }
 
 

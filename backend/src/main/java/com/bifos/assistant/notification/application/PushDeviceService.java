@@ -109,6 +109,9 @@ public class PushDeviceService {
         return lock.run(() -> newTransaction.execute(status -> {
             // 키를 바꾼 뒤 옛 키로 만든 구독이 등록되면 푸시 서비스가 403 을 답해 자동 정리도 안 된다. 키를 바꾸는 쪽도 이 잠금을 잡으므로
             // 잠금 안에서 확인해야 바꾼 직후의 등록이 기기를 되살리지 못한다.
+            if (!keys.enabled()) {
+                throw new ApiException(ErrorCode.PUSH_NOT_CONFIGURED, "web push is not configured on this server");
+            }
             if (registration.publicKey() == null || !registration.publicKey().equals(keys.publicKeyBase64Url())) {
                 throw new ApiException(ErrorCode.PUSH_KEY_CHANGED, "the subscription was made with another VAPID public key");
             }

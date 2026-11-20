@@ -6,6 +6,8 @@ import com.bifos.assistant.connector.connection.application.ConnectorBrowserBind
 import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.crypto.application.ServerSecretService;
 import com.bifos.assistant.notification.application.VapidKeyService;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +54,11 @@ public class ServerSecretAdminService {
      * @return 기기가 해제된 사용자 수
      */
     public int regenerateVapid(Long adminId, String adminEmail, String subject) {
-        String contact = subject == null || subject.isBlank() ? "mailto:" + adminEmail : subject;
+        boolean noSubject = subject == null || subject.isBlank();
+        if (noSubject && (adminEmail == null || adminEmail.isBlank())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "subject is required when the admin has no email");
+        }
+        String contact = noSubject ? "mailto:" + adminEmail : subject;
         return vapid.regenerate(adminId, contact);
     }
 
