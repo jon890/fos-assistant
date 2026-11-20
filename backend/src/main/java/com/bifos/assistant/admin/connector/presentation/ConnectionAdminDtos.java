@@ -14,7 +14,10 @@ public final class ConnectionAdminDtos {
     /**
      * 관리자가 보는 바인딩 한 줄이다. 다른 사용자의 칸 값과 비밀 앞부분은 담지 않는다.
      *
-     * @param restartRequiredSince 반영 완료 요청이 그대로 돌려보낼 재시작 대기 시작 시각
+     * @param restartRequiredSince 다시 확인 요청이 그대로 돌려보낼 재시작 대기 시작 시각
+     * @param applyFailed 자동 반영이 실패했다
+     * @param waitingSince 자동 대기가 시작된 시각. 대기가 없으면 null
+     * @param recheckable 「다시 확인」 단추를 보일 줄이다. 실패했거나 대기가 24시간을 넘었다(스펙 DECISION16)
      */
     public record AdminConnectionView(
         String connectorId,
@@ -24,8 +27,11 @@ public final class ConnectionAdminDtos {
         String status,
         boolean restartRequired,
         Instant restartRequiredSince,
-        int undeclaredTools) {
-        static AdminConnectionView from(AdminConnectionSnapshot value) {
+        int undeclaredTools,
+        boolean applyFailed,
+        Instant waitingSince,
+        boolean recheckable) {
+        static AdminConnectionView from(AdminConnectionSnapshot value, Instant staleBefore) {
             return new AdminConnectionView(
                 value.connectorId(),
                 value.userId(),
@@ -34,7 +40,10 @@ public final class ConnectionAdminDtos {
                 value.status().name(),
                 value.restartRequired(),
                 value.restartRequiredSince(),
-                value.undeclaredTools());
+                value.undeclaredTools(),
+                value.applyFailed(),
+                value.waitingSince(),
+                value.recheckable(staleBefore));
         }
     }
 
@@ -59,6 +68,7 @@ public final class ConnectionAdminDtos {
         boolean bound,
         String status,
         boolean restartRequired,
+        boolean applyFailed,
         int toolCount,
         List<String> skills) {
         static AgentConnectionResponse from(AgentConnectionView value) {
@@ -69,6 +79,7 @@ public final class ConnectionAdminDtos {
                 value.bound(),
                 value.status() == null ? null : value.status().name(),
                 value.restartRequired(),
+                value.applyFailed(),
                 value.toolCount(),
                 value.skills());
         }

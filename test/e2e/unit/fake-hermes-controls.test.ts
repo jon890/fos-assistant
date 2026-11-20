@@ -13,6 +13,7 @@ import {
 
 const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
 const TOOL_CALL_GUIDE = "# 도구 호출\n\n로컬 MCP 도구 단건 호출 안내";
+const TOOL_FAILURE_GUIDE = "# 도구가 실패했을 때\n\n다른 방법을 해 본 뒤에 묻는 안내\n둘째 줄";
 const APPROVAL_CARD_GUIDE = "# 승인 카드\n\n[승인 대기] 판정 글 안내\n둘째 줄";
 const SERVICE_CONCEPTS_GUIDE = "# 이 서비스의 기능\n\n개념 목록 안내\n- 파일 공간: /files";
 const MEMORY_GUIDE = "# 기억\n\nmemory_remember 안내";
@@ -29,19 +30,35 @@ const CONTEXT_ASSEMBLER = new URL(
   "../../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
   import.meta.url,
 );
+const TOOL_FAILURE = new URL(
+  "../../../backend/src/main/java/com/bifos/assistant/context/application/ToolFailureInstructions.java",
+  import.meta.url,
+);
+const APPROVAL_CARD = new URL(
+  "../../../backend/src/main/java/com/bifos/assistant/context/application/ApprovalCardInstructions.java",
+  import.meta.url,
+);
 
-test("답변 형식 뒤의 도구 호출과 승인 카드, 서비스 개념 목록, 기억 지침을 빼고 Memory 본문을 보존한다", () => {
-  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, APPROVAL_CARD_GUIDE, SERVICE_CONCEPTS_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n");
+test("답변 형식 뒤의 도구 호출과 도구 실패, 승인 카드, 서비스 개념 목록, 기억 지침을 빼고 Memory 본문을 보존한다", () => {
+  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, TOOL_FAILURE_GUIDE, APPROVAL_CARD_GUIDE, SERVICE_CONCEPTS_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n");
 
   assert.equal(withoutResponseGuide(instructions), MEMORY_BODY);
 });
 
 test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상수의 제목과 순서가 같다", () => {
-  // ContextAssembler 는 답변 형식, 도구 호출, 최신 정보와 출처, 기억 상수를 이 순서로 잇는다. 상수 안의 절 제목을 모두 모은다.
-  // 답변 형식은 AnswerFormatInstructions 에, 서비스 개념 목록은 ServiceConceptsInstructions 의 SECTION 에 있고 도구 호출 지침 바로 뒤에 붙는다.
-  const source = readFileSync(ANSWER_FORMAT, "utf8") + readFileSync(CONTEXT_ASSEMBLER, "utf8") + readFileSync(SERVICE_CONCEPTS, "utf8");
-  const headers = ["RESPONSE_INSTRUCTIONS", "TOOL_CALL_INSTRUCTIONS", "SECTION", "SEARCH_INSTRUCTIONS", "MEMORY_INSTRUCTIONS"].flatMap((name) => {
-    const block = new RegExp(`${name} = """([\\s\\S]*?)"""`).exec(source);
+  // ContextAssembler 는 답변 형식(AnswerFormatInstructions), 도구 호출, 도구 실패, 승인 카드, 서비스 개념 목록, 최신 정보와 출처, 기억을 이 순서로 잇는다.
+  // 같은 이름 SECTION 이 여러 파일에 있으므로 (파일, 상수) 짝의 차례로 절 제목을 모은다.
+  const parts: [URL, string][] = [
+    [ANSWER_FORMAT, "RESPONSE_INSTRUCTIONS"],
+    [CONTEXT_ASSEMBLER, "TOOL_CALL_INSTRUCTIONS"],
+    [TOOL_FAILURE, "SECTION"],
+    [APPROVAL_CARD, "SECTION"],
+    [SERVICE_CONCEPTS, "SECTION"],
+    [CONTEXT_ASSEMBLER, "SEARCH_INSTRUCTIONS"],
+    [CONTEXT_ASSEMBLER, "MEMORY_INSTRUCTIONS"],
+  ];
+  const headers = parts.flatMap(([file, name]) => {
+    const block = new RegExp(`${name} = """([\\s\\S]*?)"""`).exec(readFileSync(file, "utf8"));
     assert.ok(block, `${name} 상수를 찾지 못했다`);
     return [...block[1]!.matchAll(/^\s*(# \S.*)$/gm)].map((match) => match[1]!.trim());
   });

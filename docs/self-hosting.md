@@ -48,6 +48,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
 | `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
 | `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |
+| `CONNECTOR_OPS_TOKEN` | Backend | 운영 정기 작업이 공유 gateway 재시작 조회(`GET /internal/ops/connector-restart`)에 보낼 토큰. 비우면 조회를 늘 거절한다 |
 | `HERMES_SHARED_LISTENER_BASE_URL` | Backend | profile 접두를 붙여 부르는 공유 listener 주소 |
 | `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
 | `ASSISTANT_ATTACHMENT_ROOT` | Backend | 대화에 올린 사진을 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다. 디렉터리가 미리 있어야 하며, 없으면 도구 저장, 플러그인 설치, 스킬 게시가 409 다 |

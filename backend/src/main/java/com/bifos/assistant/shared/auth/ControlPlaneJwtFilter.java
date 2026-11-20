@@ -102,6 +102,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/support".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/content-draft-jobs/authorize".equals(uri))
+            || ("GET".equals(request.getMethod()) && "/internal/ops/connector-restart".equals(uri))
             || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }
 

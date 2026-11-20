@@ -111,7 +111,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
-| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`) |
+| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`), 도구 실패 글의 끝 줄(`ToolFailureText`) |
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리, 그룹 설정(`group_setting`) 줄을 읽고 쓰는 공통 저장소 |

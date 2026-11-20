@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.approval.application;
 
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -22,11 +23,12 @@ final class ConnectorApprovalReply {
         + "같은 도구를 다시 부르지 않는다. 승인하면 저장한 인자 그대로 한 번 실행되고 결과가 이 대화로 온다.";
 
     /** 대화 없이 돈 실행은 승인 카드가 뜰 화면이 없다. 승인받을 수 있다고 약속하지 않는다. */
-    private static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. " + "이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.";
+    private static final ToolFailureText APPROVAL_WITHOUT_CONVERSATION_MESSAGE = ToolFailureText.askUser(
+        "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.");
 
 
     static ConnectorPolicyAnswer of(ConnectorAction action) {
-        String message = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_MESSAGE;
+        String message = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE.text() : APPROVAL_MESSAGE;
         return new ConnectorPolicyAnswer(false, String.format(message, action.publicId()), action.publicId());
     }
 }

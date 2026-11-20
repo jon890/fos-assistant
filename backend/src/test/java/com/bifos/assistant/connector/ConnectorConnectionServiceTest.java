@@ -603,9 +603,9 @@ class ConnectorConnectionServiceTest {
         readyBinding(agent, stored(user), "demo");
 
         assertThat(service.catalog(user).get(0).bindings())
-            .containsExactly(new BoundAgentSummary(agent.code(), agent.name(), BindingStatus.READY, false));
+            .containsExactly(new BoundAgentSummary(agent.code(), agent.name(), BindingStatus.READY, false, false));
         assertThat(service.read(user, DEMO).bindings())
-            .containsExactly(new BoundAgentSummary(agent.code(), agent.name(), BindingStatus.READY, false));
+            .containsExactly(new BoundAgentSummary(agent.code(), agent.name(), BindingStatus.READY, false, false));
     }
 
 
@@ -1124,7 +1124,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(listed)
             .containsExactly(new AdminConnectionSnapshot(
-                DEMO, member.id(), member.displayName(), agent.code(), BindingStatus.PENDING, true, NOW, 0));
+                DEMO, member.id(), member.displayName(), agent.code(), BindingStatus.PENDING, true, NOW, 0, false, null, false));
         assertCode(() -> service.listForAdmin(member), ErrorCode.FORBIDDEN);
     }
 
