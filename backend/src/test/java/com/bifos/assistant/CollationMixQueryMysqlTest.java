@@ -50,12 +50,12 @@ class CollationMixQueryMysqlTest {
     void rejectsCollationMixOnEmptyTables() {
         assertThatThrownBy(() -> query(
             "SELECT COUNT(*) FROM parent_row p JOIN child_row c ON c.parent_public_id = p.public_id"))
-            .isInstanceOfSatisfying(SQLException.class,
-                error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
+                .isInstanceOfSatisfying(SQLException.class,
+                    error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
         assertThatThrownBy(() -> query(
             "SELECT COUNT(*) FROM child_row c WHERE c.parent_public_id NOT IN (SELECT p.public_id FROM parent_row p)"))
-            .isInstanceOfSatisfying(SQLException.class,
-                error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
+                .isInstanceOfSatisfying(SQLException.class,
+                    error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
     }
 
 

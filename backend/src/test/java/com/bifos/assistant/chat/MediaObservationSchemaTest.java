@@ -121,6 +121,7 @@ class MediaObservationSchemaTest {
         }
     }
 
+
     private String table(Connection connection) throws SQLException {
         return connection.getMetaData().storesUpperCaseIdentifiers() ? "MEDIA_OBSERVATION" : "media_observation";
     }
