@@ -169,7 +169,7 @@ async function score(values: Record<string, unknown>): Promise<number> {
     let result: QuestionScore;
     try {
       if (run.error) throw new Error(run.error);
-      // 기록한 실행들의 답을 모두 읽는다. 도구 수와 시간은 마지막 turn 의 실행 트리로 본다
+      // 질문 뒤의 자동 turn 답도 함께 읽는다. 도구 수와 시간은 마지막 사용자 turn 의 실행 트리로 본다
       const executionId = run.executionIds.at(-1);
       if (!run.conversationId || executionId == null) throw new Error("보낸 실행 번호가 없다");
       const messages = await api.messages(run.conversationId);

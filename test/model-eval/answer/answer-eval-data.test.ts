@@ -41,24 +41,29 @@ const message = (role: string, executionId: number | null, content: string | nul
   artifacts: [],
 });
 
-test("기록한 모든 실행의 비서 메시지를 대화 순서대로 모으고 다른 실행과 빈 답은 뺀다", () => {
+test("질문 뒤 자동 turn 의 답을 모으되 다음 사용자 질문과 그 답은 섞지 않는다", () => {
   const messages = [
-    message("ASSISTANT", 99, "이전 실행"),
+    message("ASSISTANT", 99, "질문 이전 답"),
     message("USER", null, "첫 질문"),
     message("ASSISTANT", 1, "첫 답과 출처"),
-    message("SYSTEM", 1, "알림 줄"),
-    message("ASSISTANT", 1, "앞서 전한 내용의 후속 답"),
-    message("ASSISTANT", 3, "자동 turn"),
-    message("USER", 2, "후속 질문"),
+    message("SYSTEM", null, "하위 작업이 끝났어요"),
+    message("SYSTEM", null, "하위 작업이 끝났어요"),
+    message("ASSISTANT", 3, "앞서 전한 내용의 후속 답"),
+    message("ASSISTANT", 4, null),
+    message("ASSISTANT", 5, "  "),
+    message("USER", null, "후속 질문"),
     message("ASSISTANT", 2, "둘째 실행의 답"),
-    message("ASSISTANT", 2, null),
-    message("ASSISTANT", 2, "  "),
-    message("ASSISTANT", null, "실행 없는 답"),
+    message("ASSISTANT", 6, "둘째 실행 뒤 자동 turn 답"),
+    message("USER", null, "평가 밖 질문"),
+    message("ASSISTANT", 7, "평가 밖 답"),
   ];
+  assert.deepEqual(collectAnswers(messages, [1]), ["첫 답과 출처", "앞서 전한 내용의 후속 답"]);
   assert.deepEqual(collectAnswers(messages, [1, null, 2, 1]), [
     "첫 답과 출처",
     "앞서 전한 내용의 후속 답",
     "둘째 실행의 답",
+    "둘째 실행 뒤 자동 turn 답",
   ]);
   assert.deepEqual(collectAnswers(messages, [null]), []);
+  assert.deepEqual(collectAnswers(messages, [99]), []);
 });

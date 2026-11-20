@@ -54,13 +54,27 @@ const URL_PATTERN = /https?:\/\/[^\s<>()\[\]"'`]+/g;
 /** 주소 안의 괄호 한 겹(`…/A_(B)`)까지 받는다. */
 const MARKDOWN_LINK = /\[[^\]]*\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g;
 
-/** 기록한 실행이 보낸 비서 메시지를 대화 순서대로 모은다. 자동 turn 과 다른 실행은 섞지 않는다. */
+/** 기록한 실행의 질문 뒤부터 다음 사용자 메시지 전까지, 자동 turn 을 포함한 비서 답을 모은다. */
 export function collectAnswers(messages: MessageView[], executionIds: (number | null)[]): string[] {
   const ids = new Set(executionIds.filter((id) => id !== null));
-  return messages
-    .filter((message) => message.role === "ASSISTANT" && message.executionId !== null && ids.has(message.executionId))
-    .map((message) => message.content)
-    .filter((content): content is string => content !== null && content.trim().length > 0);
+  const answers: string[] = [];
+  let segment: MessageView[] | null = null;
+  const collect = () => {
+    if (!segment?.some((message) => message.role === "ASSISTANT" && message.executionId !== null && ids.has(message.executionId))) return;
+    for (const message of segment) {
+      if (message.role === "ASSISTANT" && message.content?.trim()) answers.push(message.content);
+    }
+  };
+  for (const message of messages) {
+    if (message.role === "USER") {
+      collect();
+      segment = [];
+    } else {
+      segment?.push(message);
+    }
+  }
+  collect();
+  return answers;
 }
 
 /** 그 줄이 「출처」 절의 머리면 같은 줄에 이어진 본문(없으면 빈 글)을, 아니면 null 을 돌려준다. */
