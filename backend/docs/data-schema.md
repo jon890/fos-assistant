@@ -167,8 +167,7 @@ H2는 같은 목록을 `COMMENT ON`으로 적용한다.
 
 `MysqlMigrationTest`는 Flyway 적용 뒤 `INFORMATION_SCHEMA`에서 설명 누락을 검사한다.
 Flyway가 관리하는 `flyway_schema_history`만 제외하며 새 테이블과 컬럼도 자동으로 검사한다.
-`SchemaCommentsMigrationTest`와 `SchemaCommentsMysqlTest`는 적용 전후 컬럼 정의와 데이터,
-생성 컬럼의 유일 제약을 확인하고 MySQL에서는 COMMENT 이외 DDL 전체도 대조한다.
+적용 전후 컬럼 정의와 데이터를 보던 `SchemaCommentsMigrationTest`는 운영 적용 뒤 아래 「실제 MySQL 검사를 통과해야 한다」 의 규칙대로 지웠다.
 
 ### 실제 MySQL 검사를 통과해야 한다
 
@@ -182,7 +181,7 @@ Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unic
 **H2 에서 도는 검사를 MySQL 에서 되풀이하지 않는다.** MySQL 은 행 잠금, 정렬 규칙, 마이그레이션 DDL 처럼 H2 와 다르게 동작하는 것만 본다.
 그런 H2 검사만 `@MysqlCase` 로 표시하고, 근거와 이유 목록은 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
-H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `GroupSettingMysqlMigrationTest` 가 본보기다.
+H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. 하위 클래스는 `createDatabase()` 하나만 덮어쓴다. 같은 모양의 스키마 검사 `MediaObservationSchemaMysqlTest` 를 본보기로 본다.
 
 **운영에 적용된 지 14일이 지난 마이그레이션의 데이터 검사는 지운다.**
 적용된 파일은 `test/repo/migration-immutable.test.ts` 와 Flyway checksum 이 바뀌지 않게 막는다. 그 파일의 데이터 변환은 운영에서 이미 한 번 돌았고, 새로 설치하는 DB 에는 옮길 줄이 없다. 이 검사가 새로 잡는 것은 H2, MySQL, Flyway 버전을 올렸을 때의 동작 차이뿐이라 오래 둘 값이 작다.
@@ -190,7 +189,9 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 - 지우는 기준은 **운영 적용 뒤 14일**이다. 기준 버전은 운영 저장소의 Flyway 적용 기록에서 읽는다. 적용 시각이 14일 전보다 앞선 마지막 버전이 기준 버전이고, 그 버전 이하 마이그레이션의 `*MigrationTest` 와 `*MysqlMigrationTest` 가 지울 대상이다. 버전 칸은 문자열이라 옛 정수 버전(`V9`, `V54`)과 날짜 버전을 숫자로 비교한다
 - 전체 마이그레이션을 적용한 뒤 스키마를 보는 검사는, 그 검사가 보는 칸이나 제약을 만든 마이그레이션까지 모두 기준 버전 이하일 때만 지운다. 이름의 마이그레이션이 기준 이하여도 뒤 마이그레이션이 만든 칸을 보면 남긴다
 - 지우는 PR 에는 기준 버전과 지운 목록을 적는다. 이 저장소는 운영 적용 기록을 볼 수 없으므로 기준 버전은 운영 저장소를 맡은 쪽이 읽어 알려 준다
-- 다른 검사가 그 클래스를 상속하거나 도우미, fixture 를 쓰면 지우지 않고 PR 에 적는다. 예를 들어 `SchemaCommentsMysqlTest` 는 `SchemaCommentsMigrationTest` 를 상속한다
+- 후보는 `scripts/checks/migration-test-prune.ts` 가 마이그레이션 버전의 날짜(번호를 받은 날이라 머지 날짜와 가깝다)로 뽑는다. CI 의 `backend-mysql` job 이 후보를 경고로 알리고 실패시키지 않는다. 버전 날짜는 운영 적용 날짜가 아니므로 경고가 떠도 바로 지우지 않는다. 지우는 PR 에서 코디네이터가 운영 Flyway 적용 기록과 대조해 기준 버전을 정하고, 기준보다 늦은 후보는 남긴다
+- 오래돼도 지우지 않을 검사는 파일에 `// migration-test-prune: keep <까닭>` 줄을 두어 후보에서 뺀다. 그 클래스를 상속한 클래스도 빠진다. 이 표시는 아래 「지우지 않는 것」 에 든 검사에만 붙인다. 옛 버전까지 올린 뒤 줄을 넣는 데이터 검사에는 붙이지 않는다. 지금 스키마의 제약을 보려면 전체 마이그레이션 뒤에 줄을 넣는 스키마 검사(`MediaObservationSchemaTest` 처럼)로 쓰면 버전을 적지 않아 후보가 되지 않는다
+- 다른 검사가 그 클래스를 상속하거나 도우미, fixture 를 쓰면 지우지 않고 PR 에 적는다. MySQL 하위 클래스와 그 H2 부모는 함께 지운다
 - **지우지 않는 것.** 스키마를 대조하는 `MysqlMigrationTest` 와 정렬 규칙을 보는 `CollationUnifyMysqlMigrationTest` 는 마이그레이션이 얼마나 오래됐는지와 상관없이 지금 스키마와 운영 MySQL 설정의 차이를 잡는다. 장애나 리뷰 지적에서 생긴 검사도 그 교훈이 이 두 검사나 이 절의 규칙으로 일반화돼 있을 때만 지운다
 
 ## 지울 때
