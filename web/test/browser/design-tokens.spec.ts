@@ -413,7 +413,7 @@ test("실행 기록의 성공 배지는 글자가 success 색이고 바탕이 su
     data: { text: "성공 배지 색 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
 
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   const badge = records.locator('[data-slot="badge"]').filter({ hasText: /^성공$/ }).first();

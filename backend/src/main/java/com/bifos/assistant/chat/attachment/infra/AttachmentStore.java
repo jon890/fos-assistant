@@ -67,6 +67,21 @@ public class AttachmentStore {
     }
 
 
+    /**
+     * Hermes 와 실행 공간에서 보이는 그 대화의 사진 폴더다. 실행 입력의 사진 참조 목록, 원고의 {@code photoDir},
+     * 원고용 그림 사본이 같은 값을 쓴다.
+     *
+     * @param agentRoot 설정의 {@code agentRoot}. 앞뒤 공백과 끝의 {@code /} 는 뗀다
+     */
+    public static String agentConversationDirectory(String agentRoot, Long ownerUserId, Long conversationId) {
+        String root = agentRoot.strip();
+        while (root.length() > 1 && root.endsWith("/")) {
+            root = root.substring(0, root.length() - 1);
+        }
+        return root + "/users/" + userDirectoryKey(ownerUserId) + "/" + conversationId;
+    }
+
+
     /** 실행 주인 {@code u<사용자 번호>} 의 디렉터리 키다. Hermes 를 부르기 전에 만드는 디렉터리와 같은 규칙을 쓴다. */
     public static String userDirectoryKey(Long userId) {
         requirePositive(userId);

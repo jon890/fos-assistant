@@ -148,6 +148,7 @@ class McpCallerInvariantTest {
         arguments.put("follow_up_propose", json.createObjectNode().put("title", "할 일 검사 7391"));
         arguments.put("content_draft_write", json.createObjectNode());
         arguments.put("content_draft_read", json.createObjectNode());
+        arguments.put("content_draft_image", json.createObjectNode());
         arguments.put("content_draft_preview", json.createObjectNode());
         arguments.put("content_draft_save", json.createObjectNode());
         arguments.put("order_limit_read", json.createObjectNode());

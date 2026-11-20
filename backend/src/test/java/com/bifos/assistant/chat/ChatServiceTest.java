@@ -399,7 +399,7 @@ class ChatServiceTest {
                 .isEqualTo(
                     artifactService.agentPreamble(conversations
                         .findById(turn.conversationId())
-                        .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
+                        .orElseThrow(), false) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions())
                 .contains("GFM", "| --- | --- |")
@@ -1375,7 +1375,7 @@ class ChatServiceTest {
         Conversation conversation = conversations.findById(turn.conversationId()).orElseThrow();
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.input())
-                .isEqualTo(artifactService.agentPreamble(conversation)
+                .isEqualTo(artifactService.agentPreamble(conversation, false)
                     + new SkillCommand("shopping", "이번 주").hermesInput())
                 .contains("skill_view(name=\"shopping\")", "이번 주")
                 .doesNotContain("/shopping");
@@ -1457,7 +1457,7 @@ class ChatServiceTest {
         chat.regenerate(dad, first.conversationId(), relayed::add);
 
         String expected = artifactService.agentPreamble(
-            conversations.findById(first.conversationId()).orElseThrow())
+            conversations.findById(first.conversationId()).orElseThrow(), false)
             + new SkillCommand("shopping", "이번 주").hermesInput();
         assertThat(stub().received()).extracting(command -> command.input()).containsExactly(expected, expected);
         Long regenerated = relayed.getLast().executionId();

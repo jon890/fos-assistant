@@ -114,6 +114,8 @@ public class McpController {
                 McpDtos.ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
             Map.entry(McpContentDraftTools.READ, (caller, id, args) -> validated(id, args,
                 McpDtos.ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))),
+            Map.entry(McpContentDraftTools.IMAGE, (caller, id, args) -> validated(id, args,
+                McpDtos.ContentDraftImageArguments::from, value -> this.contentDrafts.image(caller, value.title()))),
             Map.entry(McpContentDraftSnapshots.PREVIEW, (caller, id, args) -> validated(id, args, McpDtos.ContentDraftPreviewArguments::from,
                 value -> this.contentSnapshots.preview(caller, value.draftId(), value.revision(), value.bindingId()))),
             Map.entry(McpContentDraftSnapshots.SAVE, (caller, id, args) -> validated(id, args,

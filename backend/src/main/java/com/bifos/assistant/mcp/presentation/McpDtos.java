@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.chat.attachment.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
+import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.shared.error.ApiException;
@@ -56,6 +57,19 @@ public final class McpDtos {
             }
             return new ContentDraftPreviewArguments(draftUuid(node.get("draftId")),
                 ContentDraftInputReader.revision(node.get("revision")), binding == null ? null : binding.longValue());
+        }
+    }
+
+    /** 그림 제목 하나만 받는다. 대화와 사용자는 서명한 호출 맥락이 정한다(ADR-20261120 / generated-image-draft). */
+    public record ContentDraftImageArguments(String title) {
+        static ContentDraftImageArguments from(JsonNode node) {
+            ContentDraftInputReader.fields(node, Set.of("title"), Set.of());
+            JsonNode title = node.get("title");
+            if (!title.isString() || title.asString().isBlank()
+                || title.asString().codePointCount(0, title.asString().length()) > McpContentDraftTools.IMAGE_TITLE_MAX) {
+                throw ContentDraftInputReader.invalid();
+            }
+            return new ContentDraftImageArguments(title.asString().strip());
         }
     }
 
