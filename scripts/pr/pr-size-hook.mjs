@@ -26,7 +26,7 @@ export function shouldSkip({ branch, labels = [] }) {
 export function advice(production, max) {
   if (!(production >= max * WARN_RATIO)) return null;
   const lines = [
-    `PR 운영 코드 변경이 ${production}줄로 상한 ${max}줄의 ${Math.round(WARN_RATIO * 100)}% 를 넘었다(scripts/pr/pr-size.mjs 기준).`,
+    `PR 운영 코드 변경이 ${production}줄로 상한 ${max}줄의 ${Math.round(WARN_RATIO * 100)}% 이상이다(scripts/pr/pr-size.mjs 기준).`,
     "남은 phase 는 이 PR 에 넣지 말고 계획서 deferred 와 PR 본문 「남은 범위」 로 미루고 코디네이터에게 status 로 알린다. 확인받은 스펙의 PR 단위 안에서 미루는 것이라 사용자에게 묻지 않는다.",
   ];
   if (production > max) lines.push(`상한을 넘었다. ${EXCEPTION_LABEL} 라벨은 붙이지 말고 코디네이터에게 결정 블록으로 묻는다.`);
