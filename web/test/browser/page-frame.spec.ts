@@ -1,5 +1,4 @@
 import { expect, PERSONA_AGENT_CODE, setSession, test } from "./fixtures.ts";
-import { isolatedUser } from "./helpers.ts";
 import type { Page, Route } from "../../node_modules/@playwright/test/index.js";
 
 // 사이드바와 설정에서 여는 화면이 같은 머리 틀과 같은 안내를 쓰는지 본다(docs/features/app-shell/spec.md 의 REQ19, REQ20).
@@ -209,7 +208,9 @@ test("서버가 읽는 화면은 읽는 중에도 머리의 제목을 그대로 
 });
 
 test("할 것이 없는 사용자의 지금 볼 것은 다른 화면과 같은 빈 목록 안내를 보인다", async ({ page, context }, testInfo) => {
-  await setSession(context, isolatedUser(testInfo, "frame"));
+  // 아무것도 만들지 않는 사용자라 반복해도 빈 채로 남는다. 반복마다 새 사용자를 만들지 않는다.
+  await setSession(context, { email: `frame-empty-${testInfo.project.name}@example.com`, name: "빈 화면 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
   await page.goto("/now");
   await expect(frame(page).getByRole("heading", { level: 1, name: "지금 볼 것", exact: true })).toBeVisible();
   await expect(frame(page).getByText("지금 확인할 것이 없어요")).toBeVisible();

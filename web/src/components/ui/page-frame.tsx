@@ -50,7 +50,11 @@ export function PageFrame({
           {back.label}
         </Link>
       ) : null}
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+      {/* 화면 위 막대가 이미 header 다. 머리 줄은 landmark 가 아니라 div 로 둔다. */}
+      <div
+        data-slot="page-head"
+        className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2"
+      >
         <div className="min-w-0 flex-1 basis-56">
           {titlePending ? (
             <Skeleton className="h-7 w-48" />
@@ -75,7 +79,7 @@ export function PageFrame({
             {action}
           </div>
         ) : null}
-      </header>
+      </div>
       <div data-slot="page-body">{children}</div>
     </div>
   );
