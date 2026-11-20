@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorBinding
 import com.bifos.assistant.connector.connection.application.dto.ConnectorInstallResult;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.SkippedSkill;
 import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.application.port.ConnectorProfileRejected;
 import com.bifos.assistant.hermes.application.port.ConnectorSandboxUnavailable;
@@ -68,7 +69,7 @@ public class ConnectorBindingInstalls {
 
 
     /**
-     * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다.
+     * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다. 빠진 에이전트용 스킬은 이 응답의 목록으로 덮어쓴다.
      *
      * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면
      * 반영 예정 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
@@ -78,6 +79,9 @@ public class ConnectorBindingInstalls {
     private boolean record(ConnectorBinding binding, InstallResult installed, Instant now) {
         boolean restart = installed.restartRequired() || installed.pluginUpdated();
         binding.installed(restart, now);
+        binding.recordSkippedSkills(installed.skippedSkills().stream()
+            .map(skipped -> new SkippedSkill(skipped.name(), skipped.reasons()))
+            .toList());
         // 재시작 대기는 관리자 반영 완료가 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
         if (restart) {
             binding.clearApplyDue();

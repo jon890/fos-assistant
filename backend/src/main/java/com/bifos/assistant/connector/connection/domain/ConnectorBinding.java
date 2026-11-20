@@ -17,6 +17,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -118,6 +119,13 @@ public class ConnectorBinding extends CreatedAtEntity {
     @Column(name = "event_watch_state", insertable = false, updatable = false, columnDefinition = "TEXT")
     private String eventWatchState;
 
+    /**
+     * 마지막으로 성공한 설치가 답한 빠진 에이전트용 스킬의 JSON 글이다(ADR-20261120 / plugin-agent-skills). 없으면 null 이다.
+     * 뜻은 {@link SkippedSkill} 가 갖고, 목록은 {@link #skippedSkills()} 로 읽는다.
+     */
+    @Column(name = "skipped_skills", columnDefinition = "TEXT")
+    private String skippedSkillsJson;
+
 
     private ConnectorBinding(Agent agent, ConnectorConnection connection, String mcpServer, Instant now) {
         this.agent = agent;
@@ -208,6 +216,18 @@ public class ConnectorBinding extends CreatedAtEntity {
     /** 예정한 확인을 시작하기 전에 비운다. 확인은 한 번만 시도한다. */
     public void clearApplyDue() {
         this.applyDueAt = null;
+    }
+
+
+    /** 성공한 설치가 답한 빠진 스킬로 덮어쓴다. 실패한 설치는 부르지 않아 옛 기록이 남는다. */
+    public void recordSkippedSkills(List<SkippedSkill> skipped) {
+        this.skippedSkillsJson = SkippedSkill.toJson(skipped);
+    }
+
+
+    /** 빠진 에이전트용 스킬이다. 기록이 없으면 빈 목록이다. */
+    public List<SkippedSkill> skippedSkills() {
+        return SkippedSkill.fromJson(skippedSkillsJson);
     }
 
 

@@ -79,12 +79,39 @@ public interface HermesConnectorClient {
      * 수 있다는 뜻이다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
      * @param reloadPending 바인딩 설치가 재시작 없이 공유 gateway 의 MCP 설정 맞추기 주기에 반영될 것을 바꿨는가
      * (ADR-20261007 / connector-live-reload). 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
+     * @param skippedSkills 붙이기가 설치하지 못한 에이전트용 스킬과 까닭(ADR-20261120 / plugin-agent-skills). 떼기와 옛 대시보드
+     * plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다
      */
-    record InstallResult(boolean restartRequired, boolean pluginUpdated, boolean reloadPending) {
+    record InstallResult(
+        boolean restartRequired, boolean pluginUpdated, boolean reloadPending, List<SkippedSkill> skippedSkills) {
+
+        public InstallResult {
+            skippedSkills = skippedSkills == null ? List.of() : List.copyOf(skippedSkills);
+        }
+
+
+        /** 빠진 스킬을 모르는 설치 결과다. */
+        public InstallResult(boolean restartRequired, boolean pluginUpdated, boolean reloadPending) {
+            this(restartRequired, pluginUpdated, reloadPending, List.of());
+        }
+
 
         /** 반영 예정을 모르는 설치 결과다. {@code reloadPending} 은 거짓이다. */
         public InstallResult(boolean restartRequired, boolean pluginUpdated) {
             this(restartRequired, pluginUpdated, false);
+        }
+    }
+
+    /**
+     * 설치하지 못한 에이전트용 스킬 하나다.
+     *
+     * @param name 스킬 이름
+     * @param reasons 대시보드가 정한 까닭 낱말. Control Plane 은 뜻을 묶지 않고 그대로 옮긴다
+     */
+    record SkippedSkill(String name, List<String> reasons) {
+
+        public SkippedSkill {
+            reasons = List.copyOf(reasons);
         }
     }
 
