@@ -273,7 +273,7 @@ sequenceDiagram
 
 ### 저장
 
-표의 칸과 유일 제약은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「decision_feedback_event」 가 갖는다. 노출, 열기, 동작, 숨김, 미루기, 복원을 모두 이 표의 사건으로 남긴다(ADR-20261101 / proactive-suggestion 의 순서 5).
+표의 칸과 유일 제약은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「decision_feedback_event」 가 갖는다. 노출, 열기, 동작, 숨김, 미루기, 복원을 모두 이 표의 사건으로 남긴다([ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 의 순서 5).
 
 | 사건 | 종류 | 쓰기 계약 | 열쇠 |
 | --- | --- | --- | --- |
