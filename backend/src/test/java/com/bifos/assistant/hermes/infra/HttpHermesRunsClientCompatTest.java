@@ -227,6 +227,19 @@ class HttpHermesRunsClientCompatTest {
 
 
     @Test
+    @DisplayName("응답을 받지 못한 중지도 기록으로 남아, 뒤에 읽은 cancelled 를 사용자 중지로 본다")
+    void failedStopIsStillRecorded() {
+        on("GET /v1/runs/run-1", 200, "{\"status\":\"cancelled\",\"admission_id\":\"adm-1\",\"execution_generation\":1}");
+        on("GET /v1/runs/run-1/events", 404, "");
+        on("POST /v1/runs/run-1/stop", 503, "{}");
+
+        assertThatThrownBy(() -> client.stop(baseUrl, "dad", "run-1")).isInstanceOf(ApiException.class);
+
+        assertThat(client.lookupRun(baseUrl, "dad", "run-1").result().status()).isEqualTo("cancelled");
+    }
+
+
+    @Test
     @DisplayName("조회에 없는 error 와 pending_steer 는 남은 끝 사건이나 보관분 다시 읽기로 채우고, 둘 다 없으면 모른다고 표시한다")
     void fillsMissingFieldsFromTerminal() {
         String failed = "{\"status\":\"failed\",\"admission_id\":\"adm-1\",\"execution_generation\":1}";
