@@ -232,6 +232,36 @@ export function specialOutputFor(input: string): string | null {
       "<script>window.__unsafeAgentHtml = true</script>",
     ].join("\n");
   }
+  if (input === "답 모양 검사") {
+    return [
+      "열이 나도 잘 먹고 잘 놀면 급하지 않습니다.",
+      "",
+      "## 집에서 할 수 있는 것",
+      "",
+      "물을 자주 먹입니다.",
+      "옷은 얇게 입힙니다.",
+      "",
+      "> 해열제는 체중에 맞춥니다.",
+      "",
+      "| 상황 | 할 일 |",
+      "| --- | --- |",
+      "| 경련 | 119 |",
+      "",
+      "```mermaid",
+      "flowchart TD",
+      "  A[열] --> B{3개월 미만?}",
+      "  B -- 예 --> C[응급실]",
+      "```",
+      "",
+      "```mermaid",
+      "이건 그림 문법이 아니다",
+      "```",
+      "",
+      "### 출처",
+      "",
+      "- [NHS · 소아 발열 안내](https://example.com/fever)",
+    ].join("\n");
+  }
   if (input === "구분 줄 없는 표 검사") {
     return "번호 | 구분 | 금액\n1 | 식비 | 100\n2 | 교통 | 200\n3 | 기타 | 300";
   }

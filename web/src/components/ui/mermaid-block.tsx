@@ -30,8 +30,9 @@ type State =
   | { status: "failed" };
 
 /**
- * 문서의 mermaid 블록이다. 그리기 전과 실패하면 원문을 보인다. 어두운 테마여도 흰 바탕에 그린다(spec.md 의 DECISION16).
- * 손그림을 지원하지 않는 그림 종류(sequence 등)는 mermaid 기본 모양이다(spec.md 의 DECISION8).
+ * mermaid 블록이다. 개발 문서와 대화 답이 함께 쓴다(docs/features/answer-quality/spec.md 의 REQ19). 그리기 전과 실패하면 원문을 보인다.
+ * 어두운 테마여도 흰 바탕에 그린다(docs/features/dev-overview/spec.md 의 DECISION16).
+ * 손그림을 지원하지 않는 그림 종류(sequence 등)는 mermaid 기본 모양이다(같은 스펙의 DECISION8).
  */
 export function MermaidBlock({ source }: { source: string }) {
   const id = mermaidRenderId(useId());

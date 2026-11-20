@@ -100,7 +100,7 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
                 ) : null}
                 {item.kind === "interim" ? (
                   <div className="min-w-0 break-words">
-                    <Markdown>{item.name}</Markdown>
+                    <Markdown density="compact">{item.name}</Markdown>
                   </div>
                 ) : (
                   <span className="min-w-0 break-words">

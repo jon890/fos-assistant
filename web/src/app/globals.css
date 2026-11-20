@@ -60,6 +60,9 @@
   --color-agent-rose-soft: var(--agent-rose-soft);
   --color-agent-slate: var(--agent-slate);
   --color-agent-slate-soft: var(--agent-slate-soft);
+  /* 대화 답 본문의 글자다. 15px 에 줄 간격 1.75(docs/features/answer-quality/spec.md 의 REQ18). */
+  --text-answer: 0.9375rem;
+  --text-answer--line-height: 1.75;
   --radius-sm: 0.25rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
