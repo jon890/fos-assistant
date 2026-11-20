@@ -39,7 +39,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 - 카드 머리의 수는 응답의 카드 `nowCount` 만 쓰고 화면이 다시 세지 않는다. 이 화면에서 `NOW` 항목을 숨기거나 미루면 다시 읽지 않고 그만큼 줄이고, 되돌리면 다시 늘린다
 - 다섯 카드가 모두 비면 카드 대신 「지금 확인할 것이 없어요」 하나를 그리고, 그 아래에도 「할 일 더하기」 를 둔다
 - `status: UNAVAILABLE` 인 카드는 항목 대신 불러오지 못했다는 경고를 그린다
-- `moreCount` 의 「N개 더 있어요」 는 실패와 맡긴 일에서만 `/usage?tab=executions` 로 가는 링크다. 내 차례는 여러 종류가 섞여 보낼 화면이 없고, 이어서 하기의 나머지 대화는 사이드바 목록에 있다
+- `moreCount` 의 「N개 더 있어요」 는 수만 알리고 링크는 두지 않는다. 사용자 사용량 화면은 없으며, 이어서 하기의 나머지 대화는 사이드바 목록에 있다
 
 **보고 카드**는 매일 깨우기나 단추로 연 살펴보기의 보고를 원래 `proactive_check` 기록에서 읽는다.
 보고는 `LATER` 라 건수가 늘지 않고, 보고 안의 남은 승인은 「내 차례」 카드에서 센다.
@@ -273,7 +273,7 @@ sequenceDiagram
 
 ### 저장
 
-표의 칸과 유일 제약은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「decision_feedback_event」 가 갖는다. 노출, 열기, 동작, 숨김, 미루기, 복원을 모두 이 표의 사건으로 남긴다(ADR-20261101 / proactive-suggestion 의 순서 5).
+표의 칸과 유일 제약은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「decision_feedback_event」 가 갖는다. 노출, 열기, 동작, 숨김, 미루기, 복원을 모두 이 표의 사건으로 남긴다([ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 의 순서 5).
 
 | 사건 | 종류 | 쓰기 계약 | 열쇠 |
 | --- | --- | --- | --- |

@@ -14,11 +14,5 @@ export default async function AdminUsagePage({
   }
   await redirectMemberHome();
 
-  return (
-    <UsageScreen
-      admin={true}
-      basePath="/admin/usage"
-      searchParams={searchParams}
-    />
-  );
+  return <UsageScreen basePath="/admin/usage" searchParams={searchParams} />;
 }
