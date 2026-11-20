@@ -74,6 +74,7 @@ import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from 
 import { hermesV023RestartScenario } from "./scenarios/hermes-v023-restart.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { userExecutionLimitScenario } from "./scenarios/user-execution-limit.ts";
+import { deployCheckScenario, E2E_QUALITY_FEATURE_TIMEOUT } from "./scenarios/deploy-check.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -168,6 +169,8 @@ const SCENARIOS: readonly Scenario[] = [
   restartReconcileScenario,
   // 한도를 바꿔 Control Plane 을 다시 띄우므로 맨 끝에 둔다.
   userExecutionLimitScenario,
+  // 평가 전용 사용자를 하나 더 만들므로 사람과 에이전트 수를 세는 시나리오 뒤, 맨 끝에 둔다.
+  deployCheckScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {
@@ -269,6 +272,8 @@ function startControlPlane(
       ASSISTANT_CONNECTOR_BINDING_DRIFT_CRON: "-",
       // 예약 작업이 정한 시각에 발화하는 것을 기본값 30초를 기다리지 않고 본다.
       ASSISTANT_TASK_DISPATCH_CRON: "* * * * * *",
+      // 배포 뒤 확인의 기능 마감. 예약 작업 발화 확인이 시간 초과로 끝나게 줄인다
+      ASSISTANT_QUALITY_FEATURE_TIMEOUT: E2E_QUALITY_FEATURE_TIMEOUT,
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
