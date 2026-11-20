@@ -9,7 +9,7 @@ import {
 } from "./fixtures.ts";
 import { FAKE_USAGE } from "../../../test/e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
-import { openAccountMenu } from "./helpers.ts";
+import { openAccountMenu, openAdminMenu } from "./helpers.ts";
 
 /** 화면 높이(모바일 844px)를 넘길 만큼의 대화 수다. 사이드바는 첫 쪽으로 30개를 읽는다. */
 const CONVERSATION_COUNT = 30;
@@ -30,7 +30,7 @@ async function createConversation(page: Page): Promise<string> {
 async function enterAdminArea(page: Page, testInfo: TestInfo): Promise<void> {
   await openAccountMenu(page, testInfo);
   await page.getByTestId("admin-entry").click();
-  await expect(page).toHaveURL(/\/admin\/people$/);
+  await expect(page).toHaveURL(/\/admin$/);
 }
 
 test("대화가 화면 높이보다 많아도 관리자 입구가 있는 이름 메뉴 단추는 뷰포트 안에 있다", async ({ page }, testInfo) => {
@@ -76,6 +76,8 @@ test("MEMBER 역할에는 관리자 입구가 없고 관리자 영역의 주소�
 
   await page.goto("/admin/people");
   await expect(page).toHaveURL(HOME_URL);
+  await page.goto("/admin");
+  await expect(page).toHaveURL(HOME_URL);
   await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
 });
 
@@ -87,21 +89,65 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
   await expect(page.getByRole("dialog", { name: "사이드바" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "사이드바 열기" })).toHaveCount(0);
 
-  const menu = page.getByRole("navigation", { name: "관리자 메뉴" });
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole("link")).toHaveText(["사용자", "에이전트", "모델", "도구", "사용량과 비용", "외부 서비스 연결", "브라우저", "파일 공간"]);
-  await expect(menu.getByRole("link", { name: "사용자", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
   await expect(page.getByRole("banner").getByText("관리자", { exact: true })).toBeVisible();
-  // 좁은 화면의 메뉴는 가로로 밀리는 한 줄이라 본문이 옆으로 넘치지 않는다.
+  // 좁은 화면도 가로 메뉴 줄이 없어 본문이 옆으로 넘치지 않는다.
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
+
+  const menu = await openAdminMenu(page, testInfo);
+  await expect(menu.locator("section > p")).toHaveText(["살펴보기", "비서 설정", "사용자와 자원"]);
+  await expect(menu.getByRole("link")).toHaveText(["요약", "사용량과 비용", "에이전트", "모델", "도구", "사용자", "외부 서비스 연결", "브라우저", "파일 공간"]);
+  await expect(menu.getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
 });
 
-test("/admin 을 바로 열면 사용자 화면으로 넘어간다", async ({ page }) => {
+test("하위 화면에서는 그 줄 하나만 골라지고 실행 상세는 사용량과 비용을 고른다", async ({ page }, testInfo) => {
+  await page.goto("/admin/models");
+  let menu = await openAdminMenu(page, testInfo);
+  await expect(menu.locator('[aria-current="page"]')).toHaveText(["모델"]);
+
+  // 실제 실행이 없으면 상세가 실행 기록으로 돌려보내 같은 줄이 골라진다. 가짜 응답으로 상세 주소에 머문다.
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalFixture() }));
+  await page.goto("/admin/executions/980");
+  await expect(page.getByTestId("execution-tree")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/executions\/980$/);
+  menu = await openAdminMenu(page, testInfo);
+  await expect(menu.locator('[aria-current="page"]')).toHaveText(["사용량과 비용"]);
+});
+
+test("휴대폰에서 관리자 메뉴는 서랍이고 줄을 고르면 닫히며 Esc 로도 닫힌다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "휴대폰 폭에서만 서랍을 쓴다");
+  await page.setViewportSize({ width: 360, height: page.viewportSize()?.height ?? 780 });
   await page.goto("/admin");
-  await expect(page).toHaveURL(/\/admin\/people$/);
-  await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
+
+  const opener = page.getByRole("button", { name: "관리자 메뉴 열기" });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("navigation", { name: "관리자 메뉴" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("link", { name: "모델", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/models$/);
+  await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
+
+  await opener.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
+});
+
+test("/admin 은 요약 화면이고 카드의 링크는 내 사용량 화면을 연다", async ({ page }) => {
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("요약");
+  await expect(page.getByRole("region", { name: "품질과 실패" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "이번 달 사용량" })).toBeVisible();
+
+  await page.getByRole("link", { name: "내 실행 기록" }).click();
+  await expect(page).toHaveURL(/\/admin\/usage\?tab=executions$/);
+  await page.goto("/admin");
+  await page.getByRole("link", { name: "내 사용량 자세히" }).click();
+  await expect(page).toHaveURL(/\/admin\/usage$/);
 });
 
 test("사용 화면으로 돌아가기는 마지막으로 보던 대화로 간다", async ({ page }, testInfo) => {
