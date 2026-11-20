@@ -1,7 +1,9 @@
 package com.bifos.assistant.connector.oauth.application;
 
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
+import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthApp;
 import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthAppStatus;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.Credentials;
 import com.bifos.assistant.crypto.domain.ServerSecretRecord;
 import com.bifos.assistant.crypto.domain.ServerSecrets;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -28,6 +30,7 @@ public class ConnectorOAuthApps {
 
     private final ServerSecrets secrets;
     private final HermesConnectorClient connectors;
+    private final ConnectorOAuthAlerts alerts;
     private final Object writes = new Object();
 
 
@@ -61,8 +64,26 @@ public class ConnectorOAuthApps {
         // 없는 줄에 두 요청이 동시에 쓰더라도 한 요청의 저장이 끝난 뒤 다음 요청이 읽는다.
         synchronized (writes) {
             secrets.write(secretName(manifest), secret, metadata, adminId);
-            return status(manifest);
         }
+        alerts.appChanged(secretName(manifest));
+        return status(manifest);
+    }
+
+
+    /** 대시보드에 보낼 앱 자격이다. client secret, client ID, 플러그인별 앱의 App 이름 가운데 하나라도 없으면 비어 있다. */
+    public Optional<ConnectorOAuthApp> app(ConnectorManifest manifest) {
+        if (manifest.oauth() == null) {
+            return Optional.empty();
+        }
+        String name = secretName(manifest);
+        Map<String, Object> metadata = secrets.find(name).map(ServerSecretRecord::meta).orElse(Map.of());
+        String clientId = text(metadata, CLIENT_ID);
+        String slug = manifest.oauth().appScope() == AppScope.PLUGIN ? text(metadata, APP_SLUG) : null;
+        if (clientId == null || (slug == null && manifest.oauth().appScope() == AppScope.PLUGIN)) {
+            return Optional.empty();
+        }
+        return secrets.read(name).filter(secret -> !secret.isBlank())
+            .map(secret -> new ConnectorOAuthApp(name, new Credentials(clientId, secret), slug));
     }
 
 

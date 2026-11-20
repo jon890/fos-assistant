@@ -197,6 +197,9 @@ assistant:
       drift-cron: "0 */10 * * * *"
       # 자동 대기가 이만큼 지나도 READY 가 되지 않으면 그룹 관리자에게 한 번 알린다(ADR-20261120 / connector-auto-apply)
       admin-alert-after: 24h
+    oauth:
+      # 단추로 만든 연결의 access token 을 만료 전에 갱신하는 주기(ADR-20261120 / connector-oauth)
+      refresh-cron: "0 5/10 * * * *"
     ops:
       # 운영 정기 작업이 공유 gateway 재시작 조회에 보내는 서비스 Bearer 토큰. 비어 있으면 조회는 늘 거절한다
       token: ${CONNECTOR_OPS_TOKEN:}

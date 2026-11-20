@@ -164,7 +164,8 @@ public final class ConnectionDtos {
         List<BoundAgentView> bindings,
         int undeclaredTools,
         Integer listedTools,
-        Integer readOnlyTools) {
+        Integer readOnlyTools,
+        AuthView auth) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -175,8 +176,14 @@ public final class ConnectionDtos {
                 value.bindings().stream().map(BoundAgentView::from).toList(),
                 value.undeclaredTools(),
                 value.listedTools(),
-                value.readOnlyTools());
+                value.readOnlyTools(),
+                new AuthView(
+                    value.auth().usesOAuth() ? "oauth" : "manual", value.auth().provider(), value.auth().reconnectRequired()));
         }
+    }
+
+    /** 연결 방식이다. {@code method} 는 {@code oauth} 나 {@code manual} 이고 {@code provider} 는 단추 연결에만 있다. */
+    public record AuthView(String method, String provider, boolean reconnectRequired) {
     }
 
     /**

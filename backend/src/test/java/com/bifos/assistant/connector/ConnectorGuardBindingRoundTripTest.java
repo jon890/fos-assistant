@@ -15,6 +15,8 @@ import com.bifos.assistant.connector.connection.application.ConnectorBindingInst
 import com.bifos.assistant.connector.connection.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.application.ConnectorInstallAttempts;
+import com.bifos.assistant.connector.connection.application.ConnectorVerifier;
+import com.bifos.assistant.connector.connection.application.port.ConnectionOAuth;
 import com.bifos.assistant.connector.connection.config.ConnectorProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionGuard;
@@ -68,6 +70,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -149,7 +152,8 @@ class ConnectorGuardBindingRoundTripTest {
         assertThat(catalogSha()).as("앞 검사를 되돌린 뒤 선언").isEqualTo(initialSha);
         remote.delegate(hermes);
         concurrent = new ConnectorConnectionService(connections, bindings, users, bindingService, hermes, manager,
-            new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
+            new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, new ConnectorVerifier(hermes, tokens),
+            Mockito.mock(ConnectionOAuth.class), clock);
         target = new TransactionTemplate(manager).execute(status -> {
             String email = UUID.randomUUID() + "@example.test";
             var user = users.saveAndFlush(AppUser.of(email, "검사 주인", 1L, UserRole.MEMBER));

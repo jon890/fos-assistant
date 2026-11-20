@@ -7,12 +7,11 @@ import java.util.List;
 public record ConnectorOAuthSummary(
     String provider, boolean ready, List<String> fields, String settingsUrl, String installSettingsUrl) {
 
-    public static ConnectorOAuthSummary from(ConnectorOAuthDeclaration declaration) {
+    public static ConnectorOAuthSummary from(ConnectorOAuthDeclaration declaration, boolean ready) {
         if (declaration == null) {
             return null;
         }
-        // 단추는 시작·완료 API와 토큰 통로가 배포될 때부터 쓸 수 있다.
         return new ConnectorOAuthSummary(
-            declaration.provider(), false, declaration.fields(), declaration.settingsUrl(), declaration.installSettingsUrl());
+            declaration.provider(), ready, declaration.fields(), declaration.settingsUrl(), declaration.installSettingsUrl());
     }
 }

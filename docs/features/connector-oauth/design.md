@@ -135,17 +135,19 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `POST /api/connections/{connectorId}/oauth/start` | 웹이 돌아오는 주소와 단추 밖 칸 값을 보낸다. 칸 값을 지금 등록과 같이 검사한다. 앱 값이 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED`. begin 으로 대기 보관 파일을 쓰고, 상태 값과 PKCE 를 만들어 로그인 주소를 답한다 |
-| `POST /api/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
+| `POST /api/v1/connections/{connectorId}/oauth/start` | 웹이 돌아오는 주소와 단추 밖 칸 값을 보낸다. 칸 값을 지금 등록과 같이 검사한다. 앱 값이 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED`. begin 으로 대기 보관 파일을 쓰고, 상태 값과 PKCE 를 만들어 로그인 주소를 답한다 |
+| `POST /api/v1/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
 | `GET /internal/connector-token/{표식}` | 토큰 통로. JWT 없이 받는다(`SecurityConfig` 에 `permitAll`, 브라우저 중계와 같은 자리). `{access_token, expires_at}` |
 
-**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 쓴 무작위 값은 만료까지 메모리 집합에 넣어 한 번만 받는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고 exchange·commit·discard 에 넘긴다.
+**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고, 서명이 맞으면 그 기억을 지워 한 번만 받은 뒤 exchange·commit·discard 에 넘긴다.
+시작은 보관 파일 이름이 필요해 연결 행이 없으면 `DISCONNECTED` 상태의 행을 먼저 만든다. 로그인 주소의 방식은 앱 줄에 App 이름이 있으면 `install`, 없으면 `authorize` 다. Control Plane 은 제공자 이름으로 나누지 않는다.
+`complete` 는 실패도 HTTP 200 의 결과 값으로 답한다. 값의 목록은 [`connector.md`](../connector.md) 의 「단추 연결(OAuth)」 이 갖는다.
 
 **토큰 통로 표식**은 두 가지다. 서명할 글은 `v1`, 종류, 번호, (대기면) `nonce` 다.
 
 | 표식 | 담는 곳 | 주는 토큰 |
 | --- | --- | --- |
-| `k<연결 번호>.<HMAC>` | OAuth 파일. 연결마다 고정 | 메모리의 현재 칸. 연결이 해제됐거나 `auth.reconnectRequired` 면 409. 확인 도구 실패로 `PENDING` 인 연결은 받는다(「연결 다시 확인」 이 이 표식으로 확인 도구를 부른다) |
+| `k<연결 번호>.<HMAC>` | OAuth 파일. 연결마다 고정 | 메모리의 현재 칸. `auth.reconnectRequired` 면 409. 확인 도구 실패로 `PENDING` 인 연결은 받는다(「연결 다시 확인」 이 이 표식으로 확인 도구를 부른다) |
 | `p<연결 번호>.<nonce>.<HMAC>` | 대기 OAuth 파일 | 메모리의 대기 칸. 연결 상태를 보지 않는다. 대기 칸이 없으면 404 |
 
 표식이 틀리면 401, 연결이 없거나 해제됐으면 404, 갱신이 `unavailable` 이면 503 이다.
@@ -186,7 +188,7 @@ sequenceDiagram
 
 **확인 도구**: 지금 등록의 확인 경로를 쓰되 `oauth: "pending"` 으로 부른다. 통과하면 commit, 메모리 대기 칸을 현재 칸으로 옮기기, 연결 `READY` 와 `auth.method=oauth`, 붙은 바인딩 다시 설치 순서다. 나머지는 지금 등록 표([connector.md](../connector.md) 「연결의 등록, 확인, 해제」)와 같다. 방식을 바꾸지 않은 다시 연결은 서버 정의가 그대로라 재시작 대기가 생기지 않는다. 붙여 넣기에서 단추로 바꾸면 보관 파일이 바뀌어 지금처럼 재시작 대기가 된다.
 
-**「연결 다시 확인」**(OAuth 연결): 먼저 갱신을 한 번 강제로 하고, `ok` 면 `oauth: "current"` 로 확인 도구를 부른다(스펙 DECISION19). `grant_revoked` 면 확인 도구 없이 다시 연결 필요로 남는다.
+**「연결 다시 확인」**(OAuth 연결): `oauth: "current"` 로 확인 도구를 부른다. 확인 전의 강제 갱신은 해제 때 취소와 함께 다음 Control Plane PR 에서 넣는다. 그 뒤의 동작은 이렇다. 먼저 갱신을 한 번 강제로 하고, `ok` 면 `oauth: "current"` 로 확인 도구를 부른다(스펙 DECISION19). `grant_revoked` 면 확인 도구 없이 다시 연결 필요로 남는다.
 
 ### 갱신 주기
 
@@ -199,7 +201,7 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 
 | `outcome` | 연결 | 알림 |
 | --- | --- | --- |
-| `grant_revoked` | `READY` 면 `PENDING`, `auth.reconnectRequired=true`. 메모리 칸을 지운다 | 그 사용자에게 하나. `target_type` 은 `CONNECTIONS`. 이미 `reconnectRequired` 면 남기지 않는다 |
+| `grant_revoked` | 해제되지 않은 단추 연결이면 `PENDING`, `auth.reconnectRequired=true`(확인 실패로 이미 `PENDING` 인 연결에도 표시를 붙인다). 메모리 칸을 지운다. 갱신하는 사이 연결이 바뀌었으면 옛 토큰의 거절이라 바꾸지 않는다 | 그 사용자에게 하나. `target_type` 은 `CONNECTIONS`. 이미 `reconnectRequired` 면 남기지 않는다 |
 | `app_rejected` | 바꾸지 않는다 | `ADMIN` 마다 하나. 새 `target_type` `ADMIN_SECRETS`(서버 비밀값 화면). 같은 `source_public_id` 의 읽지 않은 알림이 있으면 남기지 않는다. 그 앱 줄을 바꾸면 그 알림을 읽음으로 바꾼다 |
 | `unavailable` | 바꾸지 않는다 | 없다. 그 호출만 「잠시 뒤 다시」(`unavailable`) |
 

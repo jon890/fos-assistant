@@ -51,6 +51,9 @@ public class SecurityConfig {
                 // 커넥터가 부르는 브라우저 중계다. 경로의 접근 표식이 인증이고 BrowserGateway 가 확인한다.
                 .requestMatchers("/internal/browser-gateway/**")
                 .permitAll()
+                // 단추로 연결한 플러그인이 부르는 토큰 통로다. 경로의 표식이 인증이고 ConnectorOAuthSigner 가 확인한다.
+                .requestMatchers(HttpMethod.GET, "/internal/connector-token/*")
+                .permitAll()
                 // 본문의 일회성 ticket은 claim controller가 직접 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/connector-executions/claim")
                 .permitAll()
