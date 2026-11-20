@@ -103,6 +103,54 @@ class LinkImageFetcherTest {
 
 
     @Test
+    @DisplayName("이름을 푼 공개 IP 에 고정해 연결하고 SNI 와 Host 는 원래 이름을 쓴다")
+    void pinsConnectionToResolvedAddress() {
+        dns.put("img.example.com", new String[] {"93.184.216.40"});
+        image("https://img.example.com/a.png", "image/png", PNG);
+        List<String> connections = new ArrayList<>();
+        LinkImageFetcher fetcher = new LinkImageFetcher(properties(List.of(), List.of()), this::resolve, (address, host, request, c) -> {
+            connections.add(address.getHostAddress() + " " + host);
+            return respond(host, request);
+        });
+
+        fetcher.fetch(URI.create("https://img.example.com/a.png"));
+
+        assertThat(connections).containsExactly("93.184.216.40 img.example.com");
+    }
+
+
+    @Test
+    @DisplayName("동시 받기가 차면 다섯째 링크는 FAILED 다")
+    void rejectsWhenAllWorkersAreBusy() throws Exception {
+        image("https://img.example.com/a.png", "image/png", PNG);
+        CountDownLatch started = new CountDownLatch(4);
+        CountDownLatch release = new CountDownLatch(1);
+        LinkImageFetcher fetcher = new LinkImageFetcher(properties(List.of(), List.of()), this::resolve, (address, host, request, c) -> {
+            started.countDown();
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            return respond(host, request);
+        });
+        List<Thread> callers = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            Thread caller = new Thread(() -> fetcher.fetch(URI.create("https://img.example.com/a.png")));
+            caller.start();
+            callers.add(caller);
+        }
+        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+
+        assertRejected(fetcher, "https://img.example.com/a.png", Reason.FAILED);
+        release.countDown();
+        for (Thread caller : callers) {
+            caller.join(5000);
+        }
+    }
+
+
+    @Test
     @DisplayName("주소 모양, 내부망과 예약 주소, 풀리지 않는 이름, 금지 목록은 모두 BLOCKED 이고 연결하지 않는다")
     void blocksUnsafeAddressesBeforeConnecting() {
         dns.put("loop.example.com", new String[] {"127.0.0.1"});
