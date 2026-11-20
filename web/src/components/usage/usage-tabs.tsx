@@ -34,7 +34,7 @@ export function UsageTabs({
 }: {
   current: UsageTab;
   isAdmin: boolean;
-  /** 탭 링크의 바탕 경로다. 일반 화면은 `/usage`, 관리자 영역은 `/admin/usage` 다. */
+  /** 탭 링크의 바탕 경로다. 관리자 영역의 `/admin/usage` 다. */
   basePath: string;
 }) {
   return (

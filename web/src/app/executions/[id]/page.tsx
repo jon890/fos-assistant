@@ -1,8 +1,12 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ExecutionDetail } from "@/components/execution/execution-detail";
 
-export default async function ExecutionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ExecutionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.email) {
     redirect("/signin");
@@ -10,7 +14,7 @@ export default async function ExecutionPage({ params }: { params: Promise<{ id: 
 
   const { id } = await params;
   if (!/^\d+$/.test(id)) {
-    redirect("/usage");
+    notFound();
   }
 
   return (
