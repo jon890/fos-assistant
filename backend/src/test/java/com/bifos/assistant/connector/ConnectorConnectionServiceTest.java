@@ -27,6 +27,8 @@ import com.bifos.assistant.connector.approval.application.ConnectorActionService
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
+import com.bifos.assistant.connector.connection.application.ConnectorVerifier;
+import com.bifos.assistant.connector.connection.application.port.ConnectionOAuth;
 import com.bifos.assistant.connector.connection.config.ConnectorProperties;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
@@ -79,6 +81,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -1267,7 +1270,8 @@ class ConnectorConnectionServiceTest {
                 new ConnectorProperties(maxConcurrentCalls, callsPerMinute),
                 Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)),
             approvals,
-            tokens,
+            new ConnectorVerifier(connector, tokens),
+            Mockito.mock(ConnectionOAuth.class),
             Clock.systemUTC());
     }
 

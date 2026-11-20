@@ -562,8 +562,22 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
 - 카탈로그의 한 줄은 `singleBinding` 으로 연결 하나를 에이전트 하나에만 붙이는지 알린다. 전문 에이전트 만들기 화면이 떼기 칸을 잠그는 데 쓴다
-- 단추 연결을 선언한 플러그인의 카탈로그는 `oauth` 에 제공자, 단추가 대신하는 비밀 칸, 제공자의 설정 주소를 낸다. 계정 연결 API와 토큰 통로가 준비될 때까지 `ready` 는 거짓이다. 수동 연결에 쓰는 입력 칸은 같이 준다
+- 단추 연결을 선언한 플러그인의 카탈로그는 `oauth` 에 제공자, 단추가 대신하는 비밀 칸, 제공자의 설정 주소를 낸다. `ready` 는 그 플러그인의 OAuth 앱 값이 모두 있고 토큰 통로 주소를 만들 수 있을 때 참이다. 수동 연결에 쓰는 입력 칸은 같이 준다
+- 연결 상태 응답의 `auth` 는 연결 방식(`method`: `oauth` 나 `manual`), 제공자, 다시 연결 필요(`reconnectRequired`)를 준다
 - `POST /api/v1/connections/{id}/specialist` 는 그 연결만 맡는 전문 에이전트를 만든다. 칸과 순서는 [에이전트 팀](agent-team.md) 의 「전문 에이전트 만들기」 가 갖는다
+
+### 단추 연결(OAuth)
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `POST /api/v1/connections/{id}/oauth/start` | 본문 `redirectUri`(웹이 만든 돌아오는 주소)와 `values`(단추 밖 칸 값)를 받아 `authorizeUrl` 을 답한다. 단추가 대신하는 칸의 값이 오면 `VALIDATION_FAILED`, 앱 값이나 통로 주소가 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED` 다 |
+| `POST /api/v1/connections/oauth/complete` | 서비스 화면에서 돌아온 주소의 `state`, `code`, `error`, `setupAction` 을 받아 연결을 만든다. 실패도 HTTP 200 의 `outcome` 으로 답한다 |
+| `GET /internal/connector-token/{표식}` | 플러그인 프로세스가 지금 유효한 access token 을 받는 통로다. 로그인 없이 경로의 표식으로 인증한다 |
+
+`outcome` 은 `CONNECTED`, `REAUTHORIZE`(함께 온 `authorizeUrl` 로 한 번 더 보낸다), `DENIED`, `INVALID_STATE`, `SCOPE_DENIED`, `APP_REJECTED`, `VERIFY_FAILED`(`reason` 에 확인 도구의 오류 코드), `SUPERSEDED`, `UNAVAILABLE` 가운데 하나다. `connectorId` 는 돌아갈 연결 화면의 플러그인이고 상태 값을 믿을 수 없으면 비어 있다.
+단추 연결은 확인을 통과한 뒤 등록과 같은 길로 저장한다. 사용자 행 잠금 안에서 보관 파일 쓰기 자리에 대시보드 commit 을 하고 붙은 바인딩을 다시 설치한다. 시작한 흐름이 끝나기 전의 연결 행은 `DISCONNECTED` 다.
+값을 붙여 넣어 다시 등록하면 방식이 `manual` 로 바뀌고 그 연결의 토큰 통로는 닫힌다.
+순서와 실패 처리, 표식과 갱신, 끊김 알림은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
 
 ### 관리자 OAuth 앱 설정
 

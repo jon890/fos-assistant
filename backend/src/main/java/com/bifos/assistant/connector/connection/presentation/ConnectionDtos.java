@@ -164,7 +164,8 @@ public final class ConnectionDtos {
         List<BoundAgentView> bindings,
         int undeclaredTools,
         Integer listedTools,
-        Integer readOnlyTools) {
+        Integer readOnlyTools,
+        AuthView auth) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -175,8 +176,20 @@ public final class ConnectionDtos {
                 value.bindings().stream().map(BoundAgentView::from).toList(),
                 value.undeclaredTools(),
                 value.listedTools(),
-                value.readOnlyTools());
+                value.readOnlyTools(),
+                new AuthView(
+                    value.auth().usesOAuth() ? "oauth" : "manual", value.auth().provider(), value.auth().reconnectRequired()));
         }
+    }
+
+    /**
+     * 연결 방식이다. 화면이 「단추로 연결함」 과 「직접 입력함」 을 나눠 보인다.
+     *
+     * @param method {@code oauth} 나 {@code manual}
+     * @param provider 단추 연결의 제공자 이름. 붙여 넣은 연결이면 null
+     * @param reconnectRequired 서비스가 갱신을 거절해 다시 연결해야 하는가
+     */
+    public record AuthView(String method, String provider, boolean reconnectRequired) {
     }
 
     /**

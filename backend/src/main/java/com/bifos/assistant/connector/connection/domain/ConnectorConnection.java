@@ -88,6 +88,16 @@ public class ConnectorConnection extends CreatedAtEntity {
     }
 
 
+    /**
+     * 단추 연결을 시작할 때 보관 파일 이름을 정하려고 미리 만드는 행이다. 연결이 끝나기 전에는 화면에 연결로 보이지 않게 해제 상태로 둔다.
+     */
+    public static ConnectorConnection reserved(Long userId, String connectorId, Instant now) {
+        ConnectorConnection connection = new ConnectorConnection(userId, connectorId, now);
+        connection.status = ConnectionStatus.DISCONNECTED;
+        return connection;
+    }
+
+
     /** 에이전트 없는 연결이다. 값은 보관 파일에 두고 에이전트에는 바인딩으로 붙인다(ADR-083). */
     public static ConnectorConnection pending(Long userId, String connectorId, Instant now) {
         return new ConnectorConnection(userId, connectorId, now);

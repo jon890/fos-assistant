@@ -33,11 +33,11 @@
 ### 1. `ConnectionOAuth` port 와 연결 쪽 변경
 
 `ConnectionOAuth` 에 `ready(ConnectorManifest)` 와 `forget(ConnectorConnection)` 을 둔다. `ConnectorConnectionService.catalog` 가 `ConnectorOAuthSummary.from(선언, ready)` 로 `ready` 를 채운다.
-`ConnectorValues.validated` 에 단추가 대신하는 칸 목록을 받는 public 갈래를 더한다. 그 칸은 값이 오면 거절하고 필수 검사에서 뺀다.
+`ConnectorValues.validated` 에 연결 방식을 받는 갈래를 더한다. 그 칸은 값이 오면 거절하고 필수 검사에서 뺀다.
 `ConnectorConnectionService.registerOAuth(user, manifest, fields, commit)` 를 더한다. `apply` 의 보관 파일 쓰기를 인자로 받게 바꿔 붙여 넣기 등록과 단추 연결이 함께 쓴다. 붙여 넣기 등록은 보관 파일을 쓴 뒤 `forget` 을 불러 메모리 칸과 끊김 알림을 정리한다.
 `ConnectionSnapshot` 과 `ConnectionView` 에 `auth`(`method`, `provider`, `reconnectRequired`)를 더한다.
 다시 연결 필요 표시는 `ConnectorConnection.connected` 가 새 `auth` 로 덮어 지운다.
-`ConnectorVerifier` 와 `vault`, `Verified` 를 public 으로 열고 `vault` 가 `VaultAccess` 를 받게 한다. 돌아오기의 확인도 이 경로를 써서 사용자 브라우저 중계 주소, 예외의 `unavailable` 바꾸기, 확인 도구가 없을 때의 처리가 등록과 같다.
+`ConnectorVerifier` 를 Spring 빈으로 바꿔 열고(`application` 직하의 public 타입은 빈이어야 한다) `vault` 가 `VaultAccess` 를 받게 한다. 결과 record 는 `dto/ConnectorVerified` 로 옮긴다. 단추 밖 칸 값의 검사와 저장할 모양도 이 빈의 `oauthValues`, `oauthFields` 로 연다. `ConnectorValues` 는 package-private 으로 둔다. 돌아오기의 확인도 이 경로를 써서 사용자 브라우저 중계 주소, 예외의 `unavailable` 바꾸기, 확인 도구가 없을 때의 처리가 등록과 같다.
 `apply` 는 `ConnectorOAuthFlowConflict` 를 잡지 않고 그대로 내보내 트랜잭션을 되돌린다.
 
 ### 2. `ConnectorOAuthFlows` 와 컨트롤러
@@ -51,7 +51,6 @@
 ### 3. 이 phase 를 검증하는 테스트
 
 `ConnectorOAuthFlowTest`(스프링 통합, MockMvc): 정상 연결과 대시보드 호출 순서, `MEMBER` 역할 사용자, 붙여 넣은 연결에서 단추로 바꾸기, 인수 검증 계획의 REQ5 실패 경로 전부, `setupAction=update` 의 `REAUTHORIZE`, commit 409(기존 연결 상태가 그대로), 다시 연결 필요인 연결을 다시 연결하면 `READY` 이고 끊김 알림이 읽음인 것, 정상 연결의 로그 출력(`OutputCaptureExtension`)에 access token 과 client secret 이 없는 것, 앱 값이 없을 때의 409 와 카탈로그 `ready`.
-`ConnectorConnectionControllerTest` 의 「`ready` 는 거짓」 단언을 새 조건에 맞게 고친다.
 
 ## 검증
 
@@ -75,15 +74,12 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*Connecto
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/ConnectionSnapshot.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/presentation/ConnectionDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/domain/ConnectorConnection.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthSigner.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthTokens.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorOAuthFlowTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionControllerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceLockTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorGuardBindingRoundTripTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorVerifier.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/ConnectorVerified.java` | 신규 |
 | `docs/features/connector.md` | 수정 |
 | `docs/features/connector-oauth/design.md` | 수정 |
-| `docs/prd.md` | 수정 |

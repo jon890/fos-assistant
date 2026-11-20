@@ -135,11 +135,13 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `POST /api/connections/{connectorId}/oauth/start` | 웹이 돌아오는 주소와 단추 밖 칸 값을 보낸다. 칸 값을 지금 등록과 같이 검사한다. 앱 값이 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED`. begin 으로 대기 보관 파일을 쓰고, 상태 값과 PKCE 를 만들어 로그인 주소를 답한다 |
-| `POST /api/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
+| `POST /api/v1/connections/{connectorId}/oauth/start` | 웹이 돌아오는 주소와 단추 밖 칸 값을 보낸다. 칸 값을 지금 등록과 같이 검사한다. 앱 값이 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED`. begin 으로 대기 보관 파일을 쓰고, 상태 값과 PKCE 를 만들어 로그인 주소를 답한다 |
+| `POST /api/v1/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
 | `GET /internal/connector-token/{표식}` | 토큰 통로. JWT 없이 받는다(`SecurityConfig` 에 `permitAll`, 브라우저 중계와 같은 자리). `{access_token, expires_at}` |
 
-**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 쓴 무작위 값은 만료까지 메모리 집합에 넣어 한 번만 받는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고 exchange·commit·discard 에 넘긴다.
+**상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고, 서명이 맞으면 그 기억을 지워 한 번만 받은 뒤 exchange·commit·discard 에 넘긴다.
+시작은 보관 파일 이름이 필요해 연결 행이 없으면 `DISCONNECTED` 상태의 행을 먼저 만든다. 로그인 주소의 방식은 앱 줄에 App 이름이 있으면 `install`, 없으면 `authorize` 다. Control Plane 은 제공자 이름으로 나누지 않는다.
+`complete` 는 실패도 HTTP 200 의 결과 값으로 답한다. 값의 목록은 [`connector.md`](../connector.md) 의 「단추 연결(OAuth)」 이 갖는다.
 
 **토큰 통로 표식**은 두 가지다. 서명할 글은 `v1`, 종류, 번호, (대기면) `nonce` 다.
 
