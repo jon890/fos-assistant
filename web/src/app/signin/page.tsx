@@ -2,13 +2,20 @@ import { connection } from "next/server";
 import Link from "next/link";
 import { signIn } from "@/auth";
 import { appName } from "@/lib/app-name";
+import { safeNextPath } from "@/lib/push-open";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
   // 앱 이름은 실행할 때의 환경에서 읽는다. 빌드할 때 굳지 않게 요청마다 그린다.
   await connection();
   const name = appName();
+  // 로그인 뒤 돌아갈 곳이다. 푸시 열기 주소만 이 값을 붙여 보낸다(docs/features/attention/spec.md 의 DECISION23).
+  const redirectTo = safeNextPath((await searchParams).next);
   return (
     <section className="grid min-h-full place-items-center">
       <Card className="w-full max-w-sm items-center gap-0 bg-card p-6 text-center shadow-sm sm:p-8">
@@ -27,7 +34,7 @@ export default async function SignInPage() {
           className="mt-6 w-full"
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/" });
+            await signIn("google", { redirectTo });
           }}
         >
           <Button type="submit" className="w-full">

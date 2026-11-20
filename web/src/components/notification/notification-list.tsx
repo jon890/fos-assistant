@@ -34,7 +34,7 @@ function formatCreatedAt(createdAt: string): string {
   });
 }
 
-/** 내 알림 목록이다. 첫 쪽은 화면이 열린 뒤 브라우저가 읽는다. */
+/** 내 알림 목록이다. 「지금 볼 것」 의 「알림」 탭 안에 그린다. 첫 쪽은 탭이 열린 뒤 브라우저가 읽는다. */
 export function NotificationList() {
   const router = useRouter();
   const { unreadCount, refresh } = useUnreadNotifications();
@@ -182,9 +182,8 @@ export function NotificationList() {
     unreadCount > 0 || items.some((item) => item.readAt === null);
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">알림</h1>
+    <div className="w-full">
+      <div className="mb-4 flex items-center justify-end gap-3">
         <Button
           variant="outline"
           size="sm"

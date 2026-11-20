@@ -86,7 +86,7 @@ state = { phase: "waiting" } | { phase: "watching", base: string } | { phase: "o
 
 ### 알림 갈 곳
 
-`notificationHref` 에서 `kind` 가 `HANDOFF_REQUESTED` 이고 갈 곳이 대화면 `/chat/<id>?handoff=open` 이다. 다른 종류는 그대로다. 알림 목록은 `/notifications` 화면에만 있어 대화 화면으로는 늘 새로 들어온다. 훅은 `useSearchParams` 로 받으므로 같은 대화 안에서 검색어만 바뀌어도 처리한다.
+`notificationHref` 에서 `kind` 가 `HANDOFF_REQUESTED` 이고 갈 곳이 대화면 `/chat/<id>?handoff=open` 이다. 다른 종류는 그대로다. 알림 목록은 「지금 볼 것」 의 「알림」 탭에만 있어 대화 화면으로는 늘 새로 들어온다. 훅은 `useSearchParams` 로 받으므로 같은 대화 안에서 검색어만 바뀌어도 처리한다.
 
 ### 데이터
 

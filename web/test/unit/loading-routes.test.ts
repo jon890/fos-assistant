@@ -20,7 +20,7 @@ const ROUTE_FRAMES: Record<string, string> = {
   "admin/agents": "components/agent/agent-admin-panel.tsx",
   "admin/agents/[code]": "components/agent/persona-editor.tsx",
   memory: "components/memory/memory-list.tsx",
-  now: "components/now/now-screen.tsx",
+  now: "app/now/page.tsx",
   "admin/usage": "components/usage/usage-screen.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",
   "admin/executions/[id]": "app/admin/executions/[id]/page.tsx",
@@ -28,6 +28,8 @@ const ROUTE_FRAMES: Record<string, string> = {
   "admin/people": "app/admin/people/people-admin-panel.tsx",
   "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",
+  // 푸시를 누르면 여는 주소다. 읽음 표시 뒤 넘기는 곳이 대부분 대화라 대화 뼈대를 쓴다.
+  "n/[notificationId]": "components/chat/message-list.tsx",
   // `/` 는 대화방을 열어 대화 주소로 넘긴다. 뼈대가 다른 경로를 덮지 않게 경로 묶음 안에 둔다.
   "(home)": "components/chat/message-list.tsx",
 };
