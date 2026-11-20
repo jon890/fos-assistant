@@ -39,8 +39,9 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
     /**
      * profile 플러그인이 모든 도구 인자에 덮어쓴 {@code _fos_ctx} 를 뗀 복사본을 만든다.
      *
-     * <p>도구 규격은 그 키를 모르므로 떼지 않으면 {@code artifact_write} 가 모르는 키로 거절한다. Hermes 는
-     * hook 이 더한 키를 도구 규격으로 검증하지 않는다. 받은 노드는 바꾸지 않는다.
+     * <p>도구 규격은 그 키를 모르므로 떼지 않으면 {@code artifact_write} 가 모르는 키로 거절한다.
+     * Hermes v0.23.2는 루트가 닫힌 스키마의 미선언 키를 호출 전에 거절하므로, 카탈로그는 루트의
+     * {@code additionalProperties: false}를 제거한다. 서버의 인자 검사 전에 서명 키를 떼며 받은 노드는 바꾸지 않는다.
      */
     public static JsonNode strip(JsonNode arguments) {
         if (!arguments.has(FIELD)) {
