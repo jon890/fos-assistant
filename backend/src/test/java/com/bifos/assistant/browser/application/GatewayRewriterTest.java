@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.testsupport.InMemoryServerSecrets;
 import java.time.Clock;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
@@ -127,9 +128,12 @@ class GatewayRewriterTest {
             Duration.ofMinutes(30),
             gatewayBaseUrl,
             "0123456789abcdef0123456789abcdef");
-        return new BrowserGatewayTokens(LiveProperties.fixed(BrowserProperties.class, properties), Clock.systemUTC())
-            .relayBase("b1.sig")
-            .orElseThrow();
+        return new BrowserGatewayTokens(
+            LiveProperties.fixed(BrowserProperties.class, properties),
+            InMemoryServerSecrets.with(BrowserGatewayTokens.SECRET_NAME, "0123456789abcdef0123456789abcdef"),
+            Clock.systemUTC())
+                .relayBase("b1.sig")
+                .orElseThrow();
     }
 
 
