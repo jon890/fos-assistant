@@ -97,7 +97,7 @@ public class ConnectorBinding extends CreatedAtEntity {
     @Column(name = "cycle_phase", length = 16)
     private CyclePhase cyclePhase;
 
-    /** {@code IDLE_WAIT} 면 단계를 시작한 시각, {@code OFF} 면 꺼졌다는 답을 처음 커밋한 시각이다. */
+    /** {@code IDLE_WAIT} 면 단계를 시작한 시각, {@code OFF} 면 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각이다. */
     @Column(name = "cycle_at")
     private Instant cycleAt;
 

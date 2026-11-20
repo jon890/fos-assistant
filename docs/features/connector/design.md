@@ -84,7 +84,7 @@
 | 칸 | PR | 뜻 |
 | --- | --- | --- |
 | `cycle_phase` VARCHAR(16) NULL | PR1 | 껐다 켜기 단계. 비었거나 `IDLE_WAIT`(실행이 비기를 기다림), `OFF`(끈 뒤 다시 켜기를 기다림) |
-| `cycle_at` DATETIME(6) NULL | PR1 | `IDLE_WAIT` 이면 단계를 시작한 시각(10분 상한의 기준), `OFF` 이면 꺼졌다는 답을 처음 커밋한 시각 |
+| `cycle_at` DATETIME(6) NULL | PR1 | `IDLE_WAIT` 이면 단계를 시작한 시각(10분 상한의 기준), `OFF` 이면 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각 |
 | `apply_failed_at` DATETIME(6) NULL | PR1 | 자동 경로가 실패한 시각(스펙 DECISION10). 사용자나 관리자가 시작한 설치(등록, 연결 확인, 다시 확인)와 `READY` 가 비운다. 자동 경로의 설치는 비우지 않는다 |
 | `waiting_since` DATETIME(6) NULL | PR3 | 자동 대기가 시작된 시각. 비어 있을 때만 적고 단계가 바뀌어도 그대로 둔다. `READY` 와 사용자나 관리자가 시작한 설치가 비운다 |
 | `admin_notified_at` DATETIME(6) NULL | PR3 | 지금 대기에 관리자 알림을 보낸 시각. `waiting_since` 가 비워지면 함께 비운다 |
