@@ -13,13 +13,16 @@ import test from "node:test";
 const ROOT = join(import.meta.dirname, "../..");
 
 /**
- * 이름을 지우기 전의 데이터 이관 기록과, 옛 경로를 새 경로로 넘기는 페이지, 웹 푸시가 보낼 수 있는 브라우저 푸시 서비스의 호스트 목록만 예외다.
+ * 이름을 지우기 전의 데이터 이관 기록과, 옛 경로를 새 경로로 넘기는 페이지, 웹 푸시가 보낼 수 있는 브라우저 푸시 서비스의 호스트 목록,
+ * 단추 연결의 OAuth 제공자 표만 예외다.
  * 푸시 호스트는 플러그인이 아니라 브라우저가 정한 보낼 곳이고, 목록이 없으면 서버가 사용자가 준 주소로 요청을 보내는 길이 열린다.
+ * 제공자 표는 플러그인 선언이 로그인과 토큰 주소를 정하지 못하게 하려고 대시보드 plugin 이 갖는다(ADR-20261120 connector-oauth).
  */
 const EXCLUDED = new Set([
   "backend/src/main/java/com/bifos/assistant/notification/config/PushProperties.java",
   "backend/src/main/resources/db/migration/V36__accountbook_connection.sql",
   "backend/src/main/resources/db/migration/V38__connector_connection.sql",
+  "hermes/plugins/dashboard-profile-api/connector_oauth_providers.py",
   "web/src/app/connections/accountbook/page.tsx",
 ]);
 
