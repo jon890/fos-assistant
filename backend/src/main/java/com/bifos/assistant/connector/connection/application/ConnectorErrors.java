@@ -37,7 +37,7 @@ final class ConnectorErrors {
                 new ApiException(ErrorCode.CONNECTOR_INSTALL_MISMATCH, "the installed connector does not match");
             case PROBE_FAILED, NO_TOOLS ->
                 new ApiException(ErrorCode.CONNECTOR_TOOLS_UNVERIFIED, "the connector tools could not be verified");
-            case APPLY_SCHEDULED ->
+            case APPLY_SCHEDULED, CYCLE_PENDING ->
                 new ApiException(ErrorCode.CONNECTOR_APPLY_SCHEDULED, "the connector is still being applied");
             case RESTART_PENDING ->
                 new ApiException(ErrorCode.CONNECTOR_RESTART_AGAIN, "the gateway restart is still pending");

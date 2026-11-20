@@ -53,7 +53,7 @@
 
 - `InstallResult` 에 `boolean cycleAvailable`, `boolean cycleOff` 를 더하고 기존 생성자는 둘을 거짓으로 채운다. Javadoc 에 옛 plugin 은 칸을 내지 않아 거짓이라고 적는다.
 - 포트에 `default InstallResult bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser, JsonNode guard, boolean cycleOff)` 를 더한다. 기본 구현은 `cycleOff` 면 `IllegalStateException`, 아니면 6인자로 넘긴다.
-- `HttpHermesConnectorClient` 가 7인자를 구현해 `bind` 본문에 `"cycle": "off"` 를 넣는다. 기존 6인자는 7인자를 `false` 로 부른다. `installResult` 가 `cycle_available`, `cycle_off` 를 `optionalBoolean(..., false)` 로 읽는다.
+- `HttpHermesConnectorClient` 가 7인자를 구현해 `bind` 본문에 `"cycle": "off"` 를 넣는다. 본문은 `HermesConnectorBodies.bind(vault, guard, cycleOff)` 가 만든다(길이 상한 때문). 기존 6인자는 7인자를 `false` 로 부른다. `installResult` 가 `cycle_available`, `cycle_off` 를 `optionalBoolean(..., false)` 로 읽는다.
 
 ### 6. `ResyncOutcome.CYCLE_PENDING` 과 `ConnectorErrors`
 
@@ -84,6 +84,7 @@ node scripts/checks/check-file-length.mjs
 | `backend/docs/data-schema.md` | 수정 (세 칸) |
 | `backend/src/main/java/com/bifos/assistant/hermes/application/port/HermesConnectorClient.java` | 수정 (답 칸, 7인자 설치) |
 | `backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesConnectorClient.java` | 수정 (`bind.cycle`, 답 해석) |
+| `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesConnectorBodies.java` | 수정 (`bind` 본문 도우미) |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/ResyncOutcome.java` | 수정 (`CYCLE_PENDING`) |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorErrors.java` | 수정 (오류 대응) |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |

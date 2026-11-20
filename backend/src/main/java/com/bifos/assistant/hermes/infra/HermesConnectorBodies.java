@@ -15,6 +15,20 @@ final class HermesConnectorBodies {
     private static final String OWNER_BROWSER = "owner_browser";
 
 
+    /** 바인딩 설치의 {@code bind} 본문이다. guard 와 끄기 요청은 있을 때만 싣는다. */
+    static Map<String, Object> bind(String vault, JsonNode guard, boolean cycleOff) {
+        Map<String, Object> bind = new LinkedHashMap<>();
+        bind.put("vault", vault);
+        if (guard != null) {
+            bind.put("guard", guard);
+        }
+        if (cycleOff) {
+            bind.put("cycle", "off");
+        }
+        return bind;
+    }
+
+
     /** 중계 주소가 null 이면 키를 싣지 않는다. 사용자 브라우저를 쓰지 않는 커넥터의 요청 본문은 그대로다. */
     static Map<String, Object> withOwnerBrowser(Map<String, Object> request, String ownerBrowser) {
         if (ownerBrowser == null) {

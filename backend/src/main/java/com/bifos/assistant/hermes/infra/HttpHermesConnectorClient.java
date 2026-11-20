@@ -225,6 +225,19 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         String sandboxOwner,
         String ownerBrowser,
         JsonNode guard) {
+        return bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser, guard, false);
+    }
+
+
+    @Override
+    public InstallResult bindConnector(
+        String profile,
+        String connectorId,
+        String vault,
+        String sandboxOwner,
+        String ownerBrowser,
+        JsonNode guard,
+        boolean cycleOff) {
         // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
         // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
         // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
@@ -243,7 +256,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                     ENABLED,
                     true,
                     "bind",
-                    guard == null ? Map.of(VAULT, vault) : Map.of(VAULT, vault, "guard", guard),
+                    HermesConnectorBodies.bind(vault, guard, cycleOff),
                     "sandbox_owner",
                     sandboxOwner),
                 ownerBrowser),
@@ -302,7 +315,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return new InstallResult(
             requiredBoolean(body, RESTART_REQUIRED),
             optionalBoolean(body, "plugin_updated", false),
-            optionalBoolean(body, "reload_pending", false));
+            optionalBoolean(body, "reload_pending", false),
+            optionalBoolean(body, "cycle_available", false),
+            optionalBoolean(body, "cycle_off", false));
     }
 
 
