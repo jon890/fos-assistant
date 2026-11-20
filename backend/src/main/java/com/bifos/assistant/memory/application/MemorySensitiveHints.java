@@ -106,6 +106,12 @@ final class MemorySensitiveHints {
     }
 
 
+    /** 요약까지 본다. 요약이 없으면(null 이나 빈 글) 제목과 본문만 본다. */
+    public static boolean suspected(String title, String content, String summary) {
+        return suspected(title, content) || (summary != null && !summary.isEmpty() && suspected(summary));
+    }
+
+
     private static boolean suspected(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFC);
         String compact = WHITESPACE.matcher(normalized).replaceAll("");

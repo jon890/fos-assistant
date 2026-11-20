@@ -81,7 +81,7 @@ public class MemoryCaptureService {
         }
         boolean direct = request.direct()
             && !request.sensitive()
-            && !MemorySensitiveHints.suspected(request.title(), request.content());
+            && !MemorySensitiveHints.suspected(request.title(), request.content(), request.summary());
         String dedupKey;
         try {
             dedupKey = texts.proposalDedupKey(user.id(), request.title(), request.content());
@@ -99,9 +99,12 @@ public class MemoryCaptureService {
         }
         MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
         String body = request.content();
+        String summary = request.summary() == null ? "" : request.summary();
         Memory created = direct
-            ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
-            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
+            ? Memory.remembered(
+                user.id(), request.title(), body, summary, placement, request.executionId(), dedupKey, clock.instant())
+            : Memory.proposed(
+                user.id(), request.title(), body, summary, placement, request.executionId(), dedupKey, clock.instant());
         // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
         created.allowArchive(request.archivable());
         Memory saved;
@@ -221,7 +224,7 @@ public class MemoryCaptureService {
         if (!before.readable()) {
             throw conflict("an unreadable revision is not restored here");
         }
-        memoryService.revise(user, memory, before.content(), before.retrieval());
+        memoryService.revise(user, memory, before.content(), before.summary(), before.retrieval());
     }
 
 
@@ -229,7 +232,7 @@ public class MemoryCaptureService {
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
         if (!request.direct()
             || request.sensitive()
-            || MemorySensitiveHints.suspected(request.title(), request.content())) {
+            || MemorySensitiveHints.suspected(request.title(), request.content(), request.summary())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
@@ -237,13 +240,15 @@ public class MemoryCaptureService {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_TARGET_NOT_FOUND);
         }
         Memory memory = found.get();
-        if (request.content().equals(memory.content())) {
+        // 요약을 주지 않았으면 지금 요약을 둔다. 빈 글이면 지운다
+        String summary = request.summary() == null ? memory.summary() : request.summary();
+        if (request.content().equals(memory.content()) && summary.equals(memory.summary())) {
             return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
         }
         int base = memory.revision();
         try {
             // 암호화는 revision 을 남기기 전에 하므로 거절돼도 줄과 revision 이 바뀌지 않는다
-            memoryService.revise(user, memory, request.content(), memory.retrieval());
+            memoryService.revise(user, memory, request.content(), summary, memory.retrieval());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
                 return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
@@ -277,7 +282,8 @@ public class MemoryCaptureService {
                 existing.id());
             case REJECTED -> new MemoryRememberResult(MemoryRememberOutcome.REJECTED_BEFORE, existing.id());
             case PROPOSED -> {
-                if (!direct) {
+                // 저장된 제안의 요약에 민감해 보이는 글이 있으면 지금 호출이 깨끗해도 받아들이지 않는다. 이번 호출의 요약은 쓰지 않는다
+                if (!direct || MemorySensitiveHints.suspected(existing.title(), existing.content(), existing.summary())) {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());

@@ -511,7 +511,7 @@ class MemoryEncryptionTest {
     private static MemoryRememberRequest remember(String title, String content, boolean direct) {
         // 실행마다 남기는 수에 상한이 있어 호출마다 다른 실행 번호를 쓴다
         return new MemoryRememberRequest(
-            title, content, null, false, null, EXECUTIONS.incrementAndGet(), null, direct, false, false);
+            title, content, null, null, false, null, EXECUTIONS.incrementAndGet(), null, direct, false, false);
     }
 
 

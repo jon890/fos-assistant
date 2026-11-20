@@ -1,5 +1,11 @@
 package com.bifos.assistant.mcp;
 
+import java.util.Objects;
+import java.util.Set;
+import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
+import com.bifos.assistant.context.application.ContextAssembler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -114,6 +120,9 @@ class McpMemoryRememberToolTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    ContextAssembler assembler;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -322,6 +331,108 @@ class McpMemoryRememberToolTest {
 
 
     /** 판단 피드백을 {@code 종류|주체} 로 남긴 순서대로 읽는다. */
+    @Test
+    @DisplayName("사람이 보낸 turn 에서 요약과 함께 남기면 바로 저장되고 다음 조립의 요약 구역에 요약이 들어간다")
+    void remembersSummaryIntoSummarySection() throws Exception {
+        askedInThisTurn();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "다른 사람 홍길동"))))
+            .startsWith(REMEMBERED);
+
+        Memory saved = onlyMemory();
+        assertThat(saved.summary()).isEqualTo("다른 사람 홍길동");
+        assertThat(assembler.assemble(currentDad(), dadRun.agentId()).instructions())
+            .contains("- [" + saved.id() + "] 다른 사람: 다른 사람 홍길동");
+    }
+
+
+    @Test
+    @DisplayName("바깥 글을 읽은 대화의 요약은 제안이고 받아들이기 전에는 요약 구역에 없다")
+    void proposesSummaryAfterExternalRead() throws Exception {
+        askedInThisTurn();
+        toolStarted("web_search");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "제안요약-표식-6610"))))
+            .isEqualTo(PROPOSED);
+
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(Objects.toString(assembler.assemble(currentDad(), dadRun.agentId()).instructions(), ""))
+            .doesNotContain("제안요약-표식-6610");
+    }
+
+
+    @Test
+    @DisplayName("요약에만 민감해 보이는 글이 있거나 요약에만 부정이 뒤집혔으면 제안이고, 201자 요약은 거절한다")
+    void guardsSummaryLikeContent() throws Exception {
+        askedInThisTurn();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "홍길동 계좌 있음"))))
+            .isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람 둘", "다른 사람은 홍길동이다", null).put("summary", "홍길동은 안 온다"))))
+            .isEqualTo(PROPOSED);
+        JsonNode tooLong = call(remember("다른 사람 셋", "다른 사람은 홍길동이다", null).put("summary", "가".repeat(201)));
+        assertThat(tooLong.path("isError").asBoolean()).isTrue();
+        assertThat(text(tooLong)).isEqualTo("summary 는 200자까지다.");
+    }
+
+
+    @Test
+    @DisplayName("memory_id 로 고칠 때 요약을 주지 않으면 지금 요약을 두고, 같은 본문에 다른 요약이면 요약만 바꾼 revision 을 남기며, 빈 글이면 지운다")
+    void keepsChangesOrClearsSummaryOnUpdate() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "첫 요약"));
+        Memory created = onlyMemory();
+
+        call(remember("다른 사람", "다른 사람은 홍길동이고 서울에 산다", null).put("memory_id", created.id()));
+        assertThat(onlyMemory().summary()).isEqualTo("첫 요약");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이고 서울에 산다", null)
+            .put("memory_id", created.id()).put("summary", "둘째 요약")))).startsWith("기존 기억을 고쳤다.");
+        assertThat(onlyMemory().summary()).isEqualTo("둘째 요약");
+        assertThat(memoryService.revisionsOf(currentDad(), created.id()))
+            .extracting(MemoryRevision::summary)
+            .containsExactly("첫 요약", "첫 요약");
+
+        // 한 실행이 남기는 기록에는 상한(3)이 있어 새 turn 에서 고친다
+        String nextRoot = askedInNewRootRun();
+        call(remember("다른 사람", "다른 사람은 홍길동이고 서울에 산다", null).put("memory_id", created.id()).put("summary", ""), nextRoot);
+        assertThat(onlyMemory().summary()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("요약이 민감해 보이는 기존 제안은 같은 제목과 본문의 바로 저장 호출이 받아들이지 않는다")
+    void doesNotAcceptProposalWithSensitiveSummary() throws Exception {
+        captureService.remember(currentDad(), MemoryAccess.of(Set.of("core")), new MemoryRememberRequest(
+            "다른 사람", "다른 사람은 홍길동이다", "홍길동 통장 있음", null, false, null, 990_101L, null, false, false, false));
+        askedInThisTurn();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "깨끗한 요약"))))
+            .startsWith("같은 제안이 이미 있다");
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+    }
+
+
+    @Test
+    @DisplayName("되돌리기는 이전 revision 의 요약도 되돌린다")
+    void undoRestoresSummary() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", null).put("summary", "첫 요약"));
+        Memory created = onlyMemory();
+        call(remember("다른 사람", "다른 사람은 홍길동이고 서울에 산다", null)
+            .put("memory_id", created.id()).put("summary", "둘째 요약"));
+        MemoryCapture updated = capturesOfDad().stream()
+            .filter(capture -> capture.kind() == MemoryCaptureKind.UPDATED)
+            .findFirst()
+            .orElseThrow();
+
+        captureService.undo(currentDad(), updated.id());
+
+        assertThat(onlyMemory().summary()).isEqualTo("첫 요약");
+        assertThat(onlyMemory().content()).isEqualTo("다른 사람은 홍길동이다");
+    }
+
+
     private List<String> feedbackEvents() {
         return jdbc
             .queryForList(

@@ -441,6 +441,26 @@ class MemoryServiceTest {
     }
 
 
+    @Test
+    @DisplayName("요약 칸이 없는 화면 수정은 요약이 옛 본문과 같으면 새 본문을 따라가고, 새 본문이 200자를 넘으면 비우고, 따로 쓴 요약은 둔다")
+    void screenUpdateKeepsSummaryInStep() {
+        Memory followed = memories.create(ADMIN, MemoryScope.USER, "따라갈 사실", "옛 본문", false);
+        MemorySummaryRows.summarizeAsContent(texts, jdbc, followed);
+        Memory cleared = memories.create(ADMIN, MemoryScope.USER, "비울 사실", "옛 본문 둘", false);
+        MemorySummaryRows.summarizeAsContent(texts, jdbc, cleared);
+        Memory custom = memories.create(ADMIN, MemoryScope.USER, "따로 쓴 사실", "옛 본문 셋", false);
+        MemorySummaryRows.summarize(texts, jdbc, custom, "따로 쓴 요약");
+
+        memories.update(ADMIN, followed.id(), "새 본문", false, null);
+        memories.update(ADMIN, cleared.id(), "가".repeat(201), false, null);
+        memories.update(ADMIN, custom.id(), "새 본문 셋", false, null);
+
+        assertThat(repository.findById(followed.id()).orElseThrow().summary()).isEqualTo("새 본문");
+        assertThat(repository.findById(cleared.id()).orElseThrow().summary()).isEmpty();
+        assertThat(repository.findById(custom.id()).orElseThrow().summary()).isEqualTo("따로 쓴 요약");
+    }
+
+
     private static CurrentUser user(Long id, Long groupId, UserRole role) {
         return new CurrentUser(id, "user" + id + "@example.com", "user" + id, groupId, role);
     }

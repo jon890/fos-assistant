@@ -300,7 +300,20 @@ public class MemoryService {
         MemoryRetrieval retrieval = alwaysInject
             ? MemoryRetrieval.ALWAYS
             : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
-        return revise(user, memory, content, retrieval).withArchivable(archivable);
+        return revise(user, memory, content, followingSummary(memory, content), retrieval).withArchivable(archivable);
+    }
+
+
+    /**
+     * 이 화면은 요약 칸이 없다. 요약이 옛 본문과 같으면(배포 때 이관한 짧은 기억) 새 본문을 따라가고, 새 본문이 요약 상한을 넘으면 비운다. 사용자가 따로
+     * 쓴 요약은 그대로 둔다. 옛 사실이 요약으로 매 실행에 남지 않게 한다(설계 DECISION8).
+     */
+    private static String followingSummary(Memory memory, String content) {
+        String summary = memory.summary();
+        if (summary.isEmpty() || !summary.equals(memory.content()) || content.equals(memory.content())) {
+            return summary;
+        }
+        return content.length() <= Memory.SUMMARY_MAX ? content : "";
     }
 
 
