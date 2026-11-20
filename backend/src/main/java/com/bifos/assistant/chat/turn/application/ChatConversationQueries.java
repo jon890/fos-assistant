@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
+import com.bifos.assistant.chat.turn.application.dto.ActivityUse;
 import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.turn.application.dto.TurnMark;
 import com.bifos.assistant.chat.turn.application.port.CheckReportReads;
@@ -19,6 +20,8 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
+import com.bifos.assistant.usage.execution.application.dto.ConnectorToolName;
+import com.bifos.assistant.usage.execution.application.port.ConnectorToolNames;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
@@ -58,6 +61,7 @@ class ChatConversationQueries {
     private final TurnCancellation turns;
     private final Clock clock;
     private final List<CheckReportReads> checkReportReads;
+    private final ConnectorToolNames connectorToolNames;
 
 
     /**
@@ -185,10 +189,33 @@ class ChatConversationQueries {
                 Long durationMs = latestFinish == null
                     ? null
                     : Duration.between(root.startedAt(), latestFinish).toMillis();
-                summaries.put(rootId, new ActivitySummary(toolCount, subagentCount, durationMs));
+                summaries.put(rootId, new ActivitySummary(
+                    toolCount, subagentCount, durationMs, ActivityUse.firstUses(rootId, tree, eventsByExecution)));
             }
         }
-        return summaries;
+        return withConnectorNames(summaries);
+    }
+
+
+    /** 모든 답의 도구 이름을 한 번에 찾아 플러그인 도구에 서비스 이름과 도구 제목을 붙인다. */
+    private Map<Long, ActivitySummary> withConnectorNames(Map<Long, ActivitySummary> summaries) {
+        Map<String, ConnectorToolName> names = connectorToolNames.namesOf(summaries.values().stream()
+            .flatMap(summary -> summary.uses().stream())
+            .map(ActivityUse::toolName)
+            .filter(Objects::nonNull)
+            .toList());
+        if (names.isEmpty()) {
+            return summaries;
+        }
+        Map<Long, ActivitySummary> named = new HashMap<>();
+        summaries.forEach((rootId, summary) -> named.put(rootId, new ActivitySummary(
+            summary.toolCount(), summary.subagentCount(), summary.durationMs(),
+            summary.uses().stream()
+                .map(use -> use.toolName() == null
+                    ? use
+                    : new ActivityUse(use.kind(), use.toolName(), names.get(use.toolName())))
+                .toList())));
+        return named;
     }
 
 
