@@ -107,6 +107,8 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
                 response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
                 self.assertEqual(response.status_code, 409)
                 self.assertEqual(response.body["code"], "sandbox_unavailable")
+                # 정책이 틀린 거절을 정책 밖으로 오해하면 Control Plane 이 모든 에이전트의 셸을 끈다.
+                self.assertNotIn("reason", response.body)
                 self.assertEqual(path.read_bytes(), original)
 
     def test_sandbox_policy_accepts_paths_that_only_share_a_prefix(self):
@@ -181,19 +183,37 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         self.prepare_attachment_directory("a" * 64)
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("a" * 64)), 200)
 
-    def test_unlisted_profile_keeps_local_terminal_and_needs_no_sandbox_owner(self):
-        """유효한 정책에 없는 profile 은 셸 저장을 허용하고 기존 local 설정을 그대로 둔다."""
+    def test_unlisted_profile_rejects_shell_save_with_reason(self):
+        """유효한 정책에 없는 profile 의 셸 저장은 local 로 켜지 않고 409 와 reason 으로 거절한다(ADR-20261120 / no-local-shell)."""
         path = self.root / "owner/config.yaml"
         config = self.saved_config()
         config["terminal"] = {"backend": "local", "cwd": "/tmp", "timeout": 90}
         path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        original = path.read_bytes()
         self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
 
-        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
-        self.assertEqual(self.saved_config()["terminal"], config["terminal"])
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None), full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(response.body["reason"], "unlisted")
+        self.assertEqual(path.read_bytes(), original)
         self.assertFalse((self.sandbox_root / "user-1").exists())
 
-    def test_require_sandbox_rejects_unlisted_profile_instead_of_local(self):
+    def test_missing_policy_rejects_shell_save_without_reason(self):
+        """정책이 없으면 정책 밖과 구분하도록 reason 없이 409 로 거절한다."""
+        os.environ.pop("FOS_ASSISTANT_SANDBOX")
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertNotIn("reason", response.body)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_require_sandbox_also_rejects_unlisted_profile(self):
         """require_sandbox 가 참이면 정책에 없는 profile 의 셸 저장을 local 로 돌리지 않고 409 로 거절한다."""
         path = self.root / "owner/config.yaml"
         original = path.read_bytes()
@@ -205,6 +225,7 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(response.body["reason"], "unlisted")
         self.assertEqual(path.read_bytes(), original)
 
     def test_require_sandbox_still_uses_the_sandbox_for_listed_profile(self):
@@ -245,6 +266,7 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
 
                 self.assertEqual(response.status_code, 409)
                 self.assertEqual(response.body["code"], "sandbox_unavailable")
+                self.assertEqual(response.body["reason"], "unlisted")
 
     def test_video_gen_alone_uses_the_sandbox_terminal(self):
         """다른 실행 도구 없이 video_gen만 켜도 사용자별 Docker 실행 공간을 쓴다."""
@@ -256,59 +278,29 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         self.assertEqual(self.saved_config()["terminal"], self.expected_terminal(
             "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"]))
 
-    def test_empty_profiles_policy_keeps_all_profiles_local(self):
-        """profiles 가 비었으면 정책 없음과 구분해 모든 profile 의 기존 실행을 유지한다."""
+    def test_empty_profiles_policy_rejects_every_shell_save(self):
+        """profiles 가 비었으면 어떤 profile 의 셸 저장도 local 로 켜지 않고 거절한다."""
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
         self.set_sandbox_policy(self.sandbox_policy(profiles={}))
-        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
-        self.assertEqual(self.saved_config()["terminal"], {"backend": "local"})
 
-    def test_profile_removed_from_policy_returns_to_local_on_shell_save(self):
-        """정책에서 profile 을 빼면 다음 셸 저장에서 이전 docker 설정을 제거한다."""
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None), full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["reason"], "unlisted")
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_profile_removed_from_policy_rejects_shell_save(self):
+        """정책에서 빠진 profile 의 셸 저장은 거절하고 이전 docker 설정을 그대로 둔다."""
         self.save_sandbox_key()
+        before = self.saved_config()["terminal"]
         self.set_sandbox_policy(self.sandbox_policy(profiles={}))
 
-        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
-        self.assertEqual(self.saved_config()["terminal"], {"backend": "local"})
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None), full_response=True)
 
-    def test_profile_removed_from_policy_drops_unattended_approval(self):
-        """정책에서 빠져 local 로 돌아간 profile 에는 승인 없는 실행을 남기지 않고 다른 승인 키만 둔다."""
-        path = self.root / "owner/config.yaml"
-        base = path.read_bytes()
-        for label, operator, expected in (("only unattended", {}, None),
-                                          ("with mode", {"mode": "manual"}, {"mode": "manual"})):
-            with self.subTest(label=label):
-                # 앞 subTest 가 남긴 설정 대신 같은 기준 설정에서 시작한다.
-                path.write_bytes(base)
-                self.set_sandbox_policy(self.sandbox_policy())
-                config = self.saved_config()
-                config.pop("approvals", None)
-                if operator:
-                    config["approvals"] = dict(operator)
-                path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-                self.save_sandbox_key()
-                self.assertEqual(self.saved_config()["approvals"], {**operator, "unattended_mode": "approve"})
-                self.set_sandbox_policy(self.sandbox_policy(profiles={}))
-
-                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
-
-                saved = self.saved_config()
-                self.assertEqual(saved["terminal"], {"backend": "local"})
-                if expected is None:
-                    self.assertNotIn("approvals", saved)
-                else:
-                    self.assertEqual(saved["approvals"], expected)
-
-    def test_unlisted_local_profile_drops_operator_unattended_approval(self):
-        """정책에 없는 local profile 은 운영자가 직접 넣은 승인 없는 실행도 셸 저장에서 지운다."""
-        path = self.root / "owner/config.yaml"
-        config = self.saved_config()
-        config["approvals"] = {"unattended_mode": "approve", "timeout": 60}
-        path.write_text(yaml.safe_dump(config), encoding="utf-8")
-        self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
-
-        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
-
-        self.assertEqual(self.saved_config()["approvals"], {"timeout": 60})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["reason"], "unlisted")
+        self.assertEqual(self.saved_config()["terminal"], before)
 
     def test_profile_policy_does_not_change_another_profile_or_default_config(self):
         """도구를 저장한 profile 만 바뀌고 기본 profile 과 다른 profile 의 설정은 그대로다."""
@@ -398,7 +390,9 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         for label, policy in cases:
             with self.subTest(label=label):
                 self.set_sandbox_policy(policy)
-                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+                response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+                self.assertEqual(response.status_code, 409)
+                self.assertNotIn("reason", response.body)
                 self.assertEqual(path.read_bytes(), original)
 
     def test_toolset_update_without_shell_keeps_terminal_without_policy(self):
