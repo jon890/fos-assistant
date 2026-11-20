@@ -214,6 +214,8 @@ test("대화 지우기 확인 창의 지우기 단추는 destructive 바탕에 d
   await page.getByRole("menuitem", { name: "지우기" }).click();
   const confirm = page.getByRole("alertdialog", { name: "대화 지우기" }).getByRole("button", { name: "지우기" });
   await expect(confirm).toBeVisible();
+  // 앞에서 누른 메뉴 줄의 자리가 확인 단추와 겹치면 hover 색을 읽는다. 바탕 색만 보도록 포인터를 치운다.
+  await page.mouse.move(0, 0);
 
   const colors = await confirm.evaluate((button) => {
     const html = document.documentElement;

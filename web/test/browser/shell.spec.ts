@@ -653,7 +653,7 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   test.skip(testInfo.project.name !== "mobile");
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => { release = resolve; });
-  await page.route((url) => url.pathname === "/usage", async (route) => {
+  await page.route((url) => url.pathname === "/tasks", async (route) => {
     // 목적지의 RSC 요청을 미리 읽기까지 붙잡는다. 같은 주소의 문서 요청은 흘려보낸다. 빌드한 서버는 서랍이
     // 열려 링크가 보이면 미리 읽는데, 그 결과에 loading 화면이 들어 있으면 누르자마자 그 화면으로 옮겨
     // 경로가 곧바로 바뀌고 서랍이 닫힌다. 서랍을 남기는 것은 목적지를 아직 받지 못했을 때를 위한 것이다.
@@ -674,11 +674,11 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   // 다른 경로로 옮기는 동안에는 서랍이 남고, 옮긴 화면이 보인 뒤 닫힌다.
   try {
     await openSidebar(page, testInfo);
-    await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "사용량", exact: true }).click();
+    await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "예약 작업", exact: true }).click();
     await expect(sidebar.getByRole("status")).toHaveText("이동하는 중");
     await expect(sidebar).toBeInViewport();
     release();
-    await expect(page.getByRole("heading", { name: "사용량", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "예약 작업", exact: true })).toBeVisible();
     await expect(sidebar).toBeHidden();
   } finally {
     release();
