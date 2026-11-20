@@ -227,6 +227,11 @@ const LABELS: Record<string, Label> = {
     running: "연결한 서비스를 확인하고 있어요",
     done: "연결한 서비스를 확인했어요",
   },
+  // 붙이기는 승인 카드만 만든다. 붙인 것처럼 읽히지 않게 쓴다.
+  connector_attach: {
+    running: "붙이기 승인을 요청하고 있어요",
+    done: "붙이기 승인을 요청했어요",
+  },
   tool_search: {
     running: "쓸 도구를 찾고 있어요",
     done: "쓸 도구를 찾았어요",
