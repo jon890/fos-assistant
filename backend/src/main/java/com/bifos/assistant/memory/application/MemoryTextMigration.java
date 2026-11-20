@@ -21,6 +21,7 @@ import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -40,7 +41,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
+@Order(MemoryTextMigration.ORDER)
 public class MemoryTextMigration implements ApplicationRunner {
+
+    /** 기동 이관의 차례다. 요약 이관({@link MemorySummaryBackfill#ORDER})보다 먼저 돈다. 평문 줄에 요약 암호문이 먼저 쓰이지 않게 한다. */
+    public static final int ORDER = 100;
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;

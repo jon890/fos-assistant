@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
   "users": [
     {
@@ -1877,6 +1877,72 @@
       "expect": [
         "m1",
         "m2"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "DT-01",
+      "category": "DETAIL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "이직할 회사 고를 때 내가 우선으로 보는 조건이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "일하는 방식",
+          "summary": "백엔드 개발자, 자바 중심",
+          "content": "주요 경력은 물류 회사 백엔드 팀에서 6년이고 정산 시스템을 맡았다. 이직할 회사를 고를 때는 원격 근무가 되는 곳을 우선으로 본다.",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "DT-02",
+      "category": "DETAIL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "이번 달 식비 한도를 얼마로 잡았었지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "가계부 습관",
+          "summary": "가계부는 월말에 정리",
+          "content": "가계부는 매달 말일에 명세서를 내려받아 식비와 교통비로 나눠 적고, 식비 한도는 월 60만 원으로 잡았다.",
+          "updatedDaysAgo": 12
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "DT-03",
+      "category": "DETAIL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "여행 갈 때 비행기는 몇 시 출발 편을 좋아했지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "여행 취향",
+          "summary": "여행은 조용한 곳 선호",
+          "content": "여행 숙소는 바다가 보이는 조용한 곳을 고르고, 비행기는 오전 출발 편을 좋아한다. 렌터카는 소형차로 빌린다.",
+          "updatedDaysAgo": 14
+        }
+      ],
+      "expect": [
+        "m1"
       ],
       "forbidden": []
     }

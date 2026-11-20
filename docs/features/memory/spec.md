@@ -112,7 +112,7 @@ PR1a 만 배포돼도 비서는 요약으로 동작하고, 사용자는 대화�
 
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| DECISION2, DECISION4 | 기억 조립 | [ADR-20261008 / memory-facts](../../adr/ADR-20261008-memory-facts.md) 갱신(PR1) | [`docs/features/memory.md`](../memory.md) 의 「개인 사실 구역」 을 「요약 구역」 으로 고친다 |
+| DECISION2, DECISION4 | 기억 조립 | [ADR-20261008 / memory-facts](../../adr/ADR-20261008-memory-facts.md) 갱신(PR1a) | [`docs/features/memory.md`](../memory.md) 의 「요약 구역」 과 「기억 예산 설정」(PR1a 가 옛 개인 사실 구역을 고쳐 썼다) |
 | DECISION9, DECISION11 | 정비 루프 | [ADR-20261015 / memory-maintenance](../../adr/ADR-20261015-memory-maintenance.md) 갱신(PR3) | [`docs/features/memory.md`](../memory.md) 의 「정비 루프」 |
 
 ## 미결정

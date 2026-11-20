@@ -121,6 +121,7 @@ class MemoryRecallEvalTest {
         assemblies.put(LINKS_OFF, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
+        List<String> detailMisses = new ArrayList<>();
         for (Case each : DATASET.cases()) {
             scoreboard.add(NONE, noneVerdictOf(each));
             assemblies.forEach((mode, assembly) -> {
@@ -128,6 +129,9 @@ class MemoryRecallEvalTest {
                 AssembledContext context = assembly.assemble(
                     fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
                 scoreboard.add(mode, verdictOf(each, ids, context));
+                if (FACTS_ON.equals(mode) && each.category() == MemoryEvalDataset.Category.DETAIL) {
+                    detailMisses.addAll(detailMissesOf(each, ids, context));
+                }
             });
             Map<String, Long> ids = fixture.seed(each);
             scoreboard.add(FULL_INJECTION, fullInjectionVerdictOf(each, ids, agentIds.get(each.agent())));
@@ -139,6 +143,7 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
+        assertThat(detailMisses).as("요약에 없는 상세가 질문 관련 구역에 들지 않은 DETAIL 사례 항목").isEmpty();
         for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, LINKS_OFF, FULL_INJECTION)) {
             assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
         }
@@ -164,6 +169,17 @@ class MemoryRecallEvalTest {
         assertThat(MemoryEvalBaseline.load().violations(DATASET.version(), factsOnMetrics))
             .as("합성 측정이 기준 파일보다 나빠졌다. 절차는 docs/features/memory.md 의 「기준 파일」")
             .isEmpty();
+    }
+
+
+    /** DETAIL 사례의 기대 항목 가운데 상세가 질문 관련 구역에 본문으로 들지 않은 것이다. */
+    private static List<String> detailMissesOf(Case each, Map<String, Long> ids, AssembledContext context) {
+        return each.expect().stream()
+            .filter(key -> context.bundle().items().stream()
+                .noneMatch(item -> item.source() == ContextSource.MEMORY_SEARCH
+                    && item.ref().equals("memory:" + ids.get(key))))
+            .map(key -> each.id() + ":" + key)
+            .toList();
     }
 
 

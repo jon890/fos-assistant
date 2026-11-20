@@ -370,6 +370,8 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
 - `updated_at` 은 옮겨 온 줄에서 비어 있다. 바꾼 시각을 모른다
 
+`MEMORY_CONTEXT` 는 그룹의 기억 조립 예산이다. `{"version":1,"summaryMaxChars":4000,"maxChars":10000}` 이고 읽고 쓰는 일은 `MemoryContextSettings` 가 한다. 줄이 없으면 이 기본값이고, 모르는 버전이나 깨진 JSON 은 오류로 올리지 않고 기본값으로 돈다. 그 까닭과 허용 범위는 [기억](../../docs/features/memory.md) 의 「기억 예산 설정」 이 갖는다
+
 `TOOLSET` 은 그룹이 일반 에이전트 도구 화면에서 숨긴 toolset 이다. `{"version":1,"hidden":["<toolset 이름>", ...]}` 이고 이름은 이름 순에 중복이 없다. 읽고 쓰는 일은 `ToolsetVisibilityService` 가 한다.
 
 - 줄이 없는 그룹은 숨김이 없어 모두 보인다
