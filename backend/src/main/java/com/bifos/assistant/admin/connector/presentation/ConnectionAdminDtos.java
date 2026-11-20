@@ -50,7 +50,7 @@ public final class ConnectionAdminDtos {
      * 에이전트 하나에서 본 연결 하나다. 상태는 enum 이름 그대로 내고, 붙어 있지 않으면 {@code status} 가 null 이다.
      *
      * @param toolCount 커넥터가 선언한 도구 수
-     * @param skills 붙이면 그 profile 에 설치되는 커넥터 스킬 이름
+     * @param skills 붙이면 그 profile 에 설치할 수 있는 스킬 이름. 에이전트용 스킬도 들어 있다
      */
     public record AgentConnectionResponse(
         String connectorId,

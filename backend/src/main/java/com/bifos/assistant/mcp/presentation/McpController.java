@@ -17,6 +17,7 @@ import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
+import com.bifos.assistant.mcp.application.McpTaskTools;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.FollowUpProposeArguments;
@@ -77,9 +78,14 @@ public class McpController {
         AGENT_STOP,
         FOLLOW_UP_PROPOSE,
         McpConnectorListTool.NAME,
-        McpMediaObservationTools.LIST);
+        McpMediaObservationTools.LIST,
+        // 읽기와, 지우지 않고 승인 카드만 띄우는 지우기는 늘 받는다(스펙 service-concepts DECISION32).
+        McpTaskTools.LIST,
+        McpTaskTools.DELETE);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE, FILE_SPACE_PUT);
+    /** 예약 작업을 바로 바꾸는 도구. 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(스펙 service-concepts DECISION32). */
+    private static final Set<String> CHECK_TREE_TASK_TOOLS = Set.of(McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE);
 
     private final McpToolService tools;
     private final McpArtifactCalls artifactCalls;
@@ -91,6 +97,7 @@ public class McpController {
     private final McpFinancialLimitTools financialLimits;
     private final McpApprovalResumeTool approvalResume;
     private final McpConnectorListTool connectorList;
+    private final McpTaskCalls taskCalls;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -129,7 +136,12 @@ public class McpController {
             Map.entry(McpFinancialLimitTools.CHANGE, (caller, id, args) -> validated(id, args,
                 McpDtos.OrderLimitChangeArguments::from, value -> this.financialLimits.change(caller, value.name(), value.value()))),
             Map.entry(McpApprovalResumeTool.NAME, (caller, id, args) -> validated(id, args,
-                McpDtos.ApprovalResumeArguments::from, value -> this.approvalResume.resume(caller))));
+                McpDtos.ApprovalResumeArguments::from, value -> this.approvalResume.resume(caller))),
+            Map.entry(McpTaskTools.LIST, (caller, id, args) -> taskCalls.list(caller, id, args)),
+            Map.entry(McpTaskTools.CREATE, (caller, id, args) -> taskCalls.create(caller, id, args)),
+            Map.entry(McpTaskTools.UPDATE, (caller, id, args) -> taskCalls.update(caller, id, args)),
+            Map.entry(McpTaskTools.SET_STATE, (caller, id, args) -> taskCalls.setState(caller, id, args)),
+            Map.entry(McpTaskTools.DELETE, (caller, id, args) -> taskCalls.delete(caller, id, args)));
     }
 
 
@@ -219,6 +231,9 @@ public class McpController {
      * {@code file_space_put} 은 대화 인자가 없어 origin 실행의 대화로 본다.
      */
     private boolean writeAllowedInCheck(String toolName, ProactiveCheck check, McpCaller caller, JsonNode arguments) {
+        if (CHECK_TREE_TASK_TOOLS.contains(toolName)) {
+            return check.writesAllowed();
+        }
         if (!CHECK_TREE_WRITE_TOOLS.contains(toolName) || !check.writesAllowed()) {
             return false;
         }

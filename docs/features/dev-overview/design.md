@@ -24,9 +24,9 @@
 | 자리 | 맡는 것 |
 | --- | --- |
 | `web/src/lib/dev-docs/` 의 `catalog.ts`, `read.ts` (서버 전용, `node:fs`) | 묶음 넷의 목록 만들기, 경로를 목록에 대조해 파일 읽기, `prd.md` 의 「로드맵」 절 자르기 |
-| `web/src/lib/dev-docs/` 의 `source.ts`, `links.ts`, `filter.ts`, `headings.ts`, `mermaid.ts` (브라우저 부품도 import, `fs` 없음) | 문서 폴더 위치와 커밋 값, GitHub 주소, 링크 풀기, 찾기, 제목 id(rehype 플러그인), mermaid 요소 id |
+| `web/src/lib/dev-docs/` 의 `source.ts`, `links.ts`, `filter.ts`, `headings.ts` (브라우저 부품도 import, `fs` 없음) | 문서 폴더 위치와 커밋 값, GitHub 주소, 링크 풀기, 찾기, 제목 id(rehype 플러그인). mermaid 요소 id 는 2026-11-20 에 대화 답과 함께 쓰려고 `web/src/lib/mermaid.ts` 로 옮겼다 |
 | `web/src/app/dev-docs/` | 로그인 확인 뒤 서버 컴포넌트로 목록과 본문을 읽어 넘긴다. 첫 화면은 로드맵, `/dev-docs/<저장소 경로>` 는 그 문서 |
-| `web/src/components/dev-docs/` | 목록과 찾기 칸(브라우저), 문서 본문 Markdown, mermaid 블록 |
+| `web/src/components/dev-docs/` | 목록과 찾기 칸(브라우저), 문서 본문 Markdown. mermaid 블록은 2026-11-20 에 `web/src/components/ui/mermaid-block.tsx` 로 옮겼다 |
 | `web/Dockerfile` | 추가 빌드 문맥에서 문서 폴더를 runner 단계로 복사하고 `SOURCE_COMMIT` 을 받는다 |
 | 운영 배포(`fos-home-infra`) | web 빌드에 저장소 root 를 추가 빌드 문맥 `repo` 로, 배포 커밋 40자리를 빌드 인자 `SOURCE_COMMIT` 으로 준다. 이 저장소 밖의 작업이다 |
 
@@ -38,7 +38,7 @@
 - `docs/prd.md`: 「로드맵」 절과 범위 표의 한 줄
 - `web/test/browser/web-server.ts`: 브라우저 테스트 서버에 `DEV_DOCS_ROOT` 를 넘긴다
 
-채팅의 `Markdown`(`web/src/components/chat/markdown.tsx`)은 링크를 모두 새 탭으로 보내고 mermaid 를 모르므로 그대로 쓰지 않는다. 표, 목록, 코드 블록의 모양은 같은 class 를 쓴다. 공통 부분을 나누는 리팩터링은 이 PR 에서 하지 않는다.
+채팅의 `Markdown`(`web/src/components/chat/markdown.tsx`)은 링크를 모두 새 탭으로 보내므로 그대로 쓰지 않는다. mermaid 블록은 2026-11-20 부터 두 부품이 함께 쓴다([`answer-quality/spec.md`](../answer-quality/spec.md) 의 REQ19). 표, 목록, 코드 블록의 모양은 같은 class 를 쓴다. 공통 부분을 나누는 리팩터링은 이 PR 에서 하지 않는다.
 
 ## 인터페이스와 데이터
 

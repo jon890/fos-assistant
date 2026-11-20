@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
@@ -202,15 +203,17 @@ public class GeneratedImageService {
 
 
     /**
-     * 그 대화에서 만든 그림 가운데 파일이 남은 것의 제목이다. 새것부터 {@code limit} 개까지다(스펙 generated-image REQ17).
+     * 그 대화에서 만든 그림 가운데 파일이 남은 것의 제목과 참고한 링크다. 새것부터 {@code limit} 개까지다(스펙 generated-image REQ17, REQ25).
      *
-     * <p>실행 입력에 넣어, 모델이 Hermes 기록을 압축한 뒤에도 고칠 그림을 제목으로 가리킬 수 있게 한다.
+     * <p>실행 입력에 넣어, 모델이 Hermes 기록을 압축한 뒤에도 고칠 그림을 제목으로 가리키고 이어지는 장면에서 같은 링크를 다시 넣게 한다.
+     *
+     * @param ownerUserId 대화 주인. 링크의 key 주인이다
      */
-    public List<String> liveTitles(Long conversationId, int limit) {
+    public List<GeneratedImageMention> liveMentions(Long conversationId, Long ownerUserId, int limit) {
         return artifacts.findGeneratedImages(conversationId).stream()
             .filter(it -> !it.isDeleted())
-            .map(it -> GeneratedImageTitle.ofPath(it.path()))
             .limit(limit)
+            .map(it -> new GeneratedImageMention(GeneratedImageTitle.ofPath(it.path()), sourceLinksOf(it, ownerUserId)))
             .toList();
     }
 

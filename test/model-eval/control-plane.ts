@@ -18,6 +18,8 @@ export type ExecutionNode = {
   children: ExecutionNode[];
 };
 export type ExecutionTree = { root: ExecutionNode; truncated: boolean };
+/** 예약 작업 목록의 항목이다. 판정과 정리에 쓰는 칸만 적는다. */
+export type TaskView = { id: string; instruction: string; createdAt: string };
 
 /**
  * 평가가 부르는 Control Plane API 다. 요청마다 시간 제한을 건다.
@@ -106,5 +108,13 @@ export class ControlPlane {
 
   async deleteConversation(conversationId: string): Promise<void> {
     await this.request("DELETE", `/api/v1/chat/conversations/${conversationId}`);
+  }
+
+  async tasks(): Promise<TaskView[]> {
+    return this.json("GET", "/api/v1/tasks");
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await this.request("DELETE", `/api/v1/tasks/${taskId}`);
   }
 }

@@ -20,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 모델이 가리킨 링크가 요청자가 그 대화에 보낸 메시지에 있는지 확인한다(ADR-20261120 / link-image-source, 스펙 generated-image DECISION43).
  *
- * <p>같은 주소로 보는 범위는 앞의 {@code https://} 나 {@code http://} 유무, 호스트의 대소문자, 퍼센트 인코딩 차이뿐이다. 비서가 파라미터를 지우거나
+ * <p>같은 주소로 보는 범위는 앞의 {@code https://} 나 {@code http://} 유무, 호스트의 대소문자, 호스트의 punycode 와 한글 표기 차이, 퍼센트 인코딩
+ * 차이뿐이다. 호스트 표기 차이는 저장한 꼴의 링크(punycode 호스트)를 이어지는 장면에서 다시 쓸 때 맞추려는 것이다(스펙 generated-image REQ25). 비서가 파라미터를 지우거나
  * 짧은 주소를 펼친 주소는 대화에 없는 주소다.
  *
  * <p>메시지를 공백으로 나눈 낱말 하나가 주소 하나다. 낱말 앞의 여는 괄호와 따옴표, 끝의 문장 부호를 떼고 앞의 scheme 만 뗀다. 그 낱말 전체가
@@ -129,11 +130,12 @@ public class ConversationLinks {
      * 모델이 가리킨 주소를 비교 글과 받을 주소로 나눈 것이다.
      *
      * @param host 비교할 호스트(퍼센트 인코딩을 푼 글)
+     * @param altHost 같은 호스트의 다른 표기(punycode 면 한글, 한글이면 punycode). 다른 표기가 없으면 {@code host} 와 같다
      * @param rest 호스트 뒤의 비교할 글(퍼센트 인코딩을 푼 글)
      * @param rawHost 받을 주소의 호스트(원래 글)
      * @param rawRest 받을 주소의 경로와 쿼리(원래 글, 조각 뺌)
      */
-    private record Target(String host, String rest, String rawHost, String rawRest) {
+    private record Target(String host, String altHost, String rest, String rawHost, String rawRest) {
 
         static Optional<Target> of(String link) {
             if (link == null) {
@@ -154,7 +156,8 @@ public class ConversationLinks {
             if (rawHost.isEmpty() || rawHost.chars().anyMatch(Character::isWhitespace) || rawRest.chars().anyMatch(Character::isWhitespace)) {
                 return Optional.empty();
             }
-            return Optional.of(new Target(comparable(rawHost), comparable(rawRest), rawHost, rawRest));
+            String host = comparable(rawHost);
+            return Optional.of(new Target(host, otherSpelling(host), comparable(rawRest), rawHost, rawRest));
         }
 
 
@@ -166,9 +169,25 @@ public class ConversationLinks {
 
 
         private boolean sameAs(String candidate) {
-            return candidate.length() == host.length() + rest.length()
-                && candidate.regionMatches(true, 0, host, 0, host.length())
-                && candidate.startsWith(rest, host.length());
+            return sameAs(candidate, host) || !altHost.equals(host) && sameAs(candidate, altHost);
+        }
+
+
+        private boolean sameAs(String candidate, String withHost) {
+            return candidate.length() == withHost.length() + rest.length()
+                && candidate.regionMatches(true, 0, withHost, 0, withHost.length())
+                && candidate.startsWith(rest, withHost.length());
+        }
+
+
+        /** 같은 호스트의 다른 표기다. punycode 가 든 호스트는 한글로, ASCII 밖 문자가 든 호스트는 punycode 로 바꾼다. 바꾸지 못하면 그대로다. */
+        private static String otherSpelling(String host) {
+            try {
+                String ascii = IDN.toASCII(host, IDN.ALLOW_UNASSIGNED);
+                return ascii.equalsIgnoreCase(host) ? IDN.toUnicode(host, IDN.ALLOW_UNASSIGNED) : ascii;
+            } catch (IllegalArgumentException ex) {
+                return host;
+            }
         }
 
 

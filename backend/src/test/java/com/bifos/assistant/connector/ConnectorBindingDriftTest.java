@@ -18,10 +18,13 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingApplier;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingCycles;
+import com.bifos.assistant.connector.connection.application.ConnectorInstallAttempts;
 import com.bifos.assistant.connector.connection.config.ConnectorBindingProperties;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.SkippedSkill;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
@@ -130,6 +133,12 @@ class ConnectorBindingDriftTest {
     NotificationRepository notificationRows;
 
     @Autowired
+    ConnectorInstallAttempts attempts;
+
+    @Autowired
+    ConnectorBindingCycles cycles;
+
+    @Autowired
     NotificationService notifications;
 
     @Autowired
@@ -234,6 +243,56 @@ class ConnectorBindingDriftTest {
         assertThat(notificationsOf(revokedAdmin.id())).as("차단된 관리자").isEmpty();
         assertThat(notificationsOf(owner.id())).as("MEMBER 역할 사용자").isEmpty();
         assertThat(output.getAll()).contains("connector " + DEMO + " drifted: NOT_INSTALLED");
+    }
+
+
+    @Test
+    @DisplayName("다시 보낸 설치의 빠진 스킬로 바인딩의 기록을 덮어쓰고 빈 목록이면 비운다")
+    void reinstallOverwritesSkippedSkills() {
+        jdbc.update("UPDATE agent_connector_binding SET skipped_skills = ? WHERE id = ?",
+            "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]", demo.id());
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false, false, false, false, List.of(
+                new HermesConnectorClient.SkippedSkill("demo-runner", List.of("sandbox_unregistered")))));
+
+        applier.resyncDrifted();
+
+        assertThat(reload(demo).skippedSkills())
+            .containsExactly(new SkippedSkill(
+                "demo-runner", List.of("sandbox_unregistered")));
+
+        // 관리자가 반영 완료를 마친 것처럼 READY 로 되돌려 다음 어긋남을 다시 맞추게 한다.
+        jdbc.update("UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
+            + " restart_required_since = NULL, apply_due_at = NULL WHERE id = ?", demo.id());
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false));
+
+        applier.resyncDrifted();
+
+        // 설치 상태는 여전히 어긋남으로 읽혀 반영 확인은 실패한다. 설치 응답은 받았으므로 기록은 그 응답으로 바뀐다.
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(reload(demo).skippedSkills()).as("조건을 채운 다시 설치").isEmpty();
+        assertThat(reload(demo).skippedSkillsJson()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("다시 보낸 설치가 실패하면 빠진 스킬의 옛 기록을 둔다")
+    void failedReinstallKeepsSkippedSkills() {
+        String recorded = "[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\"]}]";
+        jdbc.update("UPDATE agent_connector_binding SET skipped_skills = ? WHERE id = ?", recorded, demo.id());
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenThrow(new IllegalStateException("down"));
+
+        applier.resyncDrifted();
+
+        verify(connector, times(1))
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+        assertThat(reload(demo).skippedSkills())
+            .extracting(SkippedSkill::name)
+            .containsExactly("demo-runner");
     }
 
 
@@ -404,7 +463,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("한 주기에 읽는 수가 1 이면 READY 바인딩을 번호 순으로 하나씩 보고 끝까지 읽은 뒤 처음으로 돌아간다")
     void readsOneBindingPerRunWhenBatchIsOne() {
-        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1));
+        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1, Duration.ofMinutes(10)));
 
         // 바인딩 번호는 DEMO 가 앞이다. 준비에서 단언했다.
         for (String expected : List.of(DEMO, PLAIN)) {
@@ -425,7 +484,7 @@ class ConnectorBindingDriftTest {
     @Test
     @DisplayName("drift-batch 가 1 미만이면 설정을 만들지 못해 기동이 멈춘다")
     void rejectsDriftBatchBelowOne() {
-        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0))
+        assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0, Duration.ofMinutes(10)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("drift-batch");
     }
@@ -433,7 +492,7 @@ class ConnectorBindingDriftTest {
 
     private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
         return new ConnectorBindingApplier(
-            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings);
+            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings, attempts, cycles);
     }
 
 
