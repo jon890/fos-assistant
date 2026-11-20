@@ -1,157 +1,89 @@
 package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
-import com.bifos.assistant.chat.nextturn.application.SteerLedger;
-import com.bifos.assistant.chat.attachment.application.AttachmentCleaner;
-import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
-import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
-import com.bifos.assistant.connector.approval.application.ConnectorActionSweeper;
-import com.bifos.assistant.connector.action.application.ConnectorActionBodyBackfill;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
-import com.bifos.assistant.testsupport.RepositoryQuerySweep;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Set;
-import org.flywaydb.core.Flyway;
+import java.sql.Statement;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.transaction.PlatformTransactionManager;
 
 /**
- * 정렬 규칙을 통일하기 전 스키마(V57)에서 저장소 쿼리 검사가 정렬 규칙이 섞인 쿼리를 오류 1267 로 잡는다는 것을 단언한다.
+ * 정렬 규칙이 다른 두 표의 문자열 칸을 비교하는 쿼리를 MySQL 이 줄이 없어도 오류 1267 로 거절한다는 것을 단언한다.
  *
- * <p>이 증거가 없으면 {@link RepositoryQueryMysqlTest} 가 통과하는 것이 쿼리가 맞아서인지 검사가 보지 못해서인지 알 수 없다. 이
- * 검사가 실패하면 그 검사가 이 종류의 결함을 더는 잡지 못한다는 뜻이다.
+ * <p>{@link RepositoryQueryMysqlTest} 는 빈 표에서 모든 저장소 쿼리를 한 번씩 실행해 이 종류의 결함을 잡는다고 기대한다. 이 검사는 그 기대의
+ * 전제, 곧 빈 표에서도 MySQL 이 쿼리를 거절한다는 것을 보인다. 이 검사가 실패하면 저장소 쿼리 검사가 정렬 규칙 섞임을 더는 잡지 못한다는 뜻이다.
  *
- * <p>V57 뒤의 마이그레이션이 표와 칸을 더하므로 V57 스키마는 지금의 엔티티 검증을 통과하지 못한다. 그래서 {@code ddl-auto} 를
- * {@code none} 으로 두어 검증 없이 문맥을 띄운다. 그 결과 V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패한다. 그 실패는 이 검사가
- * 보려는 것이 아니므로 실패 전체를 단언하지 않고, 정렬 규칙이 섞인 두 메서드가 실패 목록에 있고 그 실패가 오류 1267 인지만 본다.
- *
+ * <p>예전에는 앱 전체를 정렬 규칙을 통일하기 전 스키마(V57)로 띄워 같은 것을 보였다. 그 방식은 V57 뒤에 생긴 기동 작업마다 막아야 해서
+ * 마이그레이션이 더해질 때마다 고쳐야 했다. 지금은 표 두 개만 만들어 앱과 마이그레이션에 기대지 않는다.
  */
 @Tag("mysql")
-@SpringBootTest
-@ActiveProfiles("test")
 class CollationMixQueryMysqlTest {
 
-    private static final String BEFORE_VERSION = "57";
-    private static final String OLD_COLLATION = "utf8mb4_unicode_ci";
-    private static final String NEW_COLLATION = "utf8mb4_0900_ai_ci";
     private static final int ILLEGAL_MIX_OF_COLLATIONS = 1267;
 
-    /** V57 스키마에서 정렬 규칙이 다른 두 표의 문자열 칸을 비교하는 저장소 메서드다. */
-    private static final List<String> COLLATION_MIXED_METHODS = List.of(
-        "ExecutionEventRepository.findUnscheduledChildren", "ExecutionEventRepository.countUnscheduledChildren");
+    /** 운영 서버의 기본 정렬 규칙이다. scripts/checks/check-mysql-migration.sh 가 서버를 이 값으로 띄운다. */
+    private static final String SERVER_COLLATION = "utf8mb4_unicode_ci";
 
-    @Autowired
-    private ApplicationContext context;
+    /** 정렬 규칙을 적지 않은 MySQL 8.4 의 기본값이다. 예전 스키마의 표 일부가 이 값이었다. */
+    private static final String DEFAULT_COLLATION = "utf8mb4_0900_ai_ci";
 
-    @Autowired
-    private PlatformTransactionManager transactionManager;
-
-    @Autowired
-    private JdbcTemplate jdbc;
-
-    @Autowired
-    private Flyway flyway;
-
-    /** V57에는 삭제 요청 칸이 없으므로 현재 첨부의 기동 복구는 실행하지 않는다. */
-    @MockitoBean
-    private AttachmentCleaner attachmentCleaner;
-
-    /** V57에는 관찰 표가 없으므로 관찰 정리의 기동 읽기는 실행하지 않는다. */
-    @MockitoBean
-    private MediaObservationCleaner mediaObservationCleaner;
-
-    /** V57에는 원고 표가 없으므로 원고 정리의 기동 읽기도 실행하지 않는다. */
-    @MockitoBean
-    private ContentDraftCleaner contentDraftCleaner;
-
-    /** V57에는 승인 본문 key와 살펴보기 트리 칸이 없으므로 승인 기동 정리와 본문 이관은 실행하지 않는다. */
-    @MockitoBean
-    private ConnectorActionSweeper connectorActionSweeper;
-
-    @MockitoBean
-    private ConnectorActionBodyBackfill connectorActionBodyBackfill;
-
-    /** V57에는 대화의 대기 줄 칸이 없으므로 기동 뒤 대기 메시지 보내기의 읽기는 실행하지 않는다. */
-    @MockitoBean
-    private PendingMessageStore pendingMessageStore;
-
-    /** V57에는 chat_message 의 steer 칸이 없으므로 steer 말풍선의 기동 정리는 실행하지 않는다. */
-    @MockitoBean
-    private SteerLedger steerLedger;
+    private MysqlTestDatabase database;
 
 
-    @DynamicPropertySource
-    static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {
-        MysqlTestDatabase database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.flyway.target", () -> BEFORE_VERSION);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+    @BeforeEach
+    void createTables() throws SQLException {
+        database = MysqlTestDatabase.create();
+        execute("CREATE TABLE parent_row (id BIGINT PRIMARY KEY, public_id CHAR(36) NOT NULL) COLLATE " + SERVER_COLLATION);
+        execute("CREATE TABLE child_row (id BIGINT PRIMARY KEY, parent_public_id CHAR(36) NOT NULL) COLLATE " + DEFAULT_COLLATION);
+        execute("CREATE TABLE same_child_row (id BIGINT PRIMARY KEY, parent_public_id CHAR(36) NOT NULL) COLLATE " + SERVER_COLLATION);
     }
 
 
     @Test
-    @DisplayName("통일하기 전 스키마까지만 올라갔다")
-    void stopsBeforeCollationUnify() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo(BEFORE_VERSION);
-        assertThat(tableCollation("execution_event")).isEqualTo(OLD_COLLATION);
-        assertThat(tableCollation("agent_execution")).isEqualTo(NEW_COLLATION);
+    @DisplayName("정렬 규칙이 다른 칸을 비교하는 조인과 하위 쿼리는 빈 표에서도 오류 1267 로 실패한다")
+    void rejectsCollationMixOnEmptyTables() {
+        assertThatThrownBy(() -> query(
+            "SELECT COUNT(*) FROM parent_row p JOIN child_row c ON c.parent_public_id = p.public_id"))
+                .isInstanceOfSatisfying(SQLException.class,
+                    error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
+        assertThatThrownBy(() -> query(
+            "SELECT COUNT(*) FROM child_row c WHERE c.parent_public_id NOT IN (SELECT p.public_id FROM parent_row p)"))
+                .isInstanceOfSatisfying(SQLException.class,
+                    error -> assertThat(error.getErrorCode()).isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
     }
 
 
     @Test
-    @DisplayName("저장소 쿼리 검사가 정렬 규칙이 섞인 쿼리를 잡는다")
-    void catchesCollationMix() {
-        List<RepositoryQuerySweep.Failure> failures = new RepositoryQuerySweep(context, transactionManager)
-            .run(Set.of())
-            .failures();
-
-        assertThat(failures)
-            .extracting(RepositoryQuerySweep.Failure::method)
-            .contains(COLLATION_MIXED_METHODS.toArray(String[]::new));
-        // V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패하므로 정렬 규칙이 섞인 두 메서드의 실패만 오류 코드를 본다.
-        assertThat(failures)
-            .filteredOn(failure -> COLLATION_MIXED_METHODS.contains(failure.method()))
-            .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
-                .as("%s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
-                .isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
+    @DisplayName("정렬 규칙이 같은 칸의 비교는 통과한다")
+    void allowsSameCollation() throws SQLException {
+        assertThat(query("SELECT COUNT(*) FROM parent_row p JOIN same_child_row c ON c.parent_public_id = p.public_id")).isZero();
     }
 
 
-    private String tableCollation(String table) {
-        return jdbc.queryForObject(
-            "SELECT table_collation FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
-            String.class,
-            table);
-    }
-
-
-    /** 원인 사슬에서 처음 만나는 {@link SQLException} 의 오류 코드다. 없으면 null 이다. */
-    private static Integer sqlErrorCode(Throwable throwable) {
-        for (Throwable current = throwable; current != null; current = current.getCause()) {
-            if (current instanceof SQLException sql) {
-                return sql.getErrorCode();
-            }
-            if (current.getCause() == current) {
-                break;
-            }
+    private long query(String sql) throws SQLException {
+        try (Connection connection = connect();
+            Statement statement = connection.createStatement();
+            var rows = statement.executeQuery(sql)) {
+            assertThat(rows.next()).isTrue();
+            return rows.getLong(1);
         }
-        return null;
+    }
+
+
+    private void execute(String sql) throws SQLException {
+        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        }
+    }
+
+
+    private Connection connect() throws SQLException {
+        return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
 }

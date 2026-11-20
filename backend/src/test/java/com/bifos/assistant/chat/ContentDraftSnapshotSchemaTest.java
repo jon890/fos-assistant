@@ -14,11 +14,19 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
-class ContentDraftSnapshotMigrationTest {
+/**
+ * 모든 마이그레이션을 적용한 지금 스키마에서 원고 snapshot 표의 유일 제약, NULL 허용, 논리 참조, 색인을 확인한다.
+ *
+ * <p>마이그레이션은 클래스마다 한 번만 적용하고 검사마다 줄만 다시 넣는다. 실제 MySQL 에서 전체 적용은 한 번에 13~22초가 든다.
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class ContentDraftSnapshotSchemaTest {
     private String[] database;
 
 
@@ -27,17 +35,24 @@ class ContentDraftSnapshotMigrationTest {
     }
 
 
-    @BeforeEach
-    void migrate() throws SQLException {
+    @BeforeAll
+    void migrate() {
         database = createDatabase();
         Flyway.configure().dataSource(database[0], database[1], database[2]).locations("classpath:db/migration")
-            .outOfOrder(true).target("20261011060038").load().migrate();
+            .outOfOrder(true).load().migrate();
+    }
+
+
+    /** 앞 검사가 넣거나 지운 줄을 비우고 대화, 원고, revision 한 줄씩으로 되돌린다. */
+    @BeforeEach
+    void resetRows() throws SQLException {
+        execute("delete from content_draft_snapshot");
+        execute("delete from content_draft_revision");
+        execute("delete from content_draft");
+        execute("delete from conversation");
         execute("insert into conversation(id,public_id,user_id,title,created_at,updated_at) values(1,X'00000000000000000000000000000001',1,'검사',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
         execute("insert into content_draft(id,public_id,conversation_id,owner_user_id,current_revision,created_at,expires_at) values(1,'00000000-0000-0000-0000-000000000002',1,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-        execute("insert into content_draft_revision(id,draft_id,revision,status,schema_version,created_at,body,body_key_id) values(1,1,1,'VALID',1,CURRENT_TIMESTAMP,'sealed',1)");
-        Flyway.configure().dataSource(database[0], database[1], database[2]).locations("classpath:db/migration")
-            .outOfOrder(true).load().migrate();
-        assertThat(count("content_draft_revision")).isEqualTo(1);
+        execute("insert into content_draft_revision(id,draft_id,revision,status,schema_version,created_at,body,body_key_id,assets_json) values(1,1,1,'VALID',1,CURRENT_TIMESTAMP,'sealed',1,'[]')");
     }
 
 
