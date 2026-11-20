@@ -31,8 +31,8 @@
 
 - `parse` 가 상태 줄(`HTTP/1.[01] <3자리>`)의 상태 코드와 머리를 늘 읽어 `ArtifactSourceResponse(status, headers, body)` 로 돌려준다.
 - 겹치면 안 되는 머리(`content-type`, `content-length`, `transfer-encoding`, `content-encoding`, `location`)만 겹칠 때 `IOException` 을 던지고 그 밖의 겹친 머리는 처음 값만 남긴다.
-- 머리 상한을 부르는 쪽이 정하게 한다. `parse(Socket, InputStream, int maxHeaderBytes)` 로 바꾸고 스티커 받기는 지금 값(16KiB), 링크 받기는 64KiB. 이 메서드를 직접 부르는 `ArtifactSourceFetcherTest` 의 사례도 고친다.
-- `ArtifactSourceTransport.get` 에 요청 머리 `Map<String, String>` 과 머리 상한을 넘기는 칸을 더한다. `requestBytes` 가 그 머리를 덧붙인다. 머리 값의 CR, LF 는 거절한다.
+- 스티커 받기의 `parse(Socket, InputStream)` 는 지금 동작(200 이 아니면 상태 0, 모든 머리 겹침 거절, 16KiB)을 그대로 두고, 링크 받기용 `parseAnyStatus(Socket, InputStream, int maxHeaderBytes)` 를 더한다. 두 해석은 머리 읽기와 본문 틀 처리를 같이 쓴다.
+- 스티커 받기의 `ArtifactSourceTransport` 는 그대로 두고, 링크 받기용 `LinkImageTransport`(요청 머리와 머리 상한을 담은 `Request`)를 새로 두어 `ArtifactSourceSocketTransport` 가 함께 구현한다. 스티커 받기의 가짜 전송(테스트의 lambda)을 고치지 않아도 된다. `requestBytes` 가 그 머리를 덧붙인다. 머리 값의 CR, LF 는 거절한다.
 - `ArtifactSourceFetcher.validateResponse` 는 지금처럼 200 이 아니면 거절한다. 스티커 받기는 빈 요청 머리와 16KiB 로 부른다.
 
 ### 2. `backend/src/main/java/com/bifos/assistant/chat/artifact/config/LinkImageProperties.java` 신규
@@ -79,15 +79,14 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceSocketTransport.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceTransport.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceFetcher.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImageFetcher.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImage.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkImageTransport.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/artifact/infra/LinkPageParts.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/config/LinkImageProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/artifact/domain/LinkImageRejectedException.java` | 신규 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceResponseParseTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/artifact/infra/LinkImageFetcherTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactSourceFetcherTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/artifact/infra/ArtifactSourceTlsTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ArtifactWriteServiceTest.java` | 수정 (가짜 전송의 시그니처) |

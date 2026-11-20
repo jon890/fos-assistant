@@ -10,18 +10,22 @@ import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-public final class ArtifactSourceSocketTransport implements ArtifactSourceTransport {
+public final class ArtifactSourceSocketTransport implements ArtifactSourceTransport, LinkImageTransport {
     private static final int MAX_HEADERS = 16 * 1024;
     private static final int HTTPS_PORT = 443;
+    /** 링크 받기에서 두 번 오면 안 되는 응답 머리다. 나머지(`set-cookie` 등)는 처음 값만 남긴다. */
+    private static final Set<String> SINGLE_HEADERS = Set.of(
+        "content-type", "content-length", "transfer-encoding", "content-encoding", "location");
 
     private final SSLSocketFactory sslSocketFactory;
     private final int port;
@@ -51,6 +55,37 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
         Duration readTimeout,
         ArtifactSourceCancellation cancellation)
         throws IOException {
+        SSLSocket ssl = open(address, host, connectTimeout, readTimeout, cancellation);
+        try {
+            ssl.getOutputStream().write(requestBytes(target(source), host));
+            ssl.getOutputStream().flush();
+            return parse(ssl, ssl.getInputStream());
+        } catch (IOException | RuntimeException ex) {
+            closeQuietly(ssl);
+            throw ex;
+        }
+    }
+
+
+    @Override
+    public ArtifactSourceResponse get(
+        InetAddress address, String host, LinkImageTransport.Request request, ArtifactSourceCancellation cancellation)
+        throws IOException {
+        SSLSocket ssl = open(address, host, request.connectTimeout(), request.readTimeout(), cancellation);
+        try {
+            ssl.getOutputStream().write(requestBytes(target(request.source()), host, request.headers()));
+            ssl.getOutputStream().flush();
+            return parseAnyStatus(ssl, ssl.getInputStream(), request.maxHeaderBytes());
+        } catch (IOException | RuntimeException ex) {
+            closeQuietly(ssl);
+            throw ex;
+        }
+    }
+
+
+    private SSLSocket open(
+        InetAddress address, String host, Duration connectTimeout, Duration readTimeout, ArtifactSourceCancellation cancellation)
+        throws IOException {
         Socket socket = new Socket();
         try {
             cancellation.register(socket);
@@ -62,47 +97,80 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             parameters.setServerNames(List.of(new SNIHostName(host)));
             ssl.setSSLParameters(parameters);
             ssl.startHandshake();
-            String target = source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
-            if (source.getRawQuery() != null) {
-                target += "?" + source.getRawQuery();
-            }
-            ssl.getOutputStream().write(requestBytes(target, host));
-            ssl.getOutputStream().flush();
-            return parse(ssl, ssl.getInputStream());
+            return ssl;
         } catch (IOException | RuntimeException ex) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-            }
+            closeQuietly(socket);
             throw ex;
         }
     }
 
 
+    private static void closeQuietly(Socket socket) {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+
+    private static String target(URI source) {
+        String target = source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
+        if (source.getRawQuery() != null) {
+            target += "?" + source.getRawQuery();
+        }
+        return target;
+    }
+
+
+    /** 스티커 받기의 해석이다. 200 이 아니면 상태 0 과 빈 머리를 돌려주고, 같은 머리가 두 번 오면 거절한다. */
     public static ArtifactSourceResponse parse(Socket socket, InputStream input) throws IOException {
+        String[] lines = readHeaderLines(input, MAX_HEADERS);
+        if (lines.length == 0 || !lines[0].matches("HTTP/1\\.[01] 200 .*")) {
+            return new ArtifactSourceResponse(0, Map.of(), closeOnClose(input, socket));
+        }
+        return framed(socket, input, 200, headers(lines, null));
+    }
+
+
+    /**
+     * 링크 받기의 해석이다. 상태 코드와 머리를 늘 읽는다. {@link #SINGLE_HEADERS} 만 두 번 올 때 거절하고 나머지는 처음 값만 남긴다.
+     *
+     * @param maxHeaderBytes 응답 머리의 상한
+     */
+    public static ArtifactSourceResponse parseAnyStatus(Socket socket, InputStream input, int maxHeaderBytes)
+        throws IOException {
+        String[] lines = readHeaderLines(input, maxHeaderBytes);
+        if (lines.length == 0 || !lines[0].matches("HTTP/1\\.[01] [1-5][0-9][0-9]( .*)?")) {
+            throw new IOException("invalid status line");
+        }
+        int status = Integer.parseInt(lines[0].substring(9, 12));
+        return framed(socket, input, status, headers(lines, SINGLE_HEADERS));
+    }
+
+
+    private static String[] readHeaderLines(InputStream input, int maxHeaderBytes) throws IOException {
         ByteArrayOutputStream header = new ByteArrayOutputStream();
         int ending = 0;
         int current;
-        boolean complete = false;
         while ((current = input.read()) >= 0) {
             header.write(current);
-            if (header.size() > MAX_HEADERS) {
+            if (header.size() > maxHeaderBytes) {
                 throw new IOException("response headers are too large");
             }
             ending = (ending << 8) | current;
             if (header.size() >= 4 && ending == 0x0d0a0d0a) {
-                complete = true;
-                break;
+                return header.toString(StandardCharsets.ISO_8859_1).split("\r\n");
             }
         }
-        if (!complete) {
-            throw new IOException("truncated response headers");
-        }
-        String[] lines = header.toString(StandardCharsets.ISO_8859_1).split("\r\n");
-        if (lines.length == 0 || !lines[0].matches("HTTP/1\\.[01] 200 .*")) {
-            return new ArtifactSourceResponse(0, Map.of(), closeOnClose(input, socket));
-        }
-        Map<String, String> headers = new HashMap<>();
+        throw new IOException("truncated response headers");
+    }
+
+
+    /**
+     * @param single 두 번 오면 거절할 머리. null 이면 모든 머리다
+     */
+    private static Map<String, String> headers(String[] lines, Set<String> single) throws IOException {
+        Map<String, String> headers = new LinkedHashMap<>();
         for (int i = 1; i < lines.length; i++) {
             int colon = lines[i].indexOf(':');
             if (colon <= 0) {
@@ -114,26 +182,46 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             }
             key = key.toLowerCase(Locale.ROOT);
             String value = lines[i].substring(colon + 1).trim();
-            if (headers.putIfAbsent(key, value) != null) {
+            if (headers.putIfAbsent(key, value) != null && (single == null || single.contains(key))) {
                 throw new IOException("duplicate response header");
             }
         }
+        return headers;
+    }
+
+
+    private static ArtifactSourceResponse framed(Socket socket, InputStream input, int status, Map<String, String> headers)
+        throws IOException {
         if (headers.containsKey("transfer-encoding") && headers.containsKey("content-length")) {
             throw new IOException("ambiguous response framing");
         }
+        InputStream body = input;
         if ("chunked".equalsIgnoreCase(headers.get("transfer-encoding"))) {
-            input = new ChunkedInputStream(input);
+            body = new ChunkedInputStream(input);
         } else if (headers.containsKey("transfer-encoding")) {
             throw new IOException("unsupported response framing");
         }
-        return new ArtifactSourceResponse(200, Map.copyOf(headers), closeOnClose(input, socket));
+        return new ArtifactSourceResponse(status, Map.copyOf(headers), closeOnClose(body, socket));
     }
 
 
     public static byte[] requestBytes(String target, String host) {
-        return ("GET " + target + " HTTP/1.1\r\nHost: " + host
-            + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n")
-                .getBytes(StandardCharsets.US_ASCII);
+        return requestBytes(target, host, Map.of("Accept-Encoding", "identity"));
+    }
+
+
+    /**
+     * @param headers 더할 요청 머리. 이름과 값에 CR, LF 가 있으면 거절한다
+     */
+    static byte[] requestBytes(String target, String host, Map<String, String> headers) {
+        StringBuilder request = new StringBuilder("GET ").append(target).append(" HTTP/1.1\r\nHost: ").append(host);
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            if (!isHeaderName(header.getKey()) || header.getValue().indexOf('\r') >= 0 || header.getValue().indexOf('\n') >= 0) {
+                throw new IllegalArgumentException("request header is invalid");
+            }
+            request.append("\r\n").append(header.getKey()).append(": ").append(header.getValue());
+        }
+        return request.append("\r\nConnection: close\r\n\r\n").toString().getBytes(StandardCharsets.US_ASCII);
     }
 
 
