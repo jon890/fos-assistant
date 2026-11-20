@@ -1,5 +1,6 @@
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import { pickAgent } from "./helpers.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
@@ -32,13 +33,10 @@ async function putSkill(page: Page, code: string, name: string) {
     );
 }
 
-/** 새 대화 화면을 열고 에이전트 카드를 고른다. */
+/** 새 대화 화면을 열고 이름표로 에이전트를 고른다. */
 async function startWith(page: Page, agentName: string) {
   await page.goto("/new");
-  await page.getByRole("radio", { name: agentName, exact: true }).click();
-  await expect(
-    page.getByRole("radio", { name: agentName, exact: true }),
-  ).toHaveAttribute("aria-checked", "true");
+  await pickAgent(page, agentName);
 }
 
 /** 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. */
