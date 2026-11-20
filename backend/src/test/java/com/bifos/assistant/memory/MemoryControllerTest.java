@@ -65,7 +65,7 @@ class MemoryControllerTest {
     @Test
     @DisplayName("자리가 없어 실리지 않는 항목에만 표시를 단다")
     void marksOnlyItemsNotLoadedForLackOfSpace() {
-        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
+        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(11_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
 
         assertThat(controller.readable())

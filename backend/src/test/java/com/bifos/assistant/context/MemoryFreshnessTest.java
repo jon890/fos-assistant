@@ -93,7 +93,7 @@ class MemoryFreshnessTest {
         clock.set(NOW.minus(Duration.ofDays(181)));
         Memory staleAlways = memories.create(USER, MemoryScope.USER, "오래된 항상", "항상 본문", true);
         Memory staleIndex = memories.create(USER, MemoryScope.USER, "오래된 색인", "색인 본문", false);
-        Memory staleOmitted = memories.create(USER, MemoryScope.USER, "오래된 생략", "가".repeat(9_000), true);
+        Memory staleOmitted = memories.create(USER, MemoryScope.USER, "오래된 생략", "가".repeat(11_000), true);
         clock.set(NOW.minus(Duration.ofDays(180)));
         Memory boundary = memories.create(USER, MemoryScope.USER, "경계", "경계 본문", true);
         clock.set(NOW.minus(Duration.ofDays(1)));
@@ -136,13 +136,10 @@ class MemoryFreshnessTest {
         ContextAssembler configured = TestContextAssemblers.of(
             memories,
             new ContextProperties(
-                8_000,
                 4,
                 Duration.ofHours(6),
                 Duration.ZERO,
-                Map.of("career", Duration.ofDays(30)),
-                null,
-                null),
+                Map.of("career", Duration.ofDays(30))),
             clock);
 
         assertThat(configured.assembleForOwner(USER).bundle().items())
@@ -168,7 +165,8 @@ class MemoryFreshnessTest {
         when(mockedMemories.indexedFor(any(), any())).thenReturn(List.of());
         ContextAssembler mockedAssembler = TestContextAssemblers.of(
             mockedMemories,
-            new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of(), null, null),
+            new ContextProperties(
+                4, Duration.ofHours(6), Duration.ofDays(180), Map.of()),
             Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThat(mockedAssembler.assembleForOwner(USER).bundle().items())
@@ -189,13 +187,10 @@ class MemoryFreshnessTest {
         ContextAssembler configured = TestContextAssemblers.of(
             memories,
             new ContextProperties(
-                8_000,
                 4,
                 Duration.ofHours(6),
                 Duration.ofDays(180),
-                Map.of("disabled", Duration.ZERO),
-                null,
-                null),
+                Map.of("disabled", Duration.ZERO)),
             clock);
         AssembledContext context = configured.assembleForOwner(USER);
         Conversation conversation = conversations.save(Conversation.startedBy(USER.id(), "신선도", null, NOW));

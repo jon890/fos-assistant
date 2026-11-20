@@ -264,6 +264,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param group {@code GROUP} 항목의 그룹 이름
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
      * @param supersedes 이 항목이 대체하는 같은 사례의 옛 항목 key. 없으면 null
+     * @param summary 요약 줄. 없으면 배포 때 이관과 같은 규칙으로 정한다(짧은 개인 사실은 요약 = 본문)
      */
     record MemorySeed(
         String key,
@@ -278,7 +279,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         MemoryEntryType entryType,
         String documentKey,
         int updatedDaysAgo,
-        String supersedes) {
+        String supersedes,
+        String summary) {
 
         MemorySeed {
             scope = scope == null ? MemoryScope.USER : scope;
@@ -328,6 +330,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         /** 선호를 무시하면 답이 어긋나는 질문에 그 선호가 실린다(PrefEval). */
         PREFERENCE,
         /** 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목. */
-        RECALL_GAP
+        RECALL_GAP,
+        /** 요약에 없고 상세에만 있는 사실을 묻는다. 기대 항목의 상세가 질문 관련 구역에 본문으로 든다(이직, 가계부, 여행). */
+        DETAIL
     }
 }

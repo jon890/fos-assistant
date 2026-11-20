@@ -1,4 +1,4 @@
-import { type FakeHermesState } from "./state.ts";
+import { type FakeHermesState, SCRIPT_PAUSE_EVENT } from "./state.ts";
 import { createLifecycle, send, wait, toolStartedPreview } from "./lifecycle.ts";
 import { runEventWriter } from "./wire.ts";
 import { type IncomingMessage, type ServerResponse } from "node:http";
@@ -84,6 +84,15 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
           const script = state.scripts.get(run.input);
           if (script !== undefined) {
             for (const scripted of script.events ?? []) {
+              // 대본 가운데서 멈춘다. 시나리오가 `releaseLongActivity` 를 부르면 다음 사건으로 넘어간다.
+              if (scripted.event === SCRIPT_PAUSE_EVENT) {
+                await new Promise<void>((resolve) => {
+                  state.longActivityGate = resolve;
+                  response.on("close", resolve);
+                });
+                if (response.destroyed) return;
+                continue;
+              }
               if (scripted.event === "subagent.start" && typeof scripted.child_session_id === "string") {
                 state.childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
               }

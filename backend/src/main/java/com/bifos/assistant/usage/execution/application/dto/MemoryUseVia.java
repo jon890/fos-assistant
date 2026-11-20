@@ -4,7 +4,7 @@ package com.bifos.assistant.usage.execution.application.dto;
 public enum MemoryUseVia {
     /** 항상 층에 본문까지 실었다. */
     ALWAYS,
-    /** 개인 사실 구역에 본문까지 실었다. */
+    /** 요약 구역에 요약 줄을 실었다. */
     FACTS,
     /** 질문과 관련된 기억 구역에 본문까지 실었다. */
     SEARCH,

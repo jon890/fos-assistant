@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * 기억과 revision 의 제목과 본문을 주인 데이터 key 로 암호화하고 푼다(ADR-20261103 / memory-encryption).
  *
  * <p>{@code USER} 는 주인 사용자의 데이터 key, {@code GROUP} 은 그 그룹의 데이터 key 다. AAD 는
- * {@code memory:<기억 번호>:<title 또는 content>:<범위>:<주인 번호>} 이다. 암호문을 다른 기억이나 다른 컬럼, 다른 주인의 줄로 옮기면
+ * {@code memory:<기억 번호>:<title, content, summary 가운데 하나>:<범위>:<주인 번호>} 이다. 암호문을 다른 기억이나 다른 컬럼, 다른 주인의 줄로 옮기면
  * 풀리지 않는다.
  *
  * <p>KEK 가 없는 설치는 평문으로 저장하고 한 번 경고한다. KEK 가 있는데 데이터 key 를 풀지 못하면 저장을 거절한다. 평문으로 내려 저장하지
@@ -64,19 +64,20 @@ public class MemoryTexts implements MemoryTextOpener {
         sealOrReject(where, () -> cipher.seal(owner(where), "memory:probe", ""));
         memory.detachForSealing();
         Memory saved = memories.saveAndFlush(memory);
-        saved.seal(seal(saved.stored(), saved.title(), saved.content()).orElseThrow());
+        saved.seal(seal(saved.stored(), saved.title(), saved.content(), saved.summary()).orElseThrow());
         return saved;
     }
 
 
     /**
-     * 그 자리의 제목과 본문을 암호화한다.
+     * 그 자리의 제목과 본문, 요약을 암호화한다.
      *
      * @param where 암호문이 놓일 줄. 기억 번호와 범위, 주인만 쓴다
+     * @param summary 요약. null 이면 이관 전 줄이라 암호문도 null 로 둔다
      * @return 암호화가 꺼져 있으면 빈 값이다. 부르는 쪽은 평문으로 둔다
      * @throws ApiException 데이터 key 를 풀지 못할 때. MEMORY_ENCRYPTION_UNAVAILABLE
      */
-    public Optional<SealedMemoryText> seal(StoredMemoryText where, String title, String content) {
+    public Optional<SealedMemoryText> seal(StoredMemoryText where, String title, String content, String summary) {
         if (!sealing()) {
             warnPlainOnce();
             return Optional.empty();
@@ -84,7 +85,26 @@ public class MemoryTexts implements MemoryTextOpener {
         KeyOwner owner = owner(where);
         SealedText sealedTitle = sealOrReject(where, () -> cipher.seal(owner, aad(where, "title"), title));
         SealedText sealedContent = sealOrReject(where, () -> cipher.seal(owner, aad(where, "content"), content));
-        return Optional.of(new SealedMemoryText(sealedTitle.content(), sealedContent.content(), sealedContent.keyId()));
+        String sealedSummary = summary == null
+            ? null
+            : sealOrReject(where, () -> cipher.seal(owner, aad(where, "summary"), summary)).content();
+        return Optional.of(
+            new SealedMemoryText(sealedTitle.content(), sealedContent.content(), sealedSummary, sealedContent.keyId()));
+    }
+
+
+    /**
+     * 그 자리의 요약 하나를 암호화한다. 이관 전 줄에 요약을 처음 적을 때 쓴다.
+     *
+     * @return 암호화가 꺼져 있으면 빈 값이다. 부르는 쪽은 평문으로 둔다
+     * @throws ApiException 데이터 key 를 풀지 못할 때. MEMORY_ENCRYPTION_UNAVAILABLE
+     */
+    public Optional<String> sealSummary(StoredMemoryText where, String summary) {
+        if (!sealing()) {
+            warnPlainOnce();
+            return Optional.empty();
+        }
+        return Optional.of(sealOrReject(where, () -> cipher.seal(owner(where), aad(where, "summary"), summary)).content());
     }
 
 
@@ -96,9 +116,16 @@ public class MemoryTexts implements MemoryTextOpener {
             Optional<String> content = title.isEmpty()
                 ? Optional.empty()
                 : cipher.open(stored.dataKeyId(), owner, aad(stored, "content"), stored.content());
-            return content.map(body -> new MemoryText(title.get(), body));
+            if (content.isEmpty()) {
+                return Optional.empty();
+            }
+            // 이관 전 줄은 요약이 없다. 요약을 풀지 못하면 줄 전체를 풀지 못한 것으로 본다
+            Optional<String> summary = stored.summary() == null
+                ? Optional.of("")
+                : cipher.open(stored.dataKeyId(), owner, aad(stored, "summary"), stored.summary());
+            return summary.map(line -> new MemoryText(title.get(), content.get(), line));
         }
-        return Optional.of(new MemoryText(stored.title(), stored.content()));
+        return Optional.of(new MemoryText(stored.title(), stored.content(), stored.summary() == null ? "" : stored.summary()));
     }
 
 

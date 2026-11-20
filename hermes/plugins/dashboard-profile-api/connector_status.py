@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import pathlib
 
+from .connector_agent_skills import _agent_skill_plan
 from .connector_state import (
     CONNECTOR_DETACHED,
     CONNECTOR_TOOL_MAP,
@@ -24,15 +25,23 @@ from .profiles import (
 _UNSET = object()
 
 
-def _bind_skills_installed(profile_dir: pathlib.Path, manifest: dict, entry: dict) -> bool:
-    """소유 기록의 스킬이 plugin 의 스킬과 같고, 설치한 파일이 plugin 의 본문과 같은지 본다. 읽다가 예외가 나면 거짓이다."""
+def _bind_skills_installed(profile_dir: pathlib.Path, manifest: dict, entry: dict, config: dict) -> bool:
+    """소유 기록의 스킬이 지금 설치해야 할 스킬과 같고, 설치한 파일이 plugin 의 본문과 같은지 본다. 읽다가 예외가 나면 거짓이다.
+
+    설치해야 할 스킬은 플러그인 스킬 전부와, `_agent_skill_plan` 이 지금 profile 설정으로 고른 에이전트용 스킬이다.
+    셸 조건이나 이름 겹침이 바뀌면 거짓이 되어 정의 어긋남 점검이 다시 설치한다(ADR-20261120 plugin-agent-skills).
+    """
     try:
-        if sorted(entry["skills"]) != sorted(manifest["skills"]):
+        agent_skills = manifest.get("agent_skills") or {}
+        install, _ = _agent_skill_plan(profile_dir, config, manifest, entry["skills"])
+        expected = {skill for skill in manifest["skills"] if skill not in agent_skills} | install
+        if sorted(entry["skills"]) != sorted(expected):
             return False
         skills_dir = profile_dir / PROFILE_SKILLS_DIR
         if skills_dir.is_symlink():
             return False
-        for skill, files in manifest["skills"].items():
+        for skill in entry["skills"]:
+            files = manifest["skills"][skill]
             found = _skill_tree_files(skills_dir / skill)
             if found is None or {key: path.read_bytes() for key, path in found.items()} != files:
                 return False

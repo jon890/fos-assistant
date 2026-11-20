@@ -17,6 +17,10 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     List<AppUser> findByGroupIdAndRole(Long groupId, UserRole role);
 
 
+    /** 그룹의 모든 사용자를 번호 순으로 읽는다. 꺼진 사용자도 든다. */
+    List<AppUser> findByGroupIdOrderByIdAsc(Long groupId);
+
+
     Optional<AppUser> findByEmail(String email);
 
 
