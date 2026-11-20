@@ -392,7 +392,7 @@ public class McpController {
      * 인자는 {@link MemoryRememberArguments#FIELDS} 만 받고 다른 키가 오면 인자 오류다(ADR-20261007 / memory-remember).
      *
      * <p>사용자와 범위를 인자로 받지 않는다. 바로 저장할지를 정하는 인자도 없다. 그 판정은 실행의 출처로 한다. 선택 인자의
-     * {@code null} 은 없는 것으로 본다.
+     * {@code null} 은 없는 것으로 본다. {@code replaces} 의 모양은 {@link MemoryRememberArguments#validReplaces} 가 본다.
      */
     private Map<String, Object> remember(McpCaller caller, JsonNode id, JsonNode arguments) {
         if (!MemoryRememberArguments.FIELDS.containsAll(arguments.propertyNames())
@@ -403,7 +403,8 @@ public class McpController {
             || !nullOr(arguments, "summary", JsonNode::isString)
             || !nullOr(arguments, "sensitive", JsonNode::isBoolean)
             || !nullOr(arguments, "archivable", JsonNode::isBoolean)
-            || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())) {
+            || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())
+            || !MemoryRememberArguments.validReplaces(arguments)) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         MemoryRememberArguments value = MemoryRememberArguments.from(arguments);
@@ -418,7 +419,8 @@ public class McpController {
                 value.memoryId(),
                 value.collection(),
                 Boolean.TRUE.equals(value.sensitive()),
-                Boolean.TRUE.equals(value.archivable())));
+                Boolean.TRUE.equals(value.archivable()),
+                value.replaces()));
     }
 
 

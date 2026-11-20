@@ -54,6 +54,7 @@ class MemoryServiceGuardTest {
         texts,
         revisionWriter,
         mock(MemoryRelevanceSearch.class),
+        mock(MemoryReplacements.class),
         mock(DecisionFeedbackRecorder.class),
         Clock.fixed(NOW, ZoneOffset.UTC));
 

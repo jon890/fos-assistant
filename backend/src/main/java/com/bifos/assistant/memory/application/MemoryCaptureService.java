@@ -58,6 +58,7 @@ public class MemoryCaptureService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
+    private final MemoryReplacements replacements;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -118,19 +119,33 @@ public class MemoryCaptureService {
             throw ex;
         }
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
-        record(saved.id(), user, request, kind, direct ? saved.revision() : null);
+        // 합치기: 바로 저장은 같은 트랜잭션에서 옛 기억을 대신하고, 제안은 받아들일 때 대신할 번호만 기록에 둔다(설계 DECISION5)
+        List<Long> replaced = direct
+            ? replacements.supersede(user, access, saved.id(), request.replaces())
+            : replacements.replaceable(user, access, request.replaces(), saved.id());
+        record(saved.id(), user, request, kind, direct ? saved.revision() : null, null, replaced);
         if (!direct) {
             // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
             feedback.record(MemoryProposalFeedback.of(
                 user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
         }
         return new MemoryRememberResult(
-            direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
+            direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED,
+            saved.id(),
+            replaced,
+            notReplaced(request.replaces(), replaced));
+    }
+
+
+    /** 요청한 번호 가운데 대신하지 못한 것을 요청한 순서로 낸다. */
+    private static List<Long> notReplaced(List<Long> requested, List<Long> replaced) {
+        return requested.stream().distinct().filter(id -> !replaced.contains(id)).toList();
     }
 
 
     /**
-     * 한 대화에서 요청자가 남긴 기록과 그 항목을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다.
+     * 한 대화에서 요청자가 남긴 기록과 그 항목을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다. 합친 기록에는 대신한 옛 기억 가운데 요청자가 지금
+     * 읽을 수 있는 것의 제목을 붙인다.
      *
      * @param conversationId 요청자의 대화임을 부르는 쪽이 확인한 번호
      */
@@ -147,9 +162,16 @@ public class MemoryCaptureService {
             .stream()
             .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
             .collect(Collectors.toMap(Memory::id, Function.identity()));
+        Map<Long, String> titles = replacements.titlesOf(user, rows.stream()
+            .flatMap(row -> row.replacedMemoryIds().stream())
+            .distinct()
+            .toList());
         return rows.stream()
             .filter(row -> byId.containsKey(row.memoryId()))
-            .map(row -> new CapturedMemory(row, byId.get(row.memoryId())))
+            .map(row -> new CapturedMemory(row, byId.get(row.memoryId()), row.replacedMemoryIds().stream()
+                .filter(titles::containsKey)
+                .map(titles::get)
+                .toList()))
             .toList();
     }
 
@@ -292,7 +314,7 @@ public class MemoryCaptureService {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());
-                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED);
+                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED, List.of());
                 yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
             }
         };
@@ -307,7 +329,7 @@ public class MemoryCaptureService {
 
     private void record(
         Long memoryId, CurrentUser user, MemoryRememberRequest request, MemoryCaptureKind kind, Integer base) {
-        record(memoryId, user, request, kind, base, null);
+        record(memoryId, user, request, kind, base, null, List.of());
     }
 
 
@@ -317,7 +339,8 @@ public class MemoryCaptureService {
         MemoryRememberRequest request,
         MemoryCaptureKind kind,
         Integer base,
-        MemoryStatus previousStatus) {
+        MemoryStatus previousStatus,
+        List<Long> replaced) {
         captures.save(MemoryCapture.of(
             memoryId,
             user.id(),
@@ -326,13 +349,15 @@ public class MemoryCaptureService {
             kind,
             base,
             previousStatus,
-            request.externalRead()));
+            request.externalRead())
+            .replacing(replaced));
         log.info(
-            "memory captured userId={} memoryId={} executionId={} kind={}",
+            "memory captured userId={} memoryId={} executionId={} kind={} replaced={}",
             user.id(),
             memoryId,
             request.executionId(),
-            kind);
+            kind,
+            replaced);
     }
 
 
