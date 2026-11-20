@@ -289,7 +289,7 @@ class MemoryServiceTest {
             transactions.executeWithoutResult(status -> {
                 Memory held = repository.findByIdForUpdate(proposed.id()).orElseThrow();
                 revisionRepository.save(MemoryRevision.of(held, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
-                held.revise("고친 내용", null, MemoryRetrieval.SEARCH, null, NOW);
+                held.revise("고친 내용", held.summary(), null, MemoryRetrieval.SEARCH, null, NOW);
                 locked.countDown();
                 // 승인 쪽이 읽기에 닿을 틈을 준다. 잠금이 있으면 이 커밋 뒤에야 읽는다.
                 LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));
@@ -438,6 +438,32 @@ class MemoryServiceTest {
         Memory changed = memories.update(ADMIN, memory.id(), "내용", false, null);
         assertThat(changed.retrieval()).isEqualTo(MemoryRetrieval.SEARCH);
         assertThat(changed.alwaysInject()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("요약 칸이 없는 화면은 짧은 개인 사실을 만들 때 본문을 요약으로 두고, 본문을 고치면 비서가 쓴 요약도 새 본문으로 덮거나 200자를 넘으면 비운다")
+    void screenUpdateKeepsSummaryInStep() {
+        Memory followed = memories.create(ADMIN, MemoryScope.USER, "따라갈 사실", "옛 본문", false);
+        MemorySummaryRows.summarizeAsContent(texts, jdbc, followed);
+        Memory cleared = memories.create(ADMIN, MemoryScope.USER, "비울 사실", "옛 본문 둘", false);
+        MemorySummaryRows.summarizeAsContent(texts, jdbc, cleared);
+        Memory custom = memories.create(ADMIN, MemoryScope.USER, "따로 쓴 사실", "옛 본문 셋", false);
+        MemorySummaryRows.summarize(texts, jdbc, custom, "따로 쓴 요약");
+
+        memories.update(ADMIN, followed.id(), "새 본문", false, null);
+        memories.update(ADMIN, cleared.id(), "가".repeat(201), false, null);
+        memories.update(ADMIN, custom.id(), "새 본문 셋", false, null);
+
+        assertThat(repository.findById(followed.id()).orElseThrow().summary()).isEqualTo("새 본문");
+        assertThat(repository.findById(cleared.id()).orElseThrow().summary()).isEmpty();
+        assertThat(repository.findById(custom.id()).orElseThrow().summary()).isEqualTo("새 본문 셋");
+        Memory created = memories.create(ADMIN, MemoryScope.USER, "새로 만든 사실", "새로 만든 본문", false);
+        assertThat(repository.findById(created.id()).orElseThrow().summary()).isEqualTo("새로 만든 본문");
+        Memory longCreated = memories.create(ADMIN, MemoryScope.USER, "긴 사실", "가".repeat(201), false);
+        assertThat(repository.findById(longCreated.id()).orElseThrow().summary()).isEmpty();
+        Memory groupCreated = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
+        assertThat(repository.findById(groupCreated.id()).orElseThrow().summary()).isEmpty();
     }
 
 

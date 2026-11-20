@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 /**
  * 질문과 관련된 기억 구역을 싣고 색인에 놓을 순서를 정한다(ADR-20261015 / memory-hybrid-selection).
  *
- * <p>후보는 개인 사실 구역에 실리지 않은 색인 후보다. 관련 있는 항목을 점수 순으로 보며, 일반 본문이 {@code itemMaxChars} 이하이고 구역 합계가
+ * <p>후보는 색인 후보 전체다. 요약 구역에 든 항목도 후보다. 관련 있는 항목을 점수 순으로 보며, 일반 본문이 {@code itemMaxChars} 이하이고 구역 합계가
  * {@code maxChars} 와 남은 자리 안에 드는 것을 {@code maxItems} 건까지 싣는다. 들어가지 않는 항목은 자르지 않고 건너뛰어 색인에 남긴다.
  *
  * <p>풀지 못한 항목은 본문을 점수에 넘기지 않고 이 구역에 싣지 않는다.
@@ -52,7 +52,7 @@ public class MemorySearchSection {
      * 구역을 싣고 색인에 놓을 항목과 그 순서를 낸다.
      *
      * @param question 질문. null 이거나 공백뿐이면 구역을 싣지 않고 색인은 번호 순이다
-     * @param candidates 개인 사실 구역에 실리지 않은 색인 후보
+     * @param candidates 색인 후보. 요약 구역에 든 항목도 포함한다
      * @param indexOnly 점수는 받되 구역에 싣지 않고 색인에 둘 항목 번호
      * @param freshness 항목의 신선도
      */

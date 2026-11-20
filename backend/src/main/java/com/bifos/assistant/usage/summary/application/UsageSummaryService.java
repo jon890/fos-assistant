@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,6 +108,32 @@ public class UsageSummaryService {
             unconfirmed,
             unpriced,
             executions.countIncompleteEventObservations(userId, from, to));
+    }
+
+
+    /**
+     * 여러 사용자의 한 달치 합계를 칸마다 더한다.
+     *
+     * <p>사용자마다 {@link #monthly(Long, Instant, Instant)} 를 불러 더한다. 자식 원장 줄과 사건 관측의 규칙을
+     * 새 질의로 두 벌 만들지 않으려는 것이다. 관리자 요약이 그룹 전체를 셀 때 쓴다. 사용자가 없으면 모두 0 이다.
+     */
+    public MonthlyUsageSummary monthly(Collection<Long> userIds, Instant from, Instant to) {
+        MonthlyUsageSummary sum = new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        for (Long userId : userIds) {
+            MonthlyUsageSummary one = monthly(userId, from, to);
+            sum = new MonthlyUsageSummary(
+                sum.estimatedMicros() + one.estimatedMicros(),
+                sum.actualMicros() + one.actualMicros(),
+                sum.pricedExecutions() + one.pricedExecutions(),
+                sum.unpricedExecutions() + one.unpricedExecutions(),
+                sum.subscriptionExecutions() + one.subscriptionExecutions(),
+                sum.pricedSubagents() + one.pricedSubagents(),
+                sum.pendingSubagents() + one.pendingSubagents(),
+                sum.unconfirmedSubagents() + one.unconfirmedSubagents(),
+                sum.unpricedSubagents() + one.unpricedSubagents(),
+                sum.observationIncompleteExecutions() + one.observationIncompleteExecutions());
+        }
+        return sum;
     }
 
 

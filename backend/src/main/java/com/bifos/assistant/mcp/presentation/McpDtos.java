@@ -262,12 +262,13 @@ public final class McpDtos {
         Long memoryId,
         String collection,
         Boolean sensitive,
-        Boolean archivable) {
+        Boolean archivable,
+        String summary) {
 
 
         /** 받는 인자 이름이다. 사용자와 범위, 바로 저장할지를 정하는 인자는 없다. */
         static final Set<String> FIELDS = Set.of(
-            "title", "content", "evidence", "memory_id", "collection", "sensitive", "archivable");
+            "title", "content", "evidence", "memory_id", "collection", "sensitive", "archivable", "summary");
 
         /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
         static MemoryRememberArguments from(JsonNode arguments) {
@@ -281,7 +282,8 @@ public final class McpDtos {
                 memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
                 optionalText(arguments, "collection"),
                 sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue(),
-                archivable == null || archivable.isNull() ? null : archivable.booleanValue());
+                archivable == null || archivable.isNull() ? null : archivable.booleanValue(),
+                optionalText(arguments, "summary"));
         }
 
 

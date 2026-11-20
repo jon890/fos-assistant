@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -131,7 +132,7 @@ class McpMemorySearchToolTest {
     void discoversActuallyOmittedItemAndRecordsOnlySuccessfulRead() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         ContextAssembler small = TestContextAssemblers.of(
-            memories, new ContextProperties(32, 4, null, null, Map.of(), 0, 200), Clock.systemUTC());
+            memories, new ContextProperties(4, null, null, Map.of()), new MemoryContextBudget(0, 32), Clock.systemUTC());
         AssembledContext assembled = small.assemble(user, run.agentId());
         assertThat(assembled.omittedMemoryIds()).containsExactly(memory.id());
         assertThat(assembled.bundle().items())

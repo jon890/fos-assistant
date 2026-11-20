@@ -1,5 +1,7 @@
 package com.bifos.assistant.admin.memory.presentation;
 
+import com.bifos.assistant.memory.application.MemoryContextSettings;
+import com.bifos.assistant.memory.application.dto.MemoryContextBudget;
 import com.bifos.assistant.memory.application.dto.AgentMemoryGrantInput;
 import com.bifos.assistant.memory.application.dto.AgentMemorySetting;
 import com.bifos.assistant.memory.application.dto.AgentMemorySettingChange;
@@ -72,6 +74,38 @@ public final class MemoryAdminDtos {
                 change.changeType(),
                 change.changedByName(),
                 change.changedAt());
+        }
+    }
+
+    /** 관리자가 바꾸는 기억 조립 예산이다. 범위는 서버가 저장할 때 검사한다. */
+    public record ReplaceMemoryContextRequest(@NotNull Long summaryMaxChars, @NotNull Long maxChars) {
+    }
+
+    /**
+     * 그룹의 지금 기억 조립 예산과 기본값, 허용 범위다.
+     *
+     * @param summaryCeiling 지금 전체 상한에서 요약 구역 예산이 가질 수 있는 최댓값. 전체 상한에서 색인 몫을 뺀 자리다
+     */
+    public record MemoryContextSettingView(
+        long summaryMaxChars,
+        long maxChars,
+        long defaultSummaryMaxChars,
+        long defaultMaxChars,
+        long summaryMin,
+        long summaryCeiling,
+        long maxCharsMin,
+        long maxCharsMax) {
+
+        public static MemoryContextSettingView of(MemoryContextBudget budget, long summaryCeiling) {
+            return new MemoryContextSettingView(
+                budget.summaryMaxChars(),
+                budget.maxChars(),
+                MemoryContextBudget.DEFAULT_SUMMARY_MAX_CHARS,
+                MemoryContextBudget.DEFAULT_MAX_CHARS,
+                MemoryContextSettings.SUMMARY_MIN,
+                summaryCeiling,
+                MemoryContextSettings.TOTAL_MIN,
+                MemoryContextSettings.TOTAL_MAX);
         }
     }
 }

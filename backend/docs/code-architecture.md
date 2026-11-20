@@ -341,7 +341,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.action.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 실으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길
@@ -391,7 +391,7 @@ provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 �
 `ContextAssembler`는 요청자의 권한, 후보 항목, 층 순서와 신선도를 결정한다.
 매 조립 호출마다 package-private `ContextBudgetWriter`를 새로 만들어 예산에 맞춘 글과 누락 항목, 문맥 묶음을 함께 조립한다.
 writer는 머리 줄과 구분 줄을 포함한 길이를 계산한다. 항상 넣는 층과 색인 층에서는 상한을 넘는 항목 하나만 건너뛰고 묶음의 원래 자리에 `OMITTED`로 남긴다.
-개인 사실 구역의 `appendIfFits`는 남은 예산에 들어가지 않는 항목을 누락으로 기록하지 않고, `ContextAssembler`가 그 항목을 색인으로 돌린다.
+요약 구역의 `appendIfFits`는 남은 예산에 들어가지 않는 항목을 누락으로 기록하지 않고, `ContextAssembler`가 그 항목을 색인으로 돌린다.
 개인 사실 후보의 선택과 색인 예산 계산도 writer의 같은 렌더링 규칙을 쓴다.
 
 ## 가격표
