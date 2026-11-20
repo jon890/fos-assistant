@@ -21,6 +21,11 @@ export type Expect = {
   includes?: string[];
   /** 낱말이 답에 하나도 없어야 한다. */
   absent?: string[];
+  /**
+   * 답이 링크한 예약 작업(`/tasks/<id>`)의 지시문에 있어야 할 말이다. 항목마다 `|` 로 나눈 낱말 가운데 하나가 있으면 된다.
+   * 스펙 service-concepts DECISION28 의 지시문 요소를 본다.
+   */
+  instructionIncludes?: string[];
 };
 export type Question = { id: string; concept: Concept; messages: string[]; expect: Expect };
 export type QuestionScore = { id: string; concept: Concept; passed: boolean; skipped: boolean; failures: string[]; error?: string };
@@ -80,6 +85,16 @@ export function answerLinks(answer: string): string[] {
   return [...found];
 }
 
+const TASK_LINK = /^\/tasks\/([0-9a-fA-F-]{36})$/;
+
+/** 답이 링크한 예약 작업의 번호다. 에이전트가 만든 작업을 찾는 데 쓴다. */
+export function linkedTaskIds(answer: string): string[] {
+  return answerLinks(answer).flatMap((link) => {
+    const match = TASK_LINK.exec(link);
+    return match ? [match[1]] : [];
+  });
+}
+
 /** 실행 트리 전체에서 끝난 Control Plane 도구의 이름이다. */
 export function completedTools(root: ExecutionNode): Set<string> {
   const names = new Set<string>();
@@ -93,7 +108,8 @@ export function completedTools(root: ExecutionNode): Set<string> {
   return names;
 }
 
-export function scoreQuestion(question: Question, answer: string, root: ExecutionNode): QuestionScore {
+/** @param instructions 답이 링크한 예약 작업들의 지시문. `instructionIncludes` 만 본다 */
+export function scoreQuestion(question: Question, answer: string, root: ExecutionNode, instructions: string[] = []): QuestionScore {
   const links = answerLinks(answer);
   const tools = completedTools(root);
   const { expect } = question;
@@ -107,6 +123,13 @@ export function scoreQuestion(question: Question, answer: string, root: Executio
   if (expect.includes && !expect.includes.some((word) => answer.includes(word)))
     failures.push(`${expect.includes.join(", ")} 가운데 하나도 없다`);
   for (const word of expect.absent ?? []) if (answer.includes(word)) failures.push(`없어야 할 「${word}」 가 있다`);
+  if (expect.instructionIncludes && instructions.length === 0) failures.push("답이 링크한 예약 작업의 지시문이 없다");
+  else
+    for (const item of expect.instructionIncludes ?? []) {
+      const words = item.split("|");
+      if (!instructions.some((text) => words.some((word) => text.includes(word))))
+        failures.push(`지시문에 ${words.join(", ")} 가운데 하나도 없다`);
+    }
   return { id: question.id, concept: question.concept, passed: failures.length === 0, skipped: false, failures };
 }
 

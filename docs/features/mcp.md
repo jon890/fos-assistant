@@ -166,13 +166,14 @@ fos-ctx 는 Hermes 의 `image_generate` 가 만든 그림을 `POST /internal/her
 
 ### Control Plane MCP
 
-Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기, 플러그인 목록 읽기를 Control Plane 의 MCP 서버 하나가 맡는다.
+Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기, 플러그인 목록 읽기, 예약 작업 다루기를 Control Plane 의 MCP 서버 하나가 맡는다.
 서버 이름, 경로, 프로토콜 버전, 도구 목록은 `McpController` 와 `McpToolService` 가 갖는다. Hermes 는 이 서버의 도구를 `mcp__fos_assistant__<도구>` 로 보인다.
 
-**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS` 와 `CHECK_TREE_WRITE_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
+**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS`, `CHECK_TREE_WRITE_TOOLS`, `CHECK_TREE_TASK_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
 
 - 제목 검색을 포함한 읽기와 위임 도구는 받는다. 플러그인 목록 읽기(`connector_list`)도 읽기라 받는다
 - 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 와 `file_space_put` 을 더 받는다. `file_space_put` 은 대화 인자가 없어 origin 실행의 대화가 점검 대화인지로 본다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
+- 예약 작업 목록(`task_list`)과, 지우지 않고 승인 카드만 띄우는 `task_delete` 는 늘 받는다. 바로 바꾸는 `task_create`, `task_update`, `task_set_state` 는 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(서비스 개념 스펙 DECISION32)
 - `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 
@@ -192,6 +193,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
 | `file_space_put` | 아래 「파일 공간에 넣는 도구」 |
 | `connector_list` | [서비스 개념 설계](service-concepts/design.md) 의 「`connector_list`」. 요청자의 플러그인마다 연결 상태, 이 에이전트에 붙은 상태, 연결 화면 링크를 준다. 결과는 바깥 글이 아니라 기억 바로 저장 판정의 내부 도구다 |
+| `task_list`, `task_create`, `task_update`, `task_set_state`, `task_delete` | [서비스 개념 설계](service-concepts/design.md) 의 「PR2 예약 작업 도구」. 요청자의 일반 예약 작업만 다룬다. 지우기는 승인 카드만 띄운다. 결과는 기억 바로 저장 판정의 내부 도구다 |
 | `approval_resume` | [browser-cowork 설계](browser-cowork/design.md) 의 「PR4 이어 가기」. 호출한 대화의 사람 기다림 승인 하나를 같은 승인으로 한 번 더 실행한다 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않고, Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.
