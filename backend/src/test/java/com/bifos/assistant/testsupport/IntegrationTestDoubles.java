@@ -56,6 +56,14 @@ public class IntegrationTestDoubles {
     }
 
 
+    /** 웹 푸시 요청을 네트워크 없이 모은다. 검사가 정하지 않으면 201 을 돌려준다. */
+    @Bean
+    @Primary
+    RecordingWebPushClient recordingWebPushClient() {
+        return new RecordingWebPushClient();
+    }
+
+
     /** catalog 가 시작을 선언한 원고 저장 검사만 닿는다. */
     @Bean
     @Primary

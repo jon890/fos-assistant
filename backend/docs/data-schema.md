@@ -93,6 +93,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `task` | `title`, `instruction` | 함. 옆 칸은 각각 `title_key_id`, `instruction_key_id`. 점검 작업의 지시문은 없어 옆 칸도 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `proactive_check` | `report_json` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `app_user` | `push_devices` | 안 함. 모델이 만든 글은 아니지만 웹 푸시 기기의 주소와 인증 값이 있어 운영 조회 계정에서 뺀다. 이 값만으로는 보낼 수 없고 VAPID 비밀 키는 데이터베이스 밖에 있다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)) |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
 MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
@@ -109,6 +110,8 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
+
+**예외: 웹 푸시 기기는 사용자와 1:N 이지만 `app_user.push_devices` 의 JSON 컬럼에 둔다.** 사용자가 새 테이블 대신 고른 것이다(2026-11-20). 사용자가 몇 명뿐이라 다른 사용자 줄에서 같은 주소를 `LIKE` 로 찾아도 몇 줄이고, 같은 주소가 두 사용자에게 남지 않는 것은 DB 의 유일 제약 대신 서버 안의 등록 잠금이 지킨다(서버 한 대 전제). 근거와 버린 대안은 [ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md) 가 갖는다.
 
 ## 마이그레이션 작성 규칙
 
@@ -327,6 +330,18 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
 **지금은 읽지도 쓰지도 않는다.** 「결과물 자동 보관」 스위치를 없애 자동 보관이 늘 돈다([파일 공간 스펙](../../docs/features/workspace/spec.md) REQ16). 칸을 지우는 마이그레이션은 되돌릴 수 없어 칸을 남겼다([설계](../../docs/features/workspace/design.md) DECISION11). 엔티티는 검사의 스키마가 같은 칸을 갖도록 넣기와 고치기에서 뺀 매핑만 둔다.
+
+#### 푸시 기기와 설정 컬럼
+
+`push_devices` 는 TEXT NULL 이고 웹 푸시 기기(브라우저 구독) 목록의 JSON 글이다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)). 비면 기기가 없다.
+모양은 `{"version":1,"devices":[{"id","endpoint","endpointHash","p256dh","auth","name","timeZone","registeredAt"}]}` 이고 읽고 쓰는 일은 `PushDevicesCodec` 과 `PushDeviceRepository` 가 한다.
+
+- `endpointHash` 는 주소의 SHA-256 소문자 hex 다. 다른 사용자 줄에서 같은 주소를 찾는 `LIKE` 와 화면의 「이 기기」 판정에 쓴다
+- 한 사용자의 기기는 `assistant.push.max-devices`(10)대까지다. 넘으면 `registeredAt` 이 가장 이른 기기를 뺀다
+- 주문 상한 컬럼처럼 엔티티의 넣기와 고치기에서 빼고 전용 쿼리로만 읽고 쓴다. 쓰는 쪽은 서버 안의 등록 잠금을 잡고 새 트랜잭션에서 바꿀 사용자 줄을 번호 순으로 잠그고 다시 읽은 뒤 쓴다
+- 이 칸만 바꾸는 쓰기는 일반 감사 `updated_at` 을 바꾸지 않는다. 백그라운드의 끊긴 구독 정리가 사용자의 마지막 변경 시각을 바꾸지 않게 한다
+- 모르는 버전이거나 깨진 글은 기기 없음으로 보지 않고 오류로 올린다. 없음으로 보면 다음 쓰기가 기기를 지운다
+- 관리자가 접근을 끄면 비운다. 사용자 정리는 줄째 지우므로 함께 사라진다
 
 ### allowed_person
 
@@ -869,6 +884,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
+- `connector_id` 가 `fos-assistant` 인 줄은 플러그인 도구가 아니라 Control Plane 동작(예약 작업 지우기 등)의 승인 줄이다([ADR-20261120 / agent-service-writes](adr/ADR-20261120-agent-service-writes.md)). `tool_name` 은 그 동작 이름, `hermes_tool` 은 `fos_` 를 붙인 이름이고 Hermes 는 쓰지 않는다. `dedupe_key` 는 동작, 사용자, origin 실행, 대상의 SHA-256 이다. 승인하면 profile 에서 실행하지 않고 Control Plane 이 한 번 하며, `result_text` 는 대화에 남길 알림 줄의 글이다. 위험도는 `WRITE`, 승인 방식은 `always` 다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 - `handoff_need`, `handoff_tab`, `handoff_at`, `handoff_closed_at` 은 플러그인이 그 호출에서 사람에게 「내 브라우저」 화면을 넘긴 기록이다([ADR-20261111 / connector-handoff](../../docs/adr/ADR-20261111-connector-handoff.md)). fos-ctx 의 알림이 hook 에 통과로 답한 같은 호출의 줄에만, 비어 있을 때 한 번 적는다. `handoff_need` 는 `LOGIN`, `CAPTCHA`, `DEVICE_CHECK`, `BOT_CHECK`, `UNEXPECTED_PAGE`, `HUMAN_BROWSER`, `PAYMENT`, `TAB_CHECK` 이고(마이그레이션의 칸 설명은 처음 셋만 적는다. 적용한 파일은 고치지 않는다) `handoff_tab` 은 남긴 탭의 CDP target id 다. `PAYMENT` 와 `TAB_CHECK` 는 fos-ctx 알림으로 받지 않고, 주문서 채우기의 결과 판정이 잠근 `PURCHASE` 승인 줄에 직접 적는다. 그 결과 판정이 채우기 전에 사람이 해야 하는 화면을 만난 줄에도 그 단계를 적는다. 응답을 잃은 `TAB_CHECK` 는 `handoff_tab` 이 비어 있다([ADR-20261113 / purchase-checkout](../../docs/adr/ADR-20261113-purchase-checkout.md)). 사람이 브라우저를 쥐어 탭을 만들기 전에 거절된 `HUMAN_BROWSER` 도 비어 있다([ADR-20261116 / browser-lock](../../docs/adr/ADR-20261116-browser-lock.md)). 그 대화의 다음 turn 이 시작되면 `handoff_closed_at` 을 적어 카드를 닫는다. 플러그인 알림은 `connector.handoff` 의 저장소 쿼리로, 결과 판정은 승인 줄 엔티티로 쓴다. 넘기지 않은 줄은 넷 다 비어 있다

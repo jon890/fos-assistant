@@ -136,6 +136,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261120 / generated-image-draft](ADR-20261120-generated-image-draft.md) | 만든 그림은 사진 첨부 사본으로 블로그 원고에 넣는다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 그림 행을 원고의 사진 판정에 잇되 원고의 두 지문은 바꾸지 않는다 |
 | [ADR-20261120 / image-source](ADR-20261120-image-source.md) | 그림을 고칠 바탕 사진은 모델이 가리키고 fos-ctx 가 Control Plane 에서 받아 넘긴다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 hook 에 받기를 더하고 ADR-091 의 사진 권한은 넓히지 않는다 |
 | [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) | 사용자가 보낸 링크의 사진은 Control Plane 이 대화에 있는지 확인하고 허용 목록 없이 공개 주소에서만 받는다 | backend, hermes | Accepted. [ADR-20261120 / image-source](ADR-20261120-image-source.md) 의 받기 길에 `link:` 가리킴을 더한다 |
+| [ADR-20261120 / web-push](ADR-20261120-web-push.md) | 알림을 그대로 웹 푸시로 보내고 기기는 사용자 줄의 JSON 칸에 두며 암호화는 JDK 로 한다 | backend, frontend | Accepted. ADR-070 의 알림 원장에 바깥 채널을 더하고 ADR-072 의 열린 질문 셋에 답한다 |
 
 ## 보관
 
