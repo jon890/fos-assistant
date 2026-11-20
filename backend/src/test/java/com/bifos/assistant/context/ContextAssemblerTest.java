@@ -199,6 +199,39 @@ class ContextAssemblerTest {
 
 
     @Test
+    @DisplayName("답 모양 규칙은 모든 범위에 들고 출처 목록 꼴은 대화 실행에만 든다")
+    void addsAnswerShapeToAllScopesAndSourceListFormToConversation() {
+        for (InstructionScope scope : InstructionScope.values()) {
+            assertThat(assembler.withResponseInstructions(AssembledContext.empty(), scope).instructions())
+                .as(scope.name())
+                .contains(
+                    "첫머리에 결론이나 핵심 답을 둔다",
+                    "문단은 두세 문장으로 짧게 쓰고 문단 사이에 빈 줄을 둔다",
+                    "## 제목으로 나눈다",
+                    "짧은 답에는 제목을 쓰지 않는다",
+                    "단계와 나열은 목록",
+                    "셋 이상을 두 기준 이상으로 비교하면 표",
+                    "```mermaid",
+                    "세로 방향 flowchart",
+                    "짧은 답과 단순 나열에는 그리지 않는다",
+                    "그림 아래에 핵심을 글로 한 번 더 적는다",
+                    "주소를 글자로 그대로 쓰지 않고",
+                    "머리 줄 바로 다음에 각 열의 구분 줄을 반드시 둔다");
+        }
+        String conversation = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.CONVERSATION)
+            .instructions();
+        String scheduled = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.SCHEDULED)
+            .instructions();
+
+        assertThat(conversation).contains(
+            "### 출처 제목 줄 다음에 출처마다 - [기관 · 문서 이름](주소) 한 줄",
+            "주소를 글자로 그대로 보이지 않는다",
+            "목록 안에서 같은 주소는 한 번만 쓴다");
+        assertThat(scheduled).doesNotContain("### 출처");
+    }
+
+
+    @Test
     @DisplayName("공통 지침은 Memory 예산 밖에 두고 본문과 누락 번호와 묶음을 보존한다")
     void keepsMemoryBudgetAndOmissionsIndependent() {
         String body = "가".repeat(8_000);
