@@ -44,15 +44,15 @@ test("필수 검사는 각 폭의 모든 shard 가 성공했을 때만 통과한
   assert.throws(() => checkShards([...jobs, jobs[0]], "mobile", 4));
 });
 
-test("3개로 줄인 shard도 마지막 shard 실패와 누락을 통과시키지 않는다", () => {
+test("5개로 늘린 shard도 마지막 shard 실패와 누락을 통과시키지 않는다", () => {
   for (const project of ["mobile", "desktop"]) {
-    const jobs = [1, 2, 3].map((shard) => ({
+    const jobs = [1, 2, 3, 4, 5].map((shard) => ({
       name: `browser-${project}-shard-${shard}`,
       conclusion: "success",
     }));
-    checkShards(jobs, project, 3);
-    assert.throws(() => checkShards(jobs.slice(0, 2), project, 3));
-    assert.throws(() => checkShards([...jobs.slice(0, 2), { ...jobs[2], conclusion: "failure" }], project, 3));
+    checkShards(jobs, project, 5);
+    assert.throws(() => checkShards(jobs.slice(0, 4), project, 5));
+    assert.throws(() => checkShards([...jobs.slice(0, 4), { ...jobs[4], conclusion: "failure" }], project, 5));
   }
 });
 
