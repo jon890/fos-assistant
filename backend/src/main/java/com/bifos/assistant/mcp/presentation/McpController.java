@@ -158,7 +158,9 @@ public class McpController {
             Map.entry(McpFollowUpTools.LIST, this::listFollowUps),
             Map.entry(McpFollowUpTools.DONE, this::finishFollowUp),
             Map.entry(McpMemoryForgetTool.NAME, this::forgetMemory),
-            Map.entry(McpConnectorAttachTool.NAME, this::attachConnector));
+            Map.entry(McpConnectorAttachTool.NAME, (caller, id, args) -> McpConnectorAttachTool.connectorOf(args)
+                .map(connector -> response(id, connectorAttach.attach(caller, connector)))
+                .orElseGet(() -> invalidParams(id, INVALID_ARGUMENTS))));
     }
 
 
@@ -448,13 +450,6 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, memoryForget.forget(caller, memoryId.longValue()));
-    }
-
-
-    /** 인자는 비지 않은 글 {@code connector} 하나다. */
-    private Map<String, Object> attachConnector(McpCaller caller, JsonNode id, JsonNode arguments) {
-        String connector = arguments.size() == 1 && text(arguments, "connector") ? arguments.get("connector").asString().strip() : "";
-        return McpConnectorAttachTool.accepts(connector) ? response(id, connectorAttach.attach(caller, connector)) : invalidParams(id, INVALID_ARGUMENTS);
     }
 
 

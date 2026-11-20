@@ -2,12 +2,15 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.port.ConnectorAttachRequests;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -27,9 +30,14 @@ public class McpConnectorAttachTool {
     private final ConnectorAttachRequests requests;
 
 
-    /** 플러그인 번호로 받을 수 있는 글인가. 비었거나 너무 길면 인자 오류다. */
-    public static boolean accepts(String connectorId) {
-        return !connectorId.isEmpty() && connectorId.length() <= MAX_CONNECTOR_ID;
+    /** 인자는 비지 않은 글 {@code connector} 하나다. 다른 키가 있거나 글이 비었거나 너무 길면 빈 값이고 인자 오류다. */
+    public static Optional<String> connectorOf(JsonNode arguments) {
+        JsonNode value = arguments.get("connector");
+        if (arguments.size() != 1 || value == null || !value.isString()) {
+            return Optional.empty();
+        }
+        String connector = value.asString().strip();
+        return connector.isEmpty() || connector.length() > MAX_CONNECTOR_ID ? Optional.empty() : Optional.of(connector);
     }
 
 
@@ -37,13 +45,25 @@ public class McpConnectorAttachTool {
         try {
             var origin = caller.originExecution();
             Map<String, Object> body = requests.request(caller.user(), origin.id(), origin.agentId(), connectorId);
-            Object status = body.get("status");
-            boolean done = ConnectorAttachRequests.REQUESTED.equals(status) || ConnectorAttachRequests.ALREADY_ATTACHED.equals(status);
-            return McpToolService.result(JSON.writeValueAsString(body), !done);
+            String status = String.valueOf(body.get("status"));
+            if (ConnectorAttachRequests.REQUESTED.equals(status) || ConnectorAttachRequests.ALREADY_ATTACHED.equals(status)) {
+                return McpToolService.success(JSON.writeValueAsString(body));
+            }
+            return McpToolService.jsonFailure(body, nextFor(status));
         } catch (RuntimeException ex) {
             log.warn("connector attach tool failed executionId={} kind={}", caller.executionId(), ex.getClass().getSimpleName());
-            return McpToolService.result(JSON.writeValueAsString(Map.of("status", "unavailable", "message", UNAVAILABLE)), true);
+            return McpToolService.jsonFailure(Map.of("status", "unavailable", "message", UNAVAILABLE), nextFor("unavailable"));
         }
+    }
+
+
+    /** 붙이기를 청하지 못한 까닭마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(String status) {
+        return switch (status) {
+            case "not_found" -> ToolFailureText.alternative(status, "connector_list 로 id 를 찾아 다시 부르고, 없는 서비스면 없다고 알리고 link 를 붙인다");
+            case "unavailable" -> ToolFailureText.alternative(status, "다른 방법이 없으니 /connections 화면에서 붙이라고 안내하고 잠시 뒤 다시 해 달라고 알린다");
+            default -> ToolFailureText.askUser(status);
+        };
     }
 
 
