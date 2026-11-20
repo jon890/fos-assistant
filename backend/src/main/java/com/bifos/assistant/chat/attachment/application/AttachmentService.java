@@ -230,6 +230,7 @@ public class AttachmentService {
         boolean allFree = found.size() == attachmentIds.size()
             && found.stream()
                 .allMatch(it -> it.messageId() == null
+                    && !it.isDraftImageCopy()
                     && it.isVisible()
                     && readable(it.id(), conversationId, it.uploadedByUserId()));
         if (!allFree) {

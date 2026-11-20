@@ -2,12 +2,11 @@
 
 사용자가 대화로 부탁한 그림을 비서가 만들어 답 안에 보이고 「보관한 결과물」 에 남기는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/mcp/**/ImageSource*`, `hermes/plugins/fos-ctx/generated_image.py`, `hermes/plugins/fos-ctx/image_source.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
+covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/mcp/**/ImageSource*`, `backend/src/main/java/com/bifos/assistant/chat/**/DraftImageCopies*`, `hermes/plugins/fos-ctx/generated_image.py`, `hermes/plugins/fos-ctx/image_source.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
 
-요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md), [ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md), [ADR-20261120 / image-source](../adr/ADR-20261120-image-source.md) 가 갖는다.
+요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md), [ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md), [ADR-20261120 / image-source](../adr/ADR-20261120-image-source.md), [ADR-20261120 / generated-image-draft](../adr/ADR-20261120-generated-image-draft.md) 가 갖는다.
 
-**지금은 스펙의 PR3 까지다.** 모든 사용자의 기본 비서에 「그림 만들기」 가 켜지고, 만든 그림이 답 안에 보이고 보관함에 남는다. 지금 대화의 사진과 그림을 바탕으로 고친다.
-블로그 원고에 넣기는 스펙의 PR4 가 더한다.
+모든 사용자의 기본 비서에 「그림 만들기」 가 켜지고, 만든 그림이 답 안에 보이고 보관함에 남는다. 지금 대화의 사진과 그림을 바탕으로 고치고, 만든 그림을 블로그 원고의 사진 자리에 넣는다.
 
 ## 요구
 
@@ -18,6 +17,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets
 - 모든 사용자의 기본 비서에 「그림 만들기」 가 켜져 있다. 켜고 끄는 것은 관리자만 한다. 켜면 이미지 서비스 설정이 함께 들어간다.
 - 예약 작업과 먼저 살펴보기처럼 사람이 없는 실행에서는 그림을 만들지 않는다.
 - 지금 대화에 보낸 사진과 그 대화에서 만든 그림을 바탕으로 고친 새 그림을 만든다. 바탕 한 장에 참고 사진 여러 장을 쓴다. 다른 대화의 사진과 지운 사진은 쓰지 못하고, 하나라도 쓸 수 없으면 그림을 만들지 않고 비서가 어느 사진을 왜 쓸 수 없는지 알린다.
+- 지금 대화에서 만든 그림을 블로그 원고의 사진 자리에 넣는다. 보관 기간이 지나 대화 쪽 원본이 없는 그림은 넣지 못하고, 이미 넣은 그림은 올린 사진과 같은 규칙으로 원고에 남는다.
 
 ## 흐름
 
@@ -114,6 +114,20 @@ sequenceDiagram
 | 합쳐 16장을 넘는다 | 줄여 달라고 막는다. 이미지 서비스가 받는 장수다 |
 
 고친 그림은 새 그림이라 위 흐름대로 답에 보이고 보관된다. 받기 경로의 계약은 [`fos-ctx` README](../../hermes/plugins/fos-ctx/README.md) 의 「그림을 고칠 사진을 받는다」, Hermes 가 두 인자를 받는 모양은 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「`image_generate` 의 결과와 그림 파일」, 실패 처리는 설계의 「PR3」 이 갖는다.
+
+## 블로그 원고에 넣기
+
+사용자가 그림을 글에 넣어 달라고 하면 비서가 `content_draft_image` 에 그림 제목을 준다. Control Plane 이 그 그림의 사진 첨부 사본을 같은 대화에 만들고 첨부 번호와 파일 이름, 사진 폴더를 돌려준다.
+비서는 그 값을 초안의 사진 줄과 원고의 사진 자리에 쓴다. 초안 미리보기, 승인 카드, 네이버 임시저장은 올린 사진과 같은 길로 사본을 쓴다.
+
+| 상황 | 결과 |
+| --- | --- |
+| 처음 넣는다 | 사본을 만든다. 사본은 대화 화면과 사진 순번에 나오지 않는다 |
+| 같은 그림을 다시 넣는다 | 같은 사본을 준다 |
+| 보관 기간 정리로 그림 파일이 지워졌다 | 넣지 못하고 비서가 까닭을 알린다. 원고는 바뀌지 않는다 |
+| 이미 넣은 그림의 파일이 지워졌다 | 원고는 사본을 보므로 그대로다. 사본은 올린 사진의 보관 기간을 따른다 |
+
+도구의 계약은 [`content-draft.md`](content-draft.md) 의 「만든 그림을 원고에 넣기」, 사본을 두는 방법과 실패 처리는 설계의 「PR4」 가 갖는다.
 
 ## 화면
 

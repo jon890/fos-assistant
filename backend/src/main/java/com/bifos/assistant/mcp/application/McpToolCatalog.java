@@ -155,6 +155,7 @@ public class McpToolCatalog {
             mediaObservations.recordDefinition(),
             contentDrafts.writeDefinition(),
             contentDrafts.readDefinition(),
+            contentDrafts.imageDefinition(),
             contentSnapshots.previewDefinition(),
             contentSnapshots.saveDefinition(),
             financialLimits.readDefinition(),

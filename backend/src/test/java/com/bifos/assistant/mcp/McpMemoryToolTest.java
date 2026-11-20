@@ -177,6 +177,7 @@ class McpMemoryToolTest {
                 "record_media_observation",
                 "content_draft_write",
                 "content_draft_read",
+                "content_draft_image",
                 "content_draft_preview",
                 "content_draft_save",
                 "order_limit_read",

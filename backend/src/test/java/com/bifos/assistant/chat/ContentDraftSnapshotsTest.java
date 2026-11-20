@@ -75,6 +75,12 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     @Autowired
     ContentDraftBindingAccess bindingAccess;
     @Autowired
+    com.bifos.assistant.chat.contentdraft.application.ContentDraftImages draftImages;
+    @Autowired
+    com.bifos.assistant.chat.artifact.application.GeneratedImageService generatedImages;
+    @Autowired
+    com.bifos.assistant.chat.artifact.infra.ArtifactStore artifactStore;
+    @Autowired
     ContentDraftSnapshotRepository snapshotRows;
     final ContentDraftJobRows jobRows = new ContentDraftJobRows(() -> snapshotRows);
     @Autowired
@@ -470,6 +476,46 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         var values = jdbc.queryForMap("select * from content_draft_snapshot where id=?", id);
         values.replaceAll((key, value) -> value instanceof byte[] bytes ? HexFormat.of().formatHex(bytes) : value);
         return values;
+    }
+
+
+    @Test
+    @DisplayName("원고에 넣은 그림 사본은 snapshot 입력에서 사진과 같은 폴더의 파일이고 그 파일이 그림과 바이트가 같다")
+    void resolvesGeneratedImageCopyLikePhotos() throws Exception {
+        byte[] png = new byte[96];
+        java.util.Arrays.fill(png, (byte)61);
+        System.arraycopy(new byte[] {(byte)0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, 0, png, 0, 8);
+        generatedImages.save(conversation.id(), owner.id(), "call-" + UUID.randomUUID(), "글 머리 그림", "지시문", png);
+        try {
+            var image = draftImages.attach(owner, conversation.id(), "글 머리 그림");
+            var node = json.createObjectNode().put("title", "그림 글").put("category", "분류");
+            node.putArray("tags");
+            var blocks = node.putArray("blocks");
+            blocks.addObject().put("type", "image").put("assetId", image.assetId());
+            blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
+            var withImage = drafts.create(owner, conversation.id(), reader.read(node)).draft().draftId();
+            var sent = new java.util.concurrent.atomic.AtomicReference<tools.jackson.databind.JsonNode>();
+            doAnswer(call -> {
+                sent.set(call.getArgument(3));
+                return ContentDraftSnapshotHash.compile(call.getArgument(2), call.getArgument(3));
+            }).when(compiler).compile(any(), any(), any(), any());
+
+            var row = snapshots.preview(owner, conversation.id(), withImage, 1, binding.id(), origin.id());
+
+            assertThat(row.assetIds()).containsExactlyInAnyOrder(image.assetId(), photo.id().toString());
+            assertThat(row.omittedAssetIds()).as("그림 사본은 빠진 사진으로 세지 않는다").doesNotContain(image.assetId());
+            var assets = sent.get().valueStream().toList();
+            var copy = assets.stream().filter(it -> it.path("assetId").asString().equals(image.assetId())).findFirst().orElseThrow();
+            var original = assets.stream().filter(it -> it.path("assetId").asString().equals(photo.id().toString())).findFirst().orElseThrow();
+            assertThat(copy.path("fileName").asString()).isEqualTo(image.fileName());
+            assertThat(copy.path("photoDir").asString()).isEqualTo(original.path("photoDir").asString()).isEqualTo(image.photoDir());
+            assertThat(copy.path("ordinal").asInt()).as("보낸 사진 뒤에 잇는다").isGreaterThan(original.path("ordinal").asInt());
+            var file = java.nio.file.Path.of(properties.root(), "users", com.bifos.assistant.chat.attachment.infra.AttachmentStore.userDirectoryKey(owner.id()),
+                conversation.id().toString(), image.fileName());
+            assertThat(Files.readAllBytes(file)).as("worker 가 올리는 파일").containsExactly(png);
+        } finally {
+            artifactStore.deleteFolder(conversation.id());
+        }
     }
 
 
