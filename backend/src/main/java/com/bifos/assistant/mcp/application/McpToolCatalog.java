@@ -20,6 +20,7 @@ public class McpToolCatalog {
     private final McpFinancialLimitTools financialLimits;
     private final McpApprovalResumeTool approvalResume;
     private final McpFileSpaceTools fileSpace;
+    private final McpConnectorListTool connectorList;
 
 
     public List<Map<String, Object>> tools() {
@@ -161,6 +162,7 @@ public class McpToolCatalog {
             financialLimits.changeDefinition(),
             approvalResume.definition(),
             fileSpace.definition(),
+            connectorList.definition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

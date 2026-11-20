@@ -65,7 +65,7 @@
 | 항목 | 값 |
 | --- | --- |
 | 인자 | 없음. `_fos_ctx` 를 뗀 뒤 키가 남으면 인자 오류다(`agent_list` 와 같다) |
-| 결과 | JSON 배열. 항목마다 `id`, `title`, `connected`(내 연결 상태가 `CONNECTED` 인가), `thisAgent`, `link`. `thisAgent` 는 이 실행의 에이전트에 붙은 상태로 `none`(안 붙음), `ready`(바인딩이 `READY` 이고 재시작 대기가 아님, 지금 쓸 수 있다), `pending`(붙었지만 반영이나 관리자 확인을 기다린다) 중 하나다. 연결 화면의 「붙음」 과 「붙이는 중」 과 같은 나눔이다([`connector.md`](../connector.md)) |
+| 결과 | JSON 배열. 항목마다 `id`, `title`, `connected`(내 연결 상태가 `READY` 인가. 확인 중인 `PENDING` 은 아직 연결되지 않은 것으로 본다), `thisAgent`, `link`. `thisAgent` 는 이 실행의 에이전트에 붙은 상태로 `none`(안 붙음), `ready`(바인딩이 `READY` 이고 재시작 대기가 아님, 지금 쓸 수 있다), `pending`(붙었지만 반영이나 관리자 확인을 기다린다) 중 하나다. 연결 화면의 「붙음」 과 「붙이는 중」 과 같은 나눔이다([`connector.md`](../connector.md)) |
 | `link` | `/connections/{id}`. 이 실행의 에이전트가 요청자가 주인인 비공개 에이전트면 `?agent=<code>` 를 붙인다(DECISION22) |
 | 넣지 않는 것 | 설명, 입력 칸, 도구 목록, 다른 에이전트의 바인딩, 사용 불가 항목(카탈로그에서 빠진 연결) |
 | 먼저 살펴보기 | 읽기 도구라 `CHECK_TREE_TOOLS` 에 넣는다 |

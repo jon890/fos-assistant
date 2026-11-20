@@ -140,6 +140,7 @@ class McpCallerInvariantTest {
         arguments.put("memory_read", json.createObjectNode().put("id", 1));
         arguments.put("artifact_write", json.createObjectNode());
         arguments.put("agent_list", json.createObjectNode());
+        arguments.put("connector_list", json.createObjectNode());
         arguments.put(
             "agent_delegate",
             json.createObjectNode().put("agent_code", "worker").put("task", "일"));
