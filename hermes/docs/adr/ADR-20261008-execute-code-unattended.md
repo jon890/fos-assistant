@@ -1,6 +1,7 @@
 ## ADR-20261008 / execute-code-unattended: docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다
 
 - **status**: `accepted`
+- **대체된 부분(2026-11-20)**: 「local 로 되돌릴 때 그 키를 지운다」 경로는 없어졌다. 도구 저장이 local 을 쓰지 않는다. 정책에서 빠진 docker profile 은 셸 계열이 꺼진 뒤에도 이 값이 남지만 `execute_code` 가 꺼져 쓰이지 않는다([ADR-20261120 / no-local-shell](../../../docs/adr/ADR-20261120-no-local-shell.md))
 - Date: 2026-10-08
 - [ADR-086](../../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간 설정에 승인 설정 한 칸을 더한다. [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) 가 기대는 `execute_code` 를 API 경로에서 쓸 수 있게 한다.
 

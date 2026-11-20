@@ -48,6 +48,9 @@ assistant:
     purge-cron: "40 * * * * *"
     # 기본 비서에 켜지 못한 기본 도구(「그림 만들기」)를 다시 켜 보는 시각(ADR-20261119 / image-gen-defaults)
     pending-toolsets-cron: "20 */5 * * * *"
+    # 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 실행 공간 정책 밖이면 그 도구를 끈다(ADR-20261120 / no-local-shell).
+    # 끝내지 못한 에이전트는 pending-toolsets-cron 주기에 다시 본다
+    sandbox-sweep-on-start: true
   people:
     # 첫 로그인에 만든 기본 에이전트에 켜는 도구다. 셸 계열은 실행 공간 정책에 등록된 profile 에서만 켜고,
     # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets).
@@ -377,8 +380,10 @@ assistant:
     sweep-interval: 1m
     # 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
     screen-timeout: 30m
-    # 커넥터가 브라우저에 닿는 중계의 주소와 접근 표식의 서명 비밀. 둘 중 하나라도 비면 중계만 꺼진다
+    # 커넥터가 브라우저에 닿는 중계의 주소. 비거나 서명 비밀이 없으면 중계만 꺼진다
     gateway-base-url: ${ASSISTANT_BROWSER_GATEWAY_BASE_URL:}
+    # 옛 서명 비밀. 서버 비밀값(browser_gateway)이 없을 때 기동하며 한 번 가져오는 데만 쓴다.
+    # 값은 관리자 화면의 서버 비밀값이 갖는다(ADR-20261120 / server-secret)
     gateway-secret: ${ASSISTANT_BROWSER_GATEWAY_SECRET:}
   sandbox-workspace:
     # 실행 공간 루트를 Control Plane 에서 본 경로. 읽기 전용으로 붙인다. 비면 파일 공간의 모든 경로가 503 이고 상태 조회는 available false 다

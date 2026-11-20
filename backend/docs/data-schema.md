@@ -19,7 +19,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「먼저 살펴보기 표」 | `proactive_check` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
-| 「암호화 key 표」 | `user_data_key` |
+| 「암호화 key 표」 | `user_data_key`, `server_secret` |
 
 ## 첨부 삭제 요청
 
@@ -82,6 +82,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `conversation` | `pending_messages` | 아직 |
+| `server_secret` | `sealed_value` | 함. 데이터 key 없이 KEK 로 바로 감싼다. 값이 비면 NULL 이다([ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md)) |
 | `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
 | `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
@@ -109,6 +110,7 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
 예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+`server_secret` 은 사용자, 그룹, 에이전트 어디에도 속하지 않는 서버 비밀값이라 예외로 더했다(서버 비밀값 스펙 DECISION5, 사용자 2026-11-20).
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
 
 **예외: 웹 푸시 기기는 사용자와 1:N 이지만 `app_user.push_devices` 의 JSON 컬럼에 둔다.** 사용자가 새 테이블 대신 고른 것이다(2026-11-20). 사용자가 몇 명뿐이라 다른 사용자 줄에서 같은 주소를 `LIKE` 로 찾아도 몇 줄이고, 같은 주소가 두 사용자에게 남지 않는 것은 DB 의 유일 제약 대신 서버 안의 등록 잠금이 지킨다(서버 한 대 전제). 근거와 버린 대안은 [ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md) 가 갖는다.
@@ -331,6 +333,12 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
 **지금은 읽지도 쓰지도 않는다.** 「결과물 자동 보관」 스위치를 없애 자동 보관이 늘 돈다([파일 공간 스펙](../../docs/features/workspace/spec.md) REQ16). 칸을 지우는 마이그레이션은 되돌릴 수 없어 칸을 남겼다([설계](../../docs/features/workspace/design.md) DECISION11). 엔티티는 검사의 스키마가 같은 칸을 갖도록 넣기와 고치기에서 뺀 매핑만 둔다.
 
+#### 평가 전용 사용자 컬럼
+
+`evaluation` 은 BOOLEAN NOT NULL DEFAULT FALSE 다. 참이면 배포 뒤 확인과 품질 평가가 쓰는 평가 전용 사용자다. 그룹마다 많아야 하나다.
+이 사용자는 로그인하지 않고 일반 화면과 집계에서 빠진다. 뜻과 숨기는 곳은 [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 의 「평가 전용 사용자」 가 갖는다.
+`AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼고 `AppUserRepository.markEvaluation` 의 전용 `UPDATE` 로만 켠다. 끄는 길은 두지 않는다.
+
 #### 푸시 기기와 설정 컬럼
 
 `push_devices` 는 TEXT NULL 이고 웹 푸시 기기(브라우저 구독) 목록의 JSON 글이다([ADR-20261120 / web-push](../../docs/adr/ADR-20261120-web-push.md)). 비면 기기가 없다.
@@ -366,6 +374,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `description`, `icon`, `color` 는 화면과 위임 도구 `agent_list` 가 쓰는 한 줄 소개와 이름표다. Hermes 는 읽지 않는다. 비면 화면이 할 수 있는 일, 이름 첫 글자, `code` 로 정한 자동 색으로 대신 그린다. 고를 수 있는 값과 상한은 `AgentIntroduction` 과 `AgentColor` 가 갖는다([에이전트 팀](../../docs/features/agent-team.md))
 - 첫 로그인에 만든 에이전트(기본 비서)는 이름이 「비서」 다. `V20261105074407` 이 이미 있던 첫 에이전트 가운데 이름이 사용자 표시 이름 그대로이고 주인이 그 사람인 줄만 「비서」 로 바꾸고 소개를 채웠다. 사람이 저장한 것이 아니어서 `updated_at` 은 바꾸지 않았다
 - `pending_default_toolsets` 는 Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름을 쉼표로 이은 글이다. 지금은 `image_gen` 만 들어간다. `V20261105074418` 이 이미 있던 기본 비서에 한 번 넣었고 새 기본 비서는 첫 로그인이 넣는다. 켜졌거나 관리자가 그 도구를 끄면 NULL 이다. 그룹에 공개했거나 지운 에이전트도 비운다. 엔티티 저장은 이 컬럼을 쓰지 않고 `AgentRepository` 의 전용 쿼리만 쓴다([ADR-20261119 / image-gen-defaults](../../docs/adr/ADR-20261119-image-gen-defaults.md))
+- `sandbox_check_pending` 은 Control Plane 기동 작업이 local 로 켜졌을 수 있는 셸을 한 번 점검해야 하는 에이전트다. `V20261105074434` 가 그때 있던 에이전트에 한 번 참을 넣었고, 새 에이전트는 거짓으로 만든다. 점검을 끝내면 거짓이다. 참인 에이전트만 실행 공간 정책 밖일 때 셸 계열이 꺼진다. 엔티티 저장은 이 컬럼을 쓰지 않고 `AgentRepository` 의 전용 쿼리만 쓴다([ADR-20261120 / no-local-shell](../../docs/adr/ADR-20261120-no-local-shell.md))
 - 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
 **에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).
@@ -864,6 +873,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `cycle_phase` 와 `cycle_at` 은 그 서버만 껐다 켜는 단계와 그 시작 시각이다. `IDLE_WAIT` 는 주인의 실행이 비기를 기다리는 단계이고 `cycle_at` 은 기다림 상한의 기준이다. `OFF` 는 끈 뒤 다시 켜기를 기다리는 단계이고 `cycle_at` 은 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각이다. 껐다 켜기 중이 아니면 둘 다 비어 있다. 진행과 전이는 [연결 반영 자동화 설계](../../docs/features/connector/design.md) 가 갖는다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
 - `apply_failed_at` 은 자동 경로(반영 예정 확인, 껐다 켜기, 정의 어긋남 점검)가 실패한 시각이다. 있으면 자동 경로가 그 바인딩을 다시 집지 않는다. `READY` 와 사람이 시작한 설치(등록, 연결 확인, 관리자 반영 완료)가 실제로 나갈 때 비운다. 껐다 켜기 단계에서는 연결 확인이 설치를 보내지 않으므로 관리자 반영 완료가 비운다
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
+- `skipped_skills` 는 마지막으로 성공한 설치가 답한 빠진 에이전트용 스킬의 JSON 글(`TEXT`)이다. 칸은 스킬 이름과 까닭 낱말 목록이고 없으면 NULL 이다. 설치 응답을 받을 때마다 덮어쓰고, 설치가 실패하면 옛 값을 둔다. 까닭 낱말은 대시보드가 정해 enum 으로 묶지 않는다([에이전트용 스킬 스펙](../../docs/features/agent-skill/spec.md) 의 REQ8). `event_watch_state` 와 같은 까닭으로 `JSON` 이 아니라 `TEXT` 다
 - `event_watch_enabled` 와 `event_watch_state` 는 사건 감지의 켜짐과 상태다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)). 같은 연결에서는 바인딩 하나만 켠다. 상태는 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`TEXT`)이고 끄면 비운다. 칸은 시간대, 확인 지점(결과를 다 쓴 마지막 조회를 시작한 Control Plane 시각), 겹침 구간에서 이미 본 식별자와 처음 본 시각, 마지막 확인 시각과 결과(`EventWatchResult`), 새 항목 수, 연결 문제의 연속 실패 수, 하루 실행 수와 그 날짜, 이번 연속 실패에 다시 연결 알림을 냈는지, 조용한 시간에 미룬 알림(실행 수, 새 항목 수, 알릴 수, 마지막 점검 대화 번호, 원천 이름과 항목 이름)이다. 항목의 제목과 본문은 없다. 뒤에 더한 칸이 없는 옛 글은 기본값으로 읽는다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 `ConnectorEventWatches` 의 조건부 update 만 쓴다. `updated_at` 은 바꾸지 않는다. H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 `TEXT` 로 둔다
 
 ### connector_action
@@ -1073,6 +1083,18 @@ action을 지우면 실행 내용도 지운다.
 
 `proactive_check_finding`(결과 블록의 발견 하나)과 `proactive_check_problem`(버전 3 의 문제 후보 하나, [ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md))은 `V20261105040322` 가 지웠다. 쓰임이던 다음 입력과 되풀이 판정은 제안 줄과 `proactive_check.report_json` 이 갖고, 받아들인 문제 키는 `report_json` 에 남는다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md)).
 
+## 품질 확인 표
+
+### quality_run
+
+배포 뒤 확인이나 품질 평가 한 번이 한 줄이다. 뜻과 결과의 모양은 [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 의 「저장: `quality_run`」 이 갖는다.
+
+**테이블을 늘리지 않는다는 결정(2026-11-01)의 예외로 사용자가 승인했다(2026-11-20).** 확인 한 번은 예약 작업과 수명과 뜻이 다르다(위 「테이블을 추가하는 기준」 의 「본체와 수명이 다를 때」). `task_run` 은 예약 작업 줄과 예정 시각의 유일 제약에 매여 있고, `decision_feedback_event` 는 보관 기간이 지나면 지워진다. 정기 평가와 문항 후보도 이 표와 `result_json` 으로 받아 이 기능의 새 표는 이것 하나다.
+
+- `status` 는 `RUNNING`, `PASSED`, `FAILED` 이고 끝난 줄은 다시 바뀌지 않는다
+- `result_json` 은 기능·문항별 결과 배열이다. 고정 까닭 코드, 숫자, 대화의 공개 식별자와 실행 번호만 담고 질문과 답 본문, 도구 인자를 담지 않는다. 실패한 기능의 대화와 실행 번호는 30일 뒤 비운다
+- 줄은 지우지 않는다. `requested_by_user_id` 는 사용자를 지우면 비운다(`ON DELETE SET NULL`)
+
 ## 판단 피드백 표
 
 ### decision_feedback_event
@@ -1120,6 +1142,19 @@ action을 지우면 실행 내용도 지운다.
 
 **이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.** 사용자를 지우는 흐름이 생기면 이 줄을 지워 본문을 없앤다.
 본문 칸 쪽은 이 표에 외래 키를 두지 않는다. 이 줄을 지우는 길을 막지 않기 위해서다.
+
+### server_secret
+
+서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
+결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
+
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
+- `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
+- `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)
+- `meta_json` 은 비밀이 아닌 부가 값이다. 원문이나 앞부분을 넣지 않는다
+- `updated_by` 는 바꾼 사용자 번호이고 외래 키가 없다. 기동 때 옛 설정에서 가져온 값이면 NULL 이다
+- KEK 를 바꾸면 `DataKeyRewrapper` 가 `user_data_key` 와 함께 이 표의 옛 KEK 줄도 다시 감싼다
 
 ## 옛 문서 경로
 

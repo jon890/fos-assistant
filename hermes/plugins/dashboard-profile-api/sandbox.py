@@ -51,10 +51,19 @@ SANDBOX_PATH_ENV = frozenset({
 SANDBOX_ALLOWED_ENV = SANDBOX_PATH_ENV | frozenset({"CAREER_BACKEND_URL"})
 
 
-def _sandbox_unavailable():
+def _sandbox_unavailable(reason: Optional[str] = None):
+    """실행 공간을 쓸 수 없어 거절한다.
+
+    `reason` 은 정책에 없는 profile 일 때만 `unlisted` 로 넣는다. Control Plane 은 이 값이 있을 때만 그 에이전트의
+    실행 공간 도구를 끈다. 정책이 없거나 틀린 거절을 정책 밖으로 오해하면 모든 에이전트의 셸을 끄게 된다
+    (ADR-20261120 / no-local-shell).
+    """
     from starlette.responses import JSONResponse
 
-    return JSONResponse({"detail": "실행 공간이 설정되지 않았다", "code": "sandbox_unavailable"}, status_code=409)
+    body = {"detail": "실행 공간이 설정되지 않았다", "code": "sandbox_unavailable"}
+    if reason is not None:
+        body["reason"] = reason
+    return JSONResponse(body, status_code=409)
 
 
 def _sandbox_env_ok(value) -> bool:

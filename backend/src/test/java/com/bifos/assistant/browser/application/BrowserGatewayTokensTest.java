@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.browser.application.dto.BrowserGrant;
 import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.testsupport.InMemoryServerSecrets;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Clock;
@@ -12,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.DisplayName;
@@ -130,8 +132,34 @@ class BrowserGatewayTokensTest {
     }
 
 
+    @Test
+    @DisplayName("저장소의 비밀을 바꾸면 다시 만들지 않아도 새 비밀로 서명하고 옛 비밀의 표식은 받지 않는다")
+    void followsStoredSecretWithoutRestart() {
+        BrowserProperties properties = properties(BASE);
+        InMemoryServerSecrets secrets = InMemoryServerSecrets.with(BrowserGatewayTokens.SECRET_NAME, SECRET);
+        BrowserGatewayTokens tokens = new BrowserGatewayTokens(
+            LiveProperties.fixed(BrowserProperties.class, properties), secrets, Clock.fixed(NOW, ZoneOffset.UTC));
+        String old = token(tokens.bindingAddress(42L).orElseThrow());
+
+        secrets.write(BrowserGatewayTokens.SECRET_NAME, OTHER_SECRET, Map.of(), 1L);
+
+        assertThat(tokens.bindingAddress(42L)).contains(BASE + "/b42." + hmac(OTHER_SECRET, "v1\nbinding\n42"));
+        assertThat(tokens.verify(old)).isEmpty();
+        secrets.clear(BrowserGatewayTokens.SECRET_NAME, 1L);
+        assertThat(tokens.enabled()).isFalse();
+    }
+
+
     private static BrowserGatewayTokens tokens(String baseUrl, String secret, Instant now) {
-        BrowserProperties properties = new BrowserProperties(
+        return new BrowserGatewayTokens(
+            LiveProperties.fixed(BrowserProperties.class, properties(baseUrl)),
+            InMemoryServerSecrets.with(BrowserGatewayTokens.SECRET_NAME, secret),
+            Clock.fixed(now, ZoneOffset.UTC));
+    }
+
+
+    private static BrowserProperties properties(String baseUrl) {
+        return new BrowserProperties(
             false,
             null,
             null,
@@ -150,9 +178,7 @@ class BrowserGatewayTokensTest {
             Duration.ofMinutes(30),
             Duration.ofMinutes(30),
             baseUrl,
-            secret);
-        return new BrowserGatewayTokens(
-            LiveProperties.fixed(BrowserProperties.class, properties), Clock.fixed(now, ZoneOffset.UTC));
+            null);
     }
 
 

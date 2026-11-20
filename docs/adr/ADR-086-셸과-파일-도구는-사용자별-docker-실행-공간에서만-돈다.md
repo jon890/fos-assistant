@@ -1,6 +1,7 @@
 ## ADR-086: 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다
 
 - **status**: `accepted`
+- **대체된 부분(2026-11-20)**: 「정책에 없는 profile 은 도구 저장을 허용하고 local 로 둔다」 와 그에 딸린 local 되돌리기는 [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) 이 대체한다. 정책 밖 profile 의 실행 공간 도구 저장은 409 로 거절된다
 - **결정**: 운영자가 신뢰한 정책(`FOS_ASSISTANT_SANDBOX`)의 `profiles` 에 등록한 profile 만 Hermes 의 docker terminal backend 로 보낸다.
   대시보드 plugin 이 `terminal`, `file`, `code_execution` 가운데 하나라도 켜는 도구 저장을 받을 때 등록된 profile 의 `terminal:` 설정을 통째로 다시 쓴다.
   정책에 없는 profile 은 도구 저장을 허용하고 local 로 둔다. 이미 docker 였다면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.

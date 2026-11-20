@@ -58,6 +58,9 @@ VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-9000000
 INSERT INTO group_setting (group_id, setting_key, setting_value)
 VALUES (900000001, 'coverage-900000001', '{}');
 
+INSERT INTO server_secret (name, created_at)
+VALUES ('900000001', '2020-01-01 00:00:00');
+
 INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at, items_json, last_attempt_status, last_attempt_execution_id, last_attempt_started_at)
 VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '{"version":1,"items":[{"source":"coverage-900000001","resultKey":"coverage-900000001"}]}', 'RUNNING', 900000001, '2020-01-01 00:00:00');
 
@@ -126,3 +129,6 @@ UPDATE conversation SET title_key_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE proactive_check SET root_execution_id = 900000001 WHERE id = 900000001;
+
+INSERT INTO quality_run (id, public_id, group_id, kind, trigger_type, status, started_at, item_count, model_call_count, result_json, requested_by_user_id, created_at)
+VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'DEPLOY_CHECK', 'PIPELINE', 'RUNNING', '2020-01-01 00:00:00', 0, 0, '[]', NULL, '2020-01-01 00:00:00');

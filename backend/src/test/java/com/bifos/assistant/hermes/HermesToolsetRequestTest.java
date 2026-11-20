@@ -186,8 +186,28 @@ class HermesToolsetRequestTest {
         response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
 
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                assertThat(ex.profileUnlisted()).isFalse();
+            });
+    }
+
+
+    @Test
+    @DisplayName("409 본문의 reason 이 unlisted 일 때만 정책 밖 profile 의 거절로 표시한다")
+    void conflictWithUnlistedReasonMarksTheProfileUnlisted() {
+        status = 409;
+        response = "{\"detail\":\"x\",\"code\":\"sandbox_unavailable\",\"reason\":\"unlisted\"}";
+
+        assertThatThrownBy(() -> client.writeApiServerInSandbox("kid", List.of("terminal"), "u7"))
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                assertThat(ex.profileUnlisted()).isTrue();
+            });
+
+        response = "{\"detail\":\"x\",\"code\":\"sandbox_unavailable\",\"reason\":\"other\"}";
+        assertThatThrownBy(() -> client.writeApiServerInSandbox("kid", List.of("terminal"), "u7"))
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> assertThat(ex.profileUnlisted()).isFalse());
     }
 
 
