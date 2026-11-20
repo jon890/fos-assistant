@@ -90,6 +90,15 @@ public class AppUser extends AuditedEntity {
     @Column(name = "artifact_auto_vault", insertable = false, updatable = false)
     private Boolean artifactAutoVault;
 
+    /**
+     * 평가 전용 사용자인가(docs/features/agent-quality/design.md 의 「평가 전용 사용자」). 참이면 로그인하지 않고 일반 화면과 집계에서
+     * 빠진다. 먼저 읽어 둔 사용자를 저장해도 덮지 않도록 넣기와 고치기에서 빼고 {@code AppUserRepository.markEvaluation} 으로만 바꾼다.
+     */
+    @Getter
+    @ColumnDefault("false")
+    @Column(name = "evaluation", nullable = false, insertable = false, updatable = false)
+    private boolean evaluation;
+
 
     protected AppUser() {}
 

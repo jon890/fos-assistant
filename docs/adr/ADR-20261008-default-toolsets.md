@@ -1,6 +1,7 @@
 ## ADR-20261008 / default-toolsets: 기본 에이전트는 web 과 셸, 파일, 코드 실행을 켜고 시작하되 셸 계열은 실행 공간이 있을 때만 켠다
 
 - **status**: `accepted`
+- **대체된 부분(2026-11-20)**: 「사람의 도구 저장은 정책에 없는 profile 의 셸 도구를 local 로 둔다」 전제와 「등록하지 않은 채 관리자가 켜면 local 로 켜진다」 는 더 이상 맞지 않는다. 정책 밖 profile 의 실행 공간 도구 저장은 누가 보내든 409 다([ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md))
 - Date: 2026-10-08
 - [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 도구 저장에 「local 로 돌리지 않는」 쓰기를 더한다. [ADR-029](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 의 등급 표는 바꾸지 않는다.
 

@@ -2,7 +2,9 @@ package com.bifos.assistant.crypto.application;
 
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
+import com.bifos.assistant.crypto.infra.DatabaseServerSecrets;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +16,7 @@ import org.springframework.stereotype.Component;
  * 기동할 때 활성 KEK 가 아닌 KEK 로 감싼 데이터 key 를 활성 KEK 로 다시 감싼다(ADR-20261008 / data-encryption).
  *
  * <p>KEK 를 바꾸는 절차는 이렇다. KEK 파일에 새 key 를 더하고 {@code active-kek-id} 를 새 id 로 바꿔 기동한다. 이 작업이 데이터
- * key 줄만 다시 감싼다. 본문은 다시 쓰지 않는다. 남은 줄이 없다는 로그를 본 뒤 파일에서 옛 key 를 뺀다.
+ * key 줄과 서버 비밀값({@code server_secret}) 줄만 다시 감싼다. 본문은 다시 쓰지 않는다. 남은 줄이 없다는 로그를 본 뒤 파일에서 옛 key 를 뺀다.
  *
  * <p>실패해도 기동을 멈추지 않는다. 옛 KEK 가 파일에 남아 있으면 그 줄은 그대로 읽힌다. 다음 기동에서 다시 본다.
  */
@@ -26,6 +28,8 @@ public class DataKeyRewrapper implements ApplicationRunner {
     private final UserDataKeyRepository keys;
     private final KeyEncryptionKeys keks;
     private final DataKeyWriter writer;
+    private final DatabaseServerSecrets serverSecrets;
+    private final TransactionTemplate transactions;
 
 
     @Override
@@ -34,6 +38,11 @@ public class DataKeyRewrapper implements ApplicationRunner {
             rewrapAll();
         } catch (RuntimeException e) {
             log.error("데이터 key 를 다시 감싸지 못했다 exception={}", e.getClass().getName());
+        }
+        try {
+            serverSecrets.rewrapStale(work -> transactions.executeWithoutResult(status -> work.run()));
+        } catch (RuntimeException e) {
+            log.error("서버 비밀값을 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }
     }
 

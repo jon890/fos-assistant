@@ -87,8 +87,9 @@ Chrome 은 정상 종료에서도 잠금을 남기고, 잠금에 앞 컨테이�
 
 키와 env, 기본값은 `application.yml` 의 `assistant.browser` 와 그 주석이 갖는다.
 이미지, 망, 자원, 프로필 루트는 proxy 정책이 강제한다. Control Plane 은 같은 값을 운영 설정으로 받아 생성 요청에 싣는다.
-켜져 있는데 기본값이 없는 값이 비어 있으면 기동을 멈춘다. 중계의 두 값만 예외라서, 둘 중 하나라도 비면 중계만 꺼지고 기동한다.
-중계 주소와 비밀값의 형식 검사는 `BrowserProperties` 가 갖는다.
+켜져 있는데 기본값이 없는 값이 비어 있으면 기동을 멈춘다. 중계는 예외라서, 중계 주소나 서명 비밀이 비면 중계만 꺼지고 기동한다.
+중계 주소의 형식 검사는 `BrowserProperties` 가 갖는다.
+서명 비밀은 설정이 아니라 서버 비밀값 `browser_gateway` 에 있고 관리자 화면의 「서버 비밀값」 에서 서버가 새로 만든다([ADR-20261120 / server-secret](../adr/ADR-20261120-server-secret.md)). 옛 설정 `gateway-secret` 은 그 줄이 없을 때 기동하며 한 번 가져오는 데만 쓴다.
 
 Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작은 제어 요청의 본문을 버퍼링해 실제 바이트 수를 `Content-Length` 로 보낸다.
 
@@ -221,6 +222,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 
 표식의 모양, 서명할 글, 만료는 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「결정」 이, 형식 검사와 비교는 `BrowserGatewayTokens` 가 갖는다.
 같은 바인딩은 늘 같은 표식을 받는다. 그래서 다시 설치해도 서버 정의가 바뀌지 않는다.
+서명 비밀을 새로 만들면 옛 표식은 바로 무효다. Control Plane 이 브라우저를 쓰는 플러그인의 바인딩을 모두 다시 설치하고, 그 바인딩은 반영 완료 전까지 재시작 대기다([서버 비밀값 스펙](secret-store/spec.md) 의 REQ18).
 
 #### 받는 것
 

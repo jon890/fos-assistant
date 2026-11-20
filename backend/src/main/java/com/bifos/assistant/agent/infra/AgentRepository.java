@@ -127,4 +127,15 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             + " order by id",
         nativeQuery = true)
     List<Long> findIdsWithPendingDefaultToolsets(@Param("afterId") long afterId, Pageable pageable);
+
+
+    /** local 셸 점검을 끝낸 에이전트의 표시를 지운다(ADR-20261120 / no-local-shell). */
+    @Modifying
+    @Query(value = "update agent set sandbox_check_pending = false where id = :id", nativeQuery = true)
+    int clearSandboxCheckPending(@Param("id") Long id);
+
+
+    /** 지우지 않은 에이전트 가운데 {@code afterId} 보다 큰 번호를 번호 순으로 읽는다. 기동 때 실행 공간 도구를 다시 저장하는 작업이 쓴다. */
+    @Query(value = "select id from agent where deleted_at is null and id > :afterId order by id", nativeQuery = true)
+    List<Long> findLiveIdsAfter(@Param("afterId") long afterId, Pageable pageable);
 }
