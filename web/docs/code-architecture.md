@@ -34,7 +34,7 @@
 | `/tasks/new` | 예약 작업 만들기 |
 | `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
 | `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」) |
-| `/admin` | 관리자 영역의 첫 주소. `/admin/people` 로 넘긴다 |
+| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)) |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |
 | `/admin/agents/{code}` | 에이전트 하나의 관리. 일반 상세의 절에 「모델」, 「기억 영역」, 「관리」 절이 더해진다 |
@@ -150,18 +150,17 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 
 좁은 화면
 ┌────────────────────────────┐
-│ [관리자]   ← 사용 화면으로   │
-├────────────────────────────┤
-│ 메뉴 …                      │  ← 가로로 밀리는 한 줄
+│ ☰ [관리자]   ← 사용 화면으로 │  ← ☰ 가 같은 메뉴를 왼쪽 서랍으로 연다
 ├────────────────────────────┤
 │ 고른 메뉴의 화면             │
 └────────────────────────────┘
 ```
 
-메뉴와 순서는 [`docs/features/users.md`](../../docs/features/users.md) 「관리자 영역」 의 표와 같고, 목록은 `components/shell/admin-shell.tsx` 가 갖는다.
+메뉴는 「살펴보기」, 「비서 설정」, 「사용자와 자원」 세 묶음이고 묶음 제목은 누를 수 없다. 묶음과 순서는 [`docs/features/users.md`](../../docs/features/users.md) 「관리자 영역」 의 표와 같고, 목록은 `components/shell/admin-shell.tsx` 가 갖는다.
+「요약」 줄은 `/admin` 과 주소가 같을 때만 골라진다. 좁은 화면의 서랍은 줄을 고르거나 바깥을 누르거나 `Esc` 로 닫힌다.
 
 머리의 「관리자」 는 배지다. 색과 부품은 일반 화면과 같은 토큰을 쓴다.
-관리자 메뉴도 항목마다 아이콘을 둔다. 사용자 `Users`, 에이전트 `Bot`, 모델 `Cpu`, 사용량과 비용 `Receipt`, 플러그인 `Plug`, 브라우저 `Globe`, 파일 공간 `HardDrive` 다.
+관리자 메뉴도 항목마다 아이콘을 둔다. 요약 `LayoutDashboard`, 사용자 `Users`, 에이전트 `Bot`, 모델 `Cpu`, 사용량과 비용 `Receipt`, 플러그인 `Plug`, 브라우저 `Globe`, 파일 공간 `HardDrive` 다.
 머리에 특정 그룹을 뜻하는 이름을 적지 않는다.
 
 **「사용 화면으로 돌아가기」 는 마지막으로 보던 대화로 간다.**
