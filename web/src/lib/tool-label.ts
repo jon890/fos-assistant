@@ -55,9 +55,10 @@ const LABELS: Record<string, Label> = {
     running: "할 일을 보고 있어요",
     done: "할 일을 봤어요",
   },
+  // 대상이 여럿이거나 사람이 시키지 않은 실행이면 끝내지 않는다. 끝낸 것처럼 읽히지 않게 쓴다.
   follow_up_done: {
-    running: "할 일을 끝내고 있어요",
-    done: "할 일을 끝냈어요",
+    running: "끝낼 할 일을 찾고 있어요",
+    done: "끝낼 할 일을 확인했어요",
   },
   // 지우기는 승인 카드만 만든다. 지운 것처럼 읽히지 않게 쓴다.
   memory_forget: {

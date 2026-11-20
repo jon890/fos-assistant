@@ -227,7 +227,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 줄은 지우지 않는다. 실행 기록과 함께 남고, 내장 위임 결과의 맡긴 일과 결과 글과 그 key(`goal_preview`, `result_text`, `result_key_id`)만 비운다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다. 에이전트가 청한 기억 지우기는 카드에 보인 제목과 본문 앞부분이 승인 줄(`connector_action.args_json`)에도 남고 그 대화를 정리할 때 지워진다.
 그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.

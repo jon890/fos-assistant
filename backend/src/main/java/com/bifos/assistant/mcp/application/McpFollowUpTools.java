@@ -21,6 +21,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,14 @@ public class McpFollowUpTools {
     public static final String DONE = "follow_up_done";
     static final String NOT_DIRECTED = "이 실행은 할 일을 끝내지 못한다. 바꾸지 않았다. 끝냈다고 말하지 않고, 사용자에게 끝났는지 묻고 /now 에서 끝낼 수 있다고 안내한다.";
     static final String UNAVAILABLE = "할 일을 지금 다루지 못했다. 했다고 말하지 않고, 잠시 뒤 다시 부탁하거나 /now 화면에서 하라고 안내한다.";
+    /**
+     * 할 일을 바로 바꾸는 판정이 바깥 글을 읽지 않는다고 보는 도구다. 기억의 바로 저장 판정이 쓰는 목록에 할 일 목록과 끝내기를 더한다.
+     * 더하지 않으면 목록을 읽은 대화가 바깥 글을 읽은 대화가 되어 「그거 끝냈어」 를 끝내지 못한다. 기억의 판정은 넓히지 않는다
+     * (스펙 DECISION5).
+     */
+    private static final Set<String> INTERNAL_TOOLS = Stream.concat(
+        McpMemoryRemember.INTERNAL_TOOLS.stream(),
+        Stream.of("mcp__fos_assistant__" + LIST, "mcp__fos_assistant__" + DONE)).collect(Collectors.toUnmodifiableSet());
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DUE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -59,7 +70,7 @@ public class McpFollowUpTools {
      * 실행이다. 예약 작업은 지시문이 사용자가 쓴 글이라 바깥 글을 읽었어도 참이다. 맡긴 실행, 먼저 살펴보기 트리, 점검 대화의 실행,
      * 대화가 없는 실행은 거짓이다.
      *
-     * <p>바깥 글은 {@code memory_remember} 의 바로 저장 판정과 같은 도구 목록으로 대화 전체를 본다. Hermes session 이 앞 turn 의
+     * <p>바깥 글은 {@code memory_remember} 의 바로 저장 판정이 쓰는 도구 목록에 할 일 목록과 끝내기를 더해 대화 전체를 본다. Hermes session 이 앞 turn 의
      * 도구 결과를 이력으로 이어 가기 때문이다.
      */
     boolean userDirected(McpCaller caller) {
@@ -68,7 +79,7 @@ public class McpFollowUpTools {
             return false;
         }
         if (turnQuestions.questionOf(origin.id(), caller.user().id()).isPresent()) {
-            return !executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), McpMemoryRemember.INTERNAL_TOOLS);
+            return !executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS);
         }
         // 사람의 질문이 없는 루트 실행 가운데 사람이 없는 실행으로 적힌 것이 예약 작업의 발화와 그 결과를 전하는 turn 이다.
         // 살펴보기의 결과를 전하는 turn 도 같은 표시라 점검 대화는 뺀다.

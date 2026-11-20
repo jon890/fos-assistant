@@ -14,6 +14,7 @@ import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.application.McpMemoryRemember;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
@@ -39,6 +40,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -330,6 +333,39 @@ class McpFollowUpDirectToolTest {
         assertThat(call(DONE, json.createObjectNode().put("follow_up", TITLE).put("user_id", 1)).has("error")).isTrue();
         assertThat(call("follow_up_list", json.createObjectNode().put("status", "DONE")).has("error")).isTrue();
         assertThat(call(PROPOSE, requested(TITLE).put("requested", "yes")).has("error")).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("한 실행이 바로 적는 할 일은 상한까지이고, 넘으면 적지 않았다는 실패 결과다")
+    void capsDirectFollowUpsPerRun() throws Exception {
+        askedByHuman();
+        for (int i = 0; i < 10; i++) {
+            assertThat(isError(call(PROPOSE, requested(TITLE + " " + i)))).isFalse();
+        }
+
+        JsonNode over = call(PROPOSE, requested(TITLE + " 넘침"));
+
+        assertThat(isError(over)).isTrue();
+        assertThat(text(over)).contains("더 적지 않았다");
+        assertThat(rows()).hasSize(10);
+    }
+
+
+    @Test
+    @DisplayName("할 일 목록을 읽은 대화에서도 기억의 바로 저장 판정은 넓어지지 않고, 살펴보기는 목록을 읽는다")
+    void listKeepsMemoryJudgmentAndWorksInCheck() throws Exception {
+        assertThat(ReflectionTestUtils.getField(McpMemoryRemember.class, "INTERNAL_TOOLS"))
+            .asInstanceOf(InstanceOfAssertFactories.collection(String.class))
+            .doesNotContain("mcp__fos_assistant__follow_up_list", "mcp__fos_assistant__follow_up_done");
+        ProactiveCheck check = ProactiveCheck.started(dad.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now());
+        check.attachRoot(run.id(), root);
+        ProactiveCheck saved = checks.save(check);
+        try {
+            assertThat(isError(call("follow_up_list", json.createObjectNode()))).isFalse();
+        } finally {
+            checks.delete(saved);
+        }
     }
 
 

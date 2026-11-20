@@ -194,6 +194,23 @@ class McpMemoryForgetToolTest {
 
 
     @Test
+    @DisplayName("카드를 띄운 뒤 관리자가 아니게 된 사용자가 승인하면 그룹 기억은 그대로이고 실패로 끝난다")
+    void rechecksGroupPermissionAtApproval() throws Exception {
+        Memory group = memories.create(current(admin), MemoryScope.GROUP, "그룹 규칙", "그룹 본문", false);
+        jdbc.update("UPDATE app_user SET role = 'ADMIN' WHERE id = ?", dad.id());
+        dad = users.findById(dad.id()).orElseThrow();
+        assertThat(isError(call(group.id()))).isFalse();
+        ConnectorAction card = actions.findAll().getFirst();
+        CurrentUser demoted = new CurrentUser(dad.id(), dad.email(), dad.displayName(), dad.groupId(), UserRole.MEMBER);
+
+        var approved = actionService.approve(demoted, card.publicId(), null, false);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(memoryRepository.findById(group.id())).isPresent();
+    }
+
+
+    @Test
     @DisplayName("다른 사용자의 기억과 문서는 없는 기억과 같은 결과이고 카드가 없으며, 스키마 밖 인자는 인자 오류다")
     void treatsOthersMemoryAndDocumentAsMissing() throws Exception {
         Memory others = memories.create(current(admin), MemoryScope.USER, "관리자의 기억", "남의 본문", false);
