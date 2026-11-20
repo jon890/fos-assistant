@@ -38,6 +38,17 @@ public interface PushDeviceRepository extends Repository<AppUser, Long> {
     List<Long> findUserIdsHoldingHash(@Param("hash") String hash);
 
 
+    /** 기기가 있는 사용자의 번호를 번호 순으로 찾는다. */
+    @Query(nativeQuery = true, value = "SELECT id FROM app_user WHERE push_devices IS NOT NULL ORDER BY id")
+    List<Long> findUserIdsWithDevices();
+
+
+    /** 모든 사용자의 기기 목록을 비운다. 고친 줄 수를 돌려준다. */
+    @Modifying(flushAutomatically = true)
+    @Query(nativeQuery = true, value = "UPDATE app_user SET push_devices = NULL WHERE push_devices IS NOT NULL")
+    int clearAllDevices();
+
+
     /** 글을 쓴다. null 이면 칸을 비운다. 고친 줄 수를 돌려준다. */
     @Modifying(flushAutomatically = true)
     @Query(nativeQuery = true, value = "UPDATE app_user SET push_devices = :json WHERE id = :userId")

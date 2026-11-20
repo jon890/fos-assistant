@@ -2,8 +2,10 @@ package com.bifos.assistant.admin.secret.presentation;
 
 import com.bifos.assistant.admin.secret.application.ServerSecretAdminService;
 import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.OverviewView;
+import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.RegenerateVapidRequest;
 import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.RegeneratedView;
 import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.ReinstallView;
+import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.VapidChangedView;
 import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,6 +47,24 @@ public class ServerSecretAdminController {
         BrowserBindingReinstall result = secrets.regenerateGateway(admin.id());
         OverviewView view = OverviewView.of(secrets.overview(), userNames::find);
         return new RegeneratedView(view.storeAvailable(), view.browserGateway(), ReinstallView.of(result));
+    }
+
+
+    @PostMapping("/vapid/regenerate")
+    public VapidChangedView regenerateVapid(@RequestBody(required = false) RegenerateVapidRequest request) {
+        CurrentUser admin = currentUser.requireAdmin();
+        int released = secrets.regenerateVapid(admin.id(), admin.email(), request == null ? null : request.subject());
+        OverviewView view = OverviewView.of(secrets.overview(), userNames::find);
+        return new VapidChangedView(view.storeAvailable(), view.vapid(), released);
+    }
+
+
+    @DeleteMapping("/vapid")
+    public VapidChangedView deleteVapid() {
+        CurrentUser admin = currentUser.requireAdmin();
+        int released = secrets.deleteVapid(admin.id());
+        OverviewView view = OverviewView.of(secrets.overview(), userNames::find);
+        return new VapidChangedView(view.storeAvailable(), view.vapid(), released);
     }
 
 

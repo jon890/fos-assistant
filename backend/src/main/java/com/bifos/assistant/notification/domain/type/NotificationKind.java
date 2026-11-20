@@ -25,5 +25,7 @@ public enum NotificationKind {
     /** 플러그인이 사람이 해야 하는 화면에서 멈춰 「내 브라우저」 화면을 넘겼다. 그 대화의 다음 turn 이 시작되면 읽음이 된다. */
     HANDOFF_REQUESTED,
     /** Control Plane 이 기본 비서에 스스로 켜려던 기본 도구를 켜지 못했다. 관리자가 할 일이 남았다(ADR-20261119 / image-gen-defaults). */
-    DEFAULT_TOOLS_PENDING
+    DEFAULT_TOOLS_PENDING,
+    /** 관리자가 VAPID 키를 새로 만들어 이 사용자의 웹 푸시 기기가 모두 해제됐다. 푸시로는 보내지 않는다(서버 비밀값 스펙 REQ6). */
+    PUSH_DEVICES_RESET
 }

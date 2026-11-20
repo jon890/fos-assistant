@@ -5,6 +5,7 @@ import com.bifos.assistant.browser.application.GatewaySecretService;
 import com.bifos.assistant.connector.connection.application.ConnectorBrowserBindings;
 import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.crypto.application.ServerSecretService;
+import com.bifos.assistant.notification.application.VapidKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +22,11 @@ public class ServerSecretAdminService {
     private final ServerSecretService store;
     private final GatewaySecretService gateway;
     private final ConnectorBrowserBindings bindings;
+    private final VapidKeyService vapid;
 
 
     public ServerSecretOverview overview() {
-        return new ServerSecretOverview(store.storeAvailable(), gateway.status(), bindings.count());
+        return new ServerSecretOverview(store.storeAvailable(), gateway.status(), bindings.count(), vapid.status());
     }
 
 
@@ -40,5 +42,23 @@ public class ServerSecretAdminService {
 
     public void deleteGateway(Long adminId) {
         gateway.delete(adminId);
+    }
+
+
+    /**
+     * 웹 푸시 VAPID 키를 새로 만들고 모든 사용자의 등록 기기를 비운다(서버 비밀값 스펙 REQ6).
+     *
+     * @param subject 푸시 서비스가 연락할 곳. 비어 있으면 만드는 관리자의 이메일이다
+     * @return 기기가 해제된 사용자 수
+     */
+    public int regenerateVapid(Long adminId, String adminEmail, String subject) {
+        String contact = subject == null || subject.isBlank() ? "mailto:" + adminEmail : subject;
+        return vapid.regenerate(adminId, contact);
+    }
+
+
+    /** @return 기기가 해제된 사용자 수 */
+    public int deleteVapid(Long adminId) {
+        return vapid.delete(adminId);
     }
 }

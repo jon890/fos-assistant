@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 
 import com.bifos.assistant.crypto.infra.DatabaseServerSecrets;
 import com.bifos.assistant.crypto.infra.ServerSecretRepository;
+import com.bifos.assistant.notification.infra.VapidKeys;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.ApplicationContext;
@@ -31,6 +32,12 @@ public final class ServerSecretsTestSupport {
 
     /** 검사가 준 중계 서명 비밀 설정을 저장소에 넣는다. 설정이 없거나 비었으면 아무것도 하지 않는다 */
     static void seed(ApplicationContext context, List<String> overrides) {
+        // 웹 푸시는 서버 비밀값 vapid 로만 켜진다. 검사마다 새 검사 전용 키 쌍을 넣는다. 키가 꺼진 동작은 VapidKeys spy 로 본다.
+        context.getBeanProvider(DatabaseServerSecrets.class).ifAvailable(secrets -> {
+            if (secrets.available()) {
+                secrets.write(VapidKeys.SECRET_NAME, VapidKeys.generate("mailto:test@example.invalid").sealed(), Map.of(), null);
+            }
+        });
         overrides.stream()
             .filter(override -> override.startsWith(GATEWAY_SECRET_KEY + "="))
             .map(override -> override.substring(GATEWAY_SECRET_KEY.length() + 1))

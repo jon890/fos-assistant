@@ -80,7 +80,8 @@ public class PushDeviceService {
 
     /** 화면이 구독을 만들 때 읽는 서버 설정이다. */
     public PushConfig config() {
-        return new PushConfig(keys.enabled(), keys.enabled() ? keys.publicKeyBase64Url() : null);
+        boolean enabled = keys.enabled();
+        return new PushConfig(enabled, enabled ? keys.publicKeyBase64Url() : null);
     }
 
 
@@ -106,6 +107,11 @@ public class PushDeviceService {
             registration.timeZone(),
             clock.instant());
         return lock.run(() -> newTransaction.execute(status -> {
+            // 키를 바꾼 뒤 옛 키로 만든 구독이 등록되면 푸시 서비스가 403 을 답해 자동 정리도 안 된다. 키를 바꾸는 쪽도 이 잠금을 잡으므로
+            // 잠금 안에서 확인해야 바꾼 직후의 등록이 기기를 되살리지 못한다.
+            if (registration.publicKey() == null || !registration.publicKey().equals(keys.publicKeyBase64Url())) {
+                throw new ApiException(ErrorCode.PUSH_KEY_CHANGED, "the subscription was made with another VAPID public key");
+            }
             TreeSet<Long> owners = new TreeSet<>(repository.findUserIdsHoldingHash(hash));
             owners.add(user.id());
             Map<Long, PushDevices> locked = new TreeMap<>();
