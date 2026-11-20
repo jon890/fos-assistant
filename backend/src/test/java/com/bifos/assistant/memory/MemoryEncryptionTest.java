@@ -15,6 +15,7 @@ import com.bifos.assistant.memory.application.dto.MemoryRememberOutcome;
 import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
 import com.bifos.assistant.memory.application.dto.MemoryRememberResult;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
+import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -32,6 +33,7 @@ import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MysqlCase;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +48,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 기억의 제목과 본문이 데이터베이스에 주인 데이터 key 의 암호문으로만 남는지 본다(ADR-20261103 / memory-encryption).
@@ -61,6 +65,7 @@ class MemoryEncryptionTest {
     private static final String TITLE = "제목-표식-2290";
     private static final String FIRST = "평문-표식-7391";
     private static final String SECOND = "평문-표식-8802";
+    private static final String SUMMARY = "요약-표식-4417";
     private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"));
     private static final AtomicLong EXECUTIONS = new AtomicLong(980_000L);
 
@@ -93,6 +98,9 @@ class MemoryEncryptionTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
 
     @BeforeEach
@@ -424,6 +432,79 @@ class MemoryEncryptionTest {
         assertThat(jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, first.id()))
             .isEqualTo(texts.proposalDedupKey(ADMIN.id(), TITLE, FIRST));
         assertThat(migration.rekeyHashes()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("요약은 제목과 본문처럼 데이터 key 의 암호문으로 남고 다시 읽으면 원래 글이며 고치면 물러난 revision 에도 이전 요약이 암호문으로 남는다")
+    void summaryIsSealedAndKeptInRevision() {
+        Memory saved = insertWithSummary();
+
+        String sealedSummary = jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, saved.id());
+        assertThat(sealedSummary).startsWith("v1.").doesNotContain(SUMMARY);
+        assertThat(reread(saved.id()).summary()).isEqualTo(SUMMARY);
+
+        memories.update(ADMIN, saved.id(), SECOND, false, null);
+
+        String revisionSummary = jdbc.queryForObject(
+            "SELECT summary FROM memory_revision WHERE memory_id = ?", String.class, saved.id());
+        assertThat(revisionSummary).startsWith("v1.").doesNotContain(SUMMARY);
+        assertThat(memories.revisionsOf(ADMIN, saved.id())).singleElement()
+            .extracting(MemoryRevision::summary).isEqualTo(SUMMARY);
+    }
+
+
+    @Test
+    @DisplayName("요약 암호문을 본문 칸으로 옮기면 풀리지 않는다")
+    void movedSummaryDoesNotOpen() {
+        Memory saved = insertWithSummary();
+        jdbc.update("UPDATE memory SET content = summary WHERE id = ?", saved.id());
+
+        assertThat(reread(saved.id()).readable()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("그룹 기억과 문서는 빈 글 밖의 요약을 받지 않는다")
+    void onlyUserMemoryHasSummary() {
+        Memory group = Memory.accepted(
+            MemoryScope.GROUP, null, 1L, TITLE, FIRST, MemoryPlacement.core(MemoryRetrieval.SEARCH), 1L,
+            Instant.parse("2026-11-20T00:00:00Z"));
+        Memory document = Memory.document(1L, "core", "doc", TITLE, FIRST, Instant.parse("2026-11-20T00:00:00Z"));
+
+        assertThatThrownBy(() -> group.revise(SECOND, SUMMARY, null, MemoryRetrieval.SEARCH, null, Instant.now()))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> document.revise(SECOND, SUMMARY, null, MemoryRetrieval.SEARCH, null, Instant.now()))
+            .isInstanceOf(IllegalArgumentException.class);
+        group.revise(SECOND, "", null, MemoryRetrieval.SEARCH, null, Instant.now());
+        assertThat(group.summary()).isEmpty();
+    }
+
+
+    @Test
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("기동 이관은 평문 줄의 평문 요약도 함께 데이터 key 로 다시 쓰고, 이관 전 요약(NULL)은 NULL 로 둔다")
+    void migrationRewritesSummaryAndKeepsPending() {
+        Long withSummary = insertRow("USER", 1L, null, TITLE, FIRST);
+        jdbc.update("UPDATE memory SET summary = ? WHERE id = ?", SUMMARY, withSummary);
+        Long pending = insertRow("USER", 1L, null, "옛 제목", SECOND);
+
+        migration.migrate();
+
+        assertThat(jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, withSummary))
+            .startsWith("v1.").doesNotContain(SUMMARY);
+        assertThat(reread(withSummary).summary()).isEqualTo(SUMMARY);
+        assertThat(jdbc.queryForObject("SELECT summary FROM memory WHERE id = ?", String.class, pending)).isNull();
+        assertThat(reread(pending).readable()).isTrue();
+        assertThat(reread(pending).summaryPending()).isTrue();
+    }
+
+
+    /** 요약을 가진 개인 기억을 넣는다. 암호문은 넣은 뒤 같은 트랜잭션에서 적으므로 트랜잭션 안에서 넣는다. */
+    private Memory insertWithSummary() {
+        return new TransactionTemplate(transactionManager).execute(status -> texts.insert(Memory.remembered(
+            ADMIN.id(), TITLE, FIRST, SUMMARY, MemoryPlacement.core(MemoryRetrieval.SEARCH), null, null,
+            Instant.parse("2026-11-20T00:00:00Z"))));
     }
 
 

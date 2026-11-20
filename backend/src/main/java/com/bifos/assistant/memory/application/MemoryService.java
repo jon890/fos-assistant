@@ -367,6 +367,12 @@ public class MemoryService {
     }
 
 
+    /** 본문과 요약, 꺼내는 방식을 고친다. 요약이 빈 글이면 지운다. */
+    Memory revise(CurrentUser user, Memory memory, String content, String summary, MemoryRetrieval retrieval) {
+        return revisionWriter.revise(user, memory, content, summary, retrieval);
+    }
+
+
     /**
      * 고치거나 지우거나 승인 상태를 바꿀 항목을 쓰기 잠금으로 읽고 쓸 수 있는지 본다.
      *

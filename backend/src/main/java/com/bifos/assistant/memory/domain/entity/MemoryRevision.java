@@ -82,6 +82,10 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String storedContent;
 
+    /** 그 revision 의 요약이다. 요약 기능 전 revision 은 {@code NULL} 이고 요약이 없는 것으로 읽는다. */
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String storedSummary;
+
     /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이다. */
     @Column(name = "data_key_id")
     private Long dataKeyId;
@@ -136,8 +140,9 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         revision.status = memory.status();
         revision.storedTitle = memory.storedTitle();
         revision.storedContent = memory.storedContent();
+        revision.storedSummary = memory.storedSummary();
         revision.dataKeyId = memory.dataKeyId();
-        revision.plain = memory.readable() ? new MemoryText(memory.title(), memory.content()) : null;
+        revision.plain = memory.readable() ? new MemoryText(memory.title(), memory.content(), memory.summary()) : null;
         revision.unreadable = !memory.readable();
         revision.retrieval = memory.retrieval();
         revision.changedByUserId = changedByUserId;
@@ -160,6 +165,12 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
 
 
     /** 제목과 본문을 풀었는가. */
+    /** 그 revision 의 요약이다. 없거나 풀지 못하면 빈 글이다. */
+    public String summary() {
+        return opened().map(MemoryText::summary).orElse("");
+    }
+
+
     public boolean readable() {
         return opened().isPresent();
     }
@@ -168,7 +179,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     /** 저장된 글과 key, 주인이다. 원래 기억의 번호로 AAD 를 만든다. */
     public StoredMemoryText stored() {
         return new StoredMemoryText(
-            id.memoryId(), scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId);
+            id.memoryId(), scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, storedSummary, dataKeyId);
     }
 
 
@@ -183,6 +194,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         opened();
         this.storedTitle = sealed.title();
         this.storedContent = sealed.content();
+        this.storedSummary = sealed.summary();
         this.dataKeyId = sealed.dataKeyId();
     }
 
@@ -191,7 +203,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         if (plain == null && !unreadable) {
             Optional<MemoryText> read = dataKeyId != null
                 ? (opener == null ? Optional.empty() : opener.open(stored()))
-                : Optional.of(new MemoryText(storedTitle, storedContent));
+                : Optional.of(new MemoryText(storedTitle, storedContent, storedSummary == null ? "" : storedSummary));
             plain = read.orElse(null);
             unreadable = read.isEmpty();
         }

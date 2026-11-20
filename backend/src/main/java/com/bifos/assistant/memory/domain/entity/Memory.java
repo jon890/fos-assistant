@@ -46,6 +46,9 @@ import org.hibernate.annotations.ColumnDefault;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Memory extends CreatedAtEntity {
 
+    /** 요약 줄의 최대 글자 수다. 운영 설정이 아니라 코드에 둔다(스펙 DECISION15). */
+    public static final int SUMMARY_MAX = 200;
+
     /** 따로 정하지 않은 항목이 가는 collection 이다. 기존 Memory 가 모두 여기 있다. */
     public static final String DEFAULT_COLLECTION = "core";
 
@@ -84,7 +87,14 @@ public class Memory extends CreatedAtEntity {
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String storedContent;
 
-    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이다. */
+    /**
+     * 저장된 요약 줄이다. {@link #dataKeyId} 가 있으면 암호문이다. {@code NULL} 은 요약 기능 전에 만들어 아직 이관하지 않은 줄이고, 빈 글은 요약이
+     * 없는 줄이다({@code docs/features/memory/design.md} 의 「스키마(PR1)」).
+     */
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String storedSummary;
+
+    /** 제목과 본문, 요약을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이다. */
     @Column(name = "data_key_id")
     private Long dataKeyId;
 
@@ -170,7 +180,8 @@ public class Memory extends CreatedAtEntity {
         this.groupId = groupId;
         this.storedTitle = title;
         this.storedContent = content;
-        this.plain = new MemoryText(title, content);
+        this.storedSummary = "";
+        this.plain = new MemoryText(title, content, "");
         this.collection = placement.collection();
         this.entryType = MemoryEntryType.MEMORY;
         place(placement.retrieval());
@@ -266,6 +277,38 @@ public class Memory extends CreatedAtEntity {
     }
 
 
+    /** 요약 줄을 함께 가진 제안이다. 요약이 빈 글이면 {@link #proposed} 와 같다. */
+    public static Memory proposed(
+        Long ownerUserId,
+        String title,
+        String content,
+        String summary,
+        MemoryPlacement placement,
+        Long proposedByExecutionId,
+        String proposalDedupKey,
+        Instant now) {
+        Memory memory = proposed(ownerUserId, title, content, placement, proposedByExecutionId, proposalDedupKey, now);
+        memory.initSummary(summary);
+        return memory;
+    }
+
+
+    /** 요약 줄을 함께 가진 바로 저장이다. 요약이 빈 글이면 {@link #remembered} 와 같다. */
+    public static Memory remembered(
+        Long ownerUserId,
+        String title,
+        String content,
+        String summary,
+        MemoryPlacement placement,
+        Long proposedByExecutionId,
+        String proposalDedupKey,
+        Instant now) {
+        Memory memory = remembered(ownerUserId, title, content, placement, proposedByExecutionId, proposalDedupKey, now);
+        memory.initSummary(summary);
+        return memory;
+    }
+
+
     /**
      * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-20261007 / memory-remember). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
      * 주인이다.
@@ -282,6 +325,28 @@ public class Memory extends CreatedAtEntity {
         memory.proposedByExecutionId = proposedByExecutionId;
         memory.proposalDedupKey = proposalDedupKey;
         return memory;
+    }
+
+
+    /** 넣기 전의 새 항목에 요약을 적는다. */
+    private void initSummary(String summary) {
+        String value = requireSummary(summary);
+        this.storedSummary = value;
+        this.plain = new MemoryText(plain.title(), plain.content(), value);
+    }
+
+
+    /**
+     * 요약은 개인 범위의 사실({@code USER}, {@code MEMORY})만 가진다. 그룹 기억과 문서, 출처 원문은 빈 글만 받는다(스펙 DECISION16).
+     *
+     * @return null 이면 빈 글이다
+     */
+    private String requireSummary(String summary) {
+        String value = summary == null ? "" : summary;
+        if (!value.isEmpty() && (scope != MemoryScope.USER || entryType != MemoryEntryType.MEMORY)) {
+            throw new IllegalArgumentException("only a user memory has a summary");
+        }
+        return value;
     }
 
 
@@ -338,12 +403,31 @@ public class Memory extends CreatedAtEntity {
         MemoryRetrieval retrieval,
         String updatedProposalDedupKey,
         Instant at) {
+        revise(content, summary(), sealed, retrieval, updatedProposalDedupKey, at);
+    }
+
+
+    /**
+     * 본문과 요약, 꺼내는 방식을 고치고 revision 을 하나 올린다. 요약은 개인 범위의 사실만 빈 글 밖의 값을 받는다.
+     *
+     * @param summary 새 요약. 빈 글이면 요약이 없다
+     * @param sealed 주인 데이터 key 로 암호화한 제목과 새 본문, 새 요약. 암호화가 꺼진 설치면 null 이다
+     */
+    public void revise(
+        String content,
+        String summary,
+        SealedMemoryText sealed,
+        MemoryRetrieval retrieval,
+        String updatedProposalDedupKey,
+        Instant at) {
+        String newSummary = requireSummary(summary);
         String title = title();
         // 암호문을 받았으면 저장 필드에 바로 적어 평문이 저장 필드에 놓이는 순간이 없다. 암호화가 꺼진 설치만 평문을 적는다
         this.storedTitle = sealed == null ? title : sealed.title();
         this.storedContent = sealed == null ? content : sealed.content();
+        this.storedSummary = sealed == null ? newSummary : sealed.summary();
         this.dataKeyId = sealed == null ? null : sealed.dataKeyId();
-        this.plain = new MemoryText(title, content);
+        this.plain = new MemoryText(title, content, newSummary);
         this.unreadable = false;
         place(retrieval);
         if (proposalDedupKey != null) {
@@ -366,6 +450,24 @@ public class Memory extends CreatedAtEntity {
     }
 
 
+    /** 요약 줄이다. 없거나 풀지 못하면 빈 글이다. */
+    public String summary() {
+        return opened().map(MemoryText::summary).orElse("");
+    }
+
+
+    /** 매 실행의 요약 구역에 들 요약 줄이 있는가. */
+    public boolean hasSummary() {
+        return !summary().isEmpty();
+    }
+
+
+    /** 요약 칸이 아직 이관 전({@code NULL})인가. */
+    public boolean summaryPending() {
+        return storedSummary == null;
+    }
+
+
     /** 제목과 본문을 풀었는가. 거짓이면 실행에 싣지 않고 고치지 않는다. */
     public boolean readable() {
         return opened().isPresent();
@@ -381,7 +483,13 @@ public class Memory extends CreatedAtEntity {
     /** 저장된 글과 key, 주인이다. 암호화와 풀기가 같은 AAD 를 만든다. */
     public StoredMemoryText stored() {
         return new StoredMemoryText(
-            id, scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId);
+            id,
+            scope,
+            scope == MemoryScope.USER ? ownerUserId : groupId,
+            storedTitle,
+            storedContent,
+            storedSummary,
+            dataKeyId);
     }
 
 
@@ -399,6 +507,7 @@ public class Memory extends CreatedAtEntity {
         opened();
         this.storedTitle = "";
         this.storedContent = "";
+        this.storedSummary = "";
     }
 
 
@@ -407,7 +516,22 @@ public class Memory extends CreatedAtEntity {
         opened();
         this.storedTitle = sealed.title();
         this.storedContent = sealed.content();
+        this.storedSummary = sealed.summary();
         this.dataKeyId = sealed.dataKeyId();
+    }
+
+
+    /**
+     * 이관 전 줄에 요약을 처음 적는다. revision 번호와 갱신 시각은 바꾸지 않는다({@code MemorySummaryBackfill}).
+     *
+     * @param summary 새 요약. 빈 글이면 요약이 없다
+     * @param sealedSummary 주인 데이터 key 로 암호화한 요약. 암호화가 꺼진 설치면 null 이다
+     */
+    public void fillSummary(String summary, String sealedSummary) {
+        MemoryText opened = opened().orElseThrow(() -> new IllegalStateException("an unreadable memory is not filled"));
+        String value = requireSummary(summary);
+        this.storedSummary = sealedSummary == null ? value : sealedSummary;
+        this.plain = new MemoryText(opened.title(), opened.content(), value);
     }
 
 
@@ -427,7 +551,7 @@ public class Memory extends CreatedAtEntity {
         if (plain == null && !unreadable) {
             Optional<MemoryText> read = sealed()
                 ? (opener == null ? Optional.empty() : opener.open(stored()))
-                : Optional.of(new MemoryText(storedTitle, storedContent));
+                : Optional.of(new MemoryText(storedTitle, storedContent, storedSummary == null ? "" : storedSummary));
             plain = read.orElse(null);
             unreadable = read.isEmpty();
         }
