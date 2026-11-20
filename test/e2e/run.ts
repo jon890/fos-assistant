@@ -357,6 +357,19 @@ async function killControlPlane(app: ChildProcess): Promise<void> {
   }
 }
 
+/** 실패한 단계의 메시지와 검사 코드 쪽 호출 위치를 가린 채 한 덩어리로 만든다. */
+function failureReason(error: unknown, secrets: readonly string[]): string {
+  if (!(error instanceof Error)) return maskBackendLog(String(error), secrets);
+  // 메시지는 한 줄로 가린다. 여러 줄이면 줄마다 따로 가려져 JSON 본문이 가림 규칙을 비켜 간다.
+  const message = maskBackendLog(`${error.name}: ${error.message}`.replaceAll("\n", " "), secrets);
+  const frames = (error.stack ?? "")
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("at ") && line.includes("/test/"))
+    .slice(0, 8)
+    .map((line) => `    ${line.trim().replace(ROOT, "")}`);
+  return [message, ...frames].join("\n");
+}
+
 /** 실패한 자리에서 Control Plane 로그를 보여준다. */
 async function printAppLog(logPath: string, secrets: readonly string[]): Promise<void> {
   const log = maskBackendLog(await readFile(logPath, "utf-8").catch(() => ""), secrets);
@@ -455,13 +468,15 @@ async function main(): Promise<void> {
     }
 
     console.log("\n모두 통과했다");
-  } catch {
-    // 예외에는 요청과 응답 본문이 섞일 수 있어 고정 필드만 남긴다.
+  } catch (error) {
+    // `실패:` 줄은 CI 가 정기 실행 실패 이슈로 옮기므로 고정 필드만 남긴다.
     console.error("\n실패:", JSON.stringify({
       status: "FAILED",
       scenario: scenarioName,
       elapsedMs: Math.round(performance.now() - scenarioStartedAt),
     }));
+    // 원인은 job 로그에만 남긴다. 예외에는 요청과 응답 본문이 섞일 수 있어 Control Plane 로그와 같은 규칙으로 가린다.
+    console.error(`원인: ${failureReason(error, [JWT_SECRET, PROFILE_KEY, FAKE_DASHBOARD_TOKEN, ...TOOL_DETAIL_SECRETS])}`);
     await printAppLog(logPath, [JWT_SECRET, PROFILE_KEY, FAKE_DASHBOARD_TOKEN, ...TOOL_DETAIL_SECRETS]);
     process.exitCode = 1;
   } finally {

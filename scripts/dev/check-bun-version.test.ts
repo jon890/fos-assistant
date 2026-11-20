@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-const script = new URL("./check-bun-version.py", import.meta.url).pathname;
+const script = new URL("./check-bun-version.ts", import.meta.url).pathname;
 
 function run(workflow: string, localBun: string | null) {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "check-bun-version-")));
@@ -17,9 +17,8 @@ function run(workflow: string, localBun: string | null) {
   }
   const file = join(directory, "ci.yml");
   writeFileSync(file, workflow);
-  const python = spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
   try {
-    return spawnSync(python, ["-I", script, file], {
+    return spawnSync(process.execPath, [script, file], {
       env: { PATH: `${bin}:/usr/bin:/bin` },
       encoding: "utf8",
     });

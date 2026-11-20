@@ -59,7 +59,7 @@ public class HermesRunTerminals {
     }
 
 
-    /** 이 프로세스가 그 run 에 중지를 보냈다. */
+    /** 이 프로세스가 그 run 에 중지를 보내려 했다. 보내기 전에 적으므로 응답을 받지 못한 시도도 남는다. */
     public void markStopped(String profileName, String runId) {
         Instant now = clock.instant();
         sweep(now);

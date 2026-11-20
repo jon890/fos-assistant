@@ -3,6 +3,7 @@ package com.bifos.assistant.memory.application.dto;
 /**
  * 에이전트가 남기려는 사실 하나다. 모양 검사를 마친 값이다.
  *
+ * @param summary 한 줄 요약. 주지 않았으면 null 이고, 빈 글이면 요약이 없다
  * @param collection 둘 collection. 고르지 않았으면 기본 collection 이다
  * @param memoryId 같은 사실을 고칠 기존 항목 번호. 새 항목이면 null 이다
  * @param executionId 이 호출의 origin 실행 번호
@@ -15,6 +16,7 @@ package com.bifos.assistant.memory.application.dto;
 public record MemoryRememberRequest(
     String title,
     String content,
+    String summary,
     String collection,
     boolean sensitive,
     Long memoryId,

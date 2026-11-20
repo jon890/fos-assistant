@@ -16,7 +16,7 @@
 
 ## 연결하는 방법
 
-처음 한 번만 하면 돼요. Google 계정과, 브라우저와 Python 3이 있는 컴퓨터가 필요해요.
+처음 한 번만 하면 돼요. Google 계정과, 브라우저와 Node 24 이상이 있는 컴퓨터가 필요해요.
 
 ### 1. Google Cloud에서 OAuth client 만들기
 
@@ -34,7 +34,7 @@
 
 ```bash
 # cwd: 저장소 root
-python3 hermes/connectors/gmail/scripts/get_refresh_token.py
+node hermes/connectors/gmail/scripts/get_refresh_token.ts
 ```
 
 1. 스크립트가 클라이언트 ID와 secret을 물어요. secret은 입력하는 동안 화면에 보이지 않아요
@@ -45,7 +45,7 @@ python3 hermes/connectors/gmail/scripts/get_refresh_token.py
 5분 안에 허용하지 않으면 스크립트가 끝나요. 그때는 다시 돌려 주세요.
 refresh token은 그 계정의 메일을 읽고 보낼 수 있는 값이에요. 붙여 넣은 뒤 터미널 기록에서 지워 주세요.
 
-Python을 쓸 수 없으면 [OAuth 2.0 Playground](https://developers.google.com/oauthplayground)로도 받을 수 있어요.
+Node를 쓸 수 없으면 [OAuth 2.0 Playground](https://developers.google.com/oauthplayground)로도 받을 수 있어요.
 이때는 클라이언트 유형을 「웹 애플리케이션」으로 만들고, 승인된 리디렉션 URI에 Playground 주소를 넣은 뒤 Playground 설정에서 자기 클라이언트를 쓰도록 켜요.
 이 방법은 client secret을 Google의 웹 도구에 입력해요.
 

@@ -46,6 +46,9 @@ SANDBOX_PATH_ENV = frozenset({
     "CAREER_BACKEND_TOKEN_FILE", "CLAUDE_PLUGIN_ROOT", "CAREER_EVIDENCE_DIR",
     "CAREER_WORKSPACE_ROOT", "CAREER_DART_API_KEY_FILE",
 })
+# 운영 정책 `profiles[*].env` 가 받는 이름 전체다. 플러그인 manifest 의 `agent_skills.sandbox_env` 도 이 목록 안의 이름만 받는다.
+# 한쪽만 고치면 선언할 수 있는데 어떤 profile 도 줄 수 없는 이름이 생기므로 둘이 이 상수를 함께 쓴다(ADR-20261120 plugin-agent-skills).
+SANDBOX_ALLOWED_ENV = SANDBOX_PATH_ENV | frozenset({"CAREER_BACKEND_URL"})
 
 
 def _sandbox_unavailable():
@@ -59,6 +62,8 @@ def _sandbox_env_ok(value) -> bool:
     if not isinstance(value, dict):
         return False
     for name, entry in value.items():
+        if name not in SANDBOX_ALLOWED_ENV:
+            return False
         if name in SANDBOX_PATH_ENV:
             if not _sandbox_path_ok(entry):
                 return False
