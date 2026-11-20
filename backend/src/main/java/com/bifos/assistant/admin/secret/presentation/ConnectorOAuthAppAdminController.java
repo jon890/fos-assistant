@@ -3,7 +3,7 @@ package com.bifos.assistant.admin.secret.presentation;
 import com.bifos.assistant.admin.secret.presentation.ConnectorOAuthAppAdminDtos.AppRequest;
 import com.bifos.assistant.admin.secret.presentation.ConnectorOAuthAppAdminDtos.AppView;
 import com.bifos.assistant.admin.secret.presentation.ConnectorOAuthAppAdminDtos.AppsView;
-import com.bifos.assistant.connector.connection.application.ConnectorOAuthApps;
+import com.bifos.assistant.connector.oauth.application.ConnectorOAuthApps;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import lombok.RequiredArgsConstructor;

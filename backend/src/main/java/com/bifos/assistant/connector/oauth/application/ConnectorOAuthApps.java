@@ -1,6 +1,7 @@
-package com.bifos.assistant.connector.connection.application;
+package com.bifos.assistant.connector.oauth.application;
 
-import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthAppStatus;
+import com.bifos.assistant.connector.connection.application.ConnectorManifests;
+import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthAppStatus;
 import com.bifos.assistant.crypto.domain.ServerSecretRecord;
 import com.bifos.assistant.crypto.domain.ServerSecrets;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -52,7 +53,7 @@ public class ConnectorOAuthApps {
         Map<String, Object> metadata = Map.of(CLIENT_ID, credential(clientId));
         if (manifest.oauth().appScope() == AppScope.PLUGIN) {
             if (appSlug == null || !appSlug.matches("[A-Za-z0-9][A-Za-z0-9-]{0,99}")) {
-                throw ConnectorErrors.invalid();
+                throw invalid();
             }
             metadata = Map.of(CLIENT_ID, clientId, APP_SLUG, appSlug);
         }
@@ -110,9 +111,14 @@ public class ConnectorOAuthApps {
     private static String credential(String value) {
         if (value == null || value.isBlank() || value.length() > MAX_CREDENTIAL_LENGTH
             || value.chars().anyMatch(ch -> Character.isWhitespace(ch) || Character.isISOControl(ch))) {
-            throw ConnectorErrors.invalid();
+            throw invalid();
         }
         return value;
+    }
+
+
+    private static ApiException invalid() {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, "connector values are invalid");
     }
 
 

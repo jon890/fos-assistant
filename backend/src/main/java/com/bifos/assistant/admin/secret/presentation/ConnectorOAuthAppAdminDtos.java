@@ -1,7 +1,7 @@
 package com.bifos.assistant.admin.secret.presentation;
 
 import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminDtos.UpdatedBy;
-import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthAppStatus;
+import com.bifos.assistant.connector.oauth.application.dto.ConnectorOAuthAppStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;

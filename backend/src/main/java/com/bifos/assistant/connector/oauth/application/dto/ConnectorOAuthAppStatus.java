@@ -1,4 +1,4 @@
-package com.bifos.assistant.connector.connection.application.dto;
+package com.bifos.assistant.connector.oauth.application.dto;
 
 import java.time.Instant;
 
