@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.SecretKey;
@@ -95,7 +96,13 @@ class QualityAdminControllerTest {
         when(toolsets.readEnabled(anyString(), anyString()))
             .thenAnswer(invocation -> enabled.getOrDefault(invocation.<String>getArgument(1), List.of("web")));
         doAnswer(invocation -> {
-            enabled.put(invocation.getArgument(0), List.copyOf(invocation.<List<String>>getArgument(1)));
+            // 첫 에이전트의 기본 도구 켜기가 요청 밖에서 겹쳐 돈다. 실제 Hermes 는 읽고 고쳐 쓰므로 겹치면 한쪽 이름이 빠질 수 있는데,
+            // 그 경쟁은 다시 준비하면 회복된다(설계 「평가 전용 사용자」). 이 검사는 준비 순서만 보도록 쓴 이름을 더해 둔다.
+            enabled.merge(invocation.getArgument(0), List.copyOf(invocation.<List<String>>getArgument(1)), (before, written) -> {
+                LinkedHashSet<String> union = new LinkedHashSet<>(before);
+                union.addAll(written);
+                return List.copyOf(union);
+            });
             return null;
         }).when(toolsets).writeApiServerInSandbox(anyString(), anyList(), any());
         admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN));
