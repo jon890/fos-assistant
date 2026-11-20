@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import pathlib
 from .connector_guard import _guard_manifest
 from .connector_description import _tool_descriptions, _tool_summaries
 from .connector_appearance import _tool_arg_labels
@@ -77,11 +76,8 @@ from .connector_schema import (
 
 from .connector_owner_env import _connector_owner_env
 
-from .sandbox import SANDBOX_ALLOWED_ENV
-from .connector_skills import (
-    _connector_skills,
-    _skill_name,
-)
+from .connector_agent_skills import _catalog_agent_skills, _plugin_and_agent_skills
+from .connector_skills import _connector_skills, _skill_name
 
 
 def _appearance_or_none(connector_id: str, name: str, read):
@@ -96,40 +92,6 @@ def _appearance_or_none(connector_id: str, name: str, read):
         reason = str(error) if type(error) is ValueError else type(error).__name__
         logger.warning("dashboard-profile-api: 플러그인 %r 의 %s 칸을 버렸다: %s", connector_id, name, reason)
         return None
-
-
-def _agent_skill_declaration(root: pathlib.Path, declared: dict, plugin_skills: dict) -> tuple[dict, dict]:
-    """`assistant.json` 의 `agent_skills` 를 읽는다. (파일 사전, {이름: frozenset(요구 env)}) 이고 칸이 없으면 둘 다 비었다.
-
-    일반 에이전트용 스킬 디렉터리다. 붙인 에이전트에 플러그인 스킬과 같은 방법으로 복사하되, `sandbox_env` 를 선언한 스킬은
-    그 에이전트의 셸 설정이 그 env 를 모두 넘길 때만 설치한다(ADR-20261120 plugin-agent-skills). 틀리면 예외다.
-    """
-    value = declared.get("agent_skills")
-    if value is None:
-        return {}, {}
-    if not isinstance(value, dict) or "path" not in value or set(value) - {"path", "sandbox_env"}:
-        raise ValueError("agent_skills 는 path 와 sandbox_env 만 받는 객체다")
-    item = value["path"]
-    if not isinstance(item, str):
-        raise ValueError("agent_skills 의 path 는 문자열이다")
-    path = root / item
-    if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
-        raise ValueError("agent_skills 는 plugin 안의 링크 없는 디렉터리여야 한다")
-    files = _connector_skills([path.resolve()])
-    if set(files) & set(plugin_skills):
-        raise ValueError("스킬 이름이 겹친다")
-    sandbox_env = value.get("sandbox_env", {})
-    if not isinstance(sandbox_env, dict):
-        raise ValueError("agent_skills 의 sandbox_env 는 객체다")
-    required = {}
-    for name, names in sandbox_env.items():
-        if name not in files:
-            raise ValueError("agent_skills 의 sandbox_env 가 없는 스킬을 가리킨다")
-        if (not isinstance(names, list) or not names or len(set(map(str, names))) != len(names)
-                or any(not isinstance(env, str) or env not in SANDBOX_ALLOWED_ENV for env in names)):
-            raise ValueError("agent_skills 의 sandbox_env 는 실행 공간 정책이 받는 env 이름의 목록이다")
-        required[name] = frozenset(names)
-    return files, {name: required.get(name, frozenset()) for name in files}
 
 
 def _load_connector(connector_id: str, entry: dict) -> dict:
@@ -256,9 +218,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
         skill_dirs.append(path.resolve())
-    installed_skills = _connector_skills(skill_dirs)
-    agent_skill_files, agent_skills = _agent_skill_declaration(root, declared, installed_skills)
-    installed_skills = {**installed_skills, **agent_skill_files}
+    installed_skills, agent_skills = _plugin_and_agent_skills(root, declared, skill_dirs)
 
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     # 표준 플러그인은 도구 정책을 선언하지 않는다. Control Plane 이 그 서버의 도구를 모두 호출마다 승인으로 판정한다.
@@ -304,9 +264,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "errors": errors,
         "error_contracts": error_contracts,
         **_connector_binding_flags(declared),
-        "skills": installed_skills,
-        # 에이전트용 스킬 이름과 그 스킬이 셸에 요구하는 env 이름이다. 이 값에 없는 `skills` 의 이름이 플러그인 스킬이다.
-        "agent_skills": agent_skills,
+        "skills": installed_skills, "agent_skills": agent_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset(option_tools if standard else {verify["tool"]} | option_tools),
         "tools": tools,
@@ -405,8 +363,7 @@ def _connector_catalog_response(include_standard: bool = False):
     옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하므로, schema 3 을 아는 쪽이 query 로 청한다
     (rule-66).
 
-    `skills` 는 붙인 에이전트에 설치할 수 있는 스킬의 이름이다(에이전트용 스킬 포함). 이름 순이다.
-    `agent_skills` 는 에이전트용 스킬마다 이름과 셸에 요구하는 env 이름이다. 에이전트용 스킬이 있을 때만 넣는다.
+    `skills` 는 붙인 에이전트에 설치할 수 있는 스킬의 이름이다(에이전트용 스킬 포함, `_catalog_agent_skills`). 이름 순이다.
     `owner_browser` 는 사용자 브라우저를 쓰는 플러그인인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
     """
     from starlette.responses import JSONResponse
@@ -419,10 +376,7 @@ def _connector_catalog_response(include_standard: bool = False):
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
-          # 에이전트용 스킬이 있을 때만 넣는다. 이 칸을 모르는 Control Plane 은 무시한다(rule-66).
-          **({"agent_skills": [{"name": name, "sandbox_env": sorted(env)}
-                               for name, env in sorted(manifest["agent_skills"].items())]}
-             if manifest.get("agent_skills") else {}),
+          **_catalog_agent_skills(manifest),
           # 결과를 모르는 코드와 그 재시도 식별자 칸 이름이다. Control Plane 이 504 본문을 이 선언과 대조한다
           # (ADR-20261013 unknown-retry-key). `retry_key` 를 선언하지 않은 코드는 null 이다.
           "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")

@@ -51,11 +51,11 @@ class AgentSkillPlanTest(ConnectorGateCase):
     def test_reasons_come_in_order_and_all_at_once(self):
         """터미널, 실행 공간, env 순서로 해당하는 까닭을 모두 낸다."""
         cases = (
-            (shell(env=FULL_ENV, terminal=False), [self.plugin.TERMINAL_OFF]),
-            (shell(env=None), [self.plugin.SANDBOX_ENV_MISSING]),
-            (shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"}), [self.plugin.SANDBOX_ENV_MISSING]),
+            (shell(env=FULL_ENV, terminal=False), ["terminal_off"]),
+            (shell(env=None), ["sandbox_env_missing"]),
+            (shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"}), ["sandbox_env_missing"]),
             (shell(terminal=False, docker=False),
-             [self.plugin.TERMINAL_OFF, self.plugin.SANDBOX_UNREGISTERED, self.plugin.SANDBOX_ENV_MISSING]),
+             ["terminal_off", "sandbox_unregistered", "sandbox_env_missing"]),
         )
         for config, reasons in cases:
             with self.subTest(reasons=reasons):
@@ -66,7 +66,7 @@ class AgentSkillPlanTest(ConnectorGateCase):
     def test_name_taken_by_a_profile_skill_the_plugin_does_not_own(self):
         """profile `skills/` 의 같은 이름은 이 플러그인이 설치한 것이면 겹침이 아니다."""
         (self.profile / "skills" / REPORT).mkdir()
-        self.assertEqual(self.plan(shell(env=FULL_ENV))[1], {REPORT: [self.plugin.NAME_TAKEN]})
+        self.assertEqual(self.plan(shell(env=FULL_ENV))[1], {REPORT: ["name_taken"]})
         self.assertEqual(self.plan(shell(env=FULL_ENV), owned=[REPORT])[1], {})
 
     def test_name_taken_by_an_uploaded_skill_regardless_of_ownership(self):
@@ -78,7 +78,7 @@ class AgentSkillPlanTest(ConnectorGateCase):
                 config = {**shell(env=FULL_ENV), "skills": {"external_dirs": external}}
                 install, skipped = self.plan(config, owned=[RUNNER])
                 self.assertEqual(install, {REPORT})
-                self.assertEqual(skipped, {RUNNER: [self.plugin.NAME_TAKEN]})
+                self.assertEqual(skipped, {RUNNER: ["name_taken"]})
 
     def test_malformed_config_does_not_raise(self):
         """설정 칸의 모양이 틀려도 예외 없이 조건을 못 채운 것으로 본다."""
@@ -86,4 +86,4 @@ class AgentSkillPlanTest(ConnectorGateCase):
             with self.subTest(config=config):
                 install, skipped = self.plan(config)
                 self.assertEqual(install, {REPORT})
-                self.assertIn(self.plugin.TERMINAL_OFF, skipped[RUNNER])
+                self.assertIn("terminal_off", skipped[RUNNER])

@@ -91,13 +91,7 @@ from .common import (
     logger,
 )
 
-from .connector_agent_skills import (
-    NAME_TAKEN,
-    SANDBOX_ENV_MISSING,
-    SANDBOX_UNREGISTERED,
-    TERMINAL_OFF,
-    _agent_skill_plan,
-)
+from .connector_agent_skills import _agent_skill_plan
 
 from .connector_install import (
     CONNECTOR_DETACHED,
@@ -278,7 +272,6 @@ from .routes import (
 
 from .sandbox import (
     IMAGE_FILE_TOOLSETS,
-    SANDBOX_ALLOWED_ENV,
     SANDBOX_ENV,
     SANDBOX_NETWORK_RE,
     SANDBOX_OWNER_RE,
