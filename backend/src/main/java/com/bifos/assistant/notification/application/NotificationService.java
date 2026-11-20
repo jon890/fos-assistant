@@ -1,5 +1,6 @@
 package com.bifos.assistant.notification.application;
 
+import com.bifos.assistant.notification.application.dto.NotificationCreated;
 import com.bifos.assistant.notification.application.dto.NotificationCursor;
 import com.bifos.assistant.notification.application.dto.NotificationEvent;
 import com.bifos.assistant.notification.application.dto.NotificationPage;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.function.LongFunction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -33,6 +35,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>계약은 {@code docs/features/attention.md} 가 갖는다. 알림과 그 원인은 한 트랜잭션이다. 줄은 원인을 저장하는
  * 트랜잭션 안에서 만들고, 사건은 그 트랜잭션이 커밋한 뒤에 그 사용자의 구독자에게 보낸다. 화면이 사건을 받고 다시 읽을 때
  * 줄이 있어야 한다.
+ *
+ * <p>저장할 때 {@link NotificationCreated} 응용 사건도 낸다. 웹 푸시가 커밋 뒤에 받아 기기로 보낸다.
  *
  * <p>사건에 싣는 읽지 않은 수는 커밋한 뒤 새 트랜잭션에서 센다. 바꾼 트랜잭션 안에서 세면 동시에 커밋한 다른 트랜잭션의
  * 알림이 빠진 수가 나중에 도착해 화면의 수를 덮는다.
@@ -54,6 +58,7 @@ public class NotificationService {
     private final NotificationEventHub hub;
     private final Clock clock;
     private final PlatformTransactionManager transactionManager;
+    private final ApplicationEventPublisher events;
 
 
     /**
@@ -87,6 +92,9 @@ public class NotificationService {
         Notification saved = notifications.saveAndFlush(
             Notification.of(userId, kind, title, body, target).caused(sourcePublicId));
         afterCommit(userId, unread -> NotificationEvent.created(saved.publicId(), unread));
+        // 웹 푸시는 이 사건을 커밋 뒤에만 받는다. 되돌아간 트랜잭션은 보내지 않는다(ADR-20261120 / web-push).
+        events.publishEvent(new NotificationCreated(
+            saved.id(), userId, kind, saved.title(), saved.body(), saved.publicId(), saved.createdAt()));
         return saved;
     }
 

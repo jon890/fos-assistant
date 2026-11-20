@@ -243,7 +243,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | 그 밖의 외부 실패 | 바인딩을 `PENDING` 으로 남기고 `CONNECTOR_OPERATION_FAILED`. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다 |
 
 대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았다. 결과 트랜잭션이 같은 설치 시도의 새 바인딩 행만 지운다.
-붙인 바인딩은 늘 `PENDING` 이다. 답의 `restart_required` 나 `plugin_updated` 가 참이면 재시작 대기로 두고 그 시각을 적는다. 둘 다 거짓이고 `reload_pending` 이 참이면 `assistant.connector.binding.apply-delay` 뒤를 반영 예정 시각으로 적는다.
+붙인 바인딩은 늘 `PENDING` 이다. 답의 `restart_required` 가 참이고 `cycle_available` 이면 재시작 대기 대신 그 서버만 껐다 켜는 단계(`IDLE_WAIT`)로 둔다(아래 「껐다 켜기」). 그 밖에 `restart_required` 나 `plugin_updated` 가 참이면 재시작 대기로 두고 그 시각을 적는다. 둘 다 거짓이고 `reload_pending` 이 참이면 `assistant.connector.binding.apply-delay` 뒤를 반영 예정 시각으로 적는다.
 답의 `skipped_skills`(설치하지 못한 에이전트용 스킬과 까닭)는 바인딩의 `skipped_skills` 에 덮어쓰고 연결 목록 응답의 `skippedSkills` 로 낸다. 칸이 없는 옛 대시보드 plugin 의 답은 빈 목록이고, 설치가 실패하면 옛 기록을 둔다.
 그 시간을 정한 까닭은 `ConnectorBindingProperties` 의 주석과 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
 
@@ -280,6 +280,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 
 | 갈리는 지점 | 처리 |
 | --- | --- |
+| 껐다 켜기 단계다 | 연결 확인과 반영 예정 확인, 정의 어긋남 점검은 설치를 보내지 않고 `CYCLE_PENDING` 으로 둔다. 등록은 꺼진 동안 끈 채로 새 값을 쓴다. 관리자 반영 완료는 아래 「관리자 반영 완료」 가 갖는다 |
 | 재시작 대기이거나 반영 예정 시각이 아직 오지 않았다 | 연결 확인과 반영 예정 확인은 설치를 다시 보내지 않고 `PENDING` 으로 둔다. 관리자 반영 완료는 재시작이 끝났다고 보고 재시작 대기에도 보내지만, 반영 예정 시각 전이면 보내지 않는다. gateway 가 서버를 연결하기 전에 probe 만 통과해 `READY` 가 되는 것을 막는다 |
 | 카탈로그에서 빠진 플러그인다 | 서버를 확인할 수 없어 다시 보내지 않고 `PENDING` |
 | 바인딩의 서버 이름이 비었다 | manifest 로 채운다. 마이그레이션이 만든 옛 바인딩이 그렇다 |
@@ -298,8 +299,8 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | --- | --- |
 | 그 사이 지워졌거나 재시작 대기가 됐거나 예정이 미뤄졌다 | 건너뛴다 |
 | 연결 사용자가 없거나 에이전트가 지워졌거나 주인이 연결 사용자와 다르다 | 비운 예정만 저장하고 건너뛴다. 그대로 두면 매 주기 다시 집는다 |
-| 카탈로그를 읽지 못한다 | 바인딩을 `PENDING` 으로 두고 비운 예정과 함께 커밋한다. 예외로 끝내면 트랜잭션이 되돌려져 예정이 살아난다 |
-| probe 가 실패해 `PENDING` 이 된다 | 다시 부르지 않는다. 사용자의 연결 확인이나 관리자 반영 완료가 다시 맞춘다 |
+| 카탈로그를 읽지 못한다 | 바인딩을 `PENDING` 으로 두고 실패 표시(`apply_failed_at`)와 비운 예정을 함께 커밋한다. 예외로 끝내면 트랜잭션이 되돌려져 예정이 살아난다 |
+| probe 가 실패해 `PENDING` 이 된다 | 실패 표시를 남기고 다시 부르지 않는다. 사용자의 연결 확인이나 관리자 반영 완료가 다시 맞추고 표시를 비운다 |
 | 다시 보낸 설치가 또 `reload_pending` 이다 | 반영 맞추기가 새 시각을 적는다 |
 | 한 바인딩이 실패한다 | 경고 로그를 남기고 다음 바인딩으로 간다 |
 
@@ -314,17 +315,24 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 | --- | --- |
 | 설치 상태를 읽지 못한다 | 경고 로그를 남기고 건너뛴다 |
 | 「바인딩의 반영 맞추기」 의 설치 판정을 통과한다 | 어긋나지 않았다. 연속으로 센 값을 지운다 |
-| 어긋났다 | 플러그인 id 와 어긋난 조건 이름을 로그에 남기고, 반영 예정 확인과 같은 차례로 잠근 뒤 다시 맞춘다. 서버 정의가 바뀌므로 대개 재시작 대기가 된다 |
+| 어긋났다 | 플러그인 id 와 어긋난 조건 이름을 로그에 남기고, 반영 예정 확인과 같은 차례로 잠근 뒤 다시 맞춘다. 서버 정의가 바뀌므로 대개 껐다 켜기 단계가 되고, `fos-ctx` 가 바뀌었으면 재시작 대기가 된다 |
 | 잠근 뒤 다시 읽으니 지워졌거나 `READY` 가 아니다 | 건너뛴다 |
-| 다시 맞춰 `READY` 가 된 뒤 또 어긋나기를 연속 상한만큼 되풀이했다 | 설치를 보내지 않고 `PENDING` 으로만 두고 알린다. 상한은 `ConnectorBindingApplier` 가 갖는다 |
-| 다시 맞춘 바인딩이 재시작 대기나 `PENDING` 으로 남았다 | 연결 주인의 그룹 관리자마다 `CONNECTOR_REINSTALLED` 알림 한 건. 재시작 대기가 있으면 재시작 뒤 반영 완료를, 아니면 반영 완료로 다시 확인하라고 쓴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다 |
+| 다시 맞춰 `READY` 가 된 뒤 또 어긋나기를 연속 상한만큼 되풀이했다 | 설치를 보내지 않고 `PENDING` 과 실패 표시로 두고 알린다. 상한은 `ConnectorBindingApplier` 가 갖는다 |
+| 다시 맞춘 바인딩이 재시작 대기나 `PENDING` 으로 남았다 | 연결 주인의 그룹 관리자마다 `CONNECTOR_REINSTALLED` 알림 한 건. 재시작 대기가 있으면 재시작 뒤 반영 완료를, 아니면 반영 완료로 다시 확인하라고 쓴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이, 껐다 켜기 단계가 된 바인딩은 「껐다 켜기」 가 맡으므로 세지 않는다 |
 
 다시 맞춘 바인딩은 `READY` 가 아니어서 다음 주기의 대상이 아니다. 그래서 같은 어긋남에 설치를 되풀이해 보내지 않는다.
 점검 위치와 연속 횟수는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 
+### 껐다 켜기
+
+이미 있던 서버의 정의나 값이 바뀐 설치와 뗀 이름을 다시 붙인 설치는 공유 gateway 를 재시작하지 않고 그 profile 의 그 서버만 껐다 켠다([ADR-20261120 / connector-auto-apply](../adr/ADR-20261120-connector-auto-apply.md)).
+`ConnectorBindingCycles` 가 반영 예정 확인과 같은 주기에 돈다. `IDLE_WAIT` 바인딩은 주인의 실행이 비거나 `assistant.connector.binding.cycle-idle-max`(10분)가 지나면 끄기 설치를 보내고, `OFF` 바인딩은 `apply-delay` 가 지나면 보통 설치로 켠다. 켠 설치의 반영 예정은 반영 예정 확인이 `READY` 로 만든다.
+단계는 보낸 요청이 아니라 설치의 답이 정하고, 자동 시도가 실패하면 실패 표시를 남기고 다시 집지 않는다. 단계 표와 실패 처리는 [연결 반영 자동화 설계](connector/design.md) 가 갖는다.
+
 ### 관리자 반영 완료
 
-재시작 대기인 바인딩에 필요하다. 값 교체처럼 이미 있던 서버가 바뀐 설치와 `fos-ctx` 갱신이 그렇다.
+재시작 대기인 바인딩에 필요하다. `fos-ctx` 갱신과, `cycle_available` 을 답하지 않는 옛 대시보드 plugin 의 값 교체가 그렇다.
+껐다 켜기 단계의 바인딩에 누르면 실패 표시를 비우고 그 단계의 다음 설치(`IDLE_WAIT` 면 끄기, `OFF` 면 켜기)를 실행을 기다리지 않고 바로 보낸다. 응답은 아직 반영 중이라는 `CONNECTOR_APPLY_SCHEDULED` 다.
 반영 예정 확인이 실패해 남았거나 정의 어긋남 점검이 `PENDING` 으로 둔 바인딩도 관리자가 눌러 다시 확인한다.
 
 에이전트 번호와 주인은 트랜잭션 밖에서 읽는다. 트랜잭션의 첫 읽기가 잠금이어야 MySQL 의 REPEATABLE READ 에서 등록이 커밋한 재시작 시각을 보기 때문이다.
@@ -426,6 +434,7 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 설치는 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치** 하나다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 `PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
+- `bind.cycle` 은 `"off"` 만 받는다. 답의 `cycle_available`, `cycle_off` 가 없는 옛 응답은 거짓으로 읽는다([ADR-20261120 / connector-auto-apply](../adr/ADR-20261120-connector-auto-apply.md)). 뜻은 위 「껐다 켜기」 와 plugin README 가 갖는다
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
 - `call` 과 `tools` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [플러그인 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
@@ -503,7 +512,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 보관 파일은 대시보드 plugin 이 Control Plane KEK 와 다른 key 로 암호화한다([ADR-20261103 / connector-vault-key](../../hermes/docs/adr/ADR-20261103-connector-vault-key.md)).
 운영은 「key 필수」 를 켠다. 그때 key 를 쓸 수 없으면 보관 파일 쓰기가 실패해 연결은 위 「등록」 표대로 `PENDING` 으로 남고, 이미 붙은 바인딩의 도구 호출은 그대로 돈다.
 **key 를 잃으면 연결을 다시 등록한다. 이전 이미지로 되돌리면 연결을 해제한 뒤 다시 등록한다.** 평문으로 되돌리는 경로는 두지 않는다.
-로컬(stdio) 플러그인의 바인딩은 칸 값을 profile `.env` 에 복사하지 않는다. 서버 정의는 실행기 정의이고, 실행기가 띄울 때 보관 파일을 풀어 그 프로세스 env 에만 넣는다. 대시보드의 직접 실행, 실행 가드 scope 검사, 스냅샷도 소유 기록의 보관 파일에서 값을 읽는다. 원격 플러그인은 예외로 `.env` 에 쓴다. 정의 모양과 기동 이관, 되돌리기는 [보관 파일 암호화 설계](connector/design.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다.
+로컬(stdio) 플러그인의 바인딩은 칸 값을 profile `.env` 에 복사하지 않는다. 서버 정의는 실행기 정의이고, 실행기가 띄울 때 보관 파일을 풀어 그 프로세스 env 에만 넣는다. 대시보드의 직접 실행, 실행 가드 scope 검사, 스냅샷도 소유 기록의 보관 파일에서 값을 읽는다. 원격 플러그인은 예외로 `.env` 에 쓴다. 정의 모양과 기동 이관, 되돌리기는 [보관 파일 암호화 설계](../../hermes/plugins/dashboard-profile-api/README.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다.
 보관 파일 값을 바꾼 뒤 다시 설치하면 정의의 보관 파일 리비전이 달라져 `restart_required` 로 답한다. 같은 값으로 다시 등록하면 보관 파일을 다시 쓰지 않아 재시작 대기가 되지 않는다.
 
 ## MCP SDK 계약

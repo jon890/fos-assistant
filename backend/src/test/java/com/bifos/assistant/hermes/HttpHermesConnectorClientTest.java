@@ -1208,6 +1208,31 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("끄기 설치는 bind.cycle 을 off 로 싣고, 답의 cycle_available 과 cycle_off 를 읽으며 없으면 거짓이다")
+    @Test
+    void sendsCycleOffAndReadsCycleFields() {
+        String head = "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,";
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andExpect(content()
+                .json(head + "\"bind\":{\"vault\":\"c7\",\"cycle\":\"off\"},\"sandbox_owner\":\"u1\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess(head + "\"restart_required\":false,\"cycle_off\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andExpect(content()
+                .json(head + "\"bind\":{\"vault\":\"c7\"},\"sandbox_owner\":\"u1\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess(head + "\"restart_required\":true,\"cycle_available\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andRespond(withSuccess(head + "\"restart_required\":true}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null, null, true))
+            .isEqualTo(new InstallResult(false, false, false, false, true));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null, null, false))
+            .isEqualTo(new InstallResult(true, false, false, true, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
+            .isEqualTo(new InstallResult(true, false, false, false, false));
+        server.verify();
+    }
+
+
     @DisplayName("바인딩 설치는 bind 칸에 보관 파일 이름과 sandbox_owner 를 싣고 떼기는 bind 칸 없이 끈다")
     @Test
     void bindsWithVaultAndUnbindsWithoutBindField() {

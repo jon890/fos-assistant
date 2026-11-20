@@ -199,7 +199,7 @@ class AgentConnectionControllerTest {
     @DisplayName("설치가 빠진 스킬을 답하면 붙이기 응답과 연결 목록의 그 바인딩에 이름과 까닭이 있고 떼면 사라진다")
     void listsSkippedSkillsOfBinding() throws Exception {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-            .thenReturn(new InstallResult(true, false, false, List.of(
+            .thenReturn(new InstallResult(true, false, false, false, false, List.of(
                 new SkippedSkill("demo-runner", List.of("terminal_off", "sandbox_env_missing")),
                 new SkippedSkill("demo-report", List.of("name_taken")))));
         CurrentUser owner = user(UserRole.MEMBER);

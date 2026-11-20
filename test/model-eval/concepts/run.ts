@@ -10,6 +10,7 @@ import {
   exitCode,
   failedQuestion,
   fill,
+  linkedTaskIds,
   markdown,
   scoreQuestion,
   scoreSet,
@@ -39,8 +40,8 @@ const USAGE = `사용법:
 문항의 자리: FOS_EVAL_OTHER_AGENT_CODE, FOS_EVAL_OTHER_AGENT_NAME, FOS_EVAL_CONNECTOR_ID, FOS_EVAL_CONNECTOR_TITLE (send 와 score 에 같은 값)
   값이 빈 자리를 쓰는 문항은 돌리지 않고 「건너뜀」 으로 적는다
 선택: FOS_EVAL_TIER (--tier 가 없을 때), FOS_EVAL_TURN_TIMEOUT_MS
-전제: 평가 에이전트는 평가 계정이 주인인 비공개 에이전트다. 다른 에이전트는 그 계정이 쓸 수 있고, 플러그인은 그 계정이 연결하지 않은 것이다
-score 는 통과한 대화를 지운다. --keep 은 모두 남긴다.
+전제: 평가 계정은 평가만 쓴다. 평가 에이전트는 평가 계정이 주인인 비공개 에이전트다. 다른 에이전트는 그 계정이 쓸 수 있고, 플러그인은 그 계정이 연결하지 않은 것이다
+score 는 통과한 대화를 지운다. --keep 은 모두 남긴다. send 를 시작한 뒤 만든 예약 작업은 --keep 이어도 지운다.
 종료 코드: 0 통과, 1 기준 미달, 2 사용법 오류나 보내기·읽기 오류`;
 
 class UsageError extends Error {}
@@ -155,7 +156,11 @@ async function score(values: Record<string, unknown>): Promise<number> {
         const answer = messages.findLast((message) => message.role === "ASSISTANT" && message.executionId === executionId);
         if (!answer?.content) throw new Error("그 실행의 답을 찾지 못했다");
         const tree = await api.tree(executionId);
-        result = scoreQuestion(question, answer.content, tree.root);
+        const linked = new Set(linkedTaskIds(answer.content));
+        const instructions = question.expect.instructionIncludes
+          ? (await api.tasks()).filter((task) => linked.has(task.id)).map((task) => task.instruction)
+          : [];
+        result = scoreQuestion(question, answer.content, tree.root, instructions);
       } catch (error) {
         if (error instanceof UsageError) throw error;
         result = failedQuestion(original, errorText(error));
@@ -172,11 +177,26 @@ async function score(values: Record<string, unknown>): Promise<number> {
     }
     console.log(`${run.questionId} ${result.skipped ? "건너뜀" : result.error ? `오류 ${result.error}` : result.passed ? "통과" : "미달"}`);
   }
+  await deleteCreatedTasks(api, file.startedAt);
   const set = scoreSet(scores);
   writeFileSync(join(out, "report.json"), `${JSON.stringify({ label: file.label, tier: file.tier, set, scores }, null, 2)}\n`);
   writeFileSync(join(out, "report.md"), markdown(file.label, file.tier, scores, set));
   console.log(`세트 결과: ${set.outcome} (통과 ${set.passed}/${set.ran}, 기준 ${set.needed})`);
   return exitCode(set.outcome);
+}
+
+/**
+ * 평가가 만든 예약 작업을 지운다. 남기면 운영에서 매일 발화해 비용이 든다. `--keep` 이어도 지운다.
+ * 평가 계정은 평가만 쓰므로 send 를 시작한 뒤 만든 작업을 모두 평가가 만든 것으로 본다.
+ */
+async function deleteCreatedTasks(api: ControlPlane, startedAt: string): Promise<void> {
+  try {
+    const created = (await api.tasks()).filter((task) => Date.parse(task.createdAt) >= Date.parse(startedAt));
+    for (const task of created) await api.deleteTask(task.id);
+    if (created.length > 0) console.log(`평가가 만든 예약 작업 ${created.length}개를 지웠다`);
+  } catch (error) {
+    console.error(`평가가 만든 예약 작업을 지우지 못했다. /tasks 에서 지운다: ${errorText(error)}`);
+  }
 }
 
 async function main(): Promise<number> {

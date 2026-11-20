@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp.application;
 import com.bifos.assistant.mcp.application.port.ApprovalResumes;
 import com.bifos.assistant.mcp.application.port.FinancialLimitRequests;
 import com.bifos.assistant.mcp.application.port.ConnectorListing;
+import com.bifos.assistant.mcp.application.port.TaskRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,7 +42,8 @@ class McpToolCatalogTest {
             new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
             new McpFileSpaceTools(null, null, null),
-            new McpConnectorListTool(mock(ConnectorListing.class)));
+            new McpConnectorListTool(mock(ConnectorListing.class)),
+            new McpTaskTools(mock(TaskRequests.class)));
 
         var first = catalog.tools();
         assertThat(first).extracting(tool -> tool.get("name"))
@@ -50,7 +52,8 @@ class McpToolCatalogTest {
                 "agent_stop", "follow_up_propose", McpMediaObservationTools.LIST, McpMediaObservationTools.RECORD,
                 McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftTools.IMAGE, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
                 McpFinancialLimitTools.READ, McpFinancialLimitTools.CHANGE, McpApprovalResumeTool.NAME, McpFileSpaceTools.PUT, McpConnectorListTool.NAME, "memory_remember",
-                "memory_search");
+                "memory_search", McpTaskTools.LIST, McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE,
+                McpTaskTools.DELETE);
         assertThat(first).contains(list, record, memory);
         assertThat(description(first))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
@@ -73,7 +76,8 @@ class McpToolCatalogTest {
             new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
             new McpFileSpaceTools(null, null, null),
-            new McpConnectorListTool(mock(ConnectorListing.class)));
+            new McpConnectorListTool(mock(ConnectorListing.class)),
+            new McpTaskTools(mock(TaskRequests.class)));
 
         assertThat(catalog.tools()).allSatisfy(tool -> {
             assertThat(tool.get("inputSchema")).isInstanceOf(Map.class);

@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.connection.domain;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import com.bifos.assistant.connector.connection.domain.type.CyclePhase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -91,6 +92,19 @@ public class ConnectorBinding extends CreatedAtEntity {
      */
     @Column(name = "apply_due_at")
     private Instant applyDueAt;
+
+    /** 껐다 켜기 단계다(ADR-20261120 / connector-auto-apply). 껐다 켜기 중이 아니면 비어 있다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cycle_phase", length = 16)
+    private CyclePhase cyclePhase;
+
+    /** {@code IDLE_WAIT} 면 단계를 시작한 시각, {@code OFF} 면 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각이다. */
+    @Column(name = "cycle_at")
+    private Instant cycleAt;
+
+    /** 자동 반영이 실패한 시각이다. 자동 경로가 다시 집지 않고, {@code READY} 나 사람이 시작한 설치가 비운다. */
+    @Column(name = "apply_failed_at")
+    private Instant applyFailedAt;
 
     /** 커밋한 설치 시도다. 결과를 한 번 적용한 뒤 비우며, 시각이 같아도 새 시도와 옛 응답을 구분한다. */
     @Column(name = "install_attempt_id", columnDefinition = "BINARY(16)")
@@ -189,11 +203,13 @@ public class ConnectorBinding extends CreatedAtEntity {
     }
 
 
-    /** 반영을 확인했다. 재시작 대기와 반영 예정을 함께 푼다. */
+    /** 반영을 확인했다. 재시작 대기, 반영 예정, 껐다 켜기 단계와 실패 표시를 함께 푼다. */
     public void ready(Instant now) {
         this.status = BindingStatus.READY;
         this.restartRequired = false;
         this.applyDueAt = null;
+        clearCycle();
+        this.applyFailedAt = null;
         this.checkedAt = now;
         this.updatedAt = now;
     }
@@ -228,6 +244,52 @@ public class ConnectorBinding extends CreatedAtEntity {
     /** 빠진 에이전트용 스킬이다. 기록이 없으면 빈 목록이다. */
     public List<SkippedSkill> skippedSkills() {
         return SkippedSkill.fromJson(skippedSkillsJson);
+    }
+
+
+    /** 껐다 켜기가 필요하다. 단계가 없을 때만 {@code IDLE_WAIT} 로 두고 시각을 적는다. 기다림 상한은 처음 시각에서 센다. */
+    public void needCycle(Instant now) {
+        if (this.cyclePhase == null) {
+            this.cyclePhase = CyclePhase.IDLE_WAIT;
+            this.cycleAt = now;
+        }
+    }
+
+
+    /** 그 서버가 꺼졌다는 답을 받았다. {@code OFF} 로 처음 넘어갈 때만 시각을 적는다. 다시 켜는 때는 이 시각에서 센다. */
+    public void cycledOff(Instant now) {
+        if (this.cyclePhase != CyclePhase.OFF) {
+            this.cyclePhase = CyclePhase.OFF;
+            this.cycleAt = now;
+        }
+    }
+
+
+    public void clearCycle() {
+        this.cyclePhase = null;
+        this.cycleAt = null;
+    }
+
+
+    public void markApplyFailed(Instant now) {
+        this.applyFailedAt = now;
+    }
+
+
+    public void clearApplyFailed() {
+        this.applyFailedAt = null;
+    }
+
+
+    /**
+     * 사람이 시작한 설치가 실패한 바인딩을 다시 잇는다. 실패 표시를 비우고, 실패한 {@code IDLE_WAIT} 면 기다림 상한을 지금부터 다시 센다.
+     * 옛 시각이 남으면 다음 주기가 상한이 지났다고 보고 주인이 대화 중이어도 바로 끈다.
+     */
+    public void resumeAfterFailure(Instant now) {
+        if (this.applyFailedAt != null && this.cyclePhase == CyclePhase.IDLE_WAIT) {
+            this.cycleAt = now;
+        }
+        this.applyFailedAt = null;
     }
 
 

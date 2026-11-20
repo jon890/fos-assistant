@@ -3,6 +3,9 @@ package com.bifos.assistant.connector.connection.application;
 import com.bifos.assistant.connector.connection.config.ConnectorBindingProperties;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.connection.application.dto.CycleStep;
+import com.bifos.assistant.connector.connection.domain.type.CyclePhase;
+import java.util.Set;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorInstallResult;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
@@ -20,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -36,6 +40,10 @@ public class ConnectorBindingInstalls {
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
     private static final String STEP_PROBE = "probe";
+    /** 자동 경로가 이 까닭으로 끝나면 실패 표시를 남긴다(스펙 DECISION10). 기다림을 뜻하는 까닭은 들지 않는다. */
+    private static final Set<ResyncOutcome> FAILED = Set.of(
+        ResyncOutcome.PROBE_FAILED, ResyncOutcome.NO_TOOLS, ResyncOutcome.NOT_INSTALLED,
+        ResyncOutcome.POLICY_HOOK_OFF, ResyncOutcome.CALL_FAILED, ResyncOutcome.CATALOG_MISSING);
 
     private final HermesConnectorClient connector;
     private final ConnectorBindingProperties properties;
@@ -44,16 +52,34 @@ public class ConnectorBindingInstalls {
 
     /** 설치를 그 방식대로 한 번 보내고 대시보드의 답을 돌려준다. 엔티티를 외부 호출로 넘기지 않는다. */
     private InstallResult sendAgain(ConnectorBindingAttempt attempt) {
-        if (attempt.guardProtocol() != null) {
-            var guard = JSON.createObjectNode().put("v", 1).put("protocol", attempt.guardProtocol())
-                .put("bindingId", attempt.bindingId().toString()).put("connectionId", attempt.connectionId().toString())
-                .put("connectionUpdatedAt", attempt.connectionRevision().toString())
-                .put("manifestSha256", attempt.guardManifestSha256());
+        if (attempt.cycleStep() == CycleStep.OFF) {
             return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
-                attempt.sandboxOwner(), attempt.ownerBrowser(), guard);
+                attempt.sandboxOwner(), attempt.ownerBrowser(), guard(attempt), true);
+        }
+        if (attempt.guardProtocol() != null) {
+            return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
+                attempt.sandboxOwner(), attempt.ownerBrowser(), guard(attempt));
         }
         return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
             attempt.sandboxOwner(), attempt.ownerBrowser());
+    }
+
+
+    /** guard 선언이 있는 바인딩의 비밀이 아닌 설치 맥락이다. 없으면 null 이다. */
+    private static JsonNode guard(ConnectorBindingAttempt attempt) {
+        if (attempt.guardProtocol() == null) {
+            return null;
+        }
+        return JSON.createObjectNode().put("v", 1).put("protocol", attempt.guardProtocol())
+            .put("bindingId", attempt.bindingId().toString()).put("connectionId", attempt.connectionId().toString())
+            .put("connectionUpdatedAt", attempt.connectionRevision().toString())
+            .put("manifestSha256", attempt.guardManifestSha256());
+    }
+
+
+    /** 재시작이 필요한 까닭이 그 서버만 껐다 켜서 풀리는 것뿐이고 바인딩이 아직 재시작 대기가 아닌가. */
+    private static boolean needsCycle(InstallResult installed, boolean restartWaiting) {
+        return installed.restartRequired() && installed.cycleAvailable() && !installed.pluginUpdated() && !restartWaiting;
     }
 
 
@@ -77,11 +103,38 @@ public class ConnectorBindingInstalls {
      * @return 재시작이나 반영 예정을 기다려야 해 지금 반영을 확인할 수 없는가
      */
     private boolean record(ConnectorBinding binding, InstallResult installed, Instant now) {
-        boolean restart = installed.restartRequired() || installed.pluginUpdated();
-        binding.installed(restart, now);
+        // 빠진 에이전트용 스킬은 설치 응답마다 덮어쓴다. 껐다 켜기 단계와 상관없다.
         binding.recordSkippedSkills(installed.skippedSkills().stream()
             .map(skipped -> new SkippedSkill(skipped.name(), skipped.reasons()))
             .toList());
+        // 껐다 켜기의 단계는 보낸 요청이 아니라 답이 정한다(ADR-20261120 / connector-auto-apply). 끈 채 남았다는 답이 아니면 켜진 것이다.
+        if (installed.cycleOff()) {
+            binding.installed(installed.pluginUpdated(), now);
+            binding.clearApplyDue();
+            binding.cycledOff(now);
+            return true;
+        }
+        boolean wasOff = binding.cyclePhase() == CyclePhase.OFF;
+        if (wasOff) {
+            binding.clearCycle();
+        }
+        if (needsCycle(installed, binding.restartRequired())) {
+            binding.installed(false, now);
+            binding.clearApplyDue();
+            binding.needCycle(now);
+            return true;
+        }
+        boolean restart = installed.restartRequired() || installed.pluginUpdated();
+        binding.installed(restart, now);
+        if (restart && binding.cyclePhase() == CyclePhase.IDLE_WAIT) {
+            // 재시작이 껐다 켜기를 덮는다.
+            binding.clearCycle();
+        }
+        if (wasOff && !restart) {
+            // 켜기가 끝났다. 바뀐 것이 없다는 답도 앞선 켜기의 결과 저장이 실패한 경우라 같다.
+            binding.scheduleApply(now.plus(properties.applyDelay()));
+            return true;
+        }
         // 재시작 대기는 관리자 반영 완료가 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
         if (restart) {
             binding.clearApplyDue();
@@ -107,6 +160,10 @@ public class ConnectorBindingInstalls {
             binding.ready(now);
         } else {
             binding.pending(now);
+            // 켜기는 같은 설치를 다시 보낼 뿐이라 실패해도 여기서 표시하지 않는다. 횟수 상한은 ConnectorBindingCycles 가 센다.
+            if (attempt.automatic() && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
+                binding.markApplyFailed(now);
+            }
         }
     }
 
@@ -143,6 +200,12 @@ public class ConnectorBindingInstalls {
         try {
             step = STEP_INSTALL;
             installed = sendAgain(attempt);
+            if (installed.cycleOff() || needsCycle(installed, attempt.restartRequired())) {
+                return new ConnectorInstallResult(installed, ResyncOutcome.CYCLE_PENDING, null);
+            }
+            if (attempt.cycleStep() == CycleStep.ON && !installed.restartRequired() && !installed.pluginUpdated()) {
+                return new ConnectorInstallResult(installed, ResyncOutcome.APPLY_SCHEDULED, null);
+            }
             boolean restart = installed.restartRequired() || installed.pluginUpdated();
             boolean scheduled = !restart && !attempt.restartRequired() && installed.reloadPending();
             ResyncOutcome outcome = restart ? ResyncOutcome.RESTART_PENDING
@@ -167,7 +230,7 @@ public class ConnectorBindingInstalls {
             }
             return new ConnectorInstallResult(installed, outcome, undeclared);
         } catch (ConnectorSandboxUnavailable | ConnectorInstallConflict | ConnectorProfileRejected ex) {
-            if (!attempt.checkInstallation() && !attempt.replaceValues()) {
+            if (!attempt.checkInstallation() && !attempt.replaceValues() && !attempt.automatic()) {
                 throw ex;
             }
             warn(step, attempt.connectorId(), ex);
