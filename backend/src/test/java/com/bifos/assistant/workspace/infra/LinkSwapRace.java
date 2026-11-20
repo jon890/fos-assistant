@@ -16,8 +16,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@code docs/secret.txt} 를 되풀이해 읽고, 본문이 공격자의 것이 아닌 횟수를 센다.
  *
  * <p>바꾸는 방법은 둘이다. {@link Mode#MOVE} 는 Java 스레드가 옮기기와 링크 만들기를 차례로 해서 그 사이에 {@code docs} 가 잠깐
- * 없다. {@link Mode#EXCHANGE} 는 {@code swap_exchange.py} 가 두 이름을 원자적으로 맞바꿔 빈 순간이 없다. 에이전트는
- * {@code mv --exchange} 나 python 으로 같은 일을 할 수 있다.
+ * 없다. {@link Mode#EXCHANGE} 는 {@code mv --exchange}({@code renameat2(RENAME_EXCHANGE)})로 {@code docs} 와
+ * {@code docs-link} 를 원자적으로 맞바꿔 빈 순간이 없다. 에이전트가 셸에서 같은 일을 할 수 있다. {@code mv --exchange} 가 없는
+ * 운영체제(macOS 의 BSD mv)에서는 {@link #exchangeAvailable()} 가 거짓이라 EXCHANGE 사례를 건너뛴다.
  */
 public final class LinkSwapRace implements AutoCloseable {
 
@@ -26,6 +27,8 @@ public final class LinkSwapRace implements AutoCloseable {
 
     private final Path dir;
     private final Path parked;
+    private final Path link;
+    private final Path stopFile;
     private final Path target;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicLong swaps = new AtomicLong();
@@ -41,6 +44,8 @@ public final class LinkSwapRace implements AutoCloseable {
         this.mode = mode;
         this.dir = Files.createDirectory(ownerDir.resolve("docs"));
         this.parked = ownerDir.resolve("docs-parked");
+        this.link = ownerDir.resolve("docs-link");
+        this.stopFile = ownerDir.resolve("docs-stop");
         this.target = targetDir;
         Files.writeString(dir.resolve("secret.txt"), OWN);
         Files.createDirectories(targetDir);
@@ -55,13 +60,15 @@ public final class LinkSwapRace implements AutoCloseable {
             thread.start();
             return this;
         }
-        Path script = Files.createTempFile("swap_exchange", ".py");
-        try (var in = LinkSwapRace.class.getResourceAsStream("/link-race/swap_exchange.py")) {
-            Files.write(script, in.readAllBytes());
-        }
-        process = new ProcessBuilder("python3", script.toString(), dir.getParent().toString(), target.toString())
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .start();
+        // docs(진짜 디렉터리)와 docs-link(target 을 가리키는 링크)를 원자적으로 맞바꾸기를 되풀이한다.
+        // stop 파일이 생기면 멈추고 바꾼 횟수를 낸다. mv 가 에이전트의 셸 동작을 그대로 흉내 낸다.
+        Files.createSymbolicLink(link, target);
+        process = new ProcessBuilder(
+            "sh", "-c",
+            "n=0; while [ ! -e \"$3\" ]; do mv -T --exchange \"$1\" \"$2\" && n=$((n+1)); done; printf %s \"$n\"",
+            "sh", dir.toString(), link.toString(), stopFile.toString())
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start();
         return this;
     }
 
@@ -72,10 +79,18 @@ public final class LinkSwapRace implements AutoCloseable {
     }
 
 
-    /** {@link Mode#EXCHANGE} 에 필요한 python3 이 있는지다. */
+    /** {@link Mode#EXCHANGE} 에 필요한 {@code mv --exchange} 를 쓸 수 있는지다. */
     public static boolean exchangeAvailable() {
         try {
-            return new ProcessBuilder("python3", "-c", "import ctypes").start().waitFor() == 0;
+            Path probe = Files.createTempDirectory("mv-exchange-probe");
+            Path first = Files.writeString(probe.resolve("a"), "a");
+            Path second = Files.writeString(probe.resolve("b"), "b");
+            int code = new ProcessBuilder("mv", "-T", "--exchange", first.toString(), second.toString())
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .start()
+                .waitFor();
+            return code == 0;
         } catch (IOException | InterruptedException ex) {
             return false;
         }
@@ -103,12 +118,17 @@ public final class LinkSwapRace implements AutoCloseable {
     public void close() throws InterruptedException, IOException {
         running.set(false);
         if (process != null) {
-            process.getOutputStream().close();
+            Files.createFile(stopFile);
             String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            if (process.waitFor() != 0 || out.isEmpty()) {
-                throw new IOException("swap_exchange.py failed");
+            if (process.waitFor() != 0) {
+                throw new IOException("mv --exchange loop failed");
             }
-            swaps.set(Long.parseLong(out));
+            swaps.set(out.isEmpty() ? 0 : Long.parseLong(out));
+            // docs 가 링크로 남았으면 한 번 더 맞바꿔 진짜 디렉터리를 제자리로 돌린다.
+            if (Files.isSymbolicLink(dir)) {
+                new ProcessBuilder("mv", "-T", "--exchange", dir.toString(), link.toString()).start().waitFor();
+            }
+            Files.deleteIfExists(link);
             return;
         }
         thread.join();
