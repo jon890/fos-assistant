@@ -12,10 +12,13 @@ import type { SourceReadSummary } from "@/components/chat/message-types";
 import { ActivityReferences } from "./activity-references";
 import { MemoryUseFeedback } from "@/components/chat/memory-use-feedback";
 import { ActivityTimeline } from "./activity-timeline";
+import { isReadableDetail } from "@/lib/tool-label";
+import { activitySummaryLabel } from "@/lib/tool-kind";
+import { ActivityKindIcon } from "./activity-icon";
 import {
   activityLabel,
   activityOutcome,
-  activitySummaryLabel,
+  activityUses,
   fromTree,
   type ActivityItem,
   type ActivityOutcome,
@@ -50,6 +53,54 @@ function OutcomeIcon({ outcome }: { outcome: ActivityOutcome }) {
       aria-hidden="true"
       className={cn(OUTCOME_ICON_CLASS, "text-success")}
     />
+  );
+}
+
+/** 도는 동안의 한 줄이다. 가장 최근 항목의 종류 아이콘, 지금 문장, 읽어도 되는 대상, 걸린 시간이다. */
+function RunningLine({
+  latest,
+  label,
+  target,
+  elapsed,
+}: {
+  latest: ActivityItem | null;
+  label: string;
+  target: string | null;
+  elapsed: string;
+}) {
+  return (
+    <>
+      <span
+        data-testid="activity-signal"
+        aria-hidden="true"
+        className="flex size-4 shrink-0 items-center justify-center text-signal"
+      >
+        {latest ? (
+          <ActivityKindIcon item={latest} className="size-4" />
+        ) : (
+          <span className="size-2 rounded-full bg-signal ring-2 ring-pill" />
+        )}
+      </span>
+      <span
+        data-testid="activity-current"
+        className="flex min-w-0 flex-1 items-baseline gap-2"
+      >
+        <span className="activity-shimmer min-w-0 shrink truncate">
+          {label}
+        </span>
+        {target ? (
+          <span
+            data-testid="activity-current-target"
+            className="min-w-0 flex-1 truncate font-normal text-muted-foreground"
+          >
+            {target}
+          </span>
+        ) : null}
+      </span>
+      <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
+        {elapsed}
+      </span>
+    </>
   );
 }
 
@@ -133,7 +184,7 @@ export function ActivityBlock(props: Props) {
         (item) => item.state === "running" || item.kind === "interim",
       )
     : null;
-  // 끝난 블록의 한 줄은 수로 고르는 고정 문장이다. 수와 모델과 토큰은 대화에 그리지 않는다.
+  // 끝난 블록의 한 줄은 쓴 것의 종류를 잇는다. 수와 모델과 토큰은 대화에 그리지 않는다.
   const outcome: ActivityOutcome =
     props.mode === "live"
       ? activityOutcome(props.state.items)
@@ -142,16 +193,18 @@ export function ActivityBlock(props: Props) {
         : "done";
   const summaryLabel = activitySummaryLabel(
     props.mode === "live"
-      ? {
-          toolCount: props.state.items.filter((item) => item.kind === "tool")
-            .length,
-          subagentCount: props.state.items.filter(
-            (item) => item.kind === "subagent",
-          ).length,
-        }
-      : props.summary,
+      ? activityUses(props.state.items)
+      : (props.summary.uses ?? []),
     outcome,
   );
+  const latestLabel = latest
+    ? `${latest.kind === "interim" ? "비서 안내: " : ""}${activityLabel(latest)}`
+    : "준비하고 있어요";
+  // 대상은 사람 말로 쓰인 검색어와 사진 질문만 보인다(ADR-038).
+  const latestTarget =
+    latest?.kind === "tool" && latest.detail && isReadableDetail(latest.name)
+      ? latest.detail
+      : null;
   const durationMs =
     props.mode === "saved"
       ? props.summary.durationMs
@@ -196,19 +249,12 @@ export function ActivityBlock(props: Props) {
         <span className="sr-only">작업 과정: </span>
         {props.mode === "live" && props.state.endedAt === null ? (
           <>
-            <span
-              data-testid="activity-signal"
-              aria-hidden="true"
-              className="size-2 shrink-0 rounded-full bg-signal ring-2 ring-pill"
+            <RunningLine
+              latest={latest ?? null}
+              label={latestLabel}
+              target={latestTarget}
+              elapsed={formatElapsed(now - props.state.startedAt)}
             />
-            <span className="min-w-0 flex-1 truncate">
-              {latest
-                ? `${latest.kind === "interim" ? "비서 안내: " : ""}${activityLabel(latest)}`
-                : "준비하고 있어요"}
-            </span>
-            <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
-              {formatElapsed(now - props.state.startedAt)}
-            </span>
           </>
         ) : (
           <>
@@ -224,6 +270,12 @@ export function ActivityBlock(props: Props) {
           )}
         />
       </button>
+      {/* 하는 일이 바뀔 때 낭독기가 읽는다. 단추 안에 두면 걸린 시간이 바뀔 때마다 읽는다. */}
+      <p className="sr-only" aria-live="polite" data-testid="activity-announce">
+        {running
+          ? `${latestLabel}${latestTarget ? ` ${latestTarget}` : ""}`
+          : ""}
+      </p>
       {/* 높이가 움직이도록 접힌 동안에도 그려 둔다. 접힌 내용에는 초점과 화면 읽기가 닿지 않게 한다. */}
       <div className="collapsible" data-open={expanded}>
         <div aria-hidden={!expanded} inert={!expanded}>
