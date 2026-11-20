@@ -42,13 +42,11 @@ export const DENSITY = {
 export type MarkdownDensity = keyof typeof DENSITY;
 
 /**
- * 부품 묶음을 만든다. 묶음이 바뀌면 react-markdown 이 그 아래를 다시 붙이므로 `density` 와 `streaming` 이 같으면 같은 묶음을 쓴다.
+ * 부품 묶음을 만든다. 묶음이 바뀌면 react-markdown 이 그 아래를 다시 붙이므로 `density` 가 같으면 같은 묶음을 쓴다.
+ * 흐르는지는 `remarkOpenFence` 가 `data-open` 으로 알린다. 묶음에 넣으면 답이 끝날 때 그림이 다시 붙어 한 번 튄다.
  * 흐르는 답은 글자마다 다시 그려져, 묶음이 바뀌면 mermaid 그림이 매번 처음부터 다시 그려진다.
  */
-export function markdownComponents(
-  density: MarkdownDensity,
-  streaming: boolean,
-): Components {
+export function markdownComponents(density: MarkdownDensity): Components {
   const size = DENSITY[density];
   const heading = "font-semibold leading-snug first:mt-0";
   return {
@@ -179,7 +177,7 @@ export function markdownComponents(
       const text = String(code).replace(/\n$/, "");
       const open = "data-open" in props;
       // 흐르는 중에 닫는 줄이 오지 않은 블록은 매 글자 그리기에 실패하므로 코드로 둔다.
-      if (language === "mermaid" && !(streaming && open)) {
+      if (language === "mermaid" && !open) {
         return <MermaidBlock source={text} />;
       }
       if (language || String(code).endsWith("\n")) {

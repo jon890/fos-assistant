@@ -37,14 +37,14 @@ export const Markdown = memo(function Markdown({
   streaming?: boolean;
 }) {
   const source = normalizeMarkdown(children);
-  const components = useMemo(
-    () => markdownComponents(density, streaming),
-    [density, streaming],
-  );
+  const components = useMemo(() => markdownComponents(density), [density]);
   return (
     <div className={cn("min-w-0 break-words", DENSITY[density].root)}>
       <ReactMarkdown
-        remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkOpenFence]}
+        remarkPlugins={[
+          [remarkGfm, { singleTilde: false }],
+          [remarkOpenFence, { streaming }],
+        ]}
         rehypePlugins={
           // 출처 절은 흐림이 제목 글을 span 으로 쪼개기 전에 찾고, 줄바꿈은 흐림이 위치로 구간을 찾은 뒤에 바꾼다.
           fades && fades.length > 0

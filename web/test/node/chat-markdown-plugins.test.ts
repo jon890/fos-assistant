@@ -13,12 +13,12 @@ import {
 } from "../../src/components/chat/markdown-plugins.ts";
 import { rehypeRevealFade } from "../../src/components/chat/reveal-fade.ts";
 
-function render(text: string): string {
+function render(text: string, streaming = false): string {
   return renderToStaticMarkup(
     createElement(
       ReactMarkdown,
       {
-        remarkPlugins: [remarkGfm, remarkOpenFence],
+        remarkPlugins: [remarkGfm, [remarkOpenFence, { streaming }]],
         rehypePlugins: [rehypeSourceSection, rehypeSoftBreaks],
       },
       text,
@@ -81,9 +81,10 @@ test("흐림 효과와 함께 써도 출처 절과 줄바꿈이 남는다", () =
   assert.match(html, /opacity/);
 });
 
-test("닫는 줄이 없는 코드 블록에 data-open 을 단다", () => {
-  assert.match(render("```mermaid\nflowchart TD\n  A --> B"), /<code class="language-mermaid" data-open="true">/);
-  assert.match(render("```mermaid\nflowchart TD\n```"), /<code class="language-mermaid">/);
+test("흐르는 중에만 닫는 줄이 없는 코드 블록에 data-open 을 단다", () => {
+  assert.doesNotMatch(render("```mermaid\nflowchart TD\n  A --> B"), /data-open/);
+  assert.match(render("```mermaid\nflowchart TD\n  A --> B", true), /<code class="language-mermaid" data-open="true">/);
+  assert.match(render("```mermaid\nflowchart TD\n```", true), /<code class="language-mermaid">/);
 });
 
 test("닫는 줄 판정은 여는 줄과 같은 글자로 같은 길이 이상일 때만 닫힌 것으로 본다", () => {
@@ -93,4 +94,32 @@ test("닫는 줄 판정은 여는 줄과 같은 글자로 같은 길이 이상�
   assert.equal(isOpenFence("````\nA\n```"), true);
   assert.equal(isOpenFence("~~~\nA\n```"), true);
   assert.equal(isOpenFence("    들여쓴 코드"), false);
+});
+
+test("흐림 구간의 경계가 줄바꿈에 걸려도 두 줄 사이의 br 이 남는다", () => {
+  const text = "앞 줄\n뒤 줄";
+  const boundary = text.indexOf("\n") + 1;
+  const html = renderToStaticMarkup(
+    createElement(
+      ReactMarkdown,
+      {
+        rehypePlugins: [
+          rehypeSourceSection,
+          [
+            rehypeRevealFade,
+            {
+              fades: [
+                { startFromEnd: text.length, endFromEnd: text.length - boundary, progress: 0.3 },
+                { startFromEnd: text.length - boundary, endFromEnd: 0, progress: 0.6 },
+              ],
+              sourceLength: text.length,
+            },
+          ],
+          rehypeSoftBreaks,
+        ],
+      },
+      text,
+    ),
+  );
+  assert.match(html, /앞 줄<br\/><\/span><span[^>]*>뒤 줄/);
 });

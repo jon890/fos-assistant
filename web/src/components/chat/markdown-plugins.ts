@@ -30,11 +30,13 @@ type MdCode = MdNode & {
 };
 
 /**
- * 닫는 줄이 없는 코드 블록의 `code` 요소에 `data-open` 을 단다. 흐르는 답이 mermaid 블록을 그릴지 고를 때 본다.
- * 원문을 부품이 붙잡지 않게 여기서 정한다. 그래야 부품 묶음을 고정해 그림이 흐르는 동안 다시 붙지 않는다.
+ * 흐르는 중(`streaming`)이면 닫는 줄이 없는 코드 블록의 `code` 요소에 `data-open` 을 단다. 부품은 이 표시가 있는 mermaid 블록을 코드로 둔다.
+ * 흐르는지를 부품 묶음이 아니라 여기서 받아, 답이 끝나도 부품 묶음이 바뀌지 않고 이미 그린 그림이 다시 붙지 않는다.
  */
-export function remarkOpenFence() {
+export function remarkOpenFence(options: { streaming?: boolean } = {}) {
   return (tree: MdNode, file: { value?: unknown }) => {
+    // 흐르는 중이 아니면 닫는 줄이 없어도 그려 본다(spec REQ19). 표시를 달지 않는다.
+    if (!options.streaming) return;
     const source = String(file.value ?? "");
     const visit = (node: MdCode) => {
       if (node.type === "code") {
@@ -86,8 +88,11 @@ function isBreak(node: HastNode | undefined): boolean {
   return node?.type === "element" && node.tagName === "br";
 }
 
-/** 글 안의 줄바꿈을 `br` 로 바꾼다. 블록 요소를 만나면 그 안으로 `visit` 을 다시 부르고, 블록 경계와 맨 앞뒤의 `br` 은 뺀다. */
-function splitSoftBreaks(node: HastNode): void {
+/**
+ * 글 안의 줄바꿈을 `br` 로 바꾼다. 블록 요소를 만나면 그 안으로 `visit` 을 다시 부른다.
+ * 블록 경계와 맨 앞뒤의 `br` 은 글을 담는 요소(`top`)에서만 뺀다. 흐림 효과의 `span` 처럼 안으로 들어간 인라인 요소의 끝 `br` 은 두 줄을 나누는 줄바꿈이라 남긴다.
+ */
+function splitSoftBreaks(node: HastNode, top: boolean): void {
   const next: HastNode[] = [];
   for (const child of node.children ?? []) {
     if (child.type === "text" && child.value?.includes("\n")) {
@@ -105,8 +110,12 @@ function splitSoftBreaks(node: HastNode): void {
     }
     if (isBlock(child)) visit(child);
     else if (child.type === "element" && !SKIPPED.has(child.tagName ?? ""))
-      splitSoftBreaks(child);
+      splitSoftBreaks(child, false);
     next.push(child);
+  }
+  if (!top) {
+    node.children = next;
+    return;
   }
   node.children = next.filter(
     (child, index) =>
@@ -135,7 +144,7 @@ const PHRASING_PARENTS = new Set([
 
 function visit(node: HastNode): void {
   if (SKIPPED.has(node.tagName ?? "")) return;
-  if (PHRASING_PARENTS.has(node.tagName ?? "")) splitSoftBreaks(node);
+  if (PHRASING_PARENTS.has(node.tagName ?? "")) splitSoftBreaks(node, true);
   else node.children?.forEach(visit);
 }
 
