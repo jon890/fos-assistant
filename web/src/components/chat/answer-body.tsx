@@ -53,6 +53,7 @@ export function AnswerBody({
           <Markdown
             key={index}
             fades={index === segments.length - 1 ? fades : undefined}
+            streaming={streaming && index === segments.length - 1}
           >
             {stripMediaPaths(segment.text)}
           </Markdown>
