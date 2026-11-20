@@ -143,6 +143,19 @@ class SkillServiceTest {
     PlatformTransactionManager transactionManager;
 
 
+    @Test
+    @DisplayName("일반 스킬 목록은 플러그인 이름과 꺼진 상태를 보여 주고 기본 스킬은 숨긴다")
+    void listsPluginSkillsWithTheirInstallationSource() {
+        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(
+            new HermesSkill("hermes-help", "기본 스킬", true),
+            new HermesSkill("note-review", "메모를 검토한다", false, "검사용 메모")));
+        assertThat(skills.list(OWNER, OWNED).skills()).containsExactly(
+            new SkillListItem("note-review", "메모를 검토한다", SkillSource.CONNECTOR, false,
+                new SkillUsageSummary(0, null), "검사용 메모"));
+        assertCode(() -> skills.toggle(OWNER, OWNED, "note-review", true), ErrorCode.SKILL_NOT_FOUND);
+    }
+
+
     @BeforeEach
     void setUp() {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {

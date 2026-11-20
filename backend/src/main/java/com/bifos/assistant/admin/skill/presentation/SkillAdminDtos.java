@@ -39,7 +39,7 @@ public final class SkillAdminDtos {
     /**
      * 스킬 목록의 한 줄이다.
      *
-     * @param source {@code UPLOADED} 나 {@code HERMES}
+     * @param source {@code UPLOADED}, {@code CONNECTOR}, {@code HERMES}
      * @param usage 호출 합계. 관리하는 사람에게만 주고, 없으면 칸을 빼고 보낸다
      */
     public record SkillItemView(
@@ -47,14 +47,16 @@ public final class SkillAdminDtos {
         String description,
         String source,
         boolean enabled,
-        @JsonInclude(JsonInclude.Include.NON_NULL) SkillUsageView usage) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) SkillUsageView usage,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String connectorTitle) {
         static SkillItemView from(SkillListItem item) {
             return new SkillItemView(
                 item.name(),
                 item.description(),
                 item.source().name(),
                 item.enabled(),
-                SkillUsageView.from(item.usage()));
+                SkillUsageView.from(item.usage()),
+                item.connectorTitle());
         }
     }
 
