@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,16 +45,21 @@ class HttpHermesRunsClientCompatTest {
 
     private final Map<String, Deque<Answer>> answers = new ConcurrentHashMap<>();
     private final List<String> requests = new CopyOnWriteArrayList<>();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private HttpServer server;
     private String baseUrl;
     private HermesRunTerminals terminals;
     private HttpHermesRunsClient client;
+    /** 요청이 닿았을 때 답하기 전에 부른다. 답보다 먼저 일어나는 일을 흉내 낸다. */
+    private volatile Consumer<String> onArrival = key -> { };
 
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::answer);
+        // 중지 요청을 답하는 도중에 조회를 받아야 하므로 요청마다 스레드를 쓴다.
+        server.setExecutor(executor);
         server.start();
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
         HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
@@ -74,6 +82,7 @@ class HttpHermesRunsClientCompatTest {
     @AfterEach
     void stop() {
         server.stop(0);
+        executor.shutdownNow();
     }
 
 
@@ -197,6 +206,26 @@ class HttpHermesRunsClientCompatTest {
 
 
     @Test
+    @DisplayName("중지 기록은 중지 요청을 보내기 전에 남겨, 응답 전에 읽은 cancelled 도 사용자 중지로 본다")
+    void stopIsRecordedBeforeTheRequest() {
+        // Hermes 는 중지 응답을 보내기 전에 실행을 cancelled 로 바꾼다. 그 사이 완료 대기가 조회한 것과 같은 때를 본다.
+        on("GET /v1/runs/run-1", 200, "{\"status\":\"cancelled\",\"admission_id\":\"adm-1\",\"execution_generation\":1}");
+        on("GET /v1/runs/run-1/events", 404, "");
+        on("POST /v1/runs/run-1/stop", 200, "{\"status\":\"stopping\"}");
+        List<String> seenAtStop = new CopyOnWriteArrayList<>();
+        onArrival = key -> {
+            if (key.equals("POST /v1/runs/run-1/stop")) {
+                seenAtStop.add(client.lookupRun(baseUrl, "dad", "run-1").result().status());
+            }
+        };
+
+        client.stop(baseUrl, "dad", "run-1");
+
+        assertThat(seenAtStop).containsExactly("cancelled");
+    }
+
+
+    @Test
     @DisplayName("조회에 없는 error 와 pending_steer 는 남은 끝 사건이나 보관분 다시 읽기로 채우고, 둘 다 없으면 모른다고 표시한다")
     void fillsMissingFieldsFromTerminal() {
         String failed = "{\"status\":\"failed\",\"admission_id\":\"adm-1\",\"execution_generation\":1}";
@@ -279,6 +308,7 @@ class HttpHermesRunsClientCompatTest {
         String key = exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath();
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         requests.add(key + " " + body);
+        onArrival.accept(key);
         Deque<Answer> queue = answers.get(key);
         Answer answer = queue == null ? new Answer(404, "{}") : queue.size() > 1 ? queue.poll() : queue.peek();
         byte[] payload = answer.body().getBytes(StandardCharsets.UTF_8);
