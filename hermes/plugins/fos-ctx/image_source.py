@@ -2,6 +2,8 @@
 
 사용자가 대화에 보낸 링크는 `link:<주소>` 로 가리키고, Control Plane 이 대화에 있는 주소인지 확인한 뒤 받는다
 (fos-assistant `docs/adr/ADR-20261120-link-image-source.md`). 받은 주소는 그림 올리기의 `source_links` 로 남긴다.
+비서가 웹 검색과 페이지 읽기로 찾은 주소도 같은 `link:` 로 가리킨다. Control Plane 이 `found_links.py` 가 알린 주소인지 확인한다
+(fos-assistant `docs/adr/ADR-20261121-found-link-image-source.md`).
 
 계약의 정본은 fos-assistant `docs/adr/ADR-20261120-image-source.md` 와 `hermes/plugins/fos-ctx/README.md` 의
 「그림을 고칠 사진을 받는다」 다. 모델은 `image_url` 과 `reference_image_urls` 에 `attachment:<첨부 번호>` 나
@@ -48,10 +50,12 @@ MAX_CALLS = 256
 MAX_ECHO_CHARS = 80
 EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
-NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
+NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, "
+                 "link:<사용자가 보낸 주소나 검색·읽기 결과에 나온 주소> 만 쓴다. "
                  "파일 경로와 맨 주소는 쓰지 않는다")
 TOO_MANY = "한 번에 쓸 수 있는 사진은 %d장까지다. 사용자에게 줄여 달라고 한다" % MAX_SOURCES
-UNKNOWN = "이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"
+UNKNOWN = ("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다. 링크라면 검색이나 페이지 읽기 결과에 나온 주소도 아니다. "
+           "결과에 나온 주소를 글자 그대로 적었는지 본다")
 GONE = "지웠거나 보관 기간이 지나 쓸 수 없다"
 # 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
 GONE_GENERATED = (GONE + ". 같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "

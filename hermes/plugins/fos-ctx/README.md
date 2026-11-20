@@ -249,7 +249,7 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 `image_generate` 의 바탕(`image_url`)과 참고(`reference_image_urls`)를 Control Plane 에서 받아 넘긴다. 1.14.0 부터다(fos-assistant [ADR-20261120 / image-source](../../../docs/adr/ADR-20261120-image-source.md)).
 실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있어, 모델이 적은 경로를 그대로 두면 다른 대화의 사진을 쓸 수 있다.
 
-- `pre_tool_call` 은 도구 판정을 통과한 `image_generate` 호출에서 두 인자의 값이 모두 `attachment:<첨부 번호>`, `generated:<제목>`, `link:<사용자가 보낸 주소>`(1.15.0 부터, fos-assistant [ADR-20261120 / link-image-source](../../../docs/adr/ADR-20261120-link-image-source.md)) 가운데 하나인지 본다. 하나라도 아니거나 합쳐 `MAX_SOURCES`(16)장을 넘으면 묻지 않고 막는다
+- `pre_tool_call` 은 도구 판정을 통과한 `image_generate` 호출에서 두 인자의 값이 모두 `attachment:<첨부 번호>`, `generated:<제목>`, `link:<사용자가 보낸 주소나 검색·읽기 결과에 나온 주소>`(1.15.0 부터, fos-assistant [ADR-20261120 / link-image-source](../../../docs/adr/ADR-20261120-link-image-source.md). 찾은 주소는 아래 「찾은 주소를 알린다」 가 알린 것만 받는다) 가운데 하나인지 본다. 하나라도 아니거나 합쳐 `MAX_SOURCES`(16)장을 넘으면 묻지 않고 막는다
 - 가리킴을 하나씩 받아 Hermes 홈의 `cache/fos-image-sources/` 에 무작위 이름으로 쓰고, 두 인자를 그 경로로 바꾼 `modify` 를 돌려준다. 제목 줄 떼기와 한 `modify` 로 묶는다. 같은 가리킴은 한 번만 받는다
 - 하나라도 받지 못하면 받은 사본을 지우고, 가리킴마다 까닭을 한 줄씩 적은 글로 막는다. 글은 「그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다.」 로 끝난다
 - 링크 가리킴을 받으면 응답 머리 `X-Image-Source-Link` 의 받은 주소를 사본과 같은 호출 키로 기억한다. 머리가 없으면 받지 못한 것으로 본다
@@ -274,6 +274,33 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 맥락이 없다 | `tool_call_id` 나 session 이 빈 호출(코드 실행 안의 호출)은 막는다 |
 
 링크(`link:`)를 쓰지 못한 까닭에는 「다음 장면이고 앞 그림은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 다시 부른다」 를 덧붙인다(스펙 generated-image DECISION52).
+
+### 찾은 주소를 알린다
+
+비서가 웹 검색과 페이지 읽기로 찾은 주소를 Control Plane 에 알린다(1.16.0 부터). Control Plane 은 그 주소의 해시를 대화에 남기고, 모델이 `image_generate` 에 `link:` 로 가리킨 주소가 사용자 메시지에 없으면 이 해시에 있을 때만 사진을 받는다(fos-assistant [ADR-20261121 / found-link-image-source](../../../docs/adr/ADR-20261121-found-link-image-source.md)). 구현은 `found_links.py` 다.
+
+- `transform_tool_result` 는 도구 이름이 `web_search` 나 `web_extract` 이고 session 과 `tool_call_id` 가 있을 때 결과 글을 JSON 으로 읽어 주소 후보를 뽑는다. `execute_code` 안에서 돈 호출은 `tool_call_id` 가 없어 알리지 않는다
+- `web_search` 는 `success` 가 참일 때 `data.web[]` 항목의 `url`, `title`, `description` 에서 `http://`, `https://` 주소를 뽑는다. 실패 응답의 `error` 글은 읽지 않는다. 기준 주소는 없다
+- `web_extract` 는 `error` 가 없는 항목마다 `content` 에서 절대 주소, 마크다운 링크와 사진의 대상, `src` 와 `href` 속성 값을 뽑는다. 항목의 `url` 은 비서가 적어 넣은 주소라 후보가 아니고 상대 주소를 푸는 기준으로만 보낸다
+- 후보 하나는 `MAX_LINK_CHARS`(2,048)자까지, 한 호출은 `MAX_LINKS`(2,000)개까지다. 같은 후보는 한 번만 보낸다
+- 뽑기만 한다. 같은 주소인지, 상대 주소를 어떻게 푸는지, 받아도 되는지는 Control Plane 이 정한다
+- **결과 글을 바꾸지 않는다.** hook 은 이 두 도구에서 늘 None 을 돌려준다. 알리지 못해도 도구 결과는 그대로 모델에게 간다. 주소와 결과 글은 로그에 남기지 않는다
+
+`POST <플러그인 정책 주소의 마지막 조각을 found-links 로 바꾼 주소>` 로 보낸다. 인증은 profile 토큰이고 제한 시간은 5초다.
+
+```json
+{"_fos_ctx": {"v": 1, "session_id": "...", "root_session_id": "...", "tool_call_id": "...", "sig": "..."},
+ "pages": [{"base": "https://shop.example.com/goods/1", "links": ["/img/a.jpg", "https://cdn.example.com/b.png"]}]}
+```
+
+`_fos_ctx` 는 도구 이름 `found_links` 로 서명한다. 검색 결과처럼 기준 주소가 없으면 `base` 는 null 이다.
+
+| 응답 | fos-ctx 가 하는 일 |
+| --- | --- |
+| 204 | 없다 |
+| 그 밖의 응답과 연결 실패 | 로그에 상태 코드나 예외 종류만 남기고 넘어간다. 이 경로를 모르는 옛 Control Plane 은 인증 거절로 답한다 |
+
+두 도구의 결과 모양은 [`hermes-contract.md`](../../docs/hermes-contract.md) 의 「웹 도구의 결과」 가 갖고, `hermes/tests/test_found_links_contract.py` 가 Hermes 소스와 대조한다.
 
 ### 승인 관문으로 가는 동작을 막는다
 
