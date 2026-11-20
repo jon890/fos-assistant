@@ -289,6 +289,6 @@ PR2 를 배포한 뒤 운영에서 옛 key 줄(`content_key_id` 가 찬 줄)이 
 
 | REQ | 테스트 | DB |
 | --- | --- | --- |
-| REQ5 | 옛 칸이 있는 Flyway 스키마에 줄을 넣고 끝까지 적용하면 줄은 그대로이고 여섯 칸이 모두 없다(`MemoryLegacyColumnsDropMigrationTest`) | H2, MySQL |
+| REQ5 | 옛 칸이 있는 Flyway 스키마에 줄을 넣고 끝까지 적용하면 줄은 그대로이고 여섯 칸이 모두 없다(`MemoryLegacyColumnsDropMigrationTest`, 운영 적용 14일 뒤 지웠다) | H2, MySQL |
 | REQ8 | 옛 key 줄이 있으면 줄 수를 알리고 멈추며 어느 칸도 지우지 않는다(같은 테스트) | H2, MySQL |
 | REQ4 | 기억을 읽고 쓰는 기존 테스트, 조립, 도구, 사용자 purge 가 칸 없는 스키마에서 통과한다 | H2, MySQL |
