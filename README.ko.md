@@ -250,7 +250,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 - [`AGENTS.md`](AGENTS.md) 에 저장소의 규칙이 있다. 공개 저장소에 적으면 안 되는 것도 거기 있다.
 - 문서를 읽는 순서는 [`AGENTS.md`](AGENTS.md) 의 「읽기 순서」 절에 있다. 모듈마다 자기 `docs/` 디렉터리에 문서를 둔다.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 는 되돌리기 어려운 결정의 목록이다.
-- push 전에 `scripts/dev/check-local.sh --fast` 를 돌린다. 공개 정보 검사를 포함한 빠른 검사만 돌고, 무거운 검사는 Draft PR 의 CI 에 맡긴다. `--fast` 없이 돌리면 전체를 돌리고, 브라우저 spec 을 인자로 주면 브라우저 검사를 그 spec 으로 줄인다. 머지는 지금 main 과 합친 상태에서 실행한 PR CI 의 필수 검사 통과로 판정한다. CI 가 돌지 못하면 로컬에서 전체 검사를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절과 「머지는 PR 로 한다」 절에 있고, 머지 판정은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
+- push 전에 `scripts/dev/check-local.sh --fast` 를 돌린다. 공개 정보 검사를 포함한 빠른 검사만 돌고, 무거운 검사는 Draft PR 의 CI 에 맡긴다. `--fast` 없이 돌리면 전체를 돌리고, 브라우저 spec 을 인자로 주면 브라우저 검사를 그 spec 으로 줄인다. 머지는 PR CI 의 필수 검사 통과로 판정한다. 기본은 지금 main 을 포함한 상태의 통과이고, CI 뒤 main 에 들어온 변경이 PR 에 영향을 주지 않으면 직전 결과를 쓴다(조건은 `AGENTS.md`). CI 가 돌지 못하면 로컬에서 전체 검사를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절과 「머지는 PR 로 한다」 절에 있고, 머지 판정은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
 
 ### 플러그인 기여
 

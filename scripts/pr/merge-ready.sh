@@ -4,9 +4,11 @@
 #   scripts/pr/merge-ready.sh <PR 번호>
 #
 # 보는 것: 브랜치 보호의 필수 검사(이름으로 대조), 미해결 리뷰 스레드, Draft 여부, mergeStateStatus,
-# head 가 origin/main 을 포함하는지. 포함하지 않으면 CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치는지,
-# 마이그레이션, 빌드와 의존성 파일, test/repo, 공유 계약을 건드렸는지 보고 다시 합쳐야 하는지 가른다.
-# 공유 계약으로 볼 경로와 까닭은 scripts/pr/merge-ready.mjs 의 RISK_PATHS 에 있다.
+# head 가 origin/main 을 포함하는지. 포함하지 않으면 CI 뒤 main 에 들어온 커밋이 이 PR 과 같은 파일을 고쳤는지,
+# 공용 경로(빌드와 의존성 파일, test/repo, CI 판정 파일)를 한쪽만 건드렸는지,
+# 같은 묶음(마이그레이션, Hermes 계약, 테스트 지원 코드)을 PR 과 main 이 둘 다 건드렸는지 보고 다시 합쳐야 하는지 정한다.
+# 경로 목록은 orch 설정(.orch/config.json)의 queue.shared_paths 와 queue.shared_groups 를 읽고,
+# 설정이 없으면 scripts/pr/merge-ready.mjs 의 DEFAULT_RULES 를 쓴다.
 # 필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 머지할 수 있는 것으로 본다.
 #
 # 첫 줄이 판정한 head 의 해시이고, 머지는 그 해시로 고정한다(gh pr merge --match-head-commit).
