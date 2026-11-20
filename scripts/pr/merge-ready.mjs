@@ -8,7 +8,7 @@
 //   2. 미해결 리뷰 스레드, Draft, mergeStateStatus 를 본다.
 //      필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 CLEAN 과 같이 본다. 필수가 아닌 검사가 도는 중이면 기다린다.
 //      CLEAN 과 그 UNSTABLE 이 아닌 mergeStateStatus 는 모두 막힘이다.
-//   3. head 가 origin/main 을 포함하지 않으면 다시 합쳐야 하는지 가른다.
+//   3. head 가 origin/main 을 포함하지 않으면 다시 합쳐야 하는지 정한다.
 //      CI 뒤 main 에 들어온 커밋이 아래 조건에 하나도 걸리지 않으면 직전 CI 결과를 쓴다.
 //      main 이 바뀔 때마다 전체 CI 를 다시 돌리면 여러 PR 이 함께 돌 때 머지가 끝없이 밀린다.
 //   4. 조회하는 동안 head 가 바뀌지 않았는지 마지막에 다시 읽는다. 바뀌었으면 대기다.
@@ -17,35 +17,70 @@
 // CI 가 돈 기준 main 은 PR 의 merge 커밋 부모가 아니라 가장 이른 workflow run 생성과 검사 시작 시각의 main 으로 정한다.
 // refs/pull/N/merge 는 main 이 움직이면 GitHub 가 다시 만들어 그때의 base 를 git 에서 읽을 수 없다.
 import { spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const VERDICT = { READY: "머지 가능", WAIT: "대기", REMERGE: "main 다시 합치기 필요", BLOCKED: "막힘" };
 export const EXIT = { READY: 0, LOOKUP: 2, WAIT: 10, REMERGE: 11, BLOCKED: 12 };
 export const NON_REQUIRED = "claude-review";
 
-// 파일이 겹치지 않아도 함께 깨질 수 있는 곳이다. 한쪽이라도 건드렸으면 직전 CI 결과를 믿지 않는다.
-// 마지막 줄의 공유 계약은 여러 모듈이 같은 값을 읽는 파일이고, 오늘 실제로 판정한 예에서 뽑았다.
-export const RISK_PATHS = [
-  ["마이그레이션", /^backend\/src\/main\/(resources\/db\/migration\/|java\/db\/migration\/)/],
-  ["빌드와 의존성 파일", /(^|\/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|bun\.lockb?|Dockerfile|[^/]*\.Dockerfile|libs\.versions\.toml|gradle-wrapper\.properties|pyproject\.toml|requirements[^/]*\.txt)$/],
-  ["저장소 전체를 보는 test/repo 검사", /^test\/repo\//],
-  // Hermes 계약 문서(hermes 테스트의 입력), 커넥터 계약 테스트, 합성 커넥터 catalog 와 fixture(backend 와 hermes 가 읽음), 테스트 지원 코드와 가짜 Hermes(실제와 다르면 테스트가 통과한다), CI 판정 자체(워크플로와 scripts/ci, check-local.sh).
-  ["공유 계약", /^(hermes\/docs\/hermes-contract\.md|hermes\/connectors\/[^/]+\/tests\/contracts?\.test\.ts|hermes\/tests\/(fixtures\/|[^/]*contract[^/]*)|test\/(resources|fixtures|support)\/|test\/e2e\/fake-hermes\/|\.github\/workflows\/|scripts\/ci\/|scripts\/dev\/check-local\.sh$)/],
-];
+// 파일이 겹치지 않아도 함께 깨질 수 있는 곳이다. 규칙은 두 종류다. orch 설정(.orch/config.json)의 queue 값과 같은 뜻이다.
+//   sharedPaths  PR 이나 main 중 한쪽만 건드려도 직전 CI 결과를 믿지 않는다(빌드·의존성 파일, test/repo, CI 판정 파일).
+//   sharedGroups 같은 묶음을 PR 과 main 이 둘 다 건드렸을 때만 믿지 않는다(마이그레이션처럼 한쪽만 바꾸면 서로 깨지지 않는 곳).
+// 설정 파일은 저장소 밖 도구의 것이라 CI 나 다른 checkout 에는 없을 수 있다. 없으면 아래 기본값을 쓴다.
+export const DEFAULT_RULES = {
+  sharedPaths: [
+    "(^|/)(build\\.gradle\\.kts|settings\\.gradle\\.kts|gradle\\.properties|package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml|bun\\.lockb?|Dockerfile|[^/]*\\.Dockerfile|libs\\.versions\\.toml|gradle-wrapper\\.properties|pyproject\\.toml|requirements[^/]*\\.txt)$",
+    "^test/repo/",
+    "^(\\.github/workflows/|scripts/ci/|scripts/dev/check-local\\.sh$)",
+  ],
+  sharedGroups: {
+    migration: "^backend/src/main/(resources/db/migration/|java/db/migration/)",
+    hermes_contract: [
+      "^hermes/docs/hermes-contract\\.md$",
+      "^hermes/connectors/[^/]+/tests/contracts?\\.test\\.ts$",
+      "^hermes/tests/(fixtures/|[^/]*contract[^/]*)",
+      "^test/e2e/fake-hermes/",
+    ],
+    test_support: "^test/(resources|fixtures|support)/",
+  },
+};
+
+/** orch 설정의 queue.shared_paths 와 queue.shared_groups 를 읽는다. 파일이 없거나 해당 값이 없으면 기본값을 쓴다. */
+export function loadRules(run = realRun) {
+  try {
+    const common = run("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    if (common.status !== 0) return DEFAULT_RULES;
+    const file = join(dirname(common.stdout.trim()), ".orch", "config.json");
+    const queue = JSON.parse(readFileSync(file, "utf8")).queue ?? {};
+    return {
+      sharedPaths: Array.isArray(queue.shared_paths) ? queue.shared_paths : DEFAULT_RULES.sharedPaths,
+      sharedGroups: queue.shared_groups && typeof queue.shared_groups === "object" ? queue.shared_groups : DEFAULT_RULES.sharedGroups,
+    };
+  } catch {
+    return DEFAULT_RULES;
+  }
+}
+
+const toPatterns = (value) => [].concat(value).map((source) => new RegExp(source));
 
 /**
  * CI 뒤 main 에 들어온 파일과 PR 파일로 다시 합쳐야 하는 까닭을 모두 낸다. 비면 직전 CI 를 써도 된다.
  * 이름 변경은 옛 경로와 새 경로가 모두 들어 있어야 한다.
  */
-export function remergeReasons(prFiles, mainFiles) {
+export function remergeReasons(prFiles, mainFiles, rules = DEFAULT_RULES) {
   const reasons = [];
   const mainSet = new Set(mainFiles);
   const overlap = prFiles.filter((file) => mainSet.has(file));
   if (overlap.length) reasons.push(`PR 과 main 이 같은 파일을 고쳤다(${overlap.slice(0, 3).join(", ")}${overlap.length > 3 ? ` 외 ${overlap.length - 3}개` : ""})`);
-  for (const [label, pattern] of RISK_PATHS) {
-    const side = [["PR", prFiles], ["main", mainFiles]].filter(([, files]) => files.some((file) => pattern.test(file))).map(([name]) => name);
-    if (side.length) reasons.push(`${side.join(" 과 ")} 이 ${label} 을 건드렸다`);
+  const touches = (patterns, files) => files.some((file) => patterns.some((pattern) => pattern.test(file)));
+  const sharedPaths = toPatterns(rules.sharedPaths);
+  const side = [["PR", prFiles], ["main", mainFiles]].filter(([, files]) => touches(sharedPaths, files)).map(([name]) => name);
+  if (side.length) reasons.push(`${side.join(" 과 ")} 이 공용 경로를 건드렸다`);
+  for (const [name, source] of Object.entries(rules.sharedGroups)) {
+    const patterns = toPatterns(source);
+    if (touches(patterns, prFiles) && touches(patterns, mainFiles)) reasons.push(`PR 과 main 이 둘 다 ${name} 묶음을 건드렸다`);
   }
   return reasons;
 }
@@ -179,7 +214,7 @@ export function collect(pr, run = realRun) {
     // gh pr diff 는 이름이 바뀐 파일의 새 경로만 내므로 main 쪽과 같이 --no-renames 로 옛 경로까지 구한다.
     const mergeBase = lines(must(run, "git", ["merge-base", base, view.headRefOid], "merge-base"))[0];
     const prFiles = must(run, "git", ["diff", "--name-only", "--no-renames", mergeBase, view.headRefOid], "PR 변경 파일").split("\n").filter(Boolean);
-    reasons = remergeReasons(prFiles, mainFiles);
+    reasons = remergeReasons(prFiles, mainFiles, loadRules(run));
   }
   const headRecheck = JSON.parse(must(run, "gh", ["pr", "view", pr, "--json", "headRefOid"], "PR head 재확인")).headRefOid;
   return { ...view, required, runs, unresolvedThreads, containsMain, remergeReasons: reasons, headRecheck };
