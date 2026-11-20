@@ -10,6 +10,11 @@ function sameSitePath(value) {
   if (typeof value !== "string") return null;
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\"))
     return null;
+  // 제어 문자가 섞이면 브라우저가 지우고 해석해 `//` 처럼 읽힐 수 있다. 로그인 화면의 돌아갈 주소 검사와 같은 규칙이다.
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (code < 0x20 || code === 0x7f) return null;
+  }
   return value;
 }
 

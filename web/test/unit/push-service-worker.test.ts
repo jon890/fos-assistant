@@ -42,7 +42,7 @@ test("읽지 못한 글은 알림 목록을 여는 일반 글로 띄운다", asy
 
 test("같은 사이트 경로가 아닌 여는 주소는 알림 목록으로 바꾼다", async () => {
   const worker = await loadWorker();
-  for (const url of ["https://evil.example/", "//evil.example/", "/\\evil.example", "javascript:alert(1)", 3]) {
+  for (const url of ["https://evil.example/", "//evil.example/", "/\\evil.example", "/\t/evil.example", "javascript:alert(1)", 3]) {
     assert.equal(worker.parsePushPayload(JSON.stringify({ title: "t", url })).url, "/notifications", String(url));
   }
 });
