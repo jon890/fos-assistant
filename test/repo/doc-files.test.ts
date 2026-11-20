@@ -21,9 +21,9 @@ const CONNECTOR_DOC = /^([a-z0-9]+(?:-[a-z0-9]+)*)-connector\.md$/;
 
 /**
  * 기능 폴더 `docs/features/<id>/` 안에 둘 수 있는 파일이다. 같은 이름의 기능 파일이 있어야 한다.
- * 스펙 `spec.md`, 기술 설계 `design.md`, 계획 `tasks/<계획>/index.json` 과 `phase-NN.md`, `verification-plan.md` 다. 규칙은 ADR-20261102 / feature-loop 가 정한다.
+ * 스펙 `spec.md`, 기술 설계 `design.md`, 계획 `tasks/<계획>/index.json` 과 `phase-NN.md`, `verification-plan.md`, `remote-verification.md` 다. 규칙은 ADR-20261102 / feature-loop 가 정한다.
  */
-const FEATURE_FOLDER_FILE = /^([a-z0-9]+(?:-[a-z0-9]+)*)\/(?:spec\.md|design\.md|tasks\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:index\.json|verification-plan\.md|phase-\d{2}\.md))$/;
+const FEATURE_FOLDER_FILE = /^([a-z0-9]+(?:-[a-z0-9]+)*)\/(?:spec\.md|design\.md|tasks\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:index\.json|verification-plan\.md|remote-verification\.md|phase-\d{2}\.md))$/;
 
 /** 정해진 이름 밖에 두는 문서와 그 까닭이다. 까닭이 없으면 더하지 않는다. */
 export const EXCEPTIONS: Record<string, string> = {
@@ -40,6 +40,7 @@ const OUTSIDE_DOCS = [
   /\/skills\/(?:.+\/)?SKILL\.md$/,
   /^hermes\/connectors\/[^/]+\/ICON-SOURCE\.md$/,
   /^tasks\//,
+  /^\.claude\/spec-overlay\.md$/,
 ];
 
 /** 한 파일이 둘 수 있는 자리인지 판정한다. ADR 은 `adr-index.test.ts` 가 따로 본다. */
@@ -57,7 +58,7 @@ export function problemOf(file: string): string | undefined {
       if (folder) {
         return existsSync(join(REPO_ROOT, "docs/features", `${folder}.md`)) ? undefined : "기능 폴더는 같은 이름의 기능 파일 docs/features/<id>.md 가 있어야 한다";
       }
-      if (name.includes("/")) return "docs/features/ 아래 하위 디렉터리에는 <id>/spec.md, <id>/design.md, <id>/tasks/<계획>/index.json, phase-NN.md, verification-plan.md 만 둔다";
+      if (name.includes("/")) return "docs/features/ 아래 하위 디렉터리에는 <id>/spec.md, <id>/design.md, <id>/tasks/<계획>/index.json, phase-NN.md, verification-plan.md, remote-verification.md 만 둔다";
       if (!FEATURE_DOC.test(name)) return "docs/features/ 아래에는 소문자 영문과 숫자, 하이픈 이름의 .md 만 둔다";
       const connector = CONNECTOR_DOC.exec(name)?.[1];
       if (connector && !existsSync(join(REPO_ROOT, "hermes/connectors", connector))) {
@@ -111,7 +112,7 @@ test("모듈 docs 의 정해진 이름과 예외는 통과하고 새 주제 파�
   for (const file of ["docs/prd.md", "docs/code-architecture.md", "backend/docs/data-schema.md", "web/docs/code-architecture.md", "docs/privacy.md", "docs/adr/INDEX.md", "backend/docs/adr/archive/ADR-006-x.md", "docs/features/agent-skill.md", "docs/features/chat.md", "docs/features/gmail-connector.md", "docs/features/tossinvest-connector.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
-  for (const file of ["backend/docs/flow.md", "web/docs/flow.md", "web/docs/prd.md", "docs/flow.md", "docs/data-schema.md", "docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "docs/features/x/y.md", "backend/docs/features/x.md", "docs/features/Chat.md", "docs/features/no-such-service-connector.md", "notes.md", "hermes/plugins/x/NOTES.md"]) {
+  for (const file of ["backend/docs/flow.md", "web/docs/flow.md", "web/docs/prd.md", "docs/flow.md", "docs/data-schema.md", "docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "docs/features/x/y.md", "backend/docs/features/x.md", "docs/features/Chat.md", "docs/features/no-such-service-connector.md", "notes.md", ".claude/notes.md", "hermes/plugins/x/NOTES.md"]) {
     assert.notEqual(problemOf(file), undefined, file);
   }
 });
@@ -125,6 +126,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
     "docs/features/chat/tasks/cancel-api/index.json",
     "docs/features/chat/tasks/cancel-api/phase-01.md",
     "docs/features/chat/tasks/cancel-api/verification-plan.md",
+    "docs/features/chat/tasks/cancel-api/remote-verification.md",
     "docs/features/chat/tasks/plan313-test-slimming/phase-12.md",
   ]) {
     assert.equal(problemOf(file), undefined, file);
@@ -144,6 +146,11 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
     "docs/features/chat/tasks/index.json",
     "docs/features/chat/tasks/cancel-api/notes.md",
     "docs/features/chat/tasks/verification-plan.md",
+    "docs/features/chat/remote-verification.md",
+    "docs/features/chat/tasks/remote-verification.md",
+    "docs/features/chat/tasks/cancel-api/Remote-Verification.md",
+    "docs/features/chat/tasks/cancel-api/sub/remote-verification.md",
+    "docs/features/no-such-feature/tasks/cancel-api/remote-verification.md",
     "docs/features/chat/tasks/cancel-api/Verification-Plan.md",
     "docs/features/chat/tasks/cancel-api/phase-1.md",
     "docs/features/chat/tasks/cancel-api/Phase-01.md",
@@ -158,7 +165,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
 });
 
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
-  for (const file of ["README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
+  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
 });
