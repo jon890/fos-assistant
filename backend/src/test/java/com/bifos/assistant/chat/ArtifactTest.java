@@ -123,6 +123,7 @@ class ArtifactTest {
         + "- 올린 사진이나 만든 그림을 바탕(image_url)으로 고칠 때는 인물 수와 사람별 줄을 적지 않고, 바탕에 없는 사람을 더할 때만 그 사람의 줄을 적는다."
         + " aspect_ratio 는 바탕 사진의 비율에 가까운 것을 고른다.\n"
         + "- 그림을 만들지 못했거나 쓸 수 없는 사진이나 링크라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진이나 링크와 그 까닭)과 다시 부탁하는 방법을 답한다."
+        + " 다만 다음 장면에서 앞 그림(generated:)만 쓸 수 없으면 위 다음 장면 줄대로 그 그림을 빼고 다시 그린다."
         + " 링크를 쓸 수 없으면 사진을 직접 올리는 방법도 알린다.\n"
         + "[파일 공간]\n"
         + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
@@ -304,10 +305,11 @@ class ArtifactTest {
 
 
     @Test
-    @DisplayName("그림 제목 줄에는 그림이 참고한 링크가 제목 뒤에 붙고, 다시 받을 수 없는 긴 링크와 파일이 지워진 그림의 링크는 빠진다")
+    @DisplayName("그림 제목 줄에는 그림이 참고한 링크가 제목 뒤에 붙고, 2,048자를 넘는 링크, 풀지 못한 링크, 파일이 지워진 그림의 링크는 빠진다")
     void preambleListsSourceLinksOfLiveGeneratedImages() {
         Conversation conversation = chat.startEmpty(dad, "dad");
-        String longLink = "https://shop.example.com/" + "a".repeat(2048);
+        String edgeLink = "https://shop.example.com/" + "b".repeat(2048 - "https://shop.example.com/".length());
+        String longLink = edgeLink + "c";
         generatedImages.save(
             conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "지난 장면", "지시문",
             List.of("https://gone.example.com/1"), png(41));
@@ -315,6 +317,16 @@ class ArtifactTest {
             conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "공원의 가족", "지시문",
             List.of("https://shop.example.com/goods/1", "https://img.example.com/%EC%96%91%EB%A7%90.png", longLink), png(42));
         generatedImages.save(conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "다음 장면", "지시문", List.of(), png(43));
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "경계 링크", "지시문", List.of(edgeLink), png(44));
+        generatedImages.save(
+            conversation.id(), dad.id(), "call-key-" + UUID.randomUUID(), "풀 수 없는 링크", "지시문",
+            List.of("https://locked.example.com/1"), png(45));
+        jdbc.update(
+            "UPDATE chat_artifact SET generation_source_links_key_id = ? WHERE conversation_id = ? AND path = ?",
+            Long.MAX_VALUE,
+            conversation.id(),
+            "generated/풀 수 없는 링크.png");
         jdbc.update(
             "UPDATE chat_artifact SET deleted_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND path = ?",
             conversation.id(),
@@ -322,9 +334,10 @@ class ArtifactTest {
 
         assertThat(artifactService.agentPreamble(conversation, false))
             .as("이어지는 장면에서 앞 그림의 링크를 다시 넣을 수 있게 알린다(스펙 generated-image REQ25)")
-            .contains("이 대화에서 만든 그림: 「다음 장면」, "
+            .contains("이 대화에서 만든 그림: 「풀 수 없는 링크」, 「경계 링크」(참고 링크: " + edgeLink + "), 「다음 장면」, "
                 + "「공원의 가족」(참고 링크: https://shop.example.com/goods/1, https://img.example.com/%EC%96%91%EB%A7%90.png)\n")
-            .doesNotContain(longLink)
+            .as("2,048자는 적고 2,049자는 뺀다").doesNotContain(longLink)
+            .as("풀지 못한 링크는 빼고 제목만 적는다").doesNotContain("locked.example.com")
             .doesNotContain("gone.example.com");
     }
 

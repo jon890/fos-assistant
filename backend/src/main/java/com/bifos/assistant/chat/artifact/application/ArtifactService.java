@@ -73,13 +73,12 @@ public class ArtifactService {
         + "- 올린 사진이나 만든 그림을 바탕(image_url)으로 고칠 때는 인물 수와 사람별 줄을 적지 않고, 바탕에 없는 사람을 더할 때만 그 사람의 줄을 적는다."
         + " aspect_ratio 는 바탕 사진의 비율에 가까운 것을 고른다.\n"
         + "- 그림을 만들지 못했거나 쓸 수 없는 사진이나 링크라는 결과를 받으면 그림 없이 까닭(쓸 수 없는 사진이나 링크와 그 까닭)과 다시 부탁하는 방법을 답한다."
+        + " 다만 다음 장면에서 앞 그림(generated:)만 쓸 수 없으면 위 다음 장면 줄대로 그 그림을 빼고 다시 그린다."
         + " 링크를 쓸 수 없으면 사진을 직접 올리는 방법도 알린다.\n";
 
     /** 실행 입력에 제목을 적는 만든 그림의 수다. 새것부터 센다(스펙 generated-image REQ17). */
     static final int IMAGE_TITLE_LIMIT = 20;
 
-    /** 그림 제목 줄에 적는 링크 하나의 길이 상한이다. {@code link:} 가리킴의 상한({@code ImageSourceRef})과 같다. */
-    static final int IMAGE_LINK_MAX_CHARS = 2048;
 
     /**
      * 파일 공간 규칙이다(스펙 workspace REQ7, REQ8). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
@@ -169,7 +168,7 @@ public class ArtifactService {
 
 
     private static String mention(GeneratedImageMention image) {
-        List<String> links = image.sourceLinks().stream().filter(link -> link.length() <= IMAGE_LINK_MAX_CHARS).toList();
+        List<String> links = image.sourceLinks().stream().filter(link -> link.length() <= GeneratedImageMention.MAX_LINK_CHARS).toList();
         String title = "「" + image.title() + "」";
         return links.isEmpty() ? title : title + "(참고 링크: " + String.join(", ", links) + ")";
     }

@@ -53,6 +53,9 @@ NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, gene
 TOO_MANY = "한 번에 쓸 수 있는 사진은 %d장까지다. 사용자에게 줄여 달라고 한다" % MAX_SOURCES
 UNKNOWN = "이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"
 GONE = "지웠거나 보관 기간이 지나 쓸 수 없다"
+# 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
+GONE_GENERATED = (GONE + ". 같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
+                  "앞 그림을 참고하지 못했다고 답에 적는다")
 LINK_REASONS = {
     "IMAGE_SOURCE_LINK_BLOCKED": "열 수 없는 주소다",
     "IMAGE_SOURCE_LINK_NO_IMAGE": "이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
@@ -176,7 +179,7 @@ def _fetch(url: str, token: str, ctx: dict, source: str, deadline: float):
         if code == "IMAGE_SOURCE_UNKNOWN":
             return None, None, UNKNOWN, None
         if code == "IMAGE_SOURCE_GONE":
-            return None, None, GONE, None
+            return None, None, GONE_GENERATED if source.startswith(GENERATED_PREFIX) else GONE, None
         if code in LINK_REASONS:
             return None, None, LINK_REASONS[code], None
         logger.warning("fos-ctx: 그림 바탕 사진을 받지 못했다: HTTP %d", status)

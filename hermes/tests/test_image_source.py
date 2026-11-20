@@ -276,6 +276,22 @@ class PromptFrameTest(ImageSourceFixture):
         self.assertEqual(received["aspect_ratio"], "landscape")
         self.assertEqual(self.remembered_links(), ["https://shop.example.com/goods/1"])
 
+    def test_gone_previous_image_tells_to_redraw_with_person_lines(self):
+        """앞 그림 파일이 지워졌으면 막는 글이 그 그림을 빼고 인물 줄만으로 다시 그리라고 한다. 사진이 지워진 것과는 글이 다르다."""
+        self.answers = {"generated:공원의 가족": (410, "IMAGE_SOURCE_GONE"), "attachment:13": (410, "IMAGE_SOURCE_GONE")}
+
+        decision = self.plugin.pre_tool_call(
+            tool_name="image_generate",
+            args={"prompt": self.SCENE, "aspect_ratio": "landscape",
+                  "reference_image_urls": ["generated:공원의 가족", "attachment:13"]},
+            session_id=base.VECTOR_SESSION, tool_call_id="call_1")
+
+        self.assertEqual(decision["action"], "block")
+        self.assertIn("generated:공원의 가족: 지웠거나 보관 기간이 지나 쓸 수 없다. 같은 인물의 다음 장면을 그리던 중이면 "
+                      "이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고", decision["message"])
+        self.assertIn("attachment:13: 지웠거나 보관 기간이 지나 쓸 수 없다\n", decision["message"])
+        self.assertEqual(self.copied(), [])
+
 
 class RejectTest(ImageSourceFixture):
     """쓸 수 없는 사진이 하나라도 있으면 막는지 본다(스펙 generated-image REQ16, DECISION25, DECISION32)."""
