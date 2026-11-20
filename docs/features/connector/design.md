@@ -1,309 +1,230 @@
-# 커넥터 보관 파일 암호화 기술 설계
+# 연결 반영 자동화 기술 설계
 
 스펙: [`spec.md`](spec.md).
-되돌리기 어려운 결정과 근거는 [ADR-20261103 / connector-vault-key](../../../hermes/docs/adr/ADR-20261103-connector-vault-key.md) 가 갖는다.
+되돌리기 어려운 결정과 근거는 [ADR-20261120 / connector-auto-apply](../../adr/ADR-20261120-connector-auto-apply.md) 가 갖는다.
+지금 동작은 [플러그인 연결](../connector.md) 의 「설치와 실패 처리」 와 [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
 
-이 스펙은 PR 둘로 구현한다.
+스펙 DECISION9 대로 PR 셋으로 구현한다. 각 PR 이 그 단계의 설계 변경과 구현을 함께 담는다.
 
 | PR | 요구사항 | 내용 |
 | --- | --- | --- |
-| PR1 | REQ1 부터 REQ5. 단 REQ1 의 「바인딩 설치는 원격 플러그인만 `.env` 에 쓴다」 는 PR2 | 보관 파일 암호화, 기동 이관과 key 회전, 「key 필수」 |
-| PR2 | REQ6, REQ7, REQ8 과 REQ1 의 남은 조건 | 실행기로 MCP 서버를 띄우고 profile `.env` 사본을 없앤다 |
-
-PR1 만 배포한 동안에는 바인딩 설치가 지금처럼 보관 파일을 풀어 profile `.env` 에 복사한다. 보관 파일은 암호문이 되지만 `.env` 사본은 PR2 까지 남는다.
+| PR1 | REQ1, REQ2, REQ10 | 대시보드 plugin 의 껐다 켜기, Control Plane 의 껐다 켜기 단계와 실패 표시(`apply_failed_at`). 정의 어긋남 점검이 껐다 켜기 바인딩을 관리자 알림에서 뺀다 |
+| PR2 | REQ3, REQ4, REQ7 의 재시작 대기 확인 | 대시보드 plugin 의 gateway 기동 시각 조회, Control Plane 의 재시작 감지와 재시작 대기 줄의 다시 확인 |
+| PR3 | REQ5, REQ6, REQ7, REQ8, REQ9 | 운영 정기 작업이 쓸 조회, 24시간 알림, 연결 응답의 실패 칸, 화면과 관리자 문구, `fos-home-infra` 요청 본문 |
 
 ## 지금 구조
 
-- 보관 파일은 대시보드 plugin 의 `connector_vault.py` 가 Hermes 루트 아래 `connector-vault/<vault>.json` 에 평문 JSON `{"v": 1, "connector", "values"}` 으로 쓴다. 디렉터리는 700, 파일은 600 이다.
-- 보관 파일을 읽는 자리는 `_read_vault` 하나를 거친다. 도구 호출과 연결 확인(`connector_run.py` 의 `call`, `tools`)과 바인딩 설치(`connector_install.py`)다. 둘 다 `connector` 와 `values` 만 쓴다.
-- Control Plane 의 연결 확인은 대시보드의 `call` 이나 `tools` 를 `{vault}` 로 부른다. 그래서 대시보드가 원래 값을 얻으면 Control Plane 은 바뀌지 않는다.
-- 쓰기와 지우기는 `PUT`·`DELETE /api/connector-vault` 이고 profile 쓰기 잠금 안에서 돈다. 쓰기가 실패하면 Control Plane 의 `ConnectorConnectionService` 가 연결을 `PENDING` 으로 남긴다.
-- 바인딩 설치는 보관 파일 값을 그 profile 의 `.env` 에 복사하고, 서버 정의의 `env` 는 `${이름}` 참조만 갖는다. Hermes 는 그 참조를 profile 의 secret scope 에서 풀어 정의의 `env` 만 자식 MCP 프로세스에 넘긴다([`hermes-contract.md`](../../../hermes/docs/hermes-contract.md)).
+- 바인딩 설치는 대시보드 plugin 의 `bind_connector`(`connector_binding.py`)가 profile 의 `config.yaml`, 소유 기록 `.fos-connectors.json`, `.env`, 뗀 서버 기록, 이름 대응, 스킬, `fos-ctx` 파일을 바꾸고 `restart_required`, `plugin_updated`, `reload_pending` 을 답한다.
+  `restart_required` 는 이미 있던 서버의 정의나 `.env` 칸 값이 바뀌었거나 뗀 기록의 이름을 다시 붙였을 때 참이다. 로컬 플러그인의 값 교체는 실행기 정의의 보관 파일 리비전이 바뀌어 정의 변경으로 드러난다.
+- 소유 기록의 서버 정의는 모양이 엄격하다. 로컬은 키가 정확히 `command`, `args`, `env`, `enabled`(와 `tools`)이고 `enabled` 가 참이어야 하며, 원격도 `enabled` 가 참이어야 한다(`connector_state.py`, `connector_remote.py`). 한 항목이 어긋나면 그 profile 의 소유 기록 전체를 읽지 못한다. 설정의 서버가 소유 기록과 다르면 설치는 「운영자가 바꾼 서버」 로 거절한다(`connector_binding.py`).
+- Control Plane 은 `ConnectorInstallAttempts` 의 시작, 실행, 결과 세 단계로 설치를 보낸다. 결과 단계의 `ConnectorBindingInstalls` 가 `restart_required` 나 `plugin_updated` 가 참이면 `restart_required` 칸을 OR 로 누적하고 `restart_required_since` 를 시작 트랜잭션 시각으로 적는다. 둘 다 거짓이고 `reload_pending` 이면 `apply_due_at` 을 `apply-delay`(150초) 뒤로 적는다.
+- `ConnectorBindingApplier` 가 30초마다 `apply_due_at` 이 지난 바인딩을 반영 맞추기 하고, 10분마다 `READY` 바인딩의 정의 어긋남을 점검한다. 재시작 대기 바인딩은 관리자 반영 완료(`confirmApplied`, `afterRestart=true`)만 `READY` 로 만든다.
+- 진행 중인 실행은 두 곳에 있다. 실행 기록 `agent_execution` 의 `RUNNING` 줄(`profile_name` 을 갖는다)과, `UserExecutionLimiter` 가 메모리에 쥔 turn 자리와 원격 종료 확인 자리다. 원격 종료 확인 자리는 실행 줄을 끝냈지만 Hermes 의 run 이 끝났는지 아직 모를 때다.
+- 대시보드와 공유 gateway 는 같은 컨테이너의 다른 프로세스다. Hermes 의 `gateway.status.get_running_pid(pid_path, cleanup_stale=False)` 가 gateway pid 를 정리 없이 읽고, 대시보드 자신의 gateway 상태 화면이 그렇게 부른다(v0.23.2 의 `hermes_cli/web_server_gateway.py`). 인자 없이 부르면 낡은 pid 파일과 잠금 파일을 지우는 정리를 할 수 있다.
+- gateway 의 MCP 설정 맞추기는 `enabled: false` 인 이름을 그 profile 의 그 서버만 끊는다(v0.23.2 의 `tools/mcp_tool_discovery.py`, [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 의 실측).
 
 ## 요구사항 연결
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `_write_vault` 가 활성 key 로 AES-256-GCM 암호화한 v2 파일을 쓰고, `_read_vault` 가 v1 과 v2 를 모두 풀어 같은 모양으로 돌려준다. 읽는 자리는 그대로다 |
-| REQ2 | AAD 를 `connector-vault:<vault>:<connector>` 로 묶는다. 파일 이름이나 `connector` 값을 바꾸면 태그가 맞지 않아 풀리지 않는다 |
-| REQ3 | `register` 가 경로를 감싸고 provider 를 등록하기 전에 기동 이관을 돌린다. v1 파일과 옛 key 의 v2 파일을 활성 key 로 다시 쓰고, 남은 수를 기동 로그 한 줄에 남긴다 |
-| REQ4 | 「key 필수」 환경 변수가 참이고 key 를 쓸 수 없으면 `PUT` 이 503 이다. 읽기는 key 상태와 상관없이 읽을 수 있는 파일을 읽는다 |
-| REQ5 | 문서에 「분실·되돌림 때 연결을 다시 등록한다」 와 「Control Plane KEK 와 다른 key」 만 적는다. key 사본 위치와 만드는 명령은 `fos-home-infra` 가 갖는다 |
-| REQ6 | (PR2) 바인딩 설치가 stdio 서버 정의를 실행기 정의로 쓴다. 실행기가 띄울 때 보관 파일을 풀어 자식 프로세스 env 에만 넘긴다 |
-| REQ7 | (PR2) 기동 이관이 이미 붙은 stdio 바인딩을 실행기 정의로 다시 쓰고 `.env` 사본을 지운다. 풀지 못한 바인딩은 옛 방식대로 둔다 |
-| REQ8 | (PR2) 실행기 정의에 보관 파일 바이트의 해시(`REVISION`)를 두고, 보관 파일이 바뀐 뒤 다시 설치하면 정의가 달라져 `restart_required` 를 참으로 답한다 |
+| REQ1 | 설치 답에 `cycle_available` 을 더한다. Control Plane 은 재시작 대기 대신 껐다 켜기 단계로 두고, 실행이 비면 plugin 에 끄기 설치를 보낸 뒤 `apply-delay` 가 지나면 보통 설치로 다시 켠다. 다시 켠 설치는 `reload_pending` 이라 지금의 반영 예정 확인이 `READY` 로 만든다 |
+| REQ2 | plugin 의 끄기는 `config.yaml` 의 그 서버 항목에 `enabled: false` 만 쓰고 소유 기록은 바꾸지 않는다. gateway 의 맞추기는 이름마다 연결을 맞추므로 같은 profile 의 다른 서버와 다른 profile 은 건드리지 않는다 |
+| REQ3 | plugin 이 gateway 기동 시각을 답하는 조회를 연다. Control Plane 은 30초마다 재시작 대기 바인딩이 있을 때만 이 시각을 읽고, 대기 시각이 그 시각보다 앞서고 아직 실패 표시가 없는 바인딩을 `afterRestart=true` 로 반영 맞추기 한다 |
+| REQ4 | 기동 시각을 읽지 못하거나 값이 없으면 아무것도 하지 않는다. 읽을 수 있다가 못 읽게 된 때에만 경고 한 줄, 다시 읽히면 info 한 줄을 남긴다 |
+| REQ5 | 서비스 토큰으로 부르는 내부 조회 하나가 재시작 대기 바인딩 수와 가장 오래된 대기 시각, 진행 중 실행 수를 답한다. 재시작 조건(스펙 DECISION5)의 판단과 6시간 상한은 운영 정기 작업이 갖는다 |
+| REQ6 | 연결 응답의 `restartRequired` 와 새 `applyFailed` 로 웹이 문구를 고른다. `boundReadiness` 와 `connectionStatusLabel` 이 바뀐다 |
+| REQ7 | `confirmApplied` 의 경로와 응답 모양은 그대로 둔다. 화면의 단추 이름과 설명, 보이는 조건을 바꾸고, 껐다 켜기 단계와 재시작 대기에서 할 일을 아래 「관리자 다시 확인」 대로 정한다 |
+| REQ8 | 바인딩에 `waiting_since` 와 `admin_notified_at` 을 두고, `waiting_since` 에서 24시간이 지나면 한 번 알린다. 실패 알림은 PR1 의 실패 표시가 적힐 때 함께 보낸다 |
+| REQ9 | 자동 경로가 실패 까닭(스펙 DECISION10)으로 끝나면 `apply_failed_at` 을 적는다(PR1). 연결 응답과 관리자 목록이 이것으로 실패를 보인다(PR3) |
+| REQ10 | 껐다 켜기의 끄기 단계는 그 profile 이 바쁘지 않거나 단계를 시작한 지 10분이 지났을 때만 보낸다 |
 
 ## 책임과 경계
 
-- **대시보드 plugin(`hermes/plugins/dashboard-profile-api`)이 key 를 읽고 암호화한다.** 보관 파일의 주인이 이 plugin 이기 때문이다. Control Plane 과 Hermes core 는 바뀌지 않는다.
-- 새 모듈 둘로 나눈다. 파일 길이 상한(rule-44)과 책임 때문이다.
-
-  | 모듈 | 맡는 것 |
-  | --- | --- |
-  | `connector_vault_key.py` | 운영 환경 변수와 key 파일 읽기, key 상태, AES-256-GCM 의 봉인과 풀기 |
-  | `connector_vault.py` | 보관 파일의 경로, 모양 검사, 읽기와 쓰기, `PUT`·`DELETE` 처리. 지금 자리 그대로다 |
-  | `connector_vault_migration.py` | 기동 이관. 파일을 하나씩 분류해 다시 쓰고 수를 센다 |
-  | `connector_vault_format.py` | (PR2) 보관 파일의 모양 검사, AAD, 풀기. 실행기가 plugin 패키지 없이 읽도록 `connector_vault.py` 에서 옮긴다 |
-  | `connector_launch.py` | (PR2) 실행기 정의를 만들고 알아보고 펼친다. 바인딩의 칸 값을 정의의 종류에 맞는 자리에서 읽는다 |
-  | `connector_launcher.py` | (PR2) 실행기 스크립트. 보관 파일을 풀어 자식 env 를 만들고 실제 서버가 된다 |
-  | `connector_binding_migration.py` | (PR2) 이미 붙은 stdio 바인딩을 실행기 정의로 다시 설치하는 기동 이관 |
-
-- **key 는 Control Plane KEK 와 다른 key 다.** 파일 모양만 같다. Hermes 쪽이 Control Plane KEK 를 갖지 않게 한다(ADR).
-- 암호화는 Hermes 이미지가 core 의존으로 고정한 `cryptography` 의 `AESGCM` 을 쓴다. 새 의존을 더하지 않는다. `hermes/tests/hermes_contract.py` 의 제3자 패키지 목록에 `cryptography` 를 더해, plugin 이 기대는 패키지를 Hermes 를 올릴 때 다시 확인하게 한다.
+- **대시보드 plugin 은 profile 파일을 바꾸는 일과 gateway 상태를 읽는 일만 한다.** 언제 끄고 켤지, 언제 재시작이 끝났다고 볼지는 Control Plane 이 정한다. 실행 기록과 바인딩 상태, 예약 작업이 모두 Control Plane 에 있기 때문이다.
+- **공유 gateway 재시작은 운영 정기 작업이 한다.** Control Plane 과 plugin 에 재시작 권한을 주지 않는다. 사용자 요청에서 재시작하지 않는다는 지금 원칙([플러그인 연결](../connector.md) 의 「재시작」)을 지키고, 재시작 수단(s6)은 운영이 소유한다.
+- Hermes core 는 바꾸지 않는다. plugin 이 새로 기대는 Hermes 내부 지점(`gateway.status.get_running_pid`)은 `hermes/tests/hermes_contract.py` 에 선언해 Hermes 를 올릴 때 계약 테스트가 확인하게 한다(ADR-088).
+- Control Plane 안의 배치는 지금 그대로다. 단계 전이는 `ConnectorBinding` 이, 예약 작업은 `ConnectorBindingApplier` 가, 설치 보내기와 결과 적용은 `ConnectorInstallAttempts` 와 `ConnectorBindingInstalls` 가 맡는다. 운영 조회는 `connector.connection` 의 presentation 에 둔다.
+- 「바쁜가」 는 `usage.execution` 의 `UserExecutionLimiter.used(userId)` 가 답한다. connector 가 usage 를 쓰는 방향은 지금도 있다.
 
 ## 인터페이스와 데이터
 
-### 운영 환경 변수
+### 대시보드 plugin: 바인딩 설치의 껐다 켜기(PR1)
 
-대시보드 프로세스의 환경 변수다. 값과 파일의 자리는 `fos-home-infra` 가 정한다. 코드에 기본값이나 경로 상수를 두지 않는다.
+`PUT /api/connectors` 의 `bind` 에 선택 칸 `cycle` 을 더한다. 값은 `"off"` 하나다.
+꺼진 상태는 **설정의 서버 항목에만** 둔다. 소유 기록의 `server` 는 늘 `enabled: true` 인 정의 그대로다.
+끈 시각은 끄기 기록 `.fos-connector-cycle.json`(`{"<플러그인 id>": <epoch 초>}`)에 둔다.
 
-| 이름 | 뜻 |
+| 요청 | plugin 이 하는 것 | 답 |
+| --- | --- | --- |
+| 보통 설치, 서버가 켜져 있다 | 지금처럼 쓴다 | 지금 답. 재시작이 필요한 까닭이 정의나 칸 값 변경, 뗀 이름 다시 붙이기뿐이면 `cycle_available: true` 를 더한다. `plugin_updated` 가 참이면 거짓이다 |
+| `cycle: "off"`, 서버가 켜져 있다 | 지금 설치처럼 새 정의를 소유 기록에 쓰고, 설정에는 같은 정의에 `enabled: false` 를 넣어 쓴다. 끄기 기록에 지금 시각을 적고 뗀 서버 기록에서 그 이름을 지운다 | `cycle_off: true`, `restart_required: false`, `reload_pending: false` |
+| 보통 설치나 `cycle: "off"`, 서버가 꺼져 있고 끄기 기록이 최소 시간보다 새롭다 | 새 정의를 소유 기록에 쓰고 설정은 꺼진 채 새 정의로 쓴다. 끄기 기록의 시각은 바꾸지 않는다 | `cycle_off: true`, `restart_required: false`, `reload_pending: false` |
+| 보통 설치, 서버가 꺼져 있고 끄기 기록이 최소 시간보다 오래됐다 | 설정을 소유 기록과 같은 켜진 정의로 쓰고 끄기 기록에서 지운다. 끈 동안 gateway 가 옛 연결을 끊었으므로 재시작을 요구하지 않는다 | `restart_required: false`, `reload_pending: true` (`plugin_updated` 면 지금처럼 재시작 대기) |
+| `cycle: "off"`, 서버가 꺼져 있고 끄기 기록이 오래됐다 | 꺼진 채 새 정의로 쓴다 | `cycle_off: true` |
+| 떼기 | 지금처럼 떼고 끄기 기록에서 그 플러그인을 지운다 | 지금과 같다 |
+
+- 「서버가 꺼져 있다」 는 설정의 항목이 소유 기록의 정의와 `enabled` 만 다르고 끄기 기록에 그 플러그인이 있다는 뜻이다. 이때만 「운영자가 바꾼 서버」 검사를 통과시킨다. 끄기 기록 없이 `enabled` 만 다르면 지금처럼 운영자가 바꾼 것으로 보고 거절한다.
+- 상태 조회와 실행, probe 는 소유 기록을 기준으로 지금처럼 판정한다. 꺼진 서버의 `configured` 는 설정 항목이 기록과 달라 거짓일 수 있지만 Control Plane 은 껐다 켜기 단계의 바인딩을 읽지 않는다. 소유 기록의 모양이 그대로라 같은 profile 의 다른 바인딩은 영향이 없다.
+- 최소 시간은 gateway 의 맞추기 주기(60초) 둘인 120초를 plugin 상수로 둔다. Control Plane 의 `apply-delay`(150초)가 더 길어 보통은 걸리지 않는다. Control Plane 의 시계나 예약이 틀려도 끊기 전에 다시 켜지 않게 하는 마지막 확인이다.
+- 끄기 기록은 다른 profile 파일과 같은 원자적 교체와 복원 묶음에 넣는다.
+- 이전 이미지로 되돌리면 꺼진 서버의 설정이 소유 기록과 달라 그 바인딩 하나만 「운영자가 바꾼 서버」 로 거절된다. 소유 기록은 그대로라 다른 바인딩은 돈다. 그래서 운영의 되돌리기 절차는 끄기 기록이 빈 것을 먼저 확인한다(운영 요청 본문에 적는다).
+
+### 대시보드 plugin: gateway 기동 시각(PR2)
+
+토큰으로 부르는 `GET /api/gateway` 를 연다. 답은 `{"started_at": <epoch 초> | null}` 이다.
+
+- `gateway.status.get_running_pid(pid_path, cleanup_stale=False)` 로 그 컨테이너 gateway 의 pid 를 읽는다. 대시보드 자신의 상태 화면과 같은 부름이다. 정리하는 부름을 쓰지 않는다.
+- 시작 시각은 Hermes 함수를 쓰지 않고 리눅스 `/proc/<pid>/stat` 의 시작 tick, `SC_CLK_TCK`, `/proc/stat` 의 `btime` 으로 벽시계 시각을 구한다. 정밀도는 1초다.
+- pid 가 없거나 읽기가 실패하면 `null` 이다. 예외 본문과 경로는 로그에 남기지 않는다.
+
+### Control Plane: 바인딩 칸과 단계
+
+`agent_connector_binding` 에 칸을 더한다. 새 테이블을 만들지 않는다. 칸의 뜻은 [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) 에 PR 마다 적는다.
+
+| 칸 | PR | 뜻 |
+| --- | --- | --- |
+| `cycle_phase` VARCHAR(16) NULL | PR1 | 껐다 켜기 단계. 비었거나 `IDLE_WAIT`(실행이 비기를 기다림), `OFF`(끈 뒤 다시 켜기를 기다림) |
+| `cycle_at` DATETIME(6) NULL | PR1 | `IDLE_WAIT` 이면 단계를 시작한 시각(10분 상한의 기준), `OFF` 이면 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각 |
+| `apply_failed_at` DATETIME(6) NULL | PR1 | 자동 경로가 실패한 시각(스펙 DECISION10). 사용자나 관리자가 시작한 설치(등록, 연결 확인, 다시 확인)와 `READY` 가 비운다. 자동 경로의 설치는 비우지 않는다 |
+| `waiting_since` DATETIME(6) NULL | PR3 | 자동 대기가 시작된 시각. 비어 있을 때만 적고 단계가 바뀌어도 그대로 둔다. `READY` 와 사용자나 관리자가 시작한 설치가 비운다 |
+| `admin_notified_at` DATETIME(6) NULL | PR3 | 지금 대기에 관리자 알림을 보낸 시각. `waiting_since` 가 비워지면 함께 비운다 |
+
+자동 경로는 반영 예정 확인, 껐다 켜기 진행, 재시작 감지, 정의 어긋남 점검이다. `ConnectorBindingAttempt` 에 「자동 경로」 표시를 더해 결과 적용이 구분한다.
+
+**plugin 의 답이 단계를 정한다.** 결과 적용은 보낸 요청이 무엇이었든 답으로 다음 단계를 고른다. 끄기를 보내는 사이 등록이 새 시도를 커밋해 끄기 결과가 버려져도, 등록의 답이 `cycle_off` 면 `OFF` 로 맞춰진다.
+
+| 답 | 결과 적용 |
 | --- | --- |
-| `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE` | key 파일의 절대 경로 |
-| `FOS_ASSISTANT_CONNECTOR_VAULT_ACTIVE_KEY_ID` | 새로 암호화할 key 의 id |
-| `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_REQUIRED` | 「key 필수」. `true` 면 key 를 쓸 수 없을 때 보관 파일 쓰기를 거절한다. 비었거나 `false` 면 끈다. 그 밖의 값은 켠 것으로 본다(틀린 값이 평문 쓰기로 이어지지 않게) |
+| `cycle_off: true` | `OFF`. `cycle_at` 이 비었거나 단계가 `OFF` 가 아니었으면 지금 시각으로 적는다. 반영 예정을 적지 않는다 |
+| `restart_required` 이고 `cycle_available` 이며 `plugin_updated` 가 아니다 | 이미 재시작 대기면 지금처럼 재시작 대기로 둔다. 아니면 `IDLE_WAIT` 로 두고, 단계가 비어 있었을 때만 `cycle_at` 을 지금으로 적는다. `restart_required` 칸은 바꾸지 않는다 |
+| `plugin_updated` | 지금처럼 재시작 대기. 단계가 `IDLE_WAIT` 면 비운다(재시작이 덮는다). `OFF` 면 그대로 둔다(서버가 꺼져 있어 켜기가 필요하다) |
+| `reload_pending` 이고 단계가 `OFF` 였다 | 단계를 비우고 `apply_due_at` 을 적는다. 이것이 켜기다 |
+| `changed: false` 이고 단계가 `OFF` 였다 | 켜기가 이미 끝난 것이다(앞선 켜기의 결과 커밋이 실패한 경우). 단계를 비우고 `apply_due_at` 을 적는다 |
+| 그 밖의 답, 단계가 `IDLE_WAIT` 였다 | `IDLE_WAIT` 를 유지한다. gateway 가 옛 연결을 쥔 사실은 그대로이기 때문이다 |
 
-### key 파일
+예약 작업과 사람의 요청이 단계를 이렇게 다룬다.
 
-Control Plane 의 KEK 파일(`FileKeyEncryptionKeys`)과 같은 모양이다. 운영이 한 절차로 만들게 하려는 것이다.
+| 지금 | 일 | 처리 |
+| --- | --- | --- |
+| `IDLE_WAIT`, 실패 표시 없음 | 그 profile 이 바쁘지 않거나 `cycle_at` 에서 10분이 지났다 | 끄기 설치를 보낸다 |
+| `OFF`, 실패 표시 없음 | `cycle_at` 에서 `apply-delay` 가 지났다 | 보통 설치(켜기)를 보낸다 |
+| `OFF` | 등록이 설치를 보낸다 | `cycle: "off"` 로 보낸다. 새 값으로 쓰되 꺼진 채 둔다 |
+| `IDLE_WAIT` | 등록이 설치를 보낸다 | 보통 설치다. 답이 위 표대로 단계를 정한다 |
+| `IDLE_WAIT`, `OFF` | 연결 확인 | 등록이 아니면 설치를 보내지 않고 새 `ResyncOutcome.CYCLE_PENDING` 으로 끝낸다 |
+| 껐다 켜기 단계 | 반영 예정 확인, 재시작 감지 | 건너뛴다. 단계가 비어야 다룬다 |
+| 어느 단계든 | 떼기, 에이전트 삭제 | 바인딩 행이 지워진다 |
 
-- 한 줄에 `<id>:<base64 32바이트>`. id 는 `[a-z0-9][a-z0-9-]{0,31}` 이다. 빈 줄과 `#` 로 시작하는 줄은 건너뛴다.
-- id 가 겹치거나, base64 가 아니거나, 32바이트가 아니거나, 활성 id 가 파일에 없으면 파일 전체를 「모양이 틀림」 으로 본다.
-- 파일을 그룹이나 다른 사용자가 읽을 수 있으면 기동 때 경고만 남긴다.
-- 예외 메시지와 로그에 key 값과 파일 경로를 넣지 않는다.
+- 껐다 켜기 단계의 바인딩은 `PENDING` 이다. 도구 허용 조건은 바꾸지 않는다(스펙 DECISION4).
+- 연결 응답의 `restartRequired` 는 껐다 켜기 단계에서 거짓이다. 화면은 「몇 분 안에」 문구와 다시 읽기를 쓴다.
+- 반영 예정 확인은 재시작 대기 바인딩을 지금처럼 건너뛴다. 그래서 `OFF` 에서 `plugin_updated` 를 받은 바인딩은 켜진 뒤에도 재시작 감지가 맡고, gateway 가 서버를 연결하기 전에 probe 만으로 `READY` 가 되지 않는다.
 
-### key 상태
+### Control Plane: 실패 표시(PR1)
 
-`_vault_keys()` 가 부를 때마다 환경 변수와 파일을 읽어 아래 셋 가운데 하나와, 파일에서 읽은 key 들을 낸다. 파일은 작고 쓰기와 읽기는 드물어 캐시를 두지 않는다. 그래서 key 파일을 바꾸면 다음 요청부터 쓰인다. 다만 옛 key 파일의 이관은 기동 때만 돈다.
+- 자동 경로의 결과가 스펙 DECISION10 의 실패 까닭(`PROBE_FAILED`, `NO_TOOLS`, `NOT_INSTALLED`, `POLICY_HOOK_OFF`, `CALL_FAILED`, `CATALOG_MISSING`)이면 결과 트랜잭션이 `apply_failed_at` 을 적는다.
+- 설치를 거치지 않고 `PENDING` 으로 두는 자동 경로도 같다. 정의 어긋남의 연속 상한과, 카탈로그를 읽지 못해 `PENDING` 으로 둔 반영 예정 확인과 정의 어긋남 점검이다.
+- 실패 표시가 있는 바인딩은 껐다 켜기 진행과 재시작 감지가 다시 집지 않는다. 한 번이면 실패라는 스펙 DECISION10 을 지키고, 같은 실패에 설치를 되풀이해 보내지 않는다.
+- 실패한 바인딩의 그룹 관리자에게 알림을 보내는 일은 PR1 에서는 지금의 `notifyAdmins` 를 쓰고, PR3 에서 문구와 한 번만 보내기(`admin_notified_at`)를 맞춘다.
 
-| 상태 | 조건 |
+### Control Plane: 관리자 다시 확인
+
+`confirmApplied` 의 요청과 응답 모양은 그대로다. 바인딩의 지금 상태에 따라 하는 일이 갈린다.
+
+| 바인딩 | 하는 일 |
 | --- | --- |
-| 준비됨 | 두 환경 변수가 있고 파일을 읽었으며 활성 id 가 파일에 있다 |
-| 없음 | 두 환경 변수가 모두 비었다 |
-| 틀림 | 하나만 있거나, 파일을 읽지 못했거나, 파일 모양이 틀렸거나, 활성 id 가 파일에 없다 |
+| 껐다 켜기 단계 | 실패 표시를 비우고 그 단계의 다음 설치를 바로 보낸다. `IDLE_WAIT` 는 실행을 기다리지 않고 끈다. 관리자가 직접 눌렀기 때문이다. 응답은 `CYCLE_PENDING` 에 맞는 오류로 끝나 화면이 목록을 다시 읽는다 |
+| 재시작 대기 | 잠그기 전에 `GET /api/gateway` 를 부른다. `started_at` 이 있고 `restart_required_since < started_at - 2초` 가 아니면 새 오류 코드 `CONNECTOR_RESTART_NOT_DONE`(「아직 공유 gateway 가 재시작되지 않았어요」)로 거절하고 아무것도 바꾸지 않는다. 기동 시각을 읽지 못하면 지금처럼 `afterRestart=true` 로 다시 맞춘다(스펙 DECISION19, PR2) |
+| 그 밖의 `PENDING` | 지금처럼 다시 맞춘다 |
 
-**읽기 key 와 쓰기 key 를 나눈다.** 파일을 읽었으면 활성 id 가 틀려도 파일의 key 로 v2 를 푼다. 활성 id 오타나 회전 순서 실수 하나로 모든 연결의 확인과 바인딩 설치가 멈추지 않게 하려는 것이다. 쓰기만 「준비됨」 을 요구한다.
+### Control Plane: 예약 작업
 
-### 보관 파일 v2
+`ConnectorBindingApplier` 의 30초 주기(`apply-cron`)가 차례로 돈다. 바인딩마다 트랜잭션을 따로 열고 지금처럼 연결 사용자 행, 에이전트 행 차례로 잠근 뒤 다시 읽는다. 외부 호출과 「바쁜가」 조회는 잠금 밖에서 한다.
+
+1. 반영 예정 확인(지금 그대로, 껐다 켜기 단계는 건너뜀)
+2. 껐다 켜기 진행(PR1). 잠근 뒤 단계와 실패 표시가 그대로인지 다시 본다
+3. 재시작 감지(PR2). 실패 표시가 없고 단계가 비었으며 반영 예정 시각이 없는 재시작 대기 바인딩이 하나라도 있을 때만 `GET /api/gateway` 를 한 번 부른다. `started_at` 이 있으면 `restart_required_since < started_at - 2초` 인 바인딩마다 `resync(afterRestart=true)` 를 돌린다
+4. 24시간 알림(PR3). `waiting_since` 가 24시간 넘었고 `admin_notified_at` 이 빈 바인딩을 그룹별로 모아 알린다
+
+**`restart_required_since` 를 결과 트랜잭션 시각으로 바꾼다(PR2).** 지금은 시작 트랜잭션 시각이라 HTTP 를 보내기 전이다. 그 사이 gateway 가 다시 뜨면 옛 파일로 뜬 gateway 를 반영된 것으로 본다. 결과 트랜잭션은 plugin 이 파일을 다 쓰고 답한 뒤라 이 시각보다 늦게 뜬 gateway 는 새 파일을 읽었다. 2초는 `btime` 과 tick 의 정밀도를 덮는 여유다. 관리자 다시 확인의 `restartRequiredSince` 대조는 같은 칸을 그대로 쓰므로 바뀌지 않는다.
+
+### 바쁜가
+
+`UserExecutionLimiter.used(userId)` 가 두 값을 함께 낸다. turn 자리, 원격 종료 확인 자리, 대화 turn 의 루트가 아닌 `RUNNING` 줄의 합이다.
+
+- profile 하나가 바쁜가(스펙 DECISION18, REQ10): 그 profile 주인의 `used` 가 1 이상이다. 바인딩이 붙은 에이전트는 `PRIVATE` 라 그 profile 의 실행은 모두 주인의 실행이다. 주인의 다른 profile 실행도 바쁜 것으로 보지만 기다림이 길어질 뿐 대화를 끊지 않는 쪽이다. `agent_execution` 에 profile 단위 조회를 더하지 않은 것은 그 저장소 파일이 길이 상한에 닿았고 같은 판단을 이미 `used` 가 내기 때문이다
+- 전체 진행 중 실행 수(스펙 DECISION5, REQ5): PR3 이 정한다. 사용자마다의 메모리 자리와 `RUNNING` 줄을 함께 센다
+
+### Control Plane: 운영 조회(PR3)
+
+`GET /internal/ops/connector-restart` 를 연다. 서비스 Bearer 토큰 하나로 인증하고, 토큰은 새 환경 변수로 받는다(이름은 plan 이 정하고 값과 자리는 `fos-home-infra` 가 갖는다). `/internal/connector-executions/support` 의 서비스 인증과 같은 방식이다.
 
 ```json
-{"v": 2, "connector": "<플러그인 id>", "key_id": "<key id>", "sealed": "v1.<IV>.<암호문과 태그>"}
+{"restartWaiting": 2, "oldestWaitingSince": "2026-11-20T09:00:00Z", "runningExecutions": 0}
 ```
 
-- `sealed` 는 Control Plane 의 `AesGcm` 과 같은 모양이다. IV 는 매번 새로 뽑는 12바이트, 태그는 128비트, 두 조각은 패딩 없는 base64url 이다.
-- 평문은 `values` 의 JSON(`sort_keys`, UTF-8)이다.
-- AAD 는 `connector-vault:<vault>:<connector>` 의 UTF-8 이다. `<vault>` 는 파일 이름의 연결 번호(`c<번호>`), `<connector>` 는 파일의 `connector` 값이다.
-- `connector` 와 `key_id` 는 평문으로 둔다. 쓰기 전 소유 확인과 기동 이관이 풀지 않고 읽는다. 어느 연결이 어느 플러그인인지는 Control Plane DB 에도 있어 비밀이 아니다.
-- 모양 검사는 v1 과 같이 엄격하다. 키 집합이 정확히 위 넷이고 `key_id` 는 id 모양, `sealed` 는 문자열이어야 한다.
+- `restartWaiting` 은 실패 표시가 없는 재시작 대기 바인딩 수다. 껐다 켜기 단계와 실패한 바인딩은 세지 않는다. 실패한 바인딩은 재시작으로 풀리지 않아 세면 운영 작업이 재시작을 되풀이한다.
+- `runningExecutions` 는 위 「바쁜가」 의 전체 수다.
+- 재시작 여부, 6시간 상한, 재시작 뒤 확인은 운영 정기 작업이 정한다. 요청 본문은 PR3 이 써서 `fos-home-infra` 에 넘긴다. 이 저장소에는 두지 않는다.
 
-### 읽기와 쓰기
+### Control Plane: 알림과 연결 응답(PR3)
 
-| 동작 | 준비됨 | 없음 | 틀림 |
-| --- | --- | --- | --- |
-| `PUT`(쓰기) | v2 로 쓴다 | 「key 필수」 면 503, 아니면 v1 로 쓰고 경고 로그 | 「key 필수」 면 503, 아니면 v1 로 쓰고 경고 로그 |
-| 읽기 v1 | 읽는다 | 읽는다 | 읽는다 |
-| 읽기 v2 | 그 `key_id` 의 key 로 푼다. 활성 key 가 아니어도 파일에 있으면 푼다 | 실패 | 파일을 읽었으면 준비됨과 같다. 못 읽었으면 실패 |
+- 실패 알림은 실패 표시를 적은 결과 트랜잭션이 커밋된 뒤 그룹 관리자마다 보내고 `admin_notified_at` 을 적는다. 24시간 알림도 같은 칸을 쓰므로 한 대기에 두 번 가지 않는다.
+- 정의 어긋남 점검의 `notifyAdmins` 는 재시작 대기와 껐다 켜기를 세지 않는다. PR1 에서 껐다 켜기를 빼고, PR3 에서 실패 알림으로 바꾼다.
+- 알림 본문은 「연결 반영 확인」 에서 「다시 확인」 을 누르라고 쓴다.
+- 연결 응답(`AgentConnectionView`, 관리자 목록 `AdminConnection`)에 `applyFailed`(boolean)를 더한다. 관리자 목록에는 `waitingSince` 도 더한다. 기존 칸은 바꾸지 않는다.
+- 기동 시각을 읽지 못하는 상태는 메모리의 한 값으로 들고, 바뀔 때만 로그를 남긴다(REQ4).
 
-- 「틀림」 에서 「key 필수」 가 꺼져 있으면 평문으로 쓰는 것은 스펙 REQ4 의 「끄면 평문으로 쓰고 경고를 남긴다」 를 따른 것이다. 운영은 「key 필수」 를 켠다.
-- `_read_vault(vault)` 의 반환은 지금처럼 `{"v", "connector", "values"}` 다. `v` 는 파일의 버전이다. 부르는 쪽(`connector_run.py`, `connector_install.py`)은 바뀌지 않는다.
-- 읽기 실패는 지금의 「모양이 틀림」 과 같이 `ValueError` 다. 메시지에 값, key, 경로가 없다. `call`·`tools` 는 `unavailable` 로, 바인딩 설치는 503 으로 답한다. 지금 동작 그대로다.
-- `_write_vault` 의 소유 확인(같은 이름의 파일이 다른 플러그인의 것이면 409)은 **풀지 않고** 파일의 `connector` 만 읽는다. key 를 잃어 풀 수 없는 파일도 같은 플러그인의 새 값으로 덮어쓸 수 있어야 「다시 등록」 이 된다. Control Plane 은 같은 사용자의 같은 플러그인 연결에 같은 보관 파일 이름을 다시 쓴다.
-- 모양을 읽지 못하는 파일(JSON 이 아니거나 키가 다름)은 주인을 알 수 없다. 경고를 남기고 덮어쓴다. 보관 파일 이름은 연결마다 하나라 다른 플러그인과 부딪히지 않고, 막으면 그 연결은 다시 등록으로 고칠 수 없다.
-- 보관 파일 쓰기는 임시 파일을 `fsync` 한 뒤 바꿔 넣고 디렉터리도 `fsync` 한다. 이관이 모든 파일을 한 번에 다시 쓰므로 전원이 나가도 옛 파일이나 새 파일 가운데 하나가 남게 한다.
-- 「key 필수」 로 거절할 때는 기존 503 경로를 쓰되 로그에 「key 를 쓸 수 없어 보관 파일을 쓰지 않았다」 와 key 상태만 남긴다. Control Plane 은 503 을 쓰기 실패로 받아 연결을 `PENDING` 으로 남기고 `CONNECTOR_OPERATION_FAILED` 로 답한다(`ConnectorConnectionService` 의 보관 파일 단계, [`connector.md`](../connector.md) 의 「연결의 등록, 확인, 해제」 표). 그래서 화면에 실패로 보인다.
+### 웹(PR3)
 
-## 기동 이관(REQ3, DECISION3, DECISION5, DECISION7)
-
-**`register` 가 비밀값의 강도를 확인한 직후, 경로를 감싸는 `_install_gate()` 와 provider 등록보다 먼저 한 번 돈다.** 이 plugin 의 보관 파일 경로는 그 뒤에야 열리므로 이관은 요청과 겹치지 않고 profile 쓰기 잠금이 필요 없다. 비밀값이 없거나 약해 경로를 열지 않는 설치에서는 돌지 않는다.
-이관 전체를 예외로 감싸 어떤 실패도 기동을 멈추지 않게 한다. 바깥 처리는 예외 클래스 이름만 남긴다. key 파일을 열다 나는 `OSError` 는 메시지에 경로가 있으므로 「틀림」 상태로만 바꾸고 메시지를 쓰지 않는다.
-
-순서는 이렇다.
-
-1. key 상태를 읽어 로그에 남긴다. 상태 이름과 「key 필수」 여부만 남긴다. 「key 필수」 인데 준비되지 않았으면 error 로 남긴다. key 파일 권한이 넓으면 경고한다.
-2. 보관 파일 디렉터리가 없으면 수를 0 으로 남기고 끝낸다. 디렉터리가 링크면 경고하고 끝낸다.
-3. 쓰기 중에 프로세스가 죽어 남은 임시 파일(`.connector-` 로 시작)은 평문일 수 있으므로 지우고 그 수를 센다. 기동 중에는 쓰는 쪽이 없다.
-   그 밖에는 이름이 `c<번호>.json` 인 파일만 이름 순서로 본다. 다른 이름은 건너뛴다. 링크인 파일은 「평문 파일」 로 세고 건드리지 않는다.
-4. 파일마다 아래 표로 분류해 처리한다. key 가 준비되지 않았으면 다시 쓰지 않고 분류해 세기만 한다.
-5. 끝나면 info 한 줄에 수를 남긴다. 남은 파일이 있으면 그 이름(`c<번호>`)만 warning 한 줄로 남긴다.
-
-| 분류 | 처리 | 남으면 세는 칸 |
-| --- | --- | --- |
-| 모양이 맞는 v1 | 활성 key 로 v2 를 써서 바꾼다 | 평문 파일 |
-| 읽지 못하거나 모양이 틀린 파일(JSON 아님, 키가 다름) | 건드리지 않는다(DECISION5) | 평문 파일 |
-| 활성 key 의 v2 | 풀어 본다. 풀리면 그대로 둔다 | 풀리지 않으면 풀지 못한 파일 |
-| 다른 key 의 v2, 그 key 가 파일에 있다 | 풀어서 활성 key 로 다시 쓴다(DECISION7) | 풀리지 않으면 옛 key 파일 |
-| 다른 key 의 v2, 그 key 가 파일에 없다 | 건드리지 않는다 | 옛 key 파일 |
-
-- **다시 쓴 파일은 곧바로 다시 읽어 푼 값이 옮기기 전 값과 같은지 본다.** 다르거나 실패하면 원래 바이트로 되돌리고 남은 칸에 센다. 이관이 값을 잃지 않게 하려는 것이다.
-- 쓰기는 지금 쓰기와 같은 원자적 쓰기와 600 권한이다.
-- 다른 연결에서 복사해 온 v2 는 AAD 가 맞지 않아 「풀지 못한 파일」 이나 「옛 key 파일」 로 남는다. 다른 연결에서 복사해 온 v1 은 구별할 수 없어 그대로 v2 로 바뀐다. v1 에는 묶을 정보가 없기 때문이고, 이것은 지금과 같다.
-- 로그는 `보관 파일 이관: key=<상태> 필수=<참/거짓>, 그대로 둔 암호화 파일 N, v1 에서 옮김 N, 옛 key 에서 옮김 N, 남은 평문 파일 N, 남은 옛 key 파일 N, 풀지 못한 파일 N, 지운 임시 파일 N` 꼴이다. 운영은 배포 뒤 평문 파일과 옛 key 파일이 모두 0 인지 본다(REQ3). 옛 key 파일 수는 `key=ready` 일 때만 근거가 된다. key 가 준비되지 않으면 암호화한 파일을 모두 「그대로 둔 암호화 파일」 로 세고 옛 key 여부를 세지 않았다는 경고를 남긴다. `key=ready` 이고 옛 key 파일이 0 이면 그 key 를 key 파일에서 빼도 된다.
-
-### key 회전(DECISION7)
-
-1. 운영이 key 파일에 새 줄을 더하고 활성 id 를 새 id 로 바꾼 뒤 대시보드를 다시 띄운다.
-2. 기동 이관이 옛 key 의 파일을 모두 새 key 로 다시 쓰고, 남은 옛 key 파일 수를 남긴다.
-3. 그 수가 0 이면 옛 줄을 지운다. 0 이 아닌데 옛 줄을 지우면 남은 파일은 풀리지 않아 그 연결을 다시 등록해야 한다.
+| 자리 | 바뀌는 것 |
+| --- | --- |
+| `boundReadiness`, `connectionStatusLabel` | `applyFailed` 면 「반영하지 못했어요. 관리자에게 알렸어요.」, `restartRequired` 면 「자동으로 반영하고 있어요. 대화가 없는 틈에 반영돼서 조금 걸릴 수 있어요.」(상태 글은 「자동 반영 중」), 그 밖의 `PENDING` 은 「몇 분 안에 자동으로 반영돼요.」 |
+| `isAwaitingApply` 와 다시 읽기 상한 | 실패한 바인딩은 다시 읽지 않는다. 상한을 껐다 켜기의 10분 대기와 두 번의 `apply-delay` 를 덮도록 15분 이상으로 늘린다 |
+| `ConnectorAdminPanel` | 상태 글을 「자동 반영 중」 과 「반영 실패」 로 나눈다. 「다시 확인」 단추는 `applyFailed` 이거나 `waitingSince` 에서 24시간이 지난 줄에만 보인다. 설명에 「자동 반영이 실패했을 때만 누르세요」 |
 
 ## 실패와 일관성
 
-- **이관 중 파일 하나가 실패해도 기동은 잇는다(DECISION5).** 그 파일은 원래 바이트로 남고 이름만 로그에 남는다.
-- 기동 이관과 요청이 겹치지 않는다. `register` 가 끝난 뒤에 경로가 열린다.
-- key 를 잃으면 v2 파일을 풀 수 없다. 평문으로 되돌리는 스크립트는 두지 않고 연결을 다시 등록한다(스펙 DECISION2). 이 PR 의 코드는 같은 이름의 보관 파일을 새 값으로 덮어쓴다.
-- **이전 이미지로 되돌리면 연결을 해제한 뒤 다시 등록한다(스펙 DECISION6).** 이전 이미지의 쓰기는 소유 확인에서 v2 파일을 읽지 못해 503 이므로, 값만 다시 넣는 것으로는 풀리지 않는다. 해제는 이전 이미지에서도 보관 파일을 지우므로 그 뒤의 등록은 새 파일을 쓴다.
-- PR1 배포 순서: 운영이 key 파일과 세 환경 변수를 넣는다 → 배포 → 기동 로그의 평문 파일 수와 옛 key 파일 수가 0 인지 본다 → 도구 호출을 한 번 왕복시킨다. key 없이 배포해도 지금처럼 평문으로 돈다(「key 필수」 를 켜지 않았다면).
-- PR1 은 profile `.env` 사본을 바꾸지 않는다. 그래서 「key 필수」 로 쓰기를 거절해도 이미 붙은 바인딩의 Hermes 쪽 도구 호출은 `.env` 사본으로 그대로 돈다(REQ4). 대시보드의 `call`·`tools` 는 v1 파일과 풀 수 있는 v2 파일을 그대로 읽는다.
-
-## PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)
-
-PR2 는 위 설계를 다시 쓰지 않고 이어서 쓴다. 보관 파일의 모양, key 상태, 기동 이관은 그대로다.
-
-### 실행기 정의(DECISION12)
-
-stdio 플러그인의 바인딩 설치는 서버 정의를 아래 모양으로 쓴다. 원격 플러그인은 지금처럼 `.env` 에 쓴다(DECISION8).
-
-```yaml
-command: <대시보드 프로세스의 python>
-args: ["-I", <plugin 의 connector_launcher.py>, <보관 파일 id>, <플러그인 id>, "<칸 key>=<env 이름>", ..., "--", <실제 command>, <실제 args>...]
-env:
-  <운영자 env>: <운영 목록의 값>
-  <주인 env>: <그 바인딩의 값이나 빈 값>
-  FOS_ASSISTANT_CONNECTOR_VAULT_DIR: <보관 파일 디렉터리>
-  FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE: <대시보드 프로세스의 같은 이름의 값. 없으면 빈 값>
-  FOS_ASSISTANT_CONNECTOR_VAULT_REVISION: <보관 파일의 판>
-enabled: true
-```
-
-- 칸 env 는 정의에도 `.env` 에도 없다. 실행기가 띄울 때 채운다.
-- 경로 값은 모두 설치할 때 대시보드 프로세스에서 읽는다(`sys.executable`, 이 plugin 의 디렉터리, `_vault_dir()`, 운영 env). 코드에 경로 상수나 기본값을 두지 않으므로 공개 저장소에는 이름만 있다.
-- **보관 파일 디렉터리를 정의로 넘긴다.** Hermes 는 자식 env 를 `PATH`, `HOME` 같은 몇 이름과 정의의 `env` 로만 만든다(`_build_safe_env`, [`hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「MCP 프로세스의 환경 값」). `HERMES_HOME` 이 오지 않아 실행기가 Hermes 루트를 스스로 구하지 못한다.
-- **활성 key id 는 넘기지 않는다.** 실행기는 읽기만 하고, 읽기는 활성 id 와 상관없이 key 파일의 key 로 푼다(위 DECISION7). 넘기면 key 를 회전할 때마다 모든 정의가 낡는다.
-- **보관 파일 리비전(`REVISION`)을 정의에 둔다(REQ8).** 리비전은 파일의 inode, 수정 시각(ns), 크기의 SHA-256 이다. 파일 내용을 해시하지 않아 v1 평문에서도 값의 단서가 정의와 설정 백업에 남지 않는다. 토큰을 바꾸면 파일이 바뀌어 리비전이 달라지고, 다시 설치가 쓰는 정의가 달라져 지금 규칙(`previous != server`) 그대로 `restart_required` 가 참이다. 소유 기록의 모양은 바꾸지 않는다. 그래서 이전 이미지도 그 기록을 읽는다(아래 「되돌리기」).
-- **같은 값의 보관 파일은 다시 쓰지 않는다.** v2 는 IV 를 매번 새로 뽑아 같은 값도 다른 바이트가 된다. `_write_vault` 는 이미 있는 파일이 활성 key 의 v2(key 가 준비되지 않았으면 v1)이고 값이 같으면 쓰지 않는다. 같은 값으로 다시 등록해도 리비전이 그대로라 붙은 바인딩이 재시작 대기가 되지 않는다. key 회전과 v1 이관은 파일을 다시 쓰므로 그 뒤 첫 다시 설치는 재시작 대기를 답한다.
-- 정의는 그 profile 의 `config.yaml` 과 설정 백업에만 남는다. 칸 값은 어디에도 없다.
-
-### 실행기(`connector_launcher.py`)
-
-대시보드 plugin 디렉터리 안의 독립 스크립트다. Hermes 의 python 이 스크립트로 연다.
-
-- python 은 격리 모드(`-I`)로 연다. `PYTHON` 으로 시작하는 env, 사용자 site, 스크립트 디렉터리를 import 경로에 넣지 않는다. 실행기는 표준 라이브러리와 venv 의 `cryptography` 만 쓴다. Hermes 가 자기 프로세스에 더하는 site 경로에 기대지 않는다.
-
-- plugin 패키지의 `__init__.py` 를 실행하지 않는다. 자기 디렉터리를 하위 모듈 검색 경로로 둔 빈 패키지를 만들어 `connector_vault_format.py`(보관 파일 모양, AAD, 풀기)와 `connector_vault_key.py`(key 파일, AES-GCM)만 읽는다. 두 모듈은 표준 라이브러리, `cryptography`, `connector_schema.py` 만 쓴다. 대시보드와 같은 풀기 코드를 쓰려는 것이다.
-- 순서는 이렇다.
-  1. 인자를 본다. 보관 파일 id, 플러그인 id, 칸 key, env 이름은 대시보드와 같은 정규식이고, `--` 뒤에 command 가 있어야 한다. 칸 대응의 순서는 manifest 의 칸 순서다.
-  2. `FOS_ASSISTANT_CONNECTOR_VAULT_DIR` 아래 `<id>.json` 을 읽는다. 디렉터리나 파일이 링크면 거절한다.
-  3. v1 이면 그대로, v2 면 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE` 을 `_parse_key_file` 로 직접 읽은 key 묶음으로 푼다. `_vault_keys()` 는 활성 id 가 없으면 key 를 내지 않으므로 쓰지 않는다. AAD 는 대시보드와 같다.
-  4. 파일의 `connector` 가 인자의 플러그인 id 와 같은지 본다.
-  5. 자식 env 는 받은 env 에서 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작하는 이름을 모두 지우고 칸 값을 넣은 것이다. 보관 파일에 없는 칸은 빈 값이다. 플러그인 코드가 key 위치를 받지 않게 한다.
-  6. `PATH` 앞에 실제 command 의 디렉터리를 붙인다. Hermes 가 정의의 command 에 하는 것과 같다. 그 뒤 `os.execve` 로 실제 서버가 된다.
-- 칸 값은 칸 대응에 있는 칸만 넘긴다. 대응은 설치 때 지금 manifest 의 칸으로 만든 것이다. 값의 모양은 보관 파일을 쓸 때 이미 검사했다.
-- 모듈 읽기와 `execve` 까지 모두 예외 처리 안에 둔다. 잡지 못한 예외의 traceback 이 경로를 stderr 에 쓰지 않게 한다.
-- 실패하면 값과 경로 없이 이유 단어 하나(`arguments`, `vault_missing`, `vault_unreadable`, `connector_mismatch`, `exec_failed`)를 stderr 에 쓰고 78 로 끝난다. 그 MCP 서버만 연결되지 않고, stderr 는 그 profile 의 MCP stderr 기록에 모인다.
-
-### 정의 비교와 옛 정의 호환
-
-- **실행기 정의를 알아보는 규칙**은 args 가 `-I`, 파일 이름이 `connector_launcher.py` 인 경로, 보관 파일 id, 플러그인 id 로 시작하고 `--` 와 그 뒤의 command 가 있는 것이다(`_launcher_parts`). 그 밖은 옛 정의나 원격 정의로 본다.
-- **`_server_matches` 는 실행기 정의를 옛 모양으로 펼쳐 지금 규칙으로 비교한다.** 펼친 모양(`_launcher_inner`)은 command 가 실제 command, args 가 실제 args, env 가 실행기 env 셋을 뺀 env 에 칸 env 를 `${이름}` 으로 더한 것이다.
-- 실행기 칸은 따로 본다. python, 실행기 경로, 보관 파일 디렉터리, key 파일 값이 지금 대시보드의 값과 같고, 칸 대응이 지금 manifest 의 칸 key 와 env 이름과 같고, 플러그인 id 가 manifest 의 id 와 같아야 한다. 정의 env 에 칸 env 이름이 없어야 한다. `REVISION` 은 64자리 16진수인지만 본다.
-- 경로가 바뀌면(이미지의 python 자리, key 파일 자리) 맞지 않음으로 본다. 상태 조회가 `configured: false` 로 답하고, Control Plane 의 연결 확인이 다시 설치해 새 정의를 쓴다. 이 비교가 없으면 재시작 뒤 서버가 조용히 뜨지 않는다.
-- 옛 정의(`${이름}` 참조)는 지금 규칙 그대로 맞다고 본다. 보관 파일을 풀지 못해 남긴 바인딩(DECISION10)과 원격 플러그인이 끊기지 않는다.
-- `_connector_state` 의 모양 검사는 실행기 정의의 보관 파일 id 가 기록의 `vault` 와 같은지도 본다.
-- `_recoverable_server`(설정만 새 `tools.exclude` 인 정의의 복구)는 `REVISION` 을 빼고 비교한다. 금융 도구를 숨긴 profile 에서 보관 파일이 바뀌어도 다시 설치가 거절되지 않는다.
-- `_entry_manifest_mismatches`, `_bind_entry_env`, `_entry_field_env` 는 펼친 모양으로 본다. 그래서 떼기는 실행기 정의를 지우고, `.env` 에 남은 그 칸 줄(옛 사본)도 지운다.
-
-### 바인딩 설치
-
-- stdio 는 실행기 정의를 쓰고 `.env` 에서 이 플러그인의 칸 줄을 지운다. 칸 env 이름의 겹침 검사는 지금과 같다.
-- 설치 요청은 보관 파일을 읽는 같은 잠금 안에서 리비전을 구해 넘긴다.
-- python 경로(`sys.executable`)가 비었거나 절대 경로가 아니면 설치를 거절한다(503).
-- `restart_required` 는 지금 규칙 그대로다. 옛 정의에서 실행기 정의로 바뀌거나 `REVISION` 이 바뀌면 참이다.
-
-### 원래 값을 받는 다른 자리
-
-`_binding_env(profile_dir, manifest, entry)` 하나가 바인딩의 칸 env 값을 낸다. 실행기 정의면 기록의 `vault` 를 `_read_vault` 로 읽고 `connector` 가 같은지 본다. 옛 정의와 원격이면 지금처럼 `.env` 를 읽는다. 값의 자리가 정의의 종류를 따라가므로, 옛 방식으로 남은 바인딩도 지금처럼 돈다.
-
-| 자리 | 쓰는 곳 | 풀지 못하면 |
-| --- | --- | --- |
-| 직접 실행 | `connector_run.py` 의 execute 와 prepare | 지금의 `profile` 단계 실패(`unavailable`) |
-| 실행 가드 scope 검사 | `connector_prepare.py` 가 `_binding_env` 를 다시 불러 같은 값인지 본다 | `scope` 단계 거절 |
-| 스냅샷 | `connector_snapshot.py` | 503 |
-
-### `PUT /api/env`
-
-칸 env 이름(카탈로그 플러그인의 `fields[].env`)을 400 으로 거절한다. Control Plane 은 이 경로로 칸 값을 쓰지 않는다. 기본 key 셋만 쓴다(`HermesProfileProvisioner`). 운영자 env 는 지금처럼 쓰지 않고 성공으로 답한다(ADR-041). `DELETE /api/env` 는 남은 사본을 지울 수 있게 그대로 받는다.
-
-### 기동 이관(REQ7, DECISION10)
-
-`register` 가 보관 파일 이관 바로 뒤, 경로를 감싸기 전에 한 번 돌린다(위 DECISION8 과 같은 까닭). 둘을 따로 예외로 감싸 하나가 멈춰도 다른 것은 돌고, 기동은 잇는다.
-
-**바인딩 설치(`_connector_bind_config`)를 다시 돌리지 않는다.** 설치는 스킬, hook plugin 파일, API 도구 목록도 검사해 거절할 수 있고, 그러면 풀 수 있는 바인딩의 사본이 남는다. 이관은 그 서버 정의, 소유 기록의 그 항목, 이름 대응, `.env` 의 그 칸 줄만 바꾼다.
-
-1. `list_profile_names()` 의 profile 마다 소유 기록이 있고 관리 표식이나 플러그인 표식이 있는 것만 본다. 소유 기록을 읽지 못하면 세고 넘어간다.
-2. 항목마다 원격이면 건너뛰고 원격 수에 센다.
-3. 실행기 정의이고, `.env` 에 그 칸 줄이 없고, 실행기 칸이 지금 값과 맞으면(manifest 가 없으면 그것만 빼고) 이미 옮긴 것으로 두고 손대지 않는다.
-4. 펼친 모양이 지금 manifest 와 맞지 않으면 남긴다. 칸 대응을 알 수 없다. 다시 연결하면 새 정의로 설치된다.
-5. `config.yaml` 의 그 서버가 소유 기록과 다르면 남긴다. 운영자가 바꾼 정의는 `.env` 를 참조할 수 있다.
-6. 보관 파일이 없거나 풀지 못하거나 그 플러그인의 것이 아니면 남긴다(DECISION10). 옛 정의와 `.env` 사본으로 계속 돈다.
-7. 그 밖이면 펼친 모양에서 실행기 정의를 만들어 `config.yaml`, 소유 기록, 이름 대응을 쓰고, 마지막에 `.env` 의 그 칸 줄을 지운다. 이미 지금 값의 실행기 정의에 사본만 남았으면 사본만 지우고 「그대로 둔 실행기 바인딩」 에 센다. 정의가 그대로라 재시작이 필요 없다. 판은 이관이 푼 바로 그 파일로 구한다. 쓰기 전에 설정 백업을 남기고, 쓰기가 실패하면 쓴 파일을 되돌린다. `.env` 를 맨 뒤에 써서 앞에서 멈추면 사본이 남고 다음 기동이 다시 지운다.
-8. 끝나면 info 한 줄을 남긴다. `바인딩 이관: 실행기로 옮김 N, 그대로 둔 실행기 바인딩 N, 남은 사본 N, 원격 N, 읽지 못한 소유 기록 N` 꼴이다. 남은 바인딩은 플러그인 id 와 수만 warning 한 줄로 남기고, profile 이름과 경로는 남기지 않는다. 옮긴 것이 있으면 「gateway 재시작이 필요하다」 를 warning 으로 남긴다. 이관은 요청이 아니라 Control Plane 에 신호가 가지 않는다. 운영이 이 줄을 보고 재시작한다.
-
-- 다시 돌리면 옮긴 바인딩은 3 에서 그대로 두므로 바뀌는 파일이 없다.
-- 「남은 사본」 은 4 부터 6 으로 남긴 stdio 바인딩 수다. 운영은 배포 뒤 이 수가 0 인지 본다.
-- 이미지를 바꿔 python 이나 plugin 경로가 바뀐 실행기 정의도 3 을 지나지 않으므로 7 에서 지금 경로로 다시 쓴다.
-
-### 되돌리기
-
-- PR1 이미지로 되돌리면 그 이미지에는 실행기가 없어 실행기 정의의 서버가 뜨지 않는다. 소유 기록의 모양은 같으므로 그 이미지의 바인딩 설치가 기록을 읽는다. 모든 연결의 연결 확인을 돌리면 다시 설치가 옛 정의와 `.env` 사본을 다시 쓰고 `restart_required` 로 답한다. 그 뒤 gateway 를 재시작한다.
-- 이미 재시작 대기로 남은 바인딩은 연결 확인이 설치를 다시 보내지 않는다. 그런 바인딩과 다시 설치가 거절된 바인딩은 떼고 다시 붙인다.
-- 실행기 정의를 평문 방식으로 되돌리는 스크립트는 두지 않는다.
-
-### 운영 순서
-
-배포 → 대시보드 기동 로그의 「바인딩 이관」 줄에서 남은 사본이 0 인지 본다 → gateway 재시작 → stdio 연결마다 도구 호출을 한 번 왕복시킨다. 남은 사본이 있으면 그 연결을 다시 등록한다. 확인 절차는 `fos-home-infra` 가 갖는다.
-대시보드와 gateway 가 같은 파일 시스템과 계정에서 돈다는 것이 전제다. 정의의 경로를 gateway 의 MCP 자식이 그대로 연다(운영 확인 2026-11-04: 같은 컨테이너, 같은 계정, 같은 venv python).
-배포와 gateway 재시작 사이에는 떠 있는 서버가 옛 값을 쥔 채 돈다. 그 사이 서버가 다시 뜨면 옛 정의의 `${이름}` 이 지워진 사본을 가리켜 값 없이 뜰 수 있으므로, 재시작은 배포 직후에 한다.
+- **자동 경로의 설치가 실패하면 실패 표시를 적고 단계를 그대로 둔다.** 다음 주기가 되풀이하지 않는다. 관리자 다시 확인이 실패 표시를 비우고 그 단계부터 잇는다.
+- 끄기 설치는 성공했는데 결과 커밋이 실패하면 plugin 은 꺼져 있고 Control Plane 은 `IDLE_WAIT` 다. 다음 주기의 끄기 설치가 `cycle_off` 를 받아 `OFF` 로 맞춰진다. 끄기 기록의 시각은 바뀌지 않으므로 최소 시간이 앞당겨지지 않는다.
+- 켜기 설치는 성공했는데 결과 커밋이 실패하면 Control Plane 은 `OFF` 로 남는다. 다음 켜기 설치가 `changed: false` 를 받아 단계를 비운다.
+- 동시성은 지금의 설치 시도 UUID 와 연결 revision 대조(「설치 호출의 커밋 경계」)를 그대로 쓴다. 늦게 온 결과는 새 시도를 덮지 못하고, 버려진 결과의 효과는 다음 답이 단계를 맞춘다.
+- 재시작 감지는 결과 트랜잭션 시각과 기동 시각을 비교하므로 옛 파일로 뜬 gateway 를 반영된 것으로 보지 않는다. 재시작 직전 설치는 대기로 남아 다음 재시작이 맡는다.
+- 배포 순서는 plugin 먼저다. Control Plane 이 먼저 나가면 `cycle_available` 이 없는 답을 거짓으로 읽어 지금처럼 재시작 대기로 두고, `GET /api/gateway` 가 404 면 기동 시각을 모르는 것으로 본다. plugin 이 먼저 나가면 새 칸은 쓰이지 않는다(rule-66).
+- 되돌리기: plugin 을 되돌리기 전에 운영이 끄기 기록이 빈지 확인한다. 꺼진 서버가 남은 채 되돌리면 그 바인딩 하나가 409 로 남고, 새 이미지로 다시 올리거나 운영이 그 서버 항목을 켜야 풀린다.
 
 ## 검증 전략
 
-PR1 의 요구사항은 대시보드 plugin 의 Python 단위 테스트로 실제 파일을 만들어 확인한다. Hermes 없이 도는 기존 테스트 기반(`dashboard_profile_api_support.ProfileApiRouteTest`)을 쓴다.
+| 요구사항 | 경계와 환경 |
+| --- | --- |
+| REQ1 | plugin 단위 테스트가 표의 경우와 끄기 기록, 최소 시간, 「운영자가 바꾼 서버」 검사의 예외를 확인한다. 같은 profile 에 다른 바인딩이 있을 때 그 설치와 조회가 계속 되는지도 본다. Control Plane 통합 테스트가 가짜 대시보드로 `IDLE_WAIT` → `OFF` → 반영 예정 → `READY` 를 사람 조작 없이 지나는지, 끄기 중 등록이 끼어든 경우를 본다. 배포 뒤 실제 값 교체 한 번을 왕복시킨다(`fos-home-infra` 절차) |
+| REQ2 | plugin 테스트가 끄기 설치에서 소유 기록, 같은 profile 의 다른 서버 항목, 다른 profile 파일이 바이트 그대로인지 본다 |
+| REQ3, REQ4 | plugin 테스트가 가짜 `/proc` 와 pid 로 시각과 `null` 을, 정리 없는 부름을 본다. Control Plane 통합 테스트가 가짜 기동 시각의 앞뒤 바인딩, 실패 표시가 있는 바인딩, 404 와 `null`, 로그가 상태가 바뀔 때만 남는지를 본다. `hermes_contract.py` 의 새 지점은 CI 의 hermes job 이 Hermes 소스와 대조한다 |
+| REQ5 | Control Plane 웹 통합 테스트가 토큰 없음, 틀린 토큰, 대기와 실행과 실패의 조합을 본다 |
+| REQ6, REQ7, REQ9 | 웹 단위 테스트가 문구 함수의 경우를, 브라우저 테스트가 붙인 직후 안내와 관리자 패널의 단추 조건을 본다. Control Plane 통합 테스트가 실패 표시를 적는 경로와 비우는 경로, 껐다 켜기 단계의 다시 확인을 본다 |
+| REQ8 | Control Plane 통합 테스트가 고정 시계로 24시간 경계, 단계가 바뀌어도 세기가 이어지는지, 한 번만 보내기를 본다 |
+| REQ10 | Control Plane 통합 테스트가 가짜 `RUNNING` 실행과 메모리 자리로 기다림과 10분 상한을 본다 |
 
-| REQ | 경계 | 확인 |
-| --- | --- | --- |
-| REQ1 | `PUT /api/connector-vault`, `call`, 바인딩 설치 | key 를 준 PUT 뒤 파일이 v2 이고 파일 글에 칸 값이 없다. 같은 vault 로 `call`·`tools` 의 자식 env 와 바인딩 설치의 `.env` 가 원래 값이다 |
-| REQ2 | `_read_vault` | 다른 연결 이름으로 복사한 파일, `connector` 값만 고친 파일이 읽기에 실패하고, 예외 메시지와 로그에 값이 없다 |
-| REQ3 | 기동 이관 함수 | v1 파일, 옛 key 파일, 깨진 파일, 다른 연결의 파일, 모르는 key 의 파일, 남은 임시 파일을 두고 이관한 뒤 파일 모양과 로그의 수를 본다. 다시 돌리면 아무것도 바뀌지 않는다 |
-| REQ4 | `PUT`, `call` | 「key 필수」 와 key 없음·틀림에서 PUT 이 503 이고 파일이 바뀌지 않는다. 같은 상태에서 v1 보관 파일의 `call` 은 돈다. 끄면 v1 로 쓰고 경고 로그가 남는다 |
-| REQ5 | 문서 | 공개 정보 검사(`check-public-safe.sh`)와 리뷰 |
-
-PR2 의 요구사항도 같은 테스트 기반으로 실제 파일과 실제 자식 프로세스를 만들어 확인한다. 실행기는 테스트의 python 으로 실제로 띄워, 받은 env 를 파일로 내는 대역 서버로 바꿔 끼운다.
-
-| REQ | 경계 | 확인 |
-| --- | --- | --- |
-| REQ6 | 바인딩 설치, 실행기, 직접 실행, prepare, 스냅샷, `PUT /api/env` | 설치 뒤 `.env` 와 `config.yaml` 에 칸 값이 없고 정의가 실행기 모양이다. 그 정의의 command 와 args, env 로 실행기를 띄우면 대역 서버가 원래 값을 받고 `FOS_ASSISTANT_CONNECTOR_VAULT_` 이름은 받지 않는다. 직접 실행, prepare 의 scope 검사, 스냅샷의 자식 env 가 원래 값이다. 보관 파일을 지우거나 다른 연결로 바꾸면 실행기가 78 로 끝나고 stderr 에 값과 경로가 없다. 떼면 실행기 정의와 남은 사본이 지워진다. `PUT /api/env` 의 칸 key 가 400 이다. `_server_matches` 가 옛 정의와 실행기 정의를 모두 맞다고 보고, 경로가 바뀐 실행기 정의는 맞지 않다고 본다 |
-| REQ7 | 기동 이관 함수 | 옛 정의와 `.env` 사본을 가진 바인딩, 보관 파일을 풀지 못하는 바인딩, 원격 바인딩을 두고 이관한 뒤, 앞의 것은 실행기 정의이고 사본이 없으며, 가운데 것은 옛 정의와 사본이 그대로이고, 원격은 그대로인지와 로그의 수를 본다. 다시 돌리면 파일이 바뀌지 않는다 |
-| REQ8 | 보관 파일 PUT 과 다시 설치 | 같은 값으로 다시 설치하면 `changed: false` 이고, 값을 바꿔 PUT 한 뒤 다시 설치하면 `restart_required: true` 다 |
-| 원격 | 바인딩 설치 | 원격 플러그인은 지금처럼 `.env` 에 쓴다 |
-
-예외와 로그에 값이 없다는 것은 모든 실패 테스트에서 칸 값과 key 의 base64 가 로그 출력과 응답에 없는지로 본다.
-운영의 수(평문 파일 0, 옛 key 파일 0, 남은 사본 0)와 gateway 재시작 뒤 도구 호출 왕복은 배포 뒤 코디네이터가 `fos-home-infra` 의 절차로 본다.
+MySQL 의 새 칸은 Draft CI 의 `backend-mysql` 이 확인한다.
 
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
-| DECISION1 | 환경 변수 이름 | 환경 변수 이름을 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작한다 | 작성자 | 대시보드 운영 값의 접두 `FOS_ASSISTANT_` 를 따르고, Control Plane 의 `ASSISTANT_DATA_ENCRYPTION_` 과 이름으로 갈린다 |
-| DECISION2 | key 캐시 | key 를 캐시하지 않고 부를 때마다 읽는다 | 작성자 | 파일이 작고 쓰기가 드물다. 캐시를 두면 테스트와 key 교체 때 낡은 값을 쓴다 |
-| DECISION3 | 「key 필수」 의 모르는 값 | 「key 필수」 의 모르는 값은 켠 것으로 본다 | 작성자 | 오타가 평문 쓰기로 이어지지 않게 한다 |
-| DECISION4 | 쓰기 전 소유 확인 | 쓰기 전 소유 확인은 풀지 않고 `connector` 만 본다 | 작성자 | key 를 잃은 파일도 같은 플러그인의 새 값으로 덮어써야 다시 등록이 된다 |
-| DECISION5 | 깨진 파일을 세는 칸 | 깨진 파일은 「평문 파일」 칸에 센다 | 작성자 | 스펙 DECISION5 의 「평문 파일 수로 드러낸다」 를 따른다. 배포 뒤 0 이면 깨진 파일도 없다 |
-| DECISION6 | 이관 쓰기의 대조 | 다시 쓴 파일은 다시 읽어 값을 대조하고, 다르면 원래 바이트로 되돌린다 | 작성자 | 기억 이관과 같이 이관이 값을 잃지 않게 한다 |
-| DECISION7 | 활성 id 가 틀릴 때의 읽기 | 읽기는 활성 id 와 상관없이 파일의 key 로 푼다 | 작성자 | 활성 id 하나가 틀려 모든 연결이 멈추지 않게 한다. 쓰기만 활성 key 를 요구한다 |
-| DECISION8 | 이관을 돌리는 때 | 이관을 경로 감싸기와 provider 등록보다 먼저 돌린다 | 작성자 | 요청과 겹치지 않음을 Hermes 의 호출 순서 가정 없이 보장한다 |
-| DECISION9 | 모양을 읽지 못하는 파일의 덮어쓰기 | 모양을 읽지 못하는 파일은 덮어쓴다 | 작성자 | 주인을 알 수 없고 연결마다 이름이 하나라, 막으면 다시 등록으로 고칠 수 없다 |
-| DECISION10 | 토큰 교체를 알리는 자리 | 보관 파일의 판(파일 stat 의 해시)을 소유 기록이 아니라 실행기 정의의 env(`REVISION`)에 둔다. 같은 값은 다시 쓰지 않는다 | 작성자 | 정의가 바뀌어 지금 규칙으로 `restart_required` 가 참이 된다. 소유 기록의 모양이 그대로라 이전 이미지가 기록을 읽어 되돌리기가 다시 설치로 끝난다 |
-| DECISION11 | 실행기에 주는 key 정보 | key 파일 위치만 주고 활성 key id 는 주지 않는다 | 작성자 | 읽기는 활성 id 를 쓰지 않는다. 주면 key 회전마다 모든 정의가 낡는다 |
-| DECISION12 | 보관 파일 디렉터리 | 설치 때 대시보드가 구한 디렉터리를 정의의 env 로 준다 | 작성자 | Hermes 가 자식에게 `HERMES_HOME` 을 넘기지 않아 실행기가 루트를 구하지 못한다 |
-| DECISION13 | 대시보드 직접 실행이 읽는 값의 자리 | 실행기 정의면 보관 파일, 옛 정의와 원격이면 `.env` | 작성자 | 이관하지 못해 남긴 바인딩(스펙 DECISION10)이 지금처럼 돈다 |
-| DECISION14 | 실행기 정의의 경로 비교 | python, 실행기, 보관 파일 디렉터리, key 파일 값을 지금 값과 견준다 | 작성자 | 경로가 바뀐 정의는 재시작 뒤 서버가 뜨지 않는다. 맞지 않음으로 드러내야 연결 확인이 다시 설치한다 |
-| DECISION15 | 실행기가 읽는 코드 | plugin 패키지를 실행하지 않고 빈 패키지로 `connector_vault_format.py` 와 `connector_vault_key.py` 만 읽는다 | 작성자 | 대시보드와 같은 풀기 코드를 쓰되 Hermes 와 starlette 를 읽지 않아 자식이 가볍고 실패할 자리가 적다 |
-| DECISION16 | 기동 이관의 범위 | 바인딩 설치를 다시 돌리지 않고 정의, 소유 기록, 이름 대응, `.env` 칸 줄만 바꾼다 | 작성자 | 설치의 다른 검사가 거절하면 풀 수 있는 바인딩의 사본이 남아 REQ7 을 어긴다. 기동 때 hook plugin 파일이 바뀌는 부작용도 없앤다 |
+| DECISION1 | 껐다 켜기를 누가 진행하나 | Control Plane 이 단계를 저장하고 예약 작업으로 끄기와 켜기를 따로 보낸다. plugin 은 요청받은 쓰기만 한다 | 작성자 | 「바쁜가」 확인(스펙 DECISION18)과 재시작 뒤 이어 하기가 Control Plane 에 있다. plugin 안의 타이머는 대시보드가 다시 뜨면 서버를 꺼진 채 남긴다 |
+| DECISION2 | 꺼진 상태를 두는 곳 | 설정의 서버 항목과 따로 둔 끄기 기록. 소유 기록은 바꾸지 않는다 | 작성자 | 소유 기록은 서버 정의의 `enabled` 가 참이어야 읽혀, 바꾸면 같은 profile 의 모든 바인딩과 이전 이미지가 멈춘다(`connector_state.py`) |
+| DECISION3 | gateway 재시작을 알아채는 방법 | plugin 이 정리 없는 `get_running_pid` 로 gateway pid 를 읽고 `/proc` 로 시작 시각을 구해 답하고, Control Plane 이 대기 시각과 비교한다 | 작성자 | Hermes core 를 고치지 않고, 대시보드도 같은 부름으로 gateway 상태를 본다. `fos-ctx` 가 적재 때 표식을 남기는 방법은 plugin 을 다시 읽을 때도 표식이 바뀌어 재시작으로 잘못 본다 |
+| DECISION4 | 재시작 감지의 시각 비교 | 결과 트랜잭션 시각인 `restart_required_since` 와 벽시계 기동 시각을 2초 여유로 비교한다. Control Plane 이 마지막으로 본 값을 저장하지 않는다 | 작성자 | 배포는 Control Plane 과 gateway 를 함께 다시 띄우므로, 메모리에 둔 이전 값과 비교하면 배포 때의 재시작을 놓친다. 시작 트랜잭션 시각은 파일을 쓰기 전이라 틀린다 |
+| DECISION5 | 운영 조회의 인증 | 새 서비스 Bearer 토큰 하나 | 작성자 | 사용자 JWT 를 운영 작업에 줄 수 없고, 기존 서비스 토큰은 용도가 달라 범위를 넓히지 않는다 |
+| DECISION6 | 재시작 판단의 자리 | 운영 정기 작업. Control Plane 은 수만 답한다 | 작성자 | 재시작 수단과 6시간 상한의 기록이 운영 쪽에 있고, Control Plane 에 재시작 권한을 주지 않는다 |
+| DECISION7 | 새 칸의 자리 | `agent_connector_binding` 의 칸 | 작성자 | 사용자 결정(2026-11-01) 「테이블은 늘리지 않는다」. 모두 바인딩 하나의 상태다 |
+| DECISION8 | 재시작 대기 줄의 다시 확인 | 기동 시각으로 재시작을 확인하고 아니면 거절한다. 읽지 못하면 지금처럼 진행한다. PR2 에 넣는다 | 사용자 2026-11-20 | 스펙 DECISION19. 기동 시각 조회가 PR2 에서 생긴다 |
+| DECISION9 | 실패 표시를 넣는 PR | PR1 | 작성자 | 껐다 켜기와 재시작 감지가 실패한 바인딩을 되풀이해 집지 않으려면 첫 PR 부터 표시가 있어야 한다. 화면에 보이는 것은 PR3 이다 |
+| DECISION10 | 「바쁜가」 의 범위 | `RUNNING` 줄과 `UserExecutionLimiter` 의 turn 자리, 원격 종료 확인 자리를 함께 본다 | 작성자 | 실행 줄을 끝냈어도 Hermes 의 run 이 아직 돌 수 있다. 스펙 DECISION13 의 「실행 기록」 보다 넓게 보아 기다림이 길어질 뿐 대화를 끊지 않는다 |
+| DECISION11 | 껐다 켜기 단계의 다시 확인 | 실패 표시를 비우고 그 단계의 다음 설치를 바로 보낸다 | 작성자 | 스펙 DECISION16 은 24시간이 넘은 줄에도 단추를 보이므로, 눌러서 아무것도 하지 않으면 꺼진 채 멈춘 바인딩을 풀 길이 없다 |
+
+
+## 결정 기록 연결
+
+| 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
+| --- | --- | --- | --- |
+| 스펙 DECISION3, 설계 DECISION1 부터 DECISION4 | architecture | [ADR-20261120 / connector-auto-apply](../../adr/ADR-20261120-connector-auto-apply.md). [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 의 값 교체 재시작 대기와 ADR-083 의 「반영」 행을 개정한다 | 이 설계, [플러그인 연결](../connector.md) 의 「바인딩의 반영 맞추기」, `hermes/plugins/dashboard-profile-api/README.md` |
+| 스펙 DECISION5, 설계 DECISION6 | architecture, areas: operations | 같은 ADR | 운영 정기 작업은 `fos-home-infra` |

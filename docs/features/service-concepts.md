@@ -2,10 +2,10 @@
 
 사용자가 대화에서 서비스의 기능(예약 작업, 기억, 할 일, 외부 서비스 연결, 모델 단계, 에이전트 고르기, 파일 공간)을 평소 말로 부르면 에이전트가 알아듣고 직접 처리하거나 그 화면으로 안내하는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/context/application/ServiceConceptsInstructions.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpConnectorListTool.java`, `test/model-eval/concepts/`, `backend/src/main/java/com/bifos/assistant/chat/artifact/application/ArtifactService.java`
+covers: `backend/src/main/java/com/bifos/assistant/context/application/ServiceConceptsInstructions.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpConnectorListTool.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpTaskTools.java`, `backend/src/main/java/com/bifos/assistant/task/application/TaskAgentRequests.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/ControlPlaneApprovals.java`, `test/model-eval/concepts/`, `backend/src/main/java/com/bifos/assistant/chat/artifact/application/ArtifactService.java`
 
 요구와 결정은 스펙 [`service-concepts/spec.md`](service-concepts/spec.md), 구조는 설계 [`service-concepts/design.md`](service-concepts/design.md) 가 갖는다.
-스펙의 PR1 이 들어오면 모든 실행의 공통 지시문에 개념 목록이 들고, 에이전트는 직접 못 하는 기능을 그 화면 링크로 안내한다. 예약 작업, 할 일과 기억, 연결 붙이기의 직접 처리는 뒤 PR 이 더한다.
+스펙의 PR1 이 들어오면 모든 실행의 공통 지시문에 개념 목록이 들고, 에이전트는 직접 못 하는 기능을 그 화면 링크로 안내한다. PR2 부터 에이전트가 예약 작업을 바로 만들고 고치고 멈추고 다시 켜며, 지우기는 승인 카드로 한다. 할 일과 기억, 연결 붙이기의 직접 처리는 뒤 PR 이 더한다.
 
 ## 개념 목록
 
@@ -14,6 +14,10 @@ covers: `backend/src/main/java/com/bifos/assistant/context/application/ServiceCo
 ## 연결 안내
 
 `connector_list` 가 요청자의 플러그인마다 연결 상태, 이 에이전트에 붙은 상태, 연결 화면 링크를 준다. 결과 칸과 링크 규칙은 [설계](service-concepts/design.md) 의 「`connector_list`」 가 갖는다.
+
+## 예약 작업 도구
+
+`task_list`, `task_create`, `task_update`, `task_set_state`, `task_delete` 가 요청자의 일반 예약 작업을 다룬다. 만든 작업은 그 대화의 에이전트로 돌고 결과는 그 대화에 쌓인다. 지우기는 플러그인 승인 카드와 같은 자리에 「예약 작업 지우기」 카드를 띄우고, 승인하면 지운 뒤 알림 줄만 남긴다. 인자, 기본값, 카드 줄은 [설계](service-concepts/design.md) 의 「PR2 예약 작업 도구」 가 갖는다.
 
 ## 평가 세트
 
