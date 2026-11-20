@@ -27,7 +27,7 @@
 | REQ19 | REQ18 과 같은 PR 이 함께 설계한다 |
 | REQ20 | 모델이 바탕이나 참고에 `link:<사용자가 보낸 주소>` 를 적는다. fos-ctx 는 PR3 의 받기 경로로 같은 가리킴을 보내고, Control Plane 이 주소를 열어 사진이면 그대로, 웹 페이지면 대표 사진(`og:image`)을 받아 원본 바이트로 돌려준다 |
 | REQ21 | Control Plane 이 origin 실행의 대화에서 요청자가 보낸 사용자 메시지에 그 주소가 있는지 먼저 본다. 받을 때는 넘어가는 주소마다 https, 공개 IP, 사진 형식, 20MiB 를 검사하고 까닭마다 다른 오류 코드를 낸다. fos-ctx 가 그 코드를 가리킴별 까닭 글로 바꿔 호출을 막는다 |
-| REQ22 | fos-ctx 가 그 호출에 쓴 링크를 기억했다가 그림 올리기에 함께 보낸다. Control Plane 은 그림 행의 새 칸에 지시문과 같은 key 로 암호화해 두고 메시지 응답으로 내보낸다. 화면이 「그림 지시문 보기」 안에 링크로 그린다 |
+| REQ22 | fos-ctx 가 그 호출에 쓴 링크를 기억했다가 그림 올리기에 함께 보낸다. Control Plane 은 그림 행의 새 칸에 지시문과 같은 방식으로 암호화해 두고 메시지 응답으로 내보낸다. 화면이 「그림 지시문 보기」 안에 링크로 그린다 |
 | REQ23 | Control Plane 은 받은 바이트를 저장하지 않고 응답으로만 준다. fos-ctx 의 사본은 PR3 과 같이 결과 hook 이 지운다 |
 | REQ24 | PR6 이 설계한다. 방향은 실행 입력의 그림 규칙(`IMAGE_RULES`) 글을 고치는 것이다 |
 | REQ25 | REQ24 와 같은 PR 이 함께 설계한다 |
@@ -396,7 +396,7 @@ PR3 의 `POST /internal/hermes/image-source` 에 오류 코드를 더한다. 200
 
 - fos-ctx 는 `prepare` 에서 받은 `link:` 가리킴마다 응답 머리 `X-Image-Source-Link` 의 주소를 사본과 같은 `(session_id, tool_call_id)` 로 기억한다. 결과 hook 의 올리기 meta 에 `source_links`(주소 목록, 쓴 순서)를 넣는다
 - 서명은 `source_links` 가 있을 때만 메시지 끝에 줄 하나(주소를 줄바꿈으로 이은 글의 SHA-256)를 더한다. 없으면 지금 메시지 그대로라 링크 없는 그림은 옛 쪽과 새 쪽이 서로 통한다. 옛 Control Plane 은 줄이 더 붙은 서명을 거절한다. 옛 서버는 `link:` 받기부터 막으므로, 받기와 올리기 사이에 Control Plane 을 되돌린 경우만 그림이 저장되지 않는다. 이것은 감수한다
-- Control Plane 은 `chat_artifact` 에 새 칸 `generation_source_links`(LONGTEXT, JSON 배열)를 더한다. 지시문과 링크를 **한 번의 암호화 호출에 같은 key 번호로** 봉한다. 지시문을 봉한 key 번호를 받아 그 key 로 링크를 봉하는 cipher API 를 쓰거나 더한다. AAD 는 지시문의 AAD 에 `:links` 를 붙인다. key 가 없어 지시문이 평문이면 링크도 평문이다. 둘 중 하나만 평문인 행은 생기지 않는다. 새 표를 만들지 않는다(사용자 결정 2026-11-01)
+- Control Plane 은 `chat_artifact` 에 새 칸 `generation_source_links`(LONGTEXT, JSON 배열)와 `generation_source_links_key_id` 를 더한다. 링크는 지시문과 같은 `OwnedTextCipher.seal` 로 따로 봉하고 그 key 번호를 자기 칸에 둔다. `seal` 은 key 를 고를 수 없어, 두 번 부르는 사이 key 가 바뀌어도 각자 자기 key 번호로 풀리게 한다. AAD 는 지시문의 AAD 에 `:links` 를 붙인다. 암호화가 꺼져 있으면 평문이고, `seal` 이 실패하면 지시문과 같이 평문으로 내려 저장하지 않는다. 링크가 없으면 두 칸 모두 비운다. 새 표를 만들지 않는다(사용자 결정 2026-11-01)
 - 메시지 응답의 그림 항목에 `sourceLinks`(문자열 배열, 없으면 빈 배열)를 더한다. 보관본에는 넣지 않는다(스펙 DECISION18 과 같은 까닭)
 - 대화를 지우면 행과 함께 지워진다
 
@@ -492,7 +492,7 @@ PR1 의 배포 순서는 자유다. Control Plane 을 먼저 올리면 새 경�
 | DECISION15 | 링크 사진을 넘기는 길 | PR3 의 받기 경로에 `link:` 가리킴을 더하고 Control Plane 이 받는다 | 작성자 | [ADR-20261120 / link-image-source](../../adr/ADR-20261120-link-image-source.md). 링크가 대화에 있는지는 메시지를 가진 Control Plane 만 판정한다 |
 | DECISION16 | 바깥 주소의 받기 | 기존 `ArtifactSourceFetcher` 의 DNS 고정 전송과 공개 IP 판정을 같이 쓰고 허용 주소 목록만 뺀 새 받기 객체. 실행기와 상한은 따로 갖는다 | 작성자 | 내부망 차단을 두 벌로 만들지 않는다. 허용 목록은 스티커 받기의 규칙으로 남긴다 |
 | DECISION17 | 대표 사진을 찾는 방법 | HTML 앞 2MiB 에서 `og:image`, `og:image:secure_url`, `twitter:image` 의 meta 만 찾는다. HTML 파서 의존성을 더하지 않는다 | 작성자 | 공유용 대표 사진(스펙 DECISION35)은 meta 하나다. 페이지 전체를 해석할 까닭이 없다 |
-| DECISION18 | 쓴 링크를 두는 곳 | `chat_artifact` 의 새 칸, 지시문과 같은 key 로 암호화 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 링크는 사용자 메시지에서 온 글이라 메시지와 같이 암호화한다. 지시문 글에 섞으면 REQ5 의 「이미지 도구에 넘긴 지시문과 같은 글」 이 깨진다 |
+| DECISION18 | 쓴 링크를 두는 곳 | `chat_artifact` 의 새 칸 둘(링크와 그 key 번호), 지시문과 같은 방식으로 암호화 | 작성자 | 새 표를 만들지 않는다(사용자 결정 2026-11-01). 링크는 사용자 메시지에서 온 글이라 메시지와 같이 암호화한다. 지시문 글에 섞으면 REQ5 의 「이미지 도구에 넘긴 지시문과 같은 글」 이 깨진다 |
 | DECISION19 | 링크 하나의 제한 시간 | 10초, 설정 값 | 작성자 | fos-ctx 한 호출의 받기 예산 15초 안에서 도구 판정과 다른 가리킴이 함께 끝나야 한다 |
 | DECISION20 | 홈서버 자신에게 되돌아오는 요청 | 설정 값 금지 목록(호스트 이름과 IP 대역)을 넘어가는 주소마다 검사한다. 값은 운영 저장소가 갖는다 | 작성자 | 허용 목록을 빼면 공개 IP 판정만 남아, 홈서버의 공개 주소로 풀리는 링크가 공유기를 돌아 내부 서비스에 닿는다 |
 | DECISION21 | 받고 남기는 주소의 꼴 | Control Plane 이 대화에서 맞춘 주소를 https, 소문자 호스트, ASCII 퍼센트 인코딩으로 바꿔 받고 응답 머리로 돌려준다 | 작성자 | 모델이 적은 글자 그대로 받으면 한글 경로가 깨지고 대문자 호스트가 막힌다. 화면 링크(스펙 DECISION46)가 늘 https 주소가 된다 |
