@@ -13,6 +13,7 @@ public record GeneratedImageMention(String title, List<String> sourceLinks) {
     /** 모델이 {@code link:} 뒤에 적을 수 있는 주소의 길이 상한이다. 받기 경로의 가리킴 해석과 그림 제목 줄이 같은 값을 쓴다. */
     public static final int MAX_LINK_CHARS = 2048;
 
+
     public GeneratedImageMention {
         sourceLinks = sourceLinks == null ? List.of() : List.copyOf(sourceLinks);
     }

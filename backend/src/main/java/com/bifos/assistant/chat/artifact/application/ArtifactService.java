@@ -80,7 +80,6 @@ public class ArtifactService {
     /** 실행 입력에 제목을 적는 만든 그림의 수다. 새것부터 센다(스펙 generated-image REQ17). */
     static final int IMAGE_TITLE_LIMIT = 20;
 
-
     /**
      * 파일 공간 규칙이다(스펙 workspace REQ7, REQ8). 조건을 먼저 적는다. 조건 없는 지시는 싼 모델이 요청과 상관없이 따른다.
      *
