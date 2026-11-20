@@ -1124,7 +1124,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(listed)
             .containsExactly(new AdminConnectionSnapshot(
-                DEMO, member.id(), member.displayName(), agent.code(), BindingStatus.PENDING, true, NOW, 0, false, null));
+                DEMO, member.id(), member.displayName(), agent.code(), BindingStatus.PENDING, true, NOW, 0, false, null, false));
         assertCode(() -> service.listForAdmin(member), ErrorCode.FORBIDDEN);
     }
 

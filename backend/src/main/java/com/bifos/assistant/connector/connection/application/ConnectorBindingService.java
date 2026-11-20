@@ -325,6 +325,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
         restarts.requireRestarted(binding, startedAt);
+        attempts.requireNotInstalling(binding, now());
         return new Confirmed(attempts.begin(binding, manifest, true, true, false, now()), manifest.orElse(null));
     }
 

@@ -168,7 +168,8 @@ public class ConnectorBindingInstalls {
         } else {
             binding.pending(now);
             // 켜기는 같은 설치를 다시 보낼 뿐이라 실패해도 여기서 표시하지 않는다. 횟수 상한은 ConnectorBindingCycles 가 센다.
-            if (attempt.automatic() && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
+            boolean failing = attempt.automatic() || attempt.resumedFailure();
+            if (failing && FAILED.contains(result.outcome()) && attempt.cycleStep() != CycleStep.ON) {
                 binding.markApplyFailed(now);
             }
             binding.trackWaiting(now);

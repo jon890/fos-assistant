@@ -96,16 +96,16 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
 
 
     /**
-     * 공유 gateway 재시작으로 풀릴 재시작 대기 바인딩의 수와 가장 오래된 대기 시각이다(ADR-20261120 / connector-auto-apply). 운영 정기
+     * 공유 gateway 재시작으로 풀릴 재시작 대기 바인딩의 연결 사용자와 대기 시각이다(ADR-20261120 / connector-auto-apply). 운영 정기
      * 작업이 재시작할지 정할 때 읽는다. 재시작 감지({@link #findRestartWaiting})처럼 실패 표시가 있거나 껐다 켜기 단계거나 대기 시각이 빈 옛
      * 바인딩은 뺀다. 재시작으로 풀리지 않아 세면 운영 작업이 재시작을 되풀이한다. 반영 예정 시각이 남은 바인딩도 재시작을 기다리므로 센다.
      * 생성자 식을 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
      */
-    @Query("select new com.bifos.assistant.connector.connection.domain.RestartWaiting(count(b), min(b.restartRequiredSince))"
+    @Query("select new com.bifos.assistant.connector.connection.domain.RestartWaiting(b.connection.userId, b.restartRequiredSince)"
         + " from ConnectorBinding b"
         + " where b.restartRequired = true and b.restartRequiredSince is not null and b.applyFailedAt is null"
         + " and b.cyclePhase is null")
-    RestartWaiting summarizeRestartWaiting();
+    List<RestartWaiting> findRestartWaitingOwners();
 
 
     /**

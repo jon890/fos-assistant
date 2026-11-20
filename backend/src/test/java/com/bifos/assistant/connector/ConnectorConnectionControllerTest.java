@@ -327,10 +327,11 @@ class ConnectorConnectionControllerTest {
         Instant recent = SHOWN.plus(Duration.ofHours(2));
         when(service.listForAdmin(ADMIN))
             .thenReturn(List.of(
-                new AdminConnectionSnapshot(DEMO, 7L, "사용자", AGENT, BindingStatus.PENDING, true, SHOWN, 3, false, SHOWN),
-                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-recent", BindingStatus.PENDING, true, recent, 0, false, recent),
-                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-failed", BindingStatus.PENDING, false, null, 0, true, recent),
-                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-ready", BindingStatus.READY, false, null, 1, false, null)));
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", AGENT, BindingStatus.PENDING, true, SHOWN, 3, false, SHOWN, false),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-recent", BindingStatus.PENDING, true, recent, 0, false, recent, false),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-failed", BindingStatus.PENDING, false, null, 0, true, recent, false),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-installing", BindingStatus.PENDING, false, null, 0, true, SHOWN, true),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-ready", BindingStatus.READY, false, null, 1, false, null, false)));
 
         mvc.perform(get("/api/v1/admin/connections"))
             .andExpect(status().isOk())
@@ -349,6 +350,7 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[2].applyFailed").value(true))
             .andExpect(jsonPath("$[2].recheckable").value(true))
             .andExpect(jsonPath("$[3].recheckable").value(false))
+            .andExpect(jsonPath("$[4].recheckable").value(false))
             .andExpect(jsonPath("$[0].secretPrefixes").doesNotExist())
             .andExpect(jsonPath("$[0].values").doesNotExist());
     }

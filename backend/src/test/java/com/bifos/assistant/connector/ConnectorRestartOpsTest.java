@@ -25,6 +25,8 @@ import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.application.port.HermesGatewayClient;
+import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -51,6 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -116,6 +119,12 @@ class ConnectorRestartOpsTest {
     @Autowired
     TestClock clock;
 
+    @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
+    TransactionTemplate transactions;
+
     private CurrentUser owner;
 
 
@@ -139,6 +148,7 @@ class ConnectorRestartOpsTest {
         bindings.deleteAll();
         connections.deleteAll();
         agents.deleteAll();
+        jdbc.update("DELETE FROM allowed_person WHERE email = ?", owner.email());
         users.deleteAll();
         clock.reset();
     }
@@ -173,6 +183,23 @@ class ConnectorRestartOpsTest {
         JsonNode waiting = ok();
         assertThat(waiting.get("restartWaiting").longValue()).isEqualTo(2);
         assertThat(Instant.parse(waiting.get("oldestWaitingSince").stringValue())).isBetween(T0, T0.plusMillis(1));
+    }
+
+
+    @Test
+    @DisplayName("접근이 철회된 사용자의 대기는 재시작으로 풀리지 않으므로 세지 않는다")
+    void skipsWaitsOfRevokedOwners() throws Exception {
+        bindWaiting();
+        assertThat(ok().get("restartWaiting").longValue()).isEqualTo(1);
+        transactions.executeWithoutResult(status -> {
+            AllowedPerson person = people.save(AllowedPerson.of(owner.email(), "사용자", "revoked-" + owner.id()));
+            person.disable();
+            people.saveAndFlush(person);
+        });
+
+        JsonNode waiting = ok();
+        assertThat(waiting.get("restartWaiting").longValue()).isZero();
+        assertThat(waiting.get("oldestWaitingSince").isNull()).isTrue();
     }
 
 

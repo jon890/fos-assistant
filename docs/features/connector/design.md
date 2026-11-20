@@ -162,8 +162,8 @@
 ```
 
 - `restartWaiting` 은 실패 표시가 없는 재시작 대기 바인딩 수다. 껐다 켜기 단계와 실패한 바인딩은 세지 않는다. 실패한 바인딩은 재시작으로 풀리지 않아 세면 운영 작업이 재시작을 되풀이한다.
-- `restartWaiting` 은 재시작 감지와 같이 `restart_required_since` 가 빈 옛 줄도 뺀다. `oldestWaitingSince` 는 그 가운데 가장 이른 `restart_required_since` 다.
-- `runningExecutions` 는 turn 자리, 원격 종료 확인 자리, `RUNNING` 줄 전부의 합이다. 대화 turn 의 루트 줄이 turn 자리와 겹쳐 실제보다 많이 세지만, 재기동 뒤 turn 자리 없이 남은 루트 줄을 놓치지 않는다. 많이 세면 재시작이 늦어질 뿐이다.
+- `restartWaiting` 은 재시작 감지와 같이 `restart_required_since` 가 빈 옛 줄도 빼고, 연결 사용자가 없거나 접근이 철회된 줄도 뺀다. 재시작 감지가 사용자 잠금에서 거절해 재시작으로 풀리지 않기 때문이다. `oldestWaitingSince` 는 그 가운데 가장 이른 `restart_required_since` 다.
+- `runningExecutions` 는 turn 자리, 원격 종료 확인 자리, `RUNNING` 줄 전부의 합이다. `RUNNING` 줄을 먼저 읽고 메모리 자리를 뒤에 읽어, 줄을 끝내며 원격 종료 확인으로 넘어가는 실행을 놓치지 않는다. 대화 turn 의 루트 줄이 turn 자리와 겹쳐 실제보다 많이 세지만, 재기동 뒤 turn 자리 없이 남은 루트 줄을 놓치지 않는다. 많이 세면 재시작이 늦어질 뿐이다.
 - 토큰은 환경 변수 `CONNECTOR_OPS_TOKEN`(설정 `assistant.connector.ops.token`)으로 받는다. 비어 있으면 조회는 늘 401 이다.
 - 재시작 여부, 6시간 상한, 재시작 뒤 확인은 운영 정기 작업이 정한다. 요청 본문은 PR3 이 써서 `fos-home-infra` 에 넘긴다. 이 저장소에는 두지 않는다.
 

@@ -16,6 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -47,6 +48,8 @@ import org.hibernate.annotations.ColumnDefault;
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConnectorBinding extends CreatedAtEntity {
+    /** 설치 시도 하나가 결과를 적기까지 걸릴 수 있는 시간의 넉넉한 상한이다. 설치와 상태 조회, probe 의 HTTP 를 덮는다. */
+    private static final Duration INSTALL_IN_FLIGHT = Duration.ofMinutes(10);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -340,6 +343,15 @@ public class ConnectorBinding extends CreatedAtEntity {
         }
         this.applyFailedAt = null;
         clearWaiting();
+    }
+
+
+    /**
+     * 시작 트랜잭션이 커밋한 설치 시도의 결과를 아직 적지 않았는가. 그 사이 관리자 다시 확인이 새 시도를 시작하면 진행 중인 설치의 결과가
+     * 버려진다. 결과 커밋이 실패해 시도가 남은 줄을 영영 막지 않도록 {@code INSTALL_IN_FLIGHT} 가 지나면 끝난 것으로 본다.
+     */
+    public boolean installInFlight(Instant now) {
+        return this.installAttemptId != null && this.updatedAt.isAfter(now.minus(INSTALL_IN_FLIGHT));
     }
 
 

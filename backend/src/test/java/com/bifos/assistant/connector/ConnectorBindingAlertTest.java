@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -36,10 +37,15 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -249,6 +255,55 @@ class ConnectorBindingAlertTest {
         assertThat(alerts.notifyDue()).isZero();
         assertThat(binding().waitingSince()).isNull();
         assertThat(binding().adminNotifiedAt()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("자동 반영이 실패한 바인딩을 관리자가 다시 확인했는데 또 실패하면 실패 표시가 남아 사용자 화면이 실패를 보인다")
+    void failedRecheckKeepsFailure() {
+        markFailed();
+        Instant since = binding().restartRequiredSince();
+        doReturn(new InstallResult(false, false, false))
+            .when(connector).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
+
+        assertThatThrownBy(() -> service.confirmApplied(adminUser(), agent.code(), DEMO, since))
+            .isInstanceOf(ApiException.class);
+
+        ConnectorBinding failed = binding();
+        assertThat(failed.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(failed.applyFailedAt()).as("다시 확인도 실패했다").isNotNull();
+        assertThat(service.listForAgent(owner, agent.code()).connections())
+            .filteredOn(view -> view.connectorId().equals(DEMO))
+            .singleElement()
+            .satisfies(view -> assertThat(view.applyFailed()).isTrue());
+    }
+
+
+    @Test
+    @DisplayName("시작한 설치의 결과를 아직 적지 않은 바인딩은 다시 확인을 거절하고, 시도가 오래 남았으면 받는다")
+    void recheckWaitsForInstallInFlight() {
+        Instant since = binding().restartRequiredSince();
+        jdbc.update("UPDATE agent_connector_binding SET install_attempt_id = ?, updated_at = ? WHERE id = ?",
+            uuidBytes(UUID.randomUUID()), Timestamp.from(clock.instant()), binding().id());
+        assertThat(binding().installInFlight(clock.instant())).isTrue();
+
+        assertThatThrownBy(() -> service.confirmApplied(adminUser(), agent.code(), DEMO, since))
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.CONNECTOR_APPLY_SCHEDULED);
+        assertThat(binding().installInFlight(clock.instant().plus(Duration.ofMinutes(11))))
+            .as("결과 저장이 실패해 남은 시도는 영영 막지 않는다").isFalse();
+    }
+
+
+    private CurrentUser adminUser() {
+        return new CurrentUser(admin.id(), admin.email(), admin.displayName(), admin.groupId(), admin.role());
+    }
+
+
+    private static byte[] uuidBytes(UUID id) {
+        return ByteBuffer.allocate(16).putLong(id.getMostSignificantBits()).putLong(id.getLeastSignificantBits()).array();
     }
 
 
