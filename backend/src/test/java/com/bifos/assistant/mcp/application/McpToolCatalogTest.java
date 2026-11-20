@@ -71,7 +71,8 @@ class McpToolCatalogTest {
             new McpContentDraftSnapshots(null, null, null, null),
             new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
             new McpApprovalResumeTool(mock(ApprovalResumes.class)),
-            new McpFileSpaceTools(null, null, null));
+            new McpFileSpaceTools(null, null, null),
+            new McpConnectorListTool(mock(ConnectorListing.class)));
 
         assertThat(catalog.tools()).allSatisfy(tool -> {
             assertThat(tool.get("inputSchema")).isInstanceOf(Map.class);
