@@ -11,6 +11,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 public class ConnectorOAuthApps {
     // UTF-8로 감싼 뒤에도 server_secret.sealed_value 열에 들어가는 길이다.
     private static final int MAX_CREDENTIAL_LENGTH = 512;
+    private static final String APP_NAME_PREFIX = "oauth_app:";
     private static final String CLIENT_ID = "clientId";
     private static final String APP_SLUG = "appSlug";
 
@@ -45,7 +47,8 @@ public class ConnectorOAuthApps {
 
 
     public ConnectorOAuthAppStatus save(String connectorId, String clientId, String clientSecret, String appSlug, Long adminId) {
-        ConnectorManifest manifest = requireDeclaredApp(connectorId);
+        ConnectorManifest manifest = declaredApp(connectorId)
+            .orElseThrow(() -> new ApiException(ErrorCode.CONNECTOR_NOT_FOUND, "connector has no OAuth app"));
         Map<String, Object> metadata = Map.of(CLIENT_ID, credential(clientId));
         if (manifest.oauth().appScope() == AppScope.PLUGIN) {
             if (appSlug == null || !appSlug.matches("[A-Za-z0-9][A-Za-z0-9-]{0,99}")) {
@@ -63,17 +66,27 @@ public class ConnectorOAuthApps {
 
 
     public void clear(String connectorId, Long adminId) {
-        ConnectorManifest manifest = requireDeclaredApp(connectorId);
+        Optional<ConnectorManifest> manifest = declaredApp(connectorId);
         synchronized (writes) {
-            secrets.clear(secretName(manifest), adminId);
+            String name = manifest.map(ConnectorOAuthApps::secretName).orElseGet(() -> previousPluginApp(connectorId));
+            secrets.clear(name, adminId);
         }
     }
 
 
-    private ConnectorManifest requireDeclaredApp(String connectorId) {
+    private Optional<ConnectorManifest> declaredApp(String connectorId) {
         return ConnectorManifests.find(connectors, connectorId)
-            .filter(manifest -> manifest.oauth() != null)
-            .orElseThrow(() -> new ApiException(ErrorCode.CONNECTOR_NOT_FOUND, "connector has no OAuth app"));
+            .filter(manifest -> manifest.oauth() != null);
+    }
+
+
+    /** 카탈로그에서 빠진 플러그인은 그 플러그인 명의로 이미 저장된 앱만 비울 수 있다. */
+    private String previousPluginApp(String connectorId) {
+        String name = APP_NAME_PREFIX + "github:" + connectorId;
+        if (!connectorId.matches("[a-z0-9][a-z0-9-]{0,63}") || !secrets.exists(name)) {
+            throw new ApiException(ErrorCode.CONNECTOR_NOT_FOUND, "connector has no OAuth app");
+        }
+        return name;
     }
 
 
@@ -89,7 +102,7 @@ public class ConnectorOAuthApps {
 
 
     private static String secretName(ConnectorManifest manifest) {
-        String prefix = "oauth_app:" + manifest.oauth().provider();
+        String prefix = APP_NAME_PREFIX + manifest.oauth().provider();
         return manifest.oauth().appScope() == AppScope.PLUGIN ? prefix + ":" + manifest.id() : prefix;
     }
 

@@ -560,4 +560,6 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 `ADMIN` 은 `GET /api/v1/admin/secrets/connector-oauth/apps` 에서 카탈로그가 선언한 앱과 서버 비밀값 저장소 상태를 읽는다. 목록의 `connectorId` 를 경로 뒤에 붙여 `PUT` 으로 `clientId`, `clientSecret`, 플러그인별 앱의 `appSlug` 를 저장하고 `DELETE` 로 비운다. 공유 앱은 같은 제공자의 플러그인이 한 설정을 쓴다.
 
+플러그인이 카탈로그에서 빠진 뒤에도 이미 저장한 플러그인별 GitHub 앱은 같은 `connectorId` 로 비울 수 있다.
+
 응답은 client ID와 App 이름, 비밀값의 입력 여부와 앞부분, 마지막 변경을 준다. 저장 위치와 연결 흐름은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.

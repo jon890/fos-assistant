@@ -99,6 +99,26 @@ class ConnectorOAuthAppAdminControllerTest {
 
 
     @Test
+    @DisplayName("카탈로그에서 빠진 플러그인의 기존 앱은 비울 수 있다")
+    void clearsStoredAppAfterPluginIsRemoved() throws Exception {
+        signIn(UserRole.ADMIN);
+        when(hermes.readCatalog()).thenReturn(List.of(manifest("demo-obsolete", "github", AppScope.PLUGIN)));
+        mvc.perform(save("demo-obsolete", "demo-app")).andExpect(status().isOk());
+
+        when(hermes.readCatalog()).thenReturn(List.of());
+        mvc.perform(save("demo-obsolete", "demo-app")).andExpect(status().isNotFound());
+        mvc.perform(delete(APPS + "/demo-obsolete")).andExpect(status().isNoContent());
+        mvc.perform(delete(APPS + "/demo-missing")).andExpect(status().isNotFound());
+
+        assertThat(secrets.find("oauth_app:github:demo-obsolete")).hasValueSatisfying(row -> {
+            assertThat(row.set()).isFalse();
+            assertThat(row.meta()).isEmpty();
+        });
+        assertThat(secrets.find("oauth_app:github:demo-missing")).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("앱은 선언 범위대로 저장하고 관리자 응답에는 비밀 앞부분만 보인다")
     void storesEncryptedAppCredentialsAndUsesDeclaredScope() throws Exception {
         signIn(UserRole.ADMIN);
