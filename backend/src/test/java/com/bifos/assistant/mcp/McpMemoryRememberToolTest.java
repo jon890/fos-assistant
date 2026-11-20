@@ -481,6 +481,28 @@ class McpMemoryRememberToolTest {
 
 
     @Test
+    @DisplayName("기억 찾기만 부른 대화는 바깥 글을 읽지 않은 것이라 바로 저장하고 요약이 요약 구역에 들어간다")
+    void remembersAfterMemorySearchOnly() throws Exception {
+        // 운영 확인에서 기억 찾기만 세 번 부른 대화의 기억이 「바깥 글」 표시를 단 제안이 되었고, 받아들인 뒤에도 요약이 없어 memory_read 를 불렀다
+        askedInThisTurn();
+        toolStarted("mcp__fos_assistant__memory_search");
+        toolStarted("mcp__fos_assistant__memory_search");
+        toolStarted("mcp__fos_assistant__memory_search");
+
+        assertThat(text(call(remember("자전거 이름", "자전거 이름은 파랑돌이다", null).put("summary", "자전거 이름 파랑돌"))))
+            .startsWith(REMEMBERED);
+
+        Memory saved = onlyMemory();
+        assertThat(saved.status()).isEqualTo(MemoryStatus.ACCEPTED);
+        assertThat(capturesOfDad())
+            .extracting(MemoryCapture::externalRead)
+            .containsExactly(false);
+        assertThat(assembler.assemble(currentDad(), dadRun.agentId()).instructions())
+            .contains("- [" + saved.id() + "] 자전거 이름: 자전거 이름 파랑돌");
+    }
+
+
+    @Test
     @DisplayName("붙은 커넥터의 READ 도구를 시작한 대화의 기억은 근거가 질문에 있어도 제안이다")
     void proposesAfterConnectorReadTool() throws Exception {
         // docs/features/connector-policy.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
