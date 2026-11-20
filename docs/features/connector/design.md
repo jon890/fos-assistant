@@ -212,7 +212,7 @@ MySQL 의 새 칸은 Draft CI 의 `backend-mysql` 이 확인한다.
 | DECISION1 | 껐다 켜기를 누가 진행하나 | Control Plane 이 단계를 저장하고 예약 작업으로 끄기와 켜기를 따로 보낸다. plugin 은 요청받은 쓰기만 한다 | 작성자 | 「바쁜가」 확인(스펙 DECISION18)과 재시작 뒤 이어 하기가 Control Plane 에 있다. plugin 안의 타이머는 대시보드가 다시 뜨면 서버를 꺼진 채 남긴다 |
 | DECISION2 | 꺼진 상태를 두는 곳 | 설정의 서버 항목과 따로 둔 끄기 기록. 소유 기록은 바꾸지 않는다 | 작성자 | 소유 기록은 서버 정의의 `enabled` 가 참이어야 읽혀, 바꾸면 같은 profile 의 모든 바인딩과 이전 이미지가 멈춘다(`connector_state.py`) |
 | DECISION3 | gateway 재시작을 알아채는 방법 | plugin 이 정리 없는 `get_running_pid` 로 gateway pid 를 읽고 `/proc` 로 시작 시각을 구해 답하고, Control Plane 이 대기 시각과 비교한다 | 작성자 | Hermes core 를 고치지 않고, 대시보드도 같은 부름으로 gateway 상태를 본다. `fos-ctx` 가 적재 때 표식을 남기는 방법은 plugin 을 다시 읽을 때도 표식이 바뀌어 재시작으로 잘못 본다 |
-| DECISION4 | 재시작 감지의 시각 비교 | 결과 트랜잭션 시각인 `restart_required_since` 와 벽시계 기동 시각을 2초 여유로 비교한다. Control Plane 이 마지막으로 본 값을 저장하지 않는다 | 작성자 | 배포는 Control Plane 과 gateway 를 함께 다시 띄우므로, 메모리에 둔 이전 값과 비교하면 배포 때의 재시작을 놓친다. 시작 트랜잭션 시각은 파일을 쓰기 전이라 틀린다 |
+| DECISION4 | 재시작 감지의 시각 비교 | 결과 트랜잭션 시각인 `restart_required_since` 와 벽시계 기동 시각을 2초 여유로 비교한다. Control Plane 이 마지막으로 본 값을 저장하지 않는다. Control Plane 의 시계와 Hermes 컨테이너 커널의 시계가 맞는다는 전제다(같은 호스트나 시간 동기화) | 작성자 | 배포는 Control Plane 과 gateway 를 함께 다시 띄우므로, 메모리에 둔 이전 값과 비교하면 배포 때의 재시작을 놓친다. 시작 트랜잭션 시각은 파일을 쓰기 전이라 틀린다 |
 | DECISION5 | 운영 조회의 인증 | 새 서비스 Bearer 토큰 하나 | 작성자 | 사용자 JWT 를 운영 작업에 줄 수 없고, 기존 서비스 토큰은 용도가 달라 범위를 넓히지 않는다 |
 | DECISION6 | 재시작 판단의 자리 | 운영 정기 작업. Control Plane 은 수만 답한다 | 작성자 | 재시작 수단과 6시간 상한의 기록이 운영 쪽에 있고, Control Plane 에 재시작 권한을 주지 않는다 |
 | DECISION7 | 새 칸의 자리 | `agent_connector_binding` 의 칸 | 작성자 | 사용자 결정(2026-11-01) 「테이블은 늘리지 않는다」. 모두 바인딩 하나의 상태다 |

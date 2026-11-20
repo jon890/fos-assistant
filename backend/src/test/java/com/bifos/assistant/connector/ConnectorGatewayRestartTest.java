@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -404,6 +405,54 @@ class ConnectorGatewayRestartTest {
             .isInstanceOfSatisfying(ApiException.class,
                 ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_APPLY_SCHEDULED));
         verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+    }
+
+
+    @Test
+    @DisplayName("기동 시각보다 앞선 대기가 없으면 카탈로그를 읽지 않는다")
+    void noEarlierWaitSkipsCatalog() {
+        Agent agent = bindWaiting();
+        clearInvocations(connector);
+        when(gateway.startedAt()).thenReturn(Optional.of(T0.minusSeconds(60)));
+
+        restarts.detect();
+
+        verify(gateway, times(1)).startedAt();
+        verify(connector, never()).readCatalog();
+        assertThat(bindingOf(agent).restartRequired()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("카탈로그를 읽지 못한 주기는 실패 표시 없이 건너뛰고 다음 주기에 반영 맞춘다")
+    void catalogFailureSkipsCycle() {
+        Agent agent = bindWaiting();
+        clock.advance(Duration.ofMinutes(1));
+        when(gateway.startedAt()).thenReturn(Optional.of(clock.instant()));
+        stubInstall(UNCHANGED);
+        doThrow(new IllegalStateException()).when(connector).readCatalog();
+
+        restarts.detect();
+
+        ConnectorBinding skipped = bindingOf(agent);
+        assertThat(skipped.restartRequired()).isTrue();
+        assertThat(skipped.applyFailedAt()).isNull();
+
+        doReturn(List.of(DEMO_MANIFEST)).when(connector).readCatalog();
+        restarts.detect();
+        assertThat(bindingOf(agent).status()).isEqualTo(BindingStatus.READY);
+    }
+
+
+    @Test
+    @DisplayName("대기 시각이 빈 옛 재시작 대기 바인딩만 있으면 기동 시각을 읽지 않는다")
+    void legacyWaitWithoutSinceIsNotATarget() {
+        Agent agent = bindWaiting();
+        jdbc.update("UPDATE agent_connector_binding SET restart_required_since = NULL WHERE id = ?", bindingOf(agent).id());
+
+        applier.runScheduled();
+
+        verify(gateway, never()).startedAt();
     }
 
 

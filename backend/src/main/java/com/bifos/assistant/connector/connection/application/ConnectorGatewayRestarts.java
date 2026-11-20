@@ -62,19 +62,23 @@ public class ConnectorGatewayRestarts {
     /**
      * 재시작 대기 바인딩이 있으면 gateway 기동 시각을 한 번 읽고, 그 전에 대기가 된 바인딩마다 반영 맞추기를 한 번 돌린다.
      *
-     * <p>대상의 번호는 트랜잭션 밖에서 읽는다. 대상이 없으면 대시보드를 부르지 않는다. 바인딩마다 연결 사용자 행, 에이전트 행 차례로 잠근
+     * <p>대상의 번호는 트랜잭션 밖에서 읽는다. 재시작 대기가 없으면 대시보드를 부르지 않고, 기동 시각보다 앞선 대기가 없으면 카탈로그를 읽지 않는다. 바인딩마다 연결 사용자 행, 에이전트 행 차례로 잠근
      * 뒤 다시 읽어 조건이 그대로인지 본다. 반영 맞추기는 자동 경로라 실패하면 실패 표시가 남고 다시 집지 않는다. 카탈로그를 읽지 못한 주기는
      * 건너뛴다. 재시작 대기는 그대로 남아 다음 주기가 맡는다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
      *
      * @return 반영 맞추기를 돌려 결과를 적용한 바인딩 수
      */
     public int detect() {
-        List<DueBinding> waiting = bindings.findRestartWaiting(clock.instant());
-        if (waiting.isEmpty()) {
+        if (bindings.findRestartWaiting(clock.instant()).isEmpty()) {
             return 0;
         }
         Optional<Instant> startedAt = startedAt();
         if (startedAt.isEmpty()) {
+            return 0;
+        }
+        // 그 gateway 뒤에 대기가 생긴 바인딩만 남았으면 카탈로그를 읽지 않는다. 다음 재시작까지 매 주기 읽지 않으려는 것이다.
+        List<DueBinding> waiting = bindings.findRestartWaitingBefore(clock.instant(), startedAt.get().minus(CLOCK_SLACK));
+        if (waiting.isEmpty()) {
             return 0;
         }
         List<ConnectorManifest> catalog = readCatalog();
