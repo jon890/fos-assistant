@@ -57,6 +57,9 @@ public class SecurityConfig {
                 // support는 controller에서 서비스 Bearer만 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/connector-executions/support")
                 .permitAll()
+                // 운영 정기 작업의 재시작 조회는 controller 에서 서비스 Bearer 만 인증한다.
+                .requestMatchers(HttpMethod.GET, "/internal/ops/connector-restart")
+                .permitAll()
                 // 원고 저장 worker 의 범위 ticket 은 authorize controller 가 직접 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/content-draft-jobs/authorize")
                 .permitAll()

@@ -23,14 +23,15 @@ const key = (connection: AdminConnection) =>
   `${connection.agentCode}/${connection.connectorId}`;
 
 /**
- * 재시작 대기, 반영 중, 그 밖(선언하지 않은 도구만 남은 바인딩)으로 나눠 상태 글을 낸다.
- * 반영 중은 재시작이 필요 없는 바인딩이다. Control Plane 이 스스로 확인하지만,
- * 그 확인이 실패해 남은 줄은 관리자가 반영 완료로 다시 확인할 수 있다.
+ * 반영 실패, 자동 반영 중, 그 밖(선언하지 않은 도구만 남은 바인딩)으로 나눠 상태 글을 낸다.
+ * 반영은 재시작 대기를 포함해 모두 Control Plane 이 스스로 한다. 자동 반영이 실패했거나 대기가 24시간을 넘은 줄만
+ * 관리자가 「다시 확인」 으로 다시 맞춘다(`recheckable`).
  * 바인딩의 `READY` 는 에이전트에 붙었다는 뜻이라 연결 상태의 「연결됨」 이 아니라 「붙음」 이다.
  */
 function statusText(connection: AdminConnection): string {
-  if (connection.restartRequired) return "반영 대기";
-  if (connection.status === "PENDING") return "반영 중";
+  if (connection.applyFailed) return "반영 실패";
+  if (connection.restartRequired || connection.status === "PENDING")
+    return "자동 반영 중";
   return "붙음";
 }
 
@@ -63,7 +64,7 @@ export function ConnectorAdminPanel({
     });
   }, []);
 
-  /** 반영 완료다. 성공하든 거절되든 목록을 다시 읽어 바뀐 대기 시각과 상태를 받는다. */
+  /** 다시 확인이다. 성공하든 거절되든 목록을 다시 읽어 바뀐 대기 시각과 상태를 받는다. */
   async function confirm(connection: AdminConnection) {
     if (pending !== null) return;
     setPending(key(connection));
@@ -85,8 +86,8 @@ export function ConnectorAdminPanel({
       <CardHeader>
         <CardTitle>연결 반영 확인</CardTitle>
         <CardDescription>
-          재시작이 필요한 연결만 공유 gateway 를 재시작한 뒤 확인해요. 나머지는
-          몇 분 안에 저절로 반영돼요.
+          연결은 자동으로 반영돼요. 「다시 확인」 은 자동 반영이 실패했을 때만
+          누르세요.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -122,8 +123,7 @@ export function ConnectorAdminPanel({
                     </Badge>
                   ) : null}
                 </div>
-                {connection.restartRequired ||
-                connection.status === "PENDING" ? (
+                {connection.recheckable ? (
                   <div className="flex flex-col items-end gap-1">
                     <Button
                       disabled={pending !== null}
@@ -132,12 +132,12 @@ export function ConnectorAdminPanel({
                       loading={pending === key(connection)}
                       loadingText="확인 중…"
                     >
-                      반영 완료
+                      다시 확인
                     </Button>
                     <span className="text-xs text-muted-foreground">
-                      {connection.restartRequired
-                        ? "공유 gateway 를 재시작한 뒤 눌러 주세요."
-                        : "몇 분이 지나도 남아 있으면 눌러 다시 확인해요."}
+                      {connection.applyFailed
+                        ? "자동 반영이 실패했어요."
+                        : "하루 넘게 자동 반영이 끝나지 않았어요."}
                     </span>
                   </div>
                 ) : null}

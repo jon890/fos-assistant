@@ -1,5 +1,8 @@
 import type { Page } from "../../node_modules/@playwright/test/index.js";
-import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import {
+  bindDemoConnector, connectDemoConnector, disconnectDemoConnector,
+  expect, PERSONA_AGENT_CODE, setSession, test,
+} from "./fixtures.ts";
 import { pickAgent } from "./helpers.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
@@ -43,7 +46,7 @@ async function startWith(page: Page, agentName: string) {
 async function routeSkills(
   page: Page,
   body: {
-    skills: { name: string; enabled: boolean }[];
+    skills: { name: string; enabled: boolean; source?: "CONNECTOR" }[];
     skillsToolsetEnabled: boolean;
   },
 ) {
@@ -54,9 +57,9 @@ async function routeSkills(
       contentType: "application/json",
       body: JSON.stringify({
         skills: body.skills.map((skill) => ({
-          ...skill,
           description: "",
           source: "UPLOADED",
+          ...skill,
         })),
         editable: true,
         skillsToolsetEnabled: body.skillsToolsetEnabled,
@@ -64,6 +67,44 @@ async function routeSkills(
     });
   });
 }
+
+test("붙인 플러그인의 스킬이 슬래시 목록과 읽기 전용 설정에 보인다", async ({
+  context, page, isolatedMember,
+}) => {
+  const name = "메모 검토 비서";
+  await setSession(context, isolatedMember);
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await connectDemoConnector(isolatedMember.email);
+  let code: string | undefined;
+  try {
+    const created = await page.request.post("/api/agents", { data: { name } });
+    expect(created.status()).toBe(201);
+    code = ((await created.json()) as { code: string }).code;
+    // 스킬 도구를 켠 뒤 업로드를 지워 플러그인 스킬만 남긴다.
+    await putSkill(page, code, NAME);
+    expect((await page.request.delete(`/api/agents/${code}/skills/${NAME}`)).ok()).toBeTruthy();
+    await bindDemoConnector(isolatedMember.email, code);
+
+    await startWith(page, name);
+    await composer(page).fill("/");
+    await expect(skillList(page).getByRole("option")).toHaveText(["/demo-note-review"]);
+
+    await page.goto(`/agents/${code}`);
+    const item = page.getByRole("region", { name: "스킬" }).getByRole("listitem")
+      .filter({ hasText: "demo-note-review" });
+    await expect(item).toContainText("검사용 메모");
+    await expect(item).toContainText("켜짐");
+    await expect(item.getByRole("link")).toHaveCount(0);
+    await expect(item.getByRole("button")).toHaveCount(0);
+    await expect(item.getByRole("switch")).toHaveCount(0);
+  } finally {
+    try {
+      if (code) expect((await page.request.delete(`/api/agents/${code}`)).ok()).toBeTruthy();
+    } finally {
+      await disconnectDemoConnector(isolatedMember.email);
+    }
+  }
+});
 
 test.describe("스킬을 올린 에이전트", () => {
   test.beforeEach(async ({ page }) => {
@@ -348,11 +389,11 @@ test("스킬 목록이 빈 에이전트에서 / 를 치면 스킬이 없다고 �
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
 });
 
-test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 스킬이 있어도 스킬이 없다고 알린다", async ({
+test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 플러그인 스킬이 있어도 스킬이 없다고 알린다", async ({
   page,
 }) => {
   await routeSkills(page, {
-    skills: [{ name: "hermes-help", enabled: true }],
+    skills: [{ name: "demo-note-review", enabled: true, source: "CONNECTOR" }],
     skillsToolsetEnabled: false,
   });
   await page.goto("/new");

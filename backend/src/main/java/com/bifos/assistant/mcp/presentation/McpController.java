@@ -6,6 +6,7 @@ import static com.bifos.assistant.mcp.presentation.McpRpc.invalidParams;
 import static com.bifos.assistant.mcp.presentation.McpRpc.response;
 import static com.bifos.assistant.mcp.presentation.McpRpc.text;
 
+import com.bifos.assistant.shared.util.ToolFailureText;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
@@ -57,7 +58,8 @@ import tools.jackson.databind.node.ObjectNode;
 @RestController
 @RequiredArgsConstructor
 public class McpController {
-    private static final String SEARCH_RESTART = "검색 순위가 앞 페이지와 달라졌습니다. cursor 없이 다시 검색하세요.";
+    private static final ToolFailureText SEARCH_RESTART = ToolFailureText.alternative(
+        "검색 순위가 앞 페이지와 달라졌습니다.", "cursor 없이 다시 검색한다");
     private static final String MEMORY_READ = "memory_read";
     private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
@@ -196,7 +198,7 @@ public class McpController {
                                 buildProperties.getVersion())));
                 case "tools/list" -> response(id, Map.of("tools", tools.tools()));
                 case "tools/call" -> call(principal, id, request.path("params"));
-                default -> error(id, -32601, "Method not found");
+                default -> error(id, -32601, ToolFailureText.askUser("Method not found"));
             });
     }
 
@@ -215,7 +217,7 @@ public class McpController {
         String toolName = name.asString();
         ToolHandler handler = handlers.get(toolName);
         if (handler == null) {
-            return error(id, -32601, "Method not found");
+            return error(id, -32601, ToolFailureText.alternative("Method not found", "tools/list 에 있는 도구 이름으로 다시 부른다"));
         }
         JsonNode fosCtx = arguments.get(McpCallContext.FIELD);
         McpCaller caller;
@@ -268,7 +270,7 @@ public class McpController {
     /** 역직렬화가 끝나기 전 실패도 원문과 cause를 공통 오류 로그로 보내지 않는다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> malformed() {
-        return ResponseEntity.ok(error(null, -32700, "Parse error"));
+        return ResponseEntity.ok(McpRpc.parseError());
     }
 
 

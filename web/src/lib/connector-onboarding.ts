@@ -53,13 +53,20 @@ export function agentChoices(
     );
 }
 
-/** 붙인 직후 언제 쓸 수 있는지를 화면 말로 바꾼다. 재시작 대기만 관리자를 기다린다. */
+/**
+ * 붙인 직후 언제 쓸 수 있는지를 화면 말로 바꾼다. 반영은 모두 자동이고 관리자를 기다린다고 말하지 않는다.
+ * 자동 반영이 실패했으면 그 사실을 알리고, 재시작 대기는 대화가 없는 틈을 기다려 조금 걸린다고 알린다.
+ * 옛 응답에는 `applyFailed` 가 없어 실패가 아닌 것으로 본다.
+ */
 export function boundReadiness(view: {
   status: BindingStatus | null;
   restartRequired: boolean;
+  applyFailed?: boolean;
 }): string {
-  if (view.restartRequired) return "관리자가 반영을 확인하면 쓸 수 있어요.";
+  if (view.applyFailed) return "반영하지 못했어요. 관리자에게 알렸어요.";
+  if (view.restartRequired)
+    return "자동으로 반영하고 있어요. 대화가 없는 틈에 반영돼서 조금 걸릴 수 있어요.";
   return view.status === "READY"
     ? "바로 쓸 수 있어요."
-    : "몇 분 안에 쓸 수 있어요.";
+    : "몇 분 안에 자동으로 반영돼요.";
 }

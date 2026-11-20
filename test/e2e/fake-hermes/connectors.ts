@@ -24,6 +24,7 @@ export const DEMO_CONNECTOR = {
   ],
   verify: { tool: "list_scopes" },
   mcp_server: "demo",
+  skills: ["demo-note-review"],
   // 도구마다의 정책이다. 확인 도구이자 선택지 도구인 `list_scopes` 는 읽기 전용이고 승인이 없다.
   // `grant` 는 대시보드 plugin 이 기본값을 채워 내는 값이다. 승인이 `required` 인 도구만 참이다.
   // `outbound` 도 기본값을 채워 낸다. 밖으로 나간다고 선언한 도구만 참이다.

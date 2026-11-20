@@ -407,9 +407,10 @@ public class ConnectorConnectionService {
         Map<Long, String> names = users.findAll().stream()
             .filter(user -> user.groupId().equals(admin.groupId()))
             .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
+        Instant now = clock.instant();
         return bindings.findByConnectionUserIdIn(List.copyOf(names.keySet())).stream()
             .map(binding -> AdminConnectionSnapshot.from(
-                binding, names.get(binding.connection().userId())))
+                binding, names.get(binding.connection().userId()), now))
             .toList();
     }
 

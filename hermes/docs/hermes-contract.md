@@ -2559,7 +2559,7 @@ Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이�
 | 경로 | 결과 |
 | --- | --- |
 | API server `GET /v1/skills` | v0.21.5 에서 늘 500. `_handle_skills` 가 `_find_all_skills` 에 없는 인자 `include_editorial` 을 넘겨 `TypeError` 가 난다. 테스트는 그 함수를 mock 으로 바꿔 두어 잡지 못한다 |
-| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
+| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. 대시보드 plugin 은 Control Plane 의 요청에 profile 의 설치 소유 기록과 스킬 파일을 확인해 설치된 플러그인 스킬에만 `connector_id`, `connector_title` 을 더한다. 플러그인 이름을 읽을 수 없으면 id 를 제목으로 쓴다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
 | 대시보드 `GET /api/skills/content?name=&profile=` | `SKILL.md` 원문 |
 
 슬래시로 부를 수 있는 이름의 목록을 주는 HTTP 경로는 없다. 이름 규칙대로 계산한다.

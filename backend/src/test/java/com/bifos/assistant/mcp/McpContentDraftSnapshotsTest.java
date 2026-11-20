@@ -128,13 +128,13 @@ class McpContentDraftSnapshotsTest {
             previewArgs().put("draftId", DRAFT.toString().toUpperCase()),
             (ObjectNode)previewArgs().without("revision"));
         for (ObjectNode args : previews) {
-            assertThat(error(call(McpContentDraftSnapshots.PREVIEW, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
+            assertThat(error(call(McpContentDraftSnapshots.PREVIEW, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.\n다음 방법: 도구 설명의 인자 형식에 맞게 고쳐 다시 부른다");
         }
         List<ObjectNode> savesArgs = List.of(json.createObjectNode(), saveArgs().put("draftId", DRAFT.toString()),
             json.createObjectNode().putNull("snapshotId"), json.createObjectNode().put("snapshotId", "not-a-uuid"),
             json.createObjectNode().put("snapshotId", 5));
         for (ObjectNode args : savesArgs) {
-            assertThat(error(call(McpContentDraftSnapshots.SAVE, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
+            assertThat(error(call(McpContentDraftSnapshots.SAVE, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.\n다음 방법: 도구 설명의 인자 형식에 맞게 고쳐 다시 부른다");
         }
         verifyNoInteractions(snapshots, saves);
     }
@@ -209,7 +209,7 @@ class McpContentDraftSnapshotsTest {
             .thenThrow(new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, null));
         var stale = result(call(McpContentDraftSnapshots.PREVIEW, previewArgs()));
         assertThat(stale.path("isError").booleanValue()).isTrue();
-        assertThat(text(stale)).isEqualTo("{\"code\":\"CONTENT_DRAFT_STALE\"}");
+        assertThat(text(stale)).isEqualTo("{\"code\":\"CONTENT_DRAFT_STALE\",\"next\":\"다음 방법: currentRevision 으로 다시 읽고 고쳐 부른다\"}");
     }
 
 

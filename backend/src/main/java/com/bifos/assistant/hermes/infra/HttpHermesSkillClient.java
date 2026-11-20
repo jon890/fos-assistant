@@ -65,10 +65,13 @@ public class HttpHermesSkillClient implements HermesSkillClient {
                 }
                 JsonNode enabled = entry.get("enabled");
                 String description = text(entry, "description");
+                String connectorId = text(entry, "connector_id");
+                String connectorTitle = text(entry, "connector_title");
                 result.add(new HermesSkill(
                     name,
                     description == null ? "" : description,
-                    enabled == null || !enabled.isBoolean() || enabled.asBoolean()));
+                    enabled == null || !enabled.isBoolean() || enabled.asBoolean(),
+                    connectorId == null ? null : Objects.requireNonNullElse(connectorTitle, connectorId)));
             }
             return List.copyOf(result);
         } catch (RestClientException ex) {

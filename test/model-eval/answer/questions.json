@@ -180,6 +180,15 @@
       ],
       "check": "sources",
       "compare": false
+    },
+    {
+      "id": "draw-found-photo",
+      "category": "쇼핑·가격",
+      "messages": [
+        "인터넷에서 GGRN 양말 상품 사진을 찾아서, 그 사진을 참고로 우리 아이가 그 양말을 신고 뛰어노는 그림을 그려 줘"
+      ],
+      "check": "photo-request",
+      "compare": false
     }
   ]
 }

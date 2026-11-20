@@ -4,6 +4,7 @@ import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.dto.TaskToolInput;
 import com.bifos.assistant.mcp.application.dto.TaskToolResult;
 import com.bifos.assistant.mcp.application.port.TaskRequests;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,11 +118,25 @@ public class McpTaskTools {
     private Map<String, Object> guarded(McpCaller caller, Supplier<TaskToolResult> action) {
         try {
             TaskToolResult result = action.get();
-            return McpToolService.result(JSON.writeValueAsString(result.body()), result.error());
+            if (!result.error()) {
+                return McpToolService.success(JSON.writeValueAsString(result.body()));
+            }
+            return McpToolService.jsonFailure(result.body(), nextFor(String.valueOf(result.body().get("status"))));
         } catch (RuntimeException ex) {
             log.warn("task tool failed executionId={} kind={}", caller.executionId(), ex.getClass().getSimpleName());
-            return McpToolService.result(JSON.writeValueAsString(Map.of("status", "unavailable", "message", UNAVAILABLE)), true);
+            return McpToolService.jsonFailure(Map.of("status", "unavailable", "message", UNAVAILABLE), nextFor("unavailable"));
         }
+    }
+
+
+    /** 예약 작업 도구의 실패마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(String status) {
+        return switch (status) {
+            case "invalid", "invalid_schedule" -> ToolFailureText.alternative(status, "인자를 도구 설명의 형식에 맞게 고쳐 다시 부른다");
+            case "not_found" -> ToolFailureText.alternative(status, "task_list 로 이름을 확인해 다시 부르고, 없으면 사용자에게 되묻는다");
+            case "unavailable" -> ToolFailureText.alternative(status, "다른 방법이 없으니 /tasks 화면에서 하라고 안내하고 잠시 뒤 다시 해 달라고 알린다");
+            default -> ToolFailureText.askUser(status);
+        };
     }
 
 
