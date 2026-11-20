@@ -234,6 +234,24 @@
       }
     },
     {
+      "id": "connection-attach",
+      "concept": "connection",
+      "messages": [
+        "{connectorTitle} 연결 마쳤어. 이 에이전트에서 쓰게 해 줘"
+      ],
+      "expect": {
+        "linkPrefixes": [
+          "/connections/{connectorId}"
+        ],
+        "absent": [
+          "연결했어요",
+          "연결했습니다",
+          "붙였어요",
+          "붙였습니다"
+        ]
+      }
+    },
+    {
       "id": "connection-unknown",
       "concept": "connection",
       "messages": [
