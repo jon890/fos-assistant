@@ -370,6 +370,8 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
 - `updated_at` 은 옮겨 온 줄에서 비어 있다. 바꾼 시각을 모른다
 
+`MEMORY_CONTEXT` 는 그룹의 기억 조립 예산이다. `{"version":1,"summaryMaxChars":4000,"maxChars":10000}` 이고 읽고 쓰는 일은 `MemoryContextSettings` 가 한다. 줄이 없으면 이 기본값이고, 모르는 버전이나 깨진 JSON 은 오류로 올리지 않고 기본값으로 돈다. 그 까닭과 허용 범위는 [기억](../../docs/features/memory.md) 의 「기억 예산 설정」 이 갖는다
+
 `TOOLSET` 은 그룹이 일반 에이전트 도구 화면에서 숨긴 toolset 이다. `{"version":1,"hidden":["<toolset 이름>", ...]}` 이고 이름은 이름 순에 중복이 없다. 읽고 쓰는 일은 `ToolsetVisibilityService` 가 한다.
 
 - 줄이 없는 그룹은 숨김이 없어 모두 보인다
@@ -727,6 +729,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `scope` 가 `USER` 면 `owner_user_id` 가, `GROUP` 이면 `group_id` 가 주인이다. `scope` 에는 기본값이 없다
 - `title` 과 `content` 는 `data_key_id` 가 있으면 그 주인 데이터 key 의 암호문이다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 비어 있으면 평문이다. 기동할 때 데이터 key 로 옮기며, KEK 가 없는 설치는 평문 줄이 남는다
 - `title` 은 암호문이 들어가도록 `VARCHAR(1200)` 이다. 입력 제한 200자는 요청 검사가 지킨다
+- `summary` 는 매 실행의 요약 구역에 들어가는 요약 한 줄이고 `title`, `content` 와 같은 key 의 암호문이다(AAD 칸 이름 `summary`). `NULL` 은 이 칸 전에 만들어 기동 이관(`MemorySummaryBackfill`)이 아직 채우지 않은 줄이고, 빈 글은 요약이 없는 줄이다. 그 뒤로 쓰는 모든 경로는 빈 글이라도 적는다. 요약은 `USER` 범위의 `MEMORY` 만 가진다([기억 요약과 상세 두 층](../../docs/features/memory/spec.md))
 - 옛 민감도 칸(`sensitivity`)과 옛 key 칸(`content_key_id`)은 지웠다. 기억에는 민감 구분이 없고([ADR-20261103 / memory-sensitivity-removal](../../docs/adr/ADR-20261103-memory-sensitivity-removal.md)), ADR-055 의 옛 환경 변수 key 는 읽지 않는다. `V20261103054416` 이 옛 key 로 암호화한 줄이 남았는지 먼저 보고 하나라도 있으면 아무 칸도 지우지 않고 멈춘다. `V20261103054417` 이 두 칸을 지웠다
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
@@ -772,6 +775,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `memory_id` 는 지운 항목의 판도 남으므로 `memory` 에 없는 번호일 수 있다. 그래서 외래 키를 걸지 않는다
 - `scope`, `owner_user_id`, `group_id`, `entry_type`, `document_key`, `status` 는 그때의 값이다. 지운 뒤에도 누가 볼 수 있는지 이 칸으로 정하고, 지운 문서의 판을 이름으로 찾는다
 - `title` 과 `content`, `data_key_id` 의 뜻은 `memory` 와 같다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다. 옛 `sensitivity` 컬럼과 `content_key_id` 컬럼은 `V20261103054418` 이 지웠다
+- `summary` 는 그 revision 의 요약이고 뜻은 `memory` 와 같다. 요약 기능 전에 남긴 revision 은 `NULL` 이고 요약이 없는 것으로 읽는다
 - 출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다
 - 고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다
 

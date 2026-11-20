@@ -6,6 +6,7 @@
   `memory_remember` 가 남기는 항목의 `retrieval` 은 그대로 `SEARCH` 다. 그 가운데 짧은 항목은 본문까지 실린다.
   [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
   [ADR-071](../../backend/docs/adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
+- 2026-11-20 갱신: 개인 사실 구역은 「요약 구역」 이 됐다. 대상은 본문 200자 이하 항목이 아니라 요약 줄(`memory.summary`)이 있는 개인 항목이고, 본문 대신 요약을 넣는다. 예산 2,000자와 전체 상한 8,000자는 그룹 설정(`group_setting` 의 `MEMORY_CONTEXT`, 기본 4,000자와 10,000자)으로 옮겨 관리자가 바꾼다. 요약 구역에 든 항목도 질문 관련 구역의 후보다. 「LLM 이 기억을 한 장으로 요약한 프로필」 의 기각은 그대로다. 요약은 기억마다 한 줄이고 고친 이력에 남는다. 스펙은 [기억 요약과 상세 두 층](../features/memory/spec.md), 지금 규칙은 [`docs/features/memory.md`](../features/memory.md) 의 「요약 구역」 이 갖는다.
 - 「감당할 것」 의 「같은 사실의 옛 값과 새 값이 함께 실릴 수 있다」 는 [ADR-20261015 / memory-link](ADR-20261015-memory-link.md) 의 「대체함」 링크가 풀었다. 그 링크는 지금 `memory.superseded_by_memory_id` 컬럼 하나로 줄었다.
 
 ### 결정

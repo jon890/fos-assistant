@@ -400,6 +400,7 @@ public class McpController {
             || !text(arguments, "content")
             || !nullOr(arguments, "evidence", JsonNode::isString)
             || !nullOr(arguments, "collection", JsonNode::isString)
+            || !nullOr(arguments, "summary", JsonNode::isString)
             || !nullOr(arguments, "sensitive", JsonNode::isBoolean)
             || !nullOr(arguments, "archivable", JsonNode::isBoolean)
             || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())) {
@@ -412,6 +413,7 @@ public class McpController {
                 caller,
                 value.title(),
                 value.content(),
+                value.summary(),
                 value.evidence(),
                 value.memoryId(),
                 value.collection(),

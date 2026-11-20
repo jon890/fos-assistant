@@ -4,7 +4,7 @@
 - Date: 2026-11-03
 - [ADR-055](archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 「민감 본문만 환경 변수 key 로 암호화한다」, 「제목과 일반 본문은 평문이다」, AAD 와 `content_key_id` 를 이 결정이 대체한다. 암호문 모양 `v1.<IV>.<암호문과 태그>` 와 AES-256-GCM 은 그대로다.
 - [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) 의 KEK, 데이터 key, 본문 세 층을 기억에도 쓴다. 그 ADR 의 「데이터 key 는 사용자마다 하나」 에 그룹마다 하나인 줄을 더한다.
-- 스펙과 설계는 [`docs/features/memory/spec.md`](../../../docs/features/memory/spec.md), [`design.md`](../../../docs/features/memory/design.md) 가 갖는다.
+- 스펙과 설계는 그때의 `docs/features/memory/spec.md` 와 `design.md` 가 가졌다. 다음 변경이 두 파일을 새로 써서 git 이력(커밋 `43af8e9ae`)에서 찾는다.
 
 ### 결정
 
