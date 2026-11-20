@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { NotificationList } from "@/components/notification/notification-list";
 
-export const metadata: Metadata = { title: "알림" };
-
-export default async function NotificationsPage() {
-  const session = await auth();
-  if (!session?.user?.email) redirect("/signin");
-  // 목록은 서버에서 읽지 않는다. 브라우저가 화면을 연 뒤 읽는다.
-  return <NotificationList />;
+/**
+ * 전의 알림 화면 주소다. 「알림」 탭이 열린 「지금 볼 것」 으로 넘긴다. 저장해 둔 주소와 이미 보낸 알림의 링크가
+ * 깨지지 않게 둔다(docs/features/app-shell/spec.md 의 DECISION15). 로그인 확인은 `/now` 가 한다.
+ */
+export default function NotificationsPage() {
+  redirect("/now?tab=notifications");
 }
