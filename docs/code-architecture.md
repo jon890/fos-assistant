@@ -79,6 +79,8 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별·그룹별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 그룹 key 는 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)). 푼 key 는 Control Plane 메모리에만 있다 |
 | 브라우저 중계 서명 비밀 | 서버 비밀값 `server_secret` 의 `browser_gateway`. KEK 로 감싼 채로 두고 관리자 화면 「서버 비밀값」 에서 서버가 새로 만든다 |
+| 플러그인 OAuth 앱 client secret | 서버 비밀값 `server_secret` 의 `oauth_app:` 줄. 관리자가 넣는다. 줄 이름은 [플러그인 OAuth 연결 설계](features/connector-oauth/design.md) 의 「서버 비밀값 줄」 이 갖는다 |
+| 단추 연결 서명 비밀 | 서버 비밀값 `server_secret` 의 `connector_oauth_signing`. 처음 쓸 때 Control Plane 이 만든다(같은 「서버 비밀값 줄」) |
 
 데이터베이스에는 어떤 비밀값도 원문으로 넣지 않는다.
 서버 비밀값은 `server_secret` 에 KEK 로 감싸 두고 관리자 화면에서 넣고 바꾼다. 옮길 값과 남길 값, 옮기는 순서는 [ADR-20261120 / server-secret](adr/ADR-20261120-server-secret.md) 과 [서버 비밀값 스펙](features/secret-store/spec.md) 이 갖는다.
@@ -106,5 +108,5 @@ profile key 와 AI credential 은 아직 홈서버 파일과 Hermes 쪽에 있�
 | OAuth 파일 | 단추로 연결한 연결의 refresh token 과 토큰 통로 주소. 보관 파일 옆에 같은 key 로 암호화해 둔다. 실행기가 통로 주소만 그 프로세스 env 에 넣는다([ADR-20261120 / connector-oauth](adr/ADR-20261120-connector-oauth.md), [플러그인 OAuth 연결 설계](features/connector-oauth/design.md)) | 연결을 해제하거나 붙여 넣기로 바꿀 때 |
 | access token | 플러그인이 도구를 부를 때 토큰 통로에서 받는 값. Control Plane 메모리와 통로 응답에만 있다 | 만료되거나 연결을 해제할 때 |
 
-값을 바꾸면 보관 파일을 다시 쓰고 붙은 바인딩을 다시 설치한다. 로컬 바인딩은 정의의 보관 파일 리비전이, 원격 바인딩은 `.env` 사본이 바뀐다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있어 그 바인딩들이 재시작 대기가 된다.
+값을 바꾸면 보관 파일을 다시 쓰고 붙은 바인딩을 다시 설치한다. 로컬 바인딩은 정의의 보관 파일 리비전이, 원격 바인딩은 `.env` 사본이 바뀐다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있어 그 서버만 껐다 켜서 반영된다([ADR-20261120 / connector-auto-apply](adr/ADR-20261120-connector-auto-apply.md)).
 설정 백업은 `.env` 와 보관 파일을 담지 않는다. 그래서 떼거나 해제한 뒤에는 그 profile 디렉터리의 어느 파일에도 칸 값의 원문이 남지 않는다.
