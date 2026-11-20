@@ -84,7 +84,8 @@ public class ControlPlaneApprovals {
         }
         String argsJson = JSON.writeValueAsString(new LinkedHashMap<>(args));
         Instant now = clock.instant();
-        var action = ConnectorAction.controlPlane(user.id(), origin, toolName, dedupeKey, Sha256.hex(argsJson), now);
+        var action = ConnectorAction.decided(user.id(), ControlPlaneActions.CONNECTOR_ID, origin.agentId(), origin,
+            ControlPlaneActions.hermesTool(toolName), toolName, ControlPlaneActions.DECISION, false, dedupeKey, Sha256.hex(argsJson), now);
         action.awaitApproval(now.plus(policy.current().approvalTtl()));
         actions.saveAndFlush(action);
         bodies.sealArgs(action, argsJson);

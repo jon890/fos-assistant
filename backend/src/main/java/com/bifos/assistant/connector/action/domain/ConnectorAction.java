@@ -227,21 +227,20 @@ public class ConnectorAction {
      * @param toolName 등록 이름과 맞는 것을 확인한 원래 도구 이름. 확인하지 못했으면 null
      * @param passed hook 에 통과로 답했는가
      */
-    public static ConnectorAction decided(
-        ConnectorConnection connection,
-        Long agentId,
-        AgentExecution origin,
-        String hermesTool,
-        String toolName,
-        ToolPolicyDecision decision,
-        boolean passed,
-        String dedupeKey,
-        String argsSha256,
-        Instant now) {
+    public static ConnectorAction decided(ConnectorConnection connection, Long agentId, AgentExecution origin, String hermesTool,
+        String toolName, ToolPolicyDecision decision, boolean passed, String dedupeKey, String argsSha256, Instant now) {
+        return decided(connection.userId(), connection.connectorId(), agentId, origin, hermesTool, toolName, decision, passed, dedupeKey,
+            argsSha256, now);
+    }
+
+
+    /** 연결 대신 주인과 연결 번호를 받는 판정 줄이다. Control Plane 동작의 승인 줄({@link ControlPlaneActions})이 쓴다. */
+    public static ConnectorAction decided(Long userId, String connectorId, Long agentId, AgentExecution origin, String hermesTool,
+        String toolName, ToolPolicyDecision decision, boolean passed, String dedupeKey, String argsSha256, Instant now) {
         ConnectorAction action = new ConnectorAction();
-        action.userId = connection.userId();
+        action.userId = userId;
         action.agentId = agentId;
-        action.connectorId = connection.connectorId();
+        action.connectorId = connectorId;
         action.toolName = toolName;
         action.hermesTool = hermesTool;
         action.risk = decision.risk();
@@ -249,32 +248,6 @@ public class ConnectorAction {
         action.decision = decision.decision();
         action.denyReason = decision.denyReason();
         action.passed = passed;
-        action.originExecutionId = origin.id();
-        action.conversationId = origin.conversationId();
-        action.dedupeKey = dedupeKey;
-        action.argsSha256 = argsSha256;
-        action.createdAt = now;
-        return action;
-    }
-
-
-    /**
-     * 커넥터 연결 없이 Control Plane 이 하는 동작의 승인 줄이다({@link ControlPlaneActions}). 판정은 늘 승인을 받는 쓰기다.
-     *
-     * @param origin 요청한 실행. 카드는 그 실행의 대화에 뜬다
-     */
-    public static ConnectorAction controlPlane(
-        Long userId, AgentExecution origin, String toolName, String dedupeKey, String argsSha256, Instant now) {
-        ConnectorAction action = new ConnectorAction();
-        action.userId = Objects.requireNonNull(userId, "userId");
-        action.agentId = origin.agentId();
-        action.connectorId = ControlPlaneActions.CONNECTOR_ID;
-        action.toolName = Objects.requireNonNull(toolName, "toolName");
-        action.hermesTool = ControlPlaneActions.hermesTool(toolName);
-        action.risk = ToolRisk.WRITE;
-        action.approvalMode = ToolApproval.ALWAYS;
-        action.decision = ActionDecision.NEEDS_APPROVAL;
-        action.passed = false;
         action.originExecutionId = origin.id();
         action.conversationId = origin.conversationId();
         action.dedupeKey = dedupeKey;

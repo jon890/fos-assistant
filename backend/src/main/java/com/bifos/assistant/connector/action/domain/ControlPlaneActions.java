@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.action.domain;
 
+import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
@@ -23,6 +24,9 @@ public final class ControlPlaneActions {
     public static final String TASK_DELETE = "task_delete";
     /** 등록 이름의 앞붙임이다. Hermes 는 이 이름을 쓰지 않는다. */
     private static final String HERMES_PREFIX = "fos_";
+
+    /** 승인 줄의 판정이다. 늘 승인을 받는 쓰기라 상시 허락과 대화 허락이 없다. */
+    public static final ToolPolicyDecision DECISION = new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.ALWAYS);
 
     private static final Map<String, ToolPolicy> POLICIES = Map.of(
         TASK_DELETE, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "예약 작업 지우기", false, Set.of("task_id", "task", "next_run")));
