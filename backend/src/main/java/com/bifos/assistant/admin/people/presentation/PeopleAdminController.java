@@ -44,7 +44,7 @@ public class PeopleAdminController {
     public List<PersonView> list() {
         currentUser.requireAdmin();
         return access.list().stream()
-            .map(entry -> PersonView.of(entry.person(), entry.joined(), entry.lastConversationAt()))
+            .map(PersonView::of)
             .toList();
     }
 
@@ -68,7 +68,7 @@ public class PeopleAdminController {
     public PersonView update(@PathVariable Long id, @Valid @RequestBody UpdatePersonRequest request) {
         currentUser.requireAdmin();
         PersonAccess result = access.setEnabled(id, request.enabled());
-        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
+        return PersonView.of(result);
     }
 
 
@@ -85,7 +85,7 @@ public class PeopleAdminController {
     public PersonView schedulePurge(@PathVariable Long id) {
         currentUser.requireAdmin();
         PersonAccess result = access.schedulePurge(id);
-        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
+        return PersonView.of(result);
     }
 
 
@@ -94,6 +94,6 @@ public class PeopleAdminController {
     public PersonView cancelPurge(@PathVariable Long id) {
         currentUser.requireAdmin();
         PersonAccess result = access.cancelPurge(id);
-        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
+        return PersonView.of(result);
     }
 }

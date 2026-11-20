@@ -2,6 +2,8 @@ package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.user.application.port.SignInRevocation;
 import java.time.Clock;
 import java.util.Optional;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SignInPolicy implements SignInRevocation {
 
     private final AllowedPersonRepository people;
+    private final AppUserRepository users;
     private final Clock clock;
 
 
@@ -29,11 +32,23 @@ public class SignInPolicy implements SignInRevocation {
         if (email == null || email.isBlank()) {
             return Optional.empty();
         }
-        return people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email));
+        String normalized = AllowedPerson.normalizeEmail(email);
+        if (evaluation(normalized)) {
+            return Optional.empty();
+        }
+        return people.findByEmailAndEnabledTrue(normalized);
     }
 
 
-    /** 그 주소의 줄이 꺼져 있는가. 줄이 없으면 거짓이다(ADR-059). */
+    /**
+     * 그 주소의 줄이 꺼져 있는가.
+     *
+     * <p>평가 전용 사용자는 여기서 막지 않는다. 예약 작업 발화가 이 판정으로 주인을 확인해, 막으면 배포 뒤 확인의 예약 작업 발화가 늘
+     * 건너뛰어진다(docs/features/agent-quality/design.md 의 「숨기는 곳」). 로그인은 {@link #admit} 과
+     * {@link #recordCompletion} 이 막는다.
+     *
+     * <p>줄이 없으면 거짓이다(ADR-059).
+     */
     @Override
     @Transactional(readOnly = true)
     public boolean revoked(String email) {
@@ -51,9 +66,18 @@ public class SignInPolicy implements SignInRevocation {
             return false;
         }
         String normalized = AllowedPerson.normalizeEmail(email);
+        if (evaluation(normalized)) {
+            return false;
+        }
         if (people.updateLastLoginAtIfNewer(normalized, clock.instant()) > 0) {
             return true;
         }
         return people.findByEmailAndEnabledTrue(normalized).isPresent();
+    }
+
+
+    /** 평가 전용 사용자의 주소인가. 평가 전용 사용자는 로그인하지 않는다. */
+    private boolean evaluation(String normalizedEmail) {
+        return users.findAllByNormalizedEmail(normalizedEmail).stream().anyMatch(AppUser::evaluation);
     }
 }

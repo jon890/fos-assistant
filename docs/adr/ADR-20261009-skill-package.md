@@ -1,6 +1,7 @@
 ## ADR-20261009 / skill-package: 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다
 
 - **status**: `accepted`
+- **대체된 부분(2026-11-20)**: 「실행 공간 정책에 없는 profile 의 셸은 local 로 돈다」 는 더 이상 맞지 않는다. 정책 밖 profile 은 셸을 켜지 못한다([ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md))
 - Date: 2026-10-09
 
 ### 결정

@@ -19,6 +19,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient.SkippedSkill;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
@@ -690,6 +691,49 @@ class HttpHermesConnectorClientTest {
             .isEqualTo(new InstallResult(false, false, true));
         assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
             .isEqualTo(new InstallResult(false, false, false));
+        server.verify();
+    }
+
+
+    @DisplayName("바인딩 설치 응답의 skipped_skills 를 이름과 까닭으로 읽고, 없거나 null 이면 빈 목록이다")
+    @Test
+    void readsSkippedSkillsFromBindResponse() {
+        String body = "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":false";
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andRespond(withSuccess(
+                body + ",\"skipped_skills\":[{\"name\":\"demo-runner\",\"reasons\":[\"terminal_off\",\"sandbox_env_missing\"]}]}",
+                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andRespond(withSuccess(body + ",\"skipped_skills\":null}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null).skippedSkills())
+            .containsExactly(new SkippedSkill("demo-runner", List.of("terminal_off", "sandbox_env_missing")));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null).skippedSkills()).as("옛 대시보드 plugin").isEmpty();
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null).skippedSkills()).isEmpty();
+        server.verify();
+    }
+
+
+    @DisplayName("모양이 틀린 skipped_skills 는 설치를 실패로 보지 않고 빈 목록으로 읽는다")
+    @Test
+    void readsMalformedSkippedSkillsAsEmpty() {
+        String body = "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":true"
+            + ",\"skipped_skills\":";
+        List<String> malformed = List.of(
+            "{}", "[{\"reasons\":[\"terminal_off\"]}]", "[{\"name\":\"demo-runner\"}]",
+            "[{\"name\":\"demo-runner\",\"reasons\":[7]}]", "[{\"name\":\"demo-runner\",\"reasons\":[\" \"]}]");
+        for (String skipped : malformed) {
+            server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(body + skipped + "}", MediaType.APPLICATION_JSON));
+        }
+
+        for (int i = 0; i < malformed.size(); i++) {
+            assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
+                .as(malformed.get(i))
+                .isEqualTo(new InstallResult(true, false, false));
+        }
         server.verify();
     }
 
