@@ -796,6 +796,90 @@ class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
                          self.plugin.CONNECTOR_SKILL_MAX_FILES)
 
 
+class ConnectorAgentSkillTest(ConnectorGateCase):
+    """`agent_skills` 가 선언한 일반 에이전트용 스킬을 읽는 규칙이다(ADR-20261120 plugin-agent-skills)."""
+
+    def agent_skill(self, directory, name, body="본문\n"):
+        skill = self.connector_root / "agent-skills" / directory
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: %s\ndescription: 검사\n---\n%s" % (name, body), encoding="utf-8")
+        return skill
+
+    def declare(self, value):
+        self.rewrite("connector.json", lambda declared: declared.update(agent_skills=value))
+
+    def test_agent_skills_reach_the_manifest_and_the_catalog(self):
+        """에이전트용 스킬은 `skills` 에 합쳐지고, 요구 env 와 함께 `agent_skills` 로 나온다."""
+        self.agent_skill("report", "demo-report")
+        self.agent_skill("runner", "demo-runner")
+        self.declare({"path": "./agent-skills",
+                      "sandbox_env": {"demo-runner": ["CLAUDE_PLUGIN_ROOT", "CAREER_BACKEND_URL"]}})
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertEqual(sorted(manifest["skills"]), ["demo", "demo-report", "demo-runner"])
+        self.assertEqual(manifest["agent_skills"], {
+            "demo-report": frozenset(), "demo-runner": frozenset({"CLAUDE_PLUGIN_ROOT", "CAREER_BACKEND_URL"})})
+        entry = self.catalog()[0]
+        self.assertEqual(entry["skills"], ["demo", "demo-report", "demo-runner"])
+        self.assertEqual(entry["agent_skills"], [
+            {"name": "demo-report", "sandbox_env": []},
+            {"name": "demo-runner", "sandbox_env": ["CAREER_BACKEND_URL", "CLAUDE_PLUGIN_ROOT"]}])
+
+    def test_connector_without_agent_skills_keeps_its_catalog(self):
+        """칸이 없는 플러그인의 카탈로그에는 `agent_skills` 가 없고 manifest 값은 비었다."""
+        self.assertNotIn("agent_skills", self.catalog()[0])
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["agent_skills"], {})
+
+    def test_invalid_agent_skills_leave_the_connector_out(self):
+        """경로, 키, 요구 env, 이름 겹침, 앞머리, 파일 수 가운데 하나라도 틀리면 카탈로그에서 뺀다."""
+        outside = self.base / "outside-skills"
+        outside.mkdir()
+
+        def linked():
+            (self.connector_root / "agent-link").symlink_to(outside)
+            self.declare({"path": "./agent-link"})
+
+        def too_many_files():
+            skill = self.agent_skill("report", "demo-report")
+            (skill / "references").mkdir()
+            for index in range(self.plugin.CONNECTOR_SKILL_MAX_FILES):
+                (skill / ("references/%02d.md" % index)).write_text("x", encoding="utf-8")
+            self.declare({"path": "./agent-skills"})
+
+        def secret():
+            skill = self.agent_skill("report", "demo-report")
+            (skill / "SKILL.md").write_text(
+                "---\nname: demo-report\nrequired_environment_variables: [CAREER_BACKEND_TOKEN]\n---\n본문\n",
+                encoding="utf-8")
+            self.declare({"path": "./agent-skills"})
+
+        def with_skill(value, name="demo-report", body="본문\n"):
+            def change():
+                self.agent_skill("report", name, body)
+                self.declare(value)
+            return change
+
+        cases = (
+            ("not an object", lambda: self.declare("./agent-skills")),
+            ("path outside the plugin", lambda: self.declare({"path": "../outside-skills"})),
+            ("missing directory", lambda: self.declare({"path": "./no-such-dir"})),
+            ("linked directory", linked),
+            ("unknown key", with_skill({"path": "./agent-skills", "extra": True})),
+            ("env for a missing skill", with_skill({"path": "./agent-skills", "sandbox_env": {"nope": ["CLAUDE_PLUGIN_ROOT"]}})),
+            ("env outside the policy list", with_skill({"path": "./agent-skills", "sandbox_env": {"demo-report": ["HOME"]}})),
+            ("empty env list", with_skill({"path": "./agent-skills", "sandbox_env": {"demo-report": []}})),
+            ("duplicated env", with_skill({"path": "./agent-skills",
+                                            "sandbox_env": {"demo-report": ["CLAUDE_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"]}})),
+            ("same name as a plugin skill", with_skill({"path": "./agent-skills"}, name="demo")),
+            ("secret request in the front matter", secret),
+            ("too many files", too_many_files),
+        )
+        for label, change in cases:
+            with self.subTest(label):
+                self.setUp()
+                change()
+                self.assertEqual(self.catalog(), [])
+
+
 class ConnectorToolPolicyTest(ConnectorGateCase):
     """`schema: 2` 의 도구 정책을 검증해 카탈로그로 내는 규칙을 검사한다(ADR-049)."""
 

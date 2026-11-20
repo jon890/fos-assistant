@@ -270,6 +270,7 @@ from .routes import (
 
 from .sandbox import (
     IMAGE_FILE_TOOLSETS,
+    SANDBOX_ALLOWED_ENV,
     SANDBOX_ENV,
     SANDBOX_NETWORK_RE,
     SANDBOX_OWNER_RE,
