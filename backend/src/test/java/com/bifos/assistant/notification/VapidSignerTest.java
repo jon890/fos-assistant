@@ -2,7 +2,8 @@ package com.bifos.assistant.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.notification.config.PushProperties;
+import com.bifos.assistant.testsupport.InMemoryServerSecrets;
+import com.bifos.assistant.notification.infra.GeneratedVapidKeys;
 import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.notification.infra.VapidSigner;
 import java.nio.charset.StandardCharsets;
@@ -10,21 +11,19 @@ import java.security.Signature;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** VAPID 머리의 모양과 서명을 본다(RFC 8292, ADR-20261120 / web-push). 키는 검사 전용 파일이다. */
+/** VAPID 머리의 모양과 서명을 본다(RFC 8292, ADR-20261120 / web-push). 키는 검사마다 새로 만든다. */
 class VapidSignerTest {
 
-    private static final String PUBLIC_KEY = "BJLSTJcZ6Dt9L9GyQVxTOYazbfg-9vZjgMEnL_1gq-El1cIpTfFKBUd77zAwz97o3a9KYJ8LUYTHPIEnhbAuE9Y";
     private static final Instant NOW = Instant.parse("2026-11-20T00:00:00Z");
 
-    private final VapidKeys keys = new VapidKeys(new PushProperties(
-        PUBLIC_KEY, "src/test/resources/push/test-vapid-private.key", "mailto:test@example.invalid", List.of("fcm.googleapis.com"),
-        Duration.ofSeconds(5), Duration.ofSeconds(10), List.of(), Duration.ofSeconds(30), 10));
+    private final GeneratedVapidKeys generated = VapidKeys.generate("mailto:test@example.invalid");
+    private final VapidKeys keys = new VapidKeys(InMemoryServerSecrets.with(VapidKeys.SECRET_NAME, generated.sealed()));
+    private final String publicKey = generated.publicKey();
     private final VapidSigner signer = new VapidSigner(keys);
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -34,7 +33,7 @@ class VapidSignerTest {
     void authorizationShape() throws Exception {
         String header = signer.authorization("https://fcm.googleapis.com/fcm/send/abc?x=1", NOW);
 
-        assertThat(header).startsWith("vapid t=").endsWith(", k=" + PUBLIC_KEY);
+        assertThat(header).startsWith("vapid t=").endsWith(", k=" + publicKey);
         String token = header.substring("vapid t=".length(), header.indexOf(", k="));
         String[] parts = token.split("\\.");
         assertThat(parts).hasSize(3);
@@ -47,7 +46,7 @@ class VapidSignerTest {
         assertThat(claims.path("sub").asString()).isEqualTo("mailto:test@example.invalid");
 
         Signature verifier = Signature.getInstance("SHA256withECDSAinP1363Format");
-        verifier.initVerify(keys.publicKey());
+        verifier.initVerify(keys.current().orElseThrow().publicKey());
         verifier.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
         assertThat(verifier.verify(decoder.decode(parts[2]))).isTrue();
     }
