@@ -38,7 +38,7 @@ export const DEFAULT_RULES = {
   sharedGroups: {
     migration: "^backend/src/main/(resources/db/migration/|java/db/migration/)",
     hermes_contract: [
-      "^hermes/docs/hermes-contract\\.md$",
+      "^hermes/docs/hermes-contract[.]md$",
       "^hermes/connectors/[^/]+/tests/contracts?\\.test\\.ts$",
       "^hermes/tests/(fixtures/|[^/]*contract[^/]*)",
       "^test/e2e/fake-hermes/",
