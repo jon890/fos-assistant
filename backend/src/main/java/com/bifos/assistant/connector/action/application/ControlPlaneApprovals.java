@@ -28,7 +28,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,14 +40,12 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>카드는 플러그인 승인 줄과 같은 {@code connector_action} 줄이라 자리, 건수, 승인 요청 알림, 만료, 거절 알림 줄을 그대로 쓴다.
  * 상시 허락과 대화 허락이 없다. 승인한 결과는 에이전트를 다시 돌리지 않고 알림 줄로만 남는다(스펙 DECISION21).
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ControlPlaneApprovals {
     /** 동작이 예외로 끝난 줄의 {@code errorCode} 다. */
     static final String FAILED = "control_plane_failed";
     private static final String UNREADABLE = "요청 내용을 읽을 수 없어 실행하지 않았어요";
-    private static final String UNAVAILABLE = "지금은 실행하지 못했어요. 잠시 뒤 다시 부탁해 주세요";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final ConnectorActionRepository actions;
     private final ConnectorActionBodies bodies;
@@ -136,12 +133,9 @@ public class ControlPlaneApprovals {
         if (args.isEmpty() || runner.isEmpty()) {
             return ControlPlaneActionOutcome.failed(UNREADABLE);
         }
-        try {
-            return runner.get().run(user, args.get());
-        } catch (RuntimeException ex) {
-            log.warn("control plane action failed actionId={} kind={}", action.publicId(), ex.getClass().getSimpleName());
-            return ControlPlaneActionOutcome.failed(UNAVAILABLE);
-        }
+        // 실행기의 저장소 예외는 잡지 않는다. 이 트랜잭션이 되돌림으로 표시돼 실패로 적어도 커밋되지 않는다.
+        // 그대로 내보내 승인 전체를 되돌리고 카드는 기다리는 채로 남긴다. 사용자는 다시 승인할 수 있다.
+        return runner.get().run(user, args.get());
     }
 
 

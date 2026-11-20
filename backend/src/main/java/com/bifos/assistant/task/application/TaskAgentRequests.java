@@ -23,11 +23,13 @@ import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +50,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class TaskAgentRequests implements TaskRequests {
+    /** 하루 발화 수를 셀 앞날이다. 요일 주기 하나를 다 본다. */
+    private static final Duration DAILY_LIMIT_HORIZON = Duration.ofDays(8);
     private final TaskService tasks;
     private final TaskAgentLookup lookup;
     private final AgentService agents;
@@ -78,6 +82,11 @@ public class TaskAgentRequests implements TaskRequests {
             return TaskToolResult.failed("agent_unavailable", "이 실행의 에이전트를 찾지 못해 만들지 않았다. /tasks/new 화면에서 만들라고 안내한다.");
         }
         Long conversationId = origin.get().parentExecutionId() == null ? origin.get().conversationId() : null;
+        Optional<UUID> same = lookup.sameTask(user, input.title(), input.cron(), input.fireAt());
+        if (same.isPresent()) {
+            // 같은 호출을 다시 받아도 두 번 만들지 않는다. 이름과 시각이 같은 작업이 이미 있으면 그것을 알린다.
+            return done("exists", user, same.get());
+        }
         try {
             ScheduleInput schedule = schedule(input.cron(), input.fireAt(), properties.defaultZone());
             Optional<TaskToolResult> tooMany = dailyLimit(schedule);
@@ -215,7 +224,7 @@ public class TaskAgentRequests implements TaskRequests {
 
 
     /**
-     * cron 이 지금부터 24시간 안에 하루 발화 수 상한보다 많이 돌면 거절한다(설계 DECISION10). 식이 틀렸으면 여기서 보지 않고
+     * cron 이 앞으로 7일 가운데 어느 하루(작업 시간대의 달력 하루)라도 하루 발화 수 상한보다 많이 돌면 거절한다(설계 DECISION10). 식이 틀렸으면 여기서 보지 않고
      * {@link TaskService} 의 검사에 맡긴다.
      */
     private Optional<TaskToolResult> dailyLimit(ScheduleInput schedule) {
@@ -232,11 +241,12 @@ public class TaskAgentRequests implements TaskRequests {
         Instant now = clock.instant();
         // 최소 간격보다 촘촘한 식은 한도가 아니라 시각 오류로 알린다. 화면과 같은 까닭이다.
         TaskSchedule.requireMinInterval(cron, zone, now, properties.minInterval());
-        Instant end = now.plus(1, ChronoUnit.DAYS);
-        int fires = 0;
+        // 요일이나 날짜를 고른 식이 지금부터 24시간만 세면 빠져나간다. 앞으로 7일의 달력 하루(작업 시간대)마다 센다.
+        Instant end = now.plus(DAILY_LIMIT_HORIZON);
+        Map<LocalDate, Integer> perDay = new HashMap<>();
         Instant next = TaskSchedule.nextAfter(cron, zone, now);
-        while (next != null && !next.isAfter(end)) {
-            fires++;
+        while (next != null && next.isBefore(end)) {
+            int fires = perDay.merge(next.atZone(zone).toLocalDate(), 1, Integer::sum);
             if (fires > properties.maxRunsPerDay()) {
                 return Optional.of(TaskToolResult.failed("daily_limit", "이 주기는 하루 " + properties.maxRunsPerDay()
                     + "번 발화 한도를 넘어 만들지 않았다. 간격을 넓히자고 사용자에게 제안한다."));

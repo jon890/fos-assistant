@@ -122,7 +122,9 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | 시간대, 놓친 실행, 모델 단계 | 화면 기본값(`Asia/Seoul`, `RUN_ONCE`), 모델 단계는 비움 |
 | 알림 | 인자가 없으면 화면 기본값(`ALWAYS`) |
 
-검사는 화면의 `TaskService.create` 를 그대로 쓴다(작업 수 상한, 최소 간격, 이름과 지시 길이). 더해서 cron 이 지금부터 24시간 안에 `assistant.task.max-runs-per-day` 보다 많이 발화하면 만들지 않고 `daily_limit` 으로 거절한다(DECISION30). 화면은 이 수를 발화할 때만 막지만, 에이전트가 만든 작업이 하루의 반을 건너뛰는 일을 미리 막는다. 고칠 때도 같다.
+검사는 화면의 `TaskService.create` 를 그대로 쓴다(작업 수 상한, 최소 간격, 이름과 지시 길이). 더해서 cron 이 앞으로 7일 가운데 어느 하루(작업 시간대의 달력 하루)라도 `assistant.task.max-runs-per-day` 보다 많이 발화하면 만들지 않고 `daily_limit` 으로 거절한다(DECISION30). 요일이나 날짜를 고른 식이 지금부터 24시간만 세면 빠져나가기 때문이다. 화면은 이 수를 발화할 때만 막지만, 에이전트가 만든 작업이 하루의 반을 건너뛰는 일을 미리 막는다. 고칠 때도 같다.
+
+이름과 시각이 같은 작업이 이미 있으면 새로 만들지 않고 그 작업을 `status: exists` 로 돌려준다. 같은 만들기를 다시 불러도 한 번만 생긴다.
 
 고치기는 저장된 값으로 `TaskInput` 을 채우고 인자로 받은 칸만 바꿔 `TaskService.update` 를 부른다. 에이전트, 모델 단계, 시간대, 대화 방식, 놓친 실행 처리는 저장된 값 그대로다.
 
@@ -139,7 +141,7 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | `conversation_id` | origin 실행의 대화. 맡긴 실행은 루트의 대화를 그대로 가진다(DECISION27) |
 | 같은 요청 | 사용자, origin 실행, 작업 번호의 해시. 끝난 줄이면 그 상태를 알린다 |
 
-승인은 `ConnectorActionService.approve` 가 Control Plane 줄을 상한 변경 줄처럼 먼저 갈라 `ControlPlaneApprovals.approve` 로 보낸다. 사용자 행과 줄을 잠그고 기다리는 줄인지와 기한을 본 뒤, 인자 해시가 맞는 작업 번호로 `ControlPlaneActionRunner`(구현은 `task` 의 `TaskDeleteRunner`)를 부른다. 성공하면 `SUCCEEDED` 와 「「작업 이름」 예약 작업을 지웠어요」, 그 사이 작업이 없어졌으면 `FAILED` 와 까닭이다.
+승인은 `ConnectorActionService.approve` 가 Control Plane 줄을 상한 변경 줄처럼 먼저 갈라 `ControlPlaneApprovals.approve` 로 보낸다. 사용자 행과 줄을 잠그고 기다리는 줄인지와 기한을 본 뒤, 인자 해시가 맞는 작업 번호로 `ControlPlaneActionRunner`(구현은 `task` 의 `TaskDeleteRunner`)를 부른다. 성공하면 `SUCCEEDED` 와 「「작업 이름」 예약 작업을 지웠어요」, 그 사이 작업이 없어졌으면 `FAILED` 와 까닭이다. 저장소 예외처럼 예상하지 못한 실패는 승인 전체를 되돌리고 카드는 기다리는 채로 남는다.
 
 승인 뒤에는 에이전트를 다시 돌리지 않는다(DECISION21). Control Plane 줄은 실행한 결과로 다음 turn 에 전하지 않고(`undeliveredResults`, `resultsFor` 에서 뺀다), 실행하지 않고 끝난 줄처럼 알림 줄로만 남긴다(`undeliveredClosures` 에 넣고 알림 글은 결과 글이다).
 

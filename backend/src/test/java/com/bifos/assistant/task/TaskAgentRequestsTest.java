@@ -1,6 +1,7 @@
 package com.bifos.assistant.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -14,6 +15,7 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.ControlPlaneActions;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
+import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.mcp.application.dto.TaskToolInput;
@@ -21,6 +23,8 @@ import com.bifos.assistant.mcp.application.dto.TaskToolResult;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.TaskAgentRequests;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.type.ConversationMode;
@@ -275,7 +279,53 @@ class TaskAgentRequestsTest {
         assertThat(actionService.undeliveredResults(conversation.id())).isEmpty();
         assertThat(actions.findByPublicId(card.publicId()).orElseThrow().resultDeliveredAt()).isNotNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-            .anySatisfy(message -> assertThat(message.role()).isEqualTo(MessageRole.SYSTEM));
+            .filteredOn(message -> message.role() == MessageRole.SYSTEM)
+            .extracting(message -> message.content())
+            .containsExactly("「아침 날씨」 예약 작업을 지웠어요");
+    }
+
+
+    @Test
+    @DisplayName("다른 사용자는 지우기 카드를 승인하지 못하고, 허락을 붙인 승인은 입력 오류이며 작업은 그대로다")
+    void deleteApprovalRejectsOthersAndGrants() {
+        CurrentUser owner = member();
+        CurrentUser other = member();
+        Agent agent = agentOf(owner);
+        AgentExecution origin = rootOf(owner, agent, conversationOf(owner, agent));
+        requests.create(owner, origin.id(), input("아침 날씨", "0 7 * * *", null));
+        requests.requestDelete(owner, origin.id(), "아침 날씨");
+        UUID card = actions.findAll().getFirst().publicId();
+
+        assertThatThrownBy(() -> actionService.approve(other, card, null, false))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_FOUND));
+        assertThatThrownBy(() -> actionService.approve(owner, card, GrantPeriod.TODAY, false))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> actionService.approve(owner, card, null, true))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+        assertThat(only(owner).state()).isEqualTo(TaskState.ACTIVE);
+        assertThat(actions.findByPublicId(card).orElseThrow().status()).isEqualTo(ActionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("요일을 고른 주기도 앞으로 7일의 하루마다 발화 수를 세고, 같은 만들기를 다시 부르면 한 번만 생긴다")
+    void countsCalendarDaysAndIgnoresRepeatedCreate() {
+        // 금요일 밤 23시 50분(서울)이다. 지금부터 24시간만 세면 평일 15분 주기가 빠져나간다
+        clock.set(Instant.parse("2026-11-20T14:50:00Z"));
+        CurrentUser owner = member();
+        Agent agent = agentOf(owner);
+        AgentExecution origin = rootOf(owner, agent, conversationOf(owner, agent));
+
+        TaskToolResult weekdays = requests.create(owner, origin.id(), input("평일 감시", "*/15 * * * 1-5", null));
+        TaskToolResult first = requests.create(owner, origin.id(), input("아침 날씨", "0 7 * * *", null));
+        TaskToolResult again = requests.create(owner, origin.id(), input(" 아침 날씨 ", "0 7 * * *", null));
+
+        assertThat(weekdays.body()).containsEntry("status", "daily_limit");
+        assertThat(first.body()).containsEntry("status", "created");
+        assertThat(again.error()).isFalse();
+        assertThat(again.body()).containsEntry("status", "exists");
+        assertThat(only(owner).title()).isEqualTo("아침 날씨");
     }
 
 

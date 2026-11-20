@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,25 @@ class TaskAgentLookup {
             return new TaskTarget(byTitle.getFirst().publicId(), List.of());
         }
         return new TaskTarget(null, byTitle.stream().map(TaskAgentLookup::candidate).toList());
+    }
+
+
+    /**
+     * 이름(앞뒤 공백과 대소문자 무시)과 시각이 같은 작업이다. 에이전트가 같은 만들기를 다시 불러도 두 번 만들지 않으려고 본다.
+     *
+     * @param fireAt {@code 2026-11-21T07:00} 꼴. 작업의 시간대로 견준다
+     */
+    @Transactional(readOnly = true)
+    Optional<UUID> sameTask(CurrentUser user, String title, String cron, String fireAt) {
+        String key = title.strip().toLowerCase(Locale.ROOT);
+        return owned(user).stream()
+            .filter(task -> task.title().strip().toLowerCase(Locale.ROOT).equals(key))
+            .filter(task -> cron != null
+                ? task.type() == TriggerType.CRON && cron.strip().equals(task.cronExpr())
+                : task.type() == TriggerType.ONCE && task.fireAt() != null
+                    && LocalDateTime.ofInstant(task.fireAt(), task.zone()).toString().startsWith(fireAt.strip()))
+            .map(Task::publicId)
+            .findFirst();
     }
 
 
