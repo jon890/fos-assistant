@@ -38,28 +38,23 @@ export function appInitial(name: string): string {
  * manifest 의 192, 512 와 iOS 의 180 이 부른다.
  */
 export async function appIcon(size: number): Promise<ImageResponse> {
-  return new ImageResponse(
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: BACKGROUND,
-        color: FOREGROUND,
-        fontSize: Math.round(size * 0.56),
-        fontFamily: "Pretendard",
-      }}
-    >
-      {appInitial(appName())}
-    </div>,
-    {
-      width: size,
-      height: size,
-      fonts: [{ name: "Pretendard", data: await loadFont(), weight: 700 }],
-      // 앱 이름이 실행 환경 값이라 오래 묶어 두지 않는다.
-      headers: { "Cache-Control": "public, max-age=3600" },
-    },
-  );
+  // next/og 는 Tailwind 클래스를 읽지 않고 인라인 스타일만 그린다. 글자 크기도 아이콘 크기에 따라 이어지는 값이다.
+  const style = {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: BACKGROUND,
+    color: FOREGROUND,
+    fontSize: Math.round(size * 0.56),
+    fontFamily: "Pretendard",
+  };
+  return new ImageResponse(<div style={style}>{appInitial(appName())}</div>, {
+    width: size,
+    height: size,
+    fonts: [{ name: "Pretendard", data: await loadFont(), weight: 700 }],
+    // 앱 이름이 실행 환경 값이라 오래 묶어 두지 않는다.
+    headers: { "Cache-Control": "public, max-age=3600" },
+  });
 }

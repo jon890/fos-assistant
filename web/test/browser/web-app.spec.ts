@@ -21,6 +21,8 @@ test("manifest 는 실행할 때의 앱 이름과 주소창 없는 표시를 담
     const image = await page.request.get(icon.src);
     expect(image.status(), icon.src).toBe(200);
     expect(image.headers()["content-type"]).toBe("image/png");
+    // 192 크기에서 잰 값: 글자 없는 바탕만 1145바이트, 「검」 2311바이트. 글꼴이 빠져 글자가 비면 바탕만 남는다.
+    expect((await image.body()).length, icon.src).toBeGreaterThan(1_300);
   }
   expect((await page.request.get("/app-icon/64")).status()).toBe(404);
 });
