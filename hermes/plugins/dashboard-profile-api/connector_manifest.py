@@ -10,6 +10,7 @@ from .connector_snapshot_manifest import _snapshot_manifest
 from .connector_remote import _is_remote, _remote_server, _remote_server_matches
 from .connector_launch import _is_launcher, _launcher_current, _launcher_inner
 from .connector_standard import STANDARD_SCHEMA, _standard_declaration
+from .connector_oauth_providers import _catalog_oauth, _normalize_oauth
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -181,9 +182,20 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
     optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
-    if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env:
+    # `oauth.token_env` 는 다른 칸이 틀려도 이름만 맞으면 env 합에 넣는다. 그래야 `oauth` 만 버리고 붙여 넣기 연결이 남는다.
+    declared_oauth = declared.get("oauth")
+    oauth_env = declared_oauth.get("token_env") if isinstance(declared_oauth, dict) else None
+    oauth_env = {oauth_env} if isinstance(oauth_env, str) and ENV_NAME_RE.match(oauth_env) else set()
+    if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env | oauth_env:
         raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env, "
-                         "owner_browser_env 의 합과 다르다")
+                         "owner_browser_env, oauth.token_env 의 합과 다르다")
+    oauth = None
+    if declared_oauth is not None:
+        try:
+            oauth = _normalize_oauth(declared_oauth, fields, field_env | set(operator_env) | owner_env, remote)
+        except ValueError as error:
+            # 틀린 선언은 단추만 뺀다. 플러그인 전체를 빼면 붙여 넣기 연결까지 끊긴다(스펙 DECISION11).
+            logger.warning("dashboard-profile-api: %s 의 oauth 선언을 쓰지 않는다: %s", connector_id, error)
     for name, value in ({} if remote else server["env"]).items():
         # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
         if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
@@ -261,6 +273,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "owner_browser_env": owner_browser_env,
         "owner_browser_login_url": owner_browser_login_url,
         "optional_env": optional_env,
+        # 정규화한 `oauth` 선언이다. 선언이 없거나 틀리면 None 이다. `token_env` 는 위 `oauth_env` 로 서버 env 에 남을 수 있다.
+        "oauth": oauth,
+        "oauth_env": next(iter(oauth_env), None),
         "errors": errors,
         "error_contracts": error_contracts,
         **_connector_binding_flags(declared),
@@ -382,6 +397,8 @@ def _connector_catalog_response(include_standard: bool = False):
           "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")
                              for code, word in sorted(manifest["errors"].items()) if word == OUTCOME_UNKNOWN},
           # `ask` 일 때만 싣는다. 이 칸을 모르는 옛 Control Plane 은 선언하지 않은 도구를 지금처럼 거절한다(rule-66).
+          # 단추로 연결할 수 있는 플러그인만 싣는다. 이 칸을 모르는 옛 Control Plane 은 단추를 내지 않는다(rule-66).
+          **({"oauth": _catalog_oauth(manifest["oauth"])} if manifest.get("oauth") is not None else {}),
           **({"default_tool_policy": "ask"} if manifest["default_tool_policy"] == "ask" else {}),
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **({"event_watch": {key: manifest["event_watch"][key] for key in ("tool", "noun", "link")}} if manifest.get("event_watch") else {}),
