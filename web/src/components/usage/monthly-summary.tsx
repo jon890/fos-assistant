@@ -27,23 +27,11 @@ export type MonthlyCost = {
 
 type Props = {
   monthly: MonthlyCost;
-  isAdmin: boolean;
 };
 
-/** 이번 달 합계다. 금액과 가격표 이야기는 관리자에게만 그리고, 그 밖의 사용자에게는 실행 건수만 그린다. */
-export function MonthlySummary({ monthly, isAdmin }: Props) {
+/** 관리자에게 이번 달 합계와 가격 정보를 보인다. */
+export function MonthlySummary({ monthly }: Props) {
   const totalExecutions = monthly.totalExecutions;
-  if (!isAdmin) {
-    return (
-      <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        <Stat
-          label="이번 달 실행"
-          value={`${totalExecutions.toLocaleString("ko-KR")}건`}
-        />
-      </dl>
-    );
-  }
-  // 여기부터는 관리자에게만 그린다. 관리자의 응답에는 아래 값이 모두 실려 온다.
   const unpricedExecutions = monthly.unpricedExecutions ?? 0;
   const gap = {
     pending: monthly.pendingSubagents ?? 0,
