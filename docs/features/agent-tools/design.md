@@ -39,7 +39,7 @@
   실행 공간 도구를 켜지 않는 저장은 `terminal:` 을 건드리지 않는다. 이미 local 인 설정은 셸이 꺼진 동안 쓰이지 않는다.
 - Control Plane `HermesCallFailure`: `reason: unlisted` 를 읽어 `HermesRequestRejected` 에 표시를 남긴다. 옛 plugin 처럼 `reason` 이 없으면 표시가 없다.
 - Control Plane 기동 작업(`ApplicationReadyEvent`, 백그라운드): 지워지지 않은 에이전트마다 행을 잠그고 Hermes 의 켜진 목록을 읽는다. 실행 공간 도구가 켜져 있으면 지금 목록 그대로(Control Plane MCP, 붙은 플러그인 서버 이름, 원본 재조회 도구 포함) `writeApiServerInSandbox` 로 다시 쓴다.
-  `unlisted` 로 거절되면 실행 공간 도구를 빼고 `require_sandbox` 없이 다시 쓰고 경고 로그를 남긴다. 그 밖의 실패(Hermes 무응답, `reason` 없는 409)는 그 에이전트를 메모리의 「끝내지 못한 목록」 에 두고 다음 에이전트로 간다. 끝내지 못한 목록은 `assistant.agents.pending-toolsets-cron` 주기에 다시 보고, 남은 수를 매 차례 로그로 남긴다.
+  셸을 끄는 일은 배포 때 한 번이다. DDL 마이그레이션이 `agent.sandbox_check_pending`(기본 거짓)을 더하고, DML 마이그레이션이 그때 있던 에이전트에 참을 넣는다. 표시가 있는 에이전트만 `unlisted` 로 거절되면 실행 공간 도구를 빼고 `require_sandbox` 없이 다시 쓰고 경고 로그를 남긴다. 주인이 있는 그룹 공개 에이전트에 옛 데이터로 켜진 셸도 이때 끈다(실행 공간이 주인 공간이다). 점검을 끝내면(결과와 상관없이 예외 없이 끝나면) 표시를 지운다. 표시가 없는 에이전트는 `unlisted` 여도 경고만 남긴다. 그 밖의 실패(Hermes 무응답, `reason` 없는 409)는 그 에이전트를 메모리의 「끝내지 못한 목록」 에 두고 다음 에이전트로 간다. 끝내지 못한 목록은 `assistant.agents.pending-toolsets-cron` 주기에 다시 보고, 남은 수를 매 차례 로그로 남긴다.
   목록 계산은 `AgentDefaultToolsets` 의 private `desired()` 를 공용으로 꺼내 쓴다. `enablePending` 은 그룹 공개, 주인 없음, 비밀값 요청 스킬로 멈추므로 그대로 쓰지 않는다. 기동 작업은 공개 범위나 스킬로 제외하지 않는다.
   정책이 바뀌지 않았으면 다시 써도 결과가 같다. 운영이 정책(이미지, 마운트, 망)을 바꾼 뒤의 기동은 셸 에이전트의 `terminal:` 을 새 정책으로 다시 써서 컨테이너가 바뀐다. 운영의 일괄 반영을 대신하는 의도된 동작이다.
   REQ1 의 「어떤 경로의 도구 저장」 은 Control Plane 토큰 경로(`_check_config_update`)다. 운영자가 Hermes 대시보드의 쿠키 경로로 직접 켜는 것은 이 plugin 이 검사하지 않으며 운영 규칙이 갖는다.
@@ -108,7 +108,7 @@
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
 | DECISION1 | 정책 밖 거절 표시 | 409 본문에 `reason: unlisted` 를 더한다 | 작성자 | 기동 작업이 정책 무효의 409 를 목록 밖으로 오해하면 모든 에이전트의 셸을 끈다 |
-| DECISION2 | 다시 저장의 자리 | Control Plane 기동 작업, 매 기동 | 작성자 | plugin 은 `sandbox_owner` 를 모른다. 정책에 있으나 local 로 남은 profile 은 주인 키가 있어야 docker 로 바꾼다. 결과가 같아 표지 없이 돌려도 된다 |
+| DECISION2 | 다시 저장의 자리와 횟수 | Control Plane 기동 작업. docker 로 다시 쓰기는 매 기동, 셸 끄기는 `agent.sandbox_check_pending` 이 켜진 에이전트에서 배포 때 한 번 | 작성자 | plugin 은 `sandbox_owner` 를 모른다. 정책에 있으나 local 로 남은 profile 은 주인 키가 있어야 docker 로 바꾼다. 셸 끄기를 매 기동 하면 운영이 정책을 잘못 고친 채 재시작했을 때 셸이 모두 꺼진다(스펙 DECISION17). 시스템 단위 기록을 둘 테이블이 없어 에이전트 줄의 컬럼을 쓴다 |
 | DECISION3 | 정책 기본 줄의 모양 | 최상위 참 거짓 칸 `isolate_unlisted` | 작성자 | 공통 설정이 이미 기본 줄의 값을 갖는다. 칸 하나라 되돌리기 쉽다. `profiles` 에 와일드카드 키를 두면 지금 plugin 의 profile 이름 검사가 정책 전체를 무효로 본다 |
 | DECISION4 | 기존 에이전트 한 번 켜기의 장치 | `pending_default_toolsets` 데이터 마이그레이션과 지금의 다시 시도 작업 | 작성자 | 켜진 뒤 주인이 끄면 `settle` 이 그 이름을 칸에서 지워 다시 켜지 않는다. 새 테이블이나 표지가 필요 없다 |
 | DECISION5 | 역할 profile 의 기본 켜기 | 관리자 등록(`AgentAdminService.create`) 때 기본 도구를 켠다 | 작성자 | 역할 profile 은 운영이 만들고 Control Plane 은 등록만 한다(`docs/code-architecture.md`) |
