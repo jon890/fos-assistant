@@ -1,10 +1,11 @@
 package com.bifos.assistant.chat.artifact.presentation;
 
 import com.bifos.assistant.chat.artifact.application.ArtifactAutoVault;
+import com.bifos.assistant.chat.artifact.application.ArtifactVaultFinder;
 import com.bifos.assistant.chat.artifact.application.ArtifactVaultService;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultContent;
+import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultQuery;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultRetryRequest;
-import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultSettingView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultStatusView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.VaultItemView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.VaultListView;
@@ -13,9 +14,9 @@ import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;
-import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -25,7 +26,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,13 +46,37 @@ public class ArtifactVaultController {
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
     private final ArtifactAutoVault autoVault;
-    private final ArtifactAutoVaultSetting autoVaultSetting;
+    private final ArtifactVaultFinder finder;
 
 
+    /**
+     * 「내 파일」 목록 한 쪽이다(스펙 workspace REQ10~REQ13, REQ17). 대화로 거를 때 그 대화가 내 것이 아니거나 지웠으면 없는 대화와 같은
+     * 응답이다.
+     *
+     * @param kind {@code IMAGE}, {@code DOCUMENT}, {@code TABLE}. 비면 전체다
+     * @param q 찾을 낱말. 제목, 설명, 파일 경로, 대화 제목에서 찾는다
+     * @param conversation 이 대화에서 나온 파일만 본다
+     * @param before 앞 쪽의 {@code nextCursor}
+     * @param limit 한 쪽의 줄 수
+     */
     @GetMapping
-    public VaultListView list() {
+    public VaultListView list(
+        @RequestParam(required = false) String kind,
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false) UUID conversation,
+        @RequestParam(required = false) Long before,
+        @RequestParam(required = false) Integer limit) {
         CurrentUser user = currentUser.require();
-        return new VaultListView(vault.list(user.id()).stream().map(VaultItemView::of).toList());
+        Long conversationId = conversation == null ? null : access.requireOwnId(user, conversation);
+        ArtifactVaultQuery query = VaultListView.query(kind, q, conversationId, before, limit);
+        return VaultListView.of(finder.page(user.id(), query));
+    }
+
+
+    /** 보관본 하나다. 대화의 「내 파일에서 보기」 가 가리킨 파일이 목록 첫 쪽에 없어도 미리보기를 연다. */
+    @GetMapping("/{id}")
+    public VaultItemView one(@PathVariable Long id) {
+        return VaultItemView.of(finder.one(currentUser.require().id(), id));
     }
 
 
@@ -64,21 +88,6 @@ public class ArtifactVaultController {
         return VaultItemView.of(vault.vault(user.id(), conversation, request.path()));
     }
 
-
-    /** 내가 결과물 자동 보관을 켰는지다. */
-    @GetMapping("/auto")
-    public AutoVaultSettingView autoVaultSetting() {
-        return new AutoVaultSettingView(autoVaultSetting.isEnabled(currentUser.require().id()));
-    }
-
-
-    /** 결과물 자동 보관을 켜거나 끈다. 끄면 다음 turn 부터 보관하지 않고 이미 보관한 것은 그대로다. */
-    @PutMapping("/auto")
-    public AutoVaultSettingView changeAutoVault(@Valid @RequestBody AutoVaultSettingView request) {
-        Long user = currentUser.require().id();
-        autoVaultSetting.change(user, request.enabled());
-        return new AutoVaultSettingView(autoVaultSetting.isEnabled(user));
-    }
 
 
     /** 자동 보관이 실패한 결과물을 지금 다시 보관한다. 대화가 내 것이 아니면 없는 대화와 같은 응답이다. */

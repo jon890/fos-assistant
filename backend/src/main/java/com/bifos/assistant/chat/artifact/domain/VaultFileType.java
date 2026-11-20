@@ -37,6 +37,8 @@ public record VaultFileType(Kind kind, String contentType, boolean inline, Magic
 
 
     private static final String DOWNLOAD = "application/octet-stream";
+    /** 화면이 글로 받아 미리 보는 형식이다. 스크립트 없는 머리글과 nosniff 로 내주므로 다른 형식으로 읽히지 않는다. */
+    private static final String PLAIN_TEXT = "text/plain";
     private static final int TEXT_PROBE_BYTES = 8192;
 
     private static final Map<String, VaultFileType> TYPES = Map.ofEntries(
@@ -47,13 +49,13 @@ public record VaultFileType(Kind kind, String contentType, boolean inline, Magic
         Map.entry("webp", new VaultFileType(Kind.IMAGE, "image/webp", true, Magic.WEBP)),
         Map.entry("html", new VaultFileType(Kind.DOCUMENT, "text/html", true, Magic.TEXT)),
         Map.entry("css", new VaultFileType(Kind.DOCUMENT, "text/css", true, Magic.TEXT)),
-        Map.entry("md", new VaultFileType(Kind.DOCUMENT, DOWNLOAD, false, Magic.TEXT)),
-        Map.entry("txt", new VaultFileType(Kind.DOCUMENT, DOWNLOAD, false, Magic.TEXT)),
+        Map.entry("md", new VaultFileType(Kind.DOCUMENT, PLAIN_TEXT, true, Magic.TEXT)),
+        Map.entry("txt", new VaultFileType(Kind.DOCUMENT, PLAIN_TEXT, true, Magic.TEXT)),
         Map.entry("pdf", new VaultFileType(Kind.DOCUMENT, DOWNLOAD, false, Magic.PDF)),
         Map.entry("docx", new VaultFileType(Kind.DOCUMENT, DOWNLOAD, false, Magic.ZIP)),
         Map.entry("pptx", new VaultFileType(Kind.DOCUMENT, DOWNLOAD, false, Magic.ZIP)),
-        Map.entry("csv", new VaultFileType(Kind.TABLE, DOWNLOAD, false, Magic.TEXT)),
-        Map.entry("tsv", new VaultFileType(Kind.TABLE, DOWNLOAD, false, Magic.TEXT)),
+        Map.entry("csv", new VaultFileType(Kind.TABLE, PLAIN_TEXT, true, Magic.TEXT)),
+        Map.entry("tsv", new VaultFileType(Kind.TABLE, PLAIN_TEXT, true, Magic.TEXT)),
         Map.entry("xlsx", new VaultFileType(Kind.TABLE, DOWNLOAD, false, Magic.ZIP)));
 
 
