@@ -74,6 +74,7 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | 사용자의 AI credential | Hermes 쪽. provider API key 는 profile `.env` 에 둔다. OAuth 로그인은 profile 에 자기 `auth.json` 이 없으면 여러 profile 이 Hermes 루트의 것을 함께 쓴다([`hermes/README.md`](../hermes/docs/hermes-contract.md)) |
 | profile 의 API server key | 홈서버의 mode 600 파일. 파일 이름이 profile 이름이다 |
 | Hermes 대시보드를 부를 토큰 | Control Plane 의 환경 변수와 그 plugin 의 환경 변수 |
+| 운영 정기 작업이 재시작 조회를 부를 토큰 | Control Plane 의 환경 변수(`CONNECTOR_OPS_TOKEN`)와 운영 정기 작업 쪽([ADR-20261120 / connector-auto-apply](adr/ADR-20261120-connector-auto-apply.md)) |
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
 | 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별·그룹별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 그룹 key 는 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)). 푼 key 는 Control Plane 메모리에만 있다 |

@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.connector.connection.application.ConnectorBindingAlerts;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
@@ -40,6 +41,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -62,14 +64,15 @@ class ConnectorConnectionControllerTest {
     private static final Instant SHOWN = Instant.parse("2026-10-01T00:00:00Z");
     private static final String ICON = "data:image/svg+xml;base64,PHN2Zy8+";
     private static final String LINK = "https://notes.example.test/";
-    private static final List<BoundAgentSummary> BINDINGS = List.of(new BoundAgentSummary(AGENT, "비서", BindingStatus.PENDING, true));
+    private static final List<BoundAgentSummary> BINDINGS = List.of(new BoundAgentSummary(AGENT, "비서", BindingStatus.PENDING, true, true));
 
     private final ConnectorConnectionService service = mock(ConnectorConnectionService.class);
     private final ConnectorBindingService bindingService = mock(ConnectorBindingService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
+    private final ConnectorBindingAlerts alerts = mock(ConnectorBindingAlerts.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
         new ConnectorConnectionController(service, currentUser),
-        new ConnectorConnectionAdminController(service, currentUser),
+        new ConnectorConnectionAdminController(service, currentUser, alerts),
         new AdminAgentConnectionController(bindingService, currentUser))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
@@ -79,6 +82,7 @@ class ConnectorConnectionControllerTest {
     void setUp() {
         when(currentUser.require()).thenReturn(MEMBER);
         when(currentUser.requireAdmin()).thenReturn(ADMIN);
+        when(alerts.staleBefore()).thenReturn(SHOWN.plus(Duration.ofHours(1)));
     }
 
 
@@ -128,6 +132,7 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[0].bindings[0].agentName").value("비서"))
             .andExpect(jsonPath("$[0].bindings[0].status").value("PENDING"))
             .andExpect(jsonPath("$[0].bindings[0].restartRequired").value(true))
+            .andExpect(jsonPath("$[0].bindings[0].applyFailed").value(true))
             .andExpect(jsonPath("$[0].fields[0].env").doesNotExist())
             .andExpect(jsonPath("$[0].fields[1].options").doesNotExist())
             .andReturn();
@@ -317,11 +322,15 @@ class ConnectorConnectionControllerTest {
 
 
     @Test
-    @DisplayName("관리자 목록은 바인딩마다 재시작 대기 시각을 주고 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
+    @DisplayName("관리자 목록은 바인딩마다 재시작 대기 시각과 실패 여부를 주고, 다시 확인은 실패했거나 대기가 24시간 넘은 PENDING 줄만이며, 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
     void adminListHidesOtherUsersPrefixesAndValues() throws Exception {
+        Instant recent = SHOWN.plus(Duration.ofHours(2));
         when(service.listForAdmin(ADMIN))
             .thenReturn(List.of(
-                new AdminConnectionSnapshot(DEMO, 7L, "사용자", AGENT, BindingStatus.PENDING, true, SHOWN, 3)));
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", AGENT, BindingStatus.PENDING, true, SHOWN, 3, false, SHOWN),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-recent", BindingStatus.PENDING, true, recent, 0, false, recent),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-failed", BindingStatus.PENDING, false, null, 0, true, recent),
+                new AdminConnectionSnapshot(DEMO, 7L, "사용자", "a-ready", BindingStatus.READY, false, null, 1, false, null)));
 
         mvc.perform(get("/api/v1/admin/connections"))
             .andExpect(status().isOk())
@@ -333,6 +342,13 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[0].restartRequired").value(true))
             .andExpect(jsonPath("$[0].restartRequiredSince").value("2026-10-01T00:00:00Z"))
             .andExpect(jsonPath("$[0].undeclaredTools").value(3))
+            .andExpect(jsonPath("$[0].applyFailed").value(false))
+            .andExpect(jsonPath("$[0].waitingSince").value("2026-10-01T00:00:00Z"))
+            .andExpect(jsonPath("$[0].recheckable").value(true))
+            .andExpect(jsonPath("$[1].recheckable").value(false))
+            .andExpect(jsonPath("$[2].applyFailed").value(true))
+            .andExpect(jsonPath("$[2].recheckable").value(true))
+            .andExpect(jsonPath("$[3].recheckable").value(false))
             .andExpect(jsonPath("$[0].secretPrefixes").doesNotExist())
             .andExpect(jsonPath("$[0].values").doesNotExist());
     }
@@ -343,7 +359,7 @@ class ConnectorConnectionControllerTest {
     void adminConfirmUsesAgentPathAndHidesPrefixesAndValues() throws Exception {
         when(bindingService.confirmApplied(ADMIN, AGENT, DEMO, SHOWN))
             .thenReturn(new AgentConnectionView(
-                DEMO, "검사용 메모", ConnectionStatus.READY, true, BindingStatus.READY, false, 3, List.of(), List.of()));
+                DEMO, "검사용 메모", ConnectionStatus.READY, true, BindingStatus.READY, false, false, 3, List.of(), List.of()));
 
         mvc.perform(post("/api/v1/admin/agents/" + AGENT + "/connections/" + DEMO + "/confirm")
             .contentType(MediaType.APPLICATION_JSON)
@@ -353,6 +369,7 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$.bound").value(true))
             .andExpect(jsonPath("$.status").value("READY"))
             .andExpect(jsonPath("$.restartRequired").value(false))
+            .andExpect(jsonPath("$.applyFailed").value(false))
             .andExpect(jsonPath("$.secretPrefixes").doesNotExist())
             .andExpect(jsonPath("$.values").doesNotExist());
 

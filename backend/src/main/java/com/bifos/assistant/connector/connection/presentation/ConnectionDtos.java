@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.connection.presentation;
 
 import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentColor;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorRestartSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionsView;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
@@ -82,11 +83,13 @@ public final class ConnectionDtos {
      * 연결이 붙은 에이전트 하나다. 상태는 enum 이름 그대로 낸다.
      *
      * @param restartRequired 그 에이전트의 profile 이 공유 gateway 재시작을 기다린다
+     * @param applyFailed 자동 반영이 실패했다
      */
-    public record BoundAgentView(String agentCode, String agentName, String status, boolean restartRequired) {
+    public record BoundAgentView(
+        String agentCode, String agentName, String status, boolean restartRequired, boolean applyFailed) {
         static BoundAgentView from(BoundAgentSummary value) {
             return new BoundAgentView(
-                value.agentCode(), value.agentName(), value.status().name(), value.restartRequired());
+                value.agentCode(), value.agentName(), value.status().name(), value.restartRequired(), value.applyFailed());
         }
     }
 
@@ -227,6 +230,7 @@ public final class ConnectionDtos {
         boolean bound,
         String status,
         boolean restartRequired,
+        boolean applyFailed,
         int toolCount,
         List<String> skills,
         List<SkippedSkillResponse> skippedSkills) {
@@ -238,6 +242,7 @@ public final class ConnectionDtos {
                 value.bound(),
                 value.status() == null ? null : value.status().name(),
                 value.restartRequired(),
+                value.applyFailed(),
                 value.toolCount(),
                 value.skills(),
                 value.skippedSkills().stream()
@@ -304,6 +309,13 @@ public final class ConnectionDtos {
                 value.detachedFrom().stream()
                     .map(agent -> new DetachedAgentResponse(agent.agentCode(), agent.agentName()))
                     .toList());
+        }
+    }
+
+    /** 운영 정기 작업의 재시작 조회 응답이다. 칸의 뜻은 {@link ConnectorRestartSnapshot} 이 갖는다. */
+    public record RestartResponse(long restartWaiting, Instant oldestWaitingSince, int runningExecutions) {
+        static RestartResponse from(ConnectorRestartSnapshot value) {
+            return new RestartResponse(value.restartWaiting(), value.oldestWaitingSince(), value.runningExecutions());
         }
     }
 }

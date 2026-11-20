@@ -475,6 +475,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             binding != null,
             binding == null ? null : binding.status(),
             binding != null && binding.restartRequired(),
+            binding != null && binding.applyFailedAt() != null,
             manifest == null ? 0 : manifest.tools().size(),
             manifest == null ? List.of() : manifest.skills(),
             binding == null ? List.of() : binding.skippedSkills());
