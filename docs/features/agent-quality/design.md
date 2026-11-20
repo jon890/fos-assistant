@@ -46,8 +46,8 @@
 | 무엇 | 정한 것 |
 | --- | --- |
 | 표시 | `app_user.evaluation` BOOLEAN NOT NULL DEFAULT FALSE. 사용자당 참/거짓 하나라 본체 컬럼에 둔다(data-schema 「테이블을 추가하는 기준」). 그룹마다 많아야 하나다 |
-| 만들기 | 관리자가 품질 화면에서 「평가 사용자 준비」 를 한 번 누른다(`POST /api/v1/admin/quality/evaluation-user`). 예약 주소(`evaluation@quality.invalid` 꼴, `.invalid` 는 메일이 가지 않는 예약 도메인)로 차례대로 만든다. (1) `PersonRegistrar.register` 가 허용 목록 행과 Hermes profile, key, MCP 토큰을 만든다. (2) `UserProvisioningService.resolve` 가 `app_user`(역할 `MEMBER`)를 만들고 첫 로그인 리스너(`FirstAgentCreator`)가 첫 에이전트를 만든다. (3) 같은 트랜잭션에서 전용 `UPDATE` 로 `evaluation` 을 켠다(data-schema 「테이블을 추가하는 기준」 의 전용 `UPDATE` 규칙). (4) `AgentLifecycleService.create` 로 위임 대상 에이전트를 만든다. (5) 그림·사진 도구를 실행 공간 안에서만 켠다. 이미 있으면 빠진 것만 채운다. 실행 공간과 첨부 정책에 평가 profile 을 등록하는 일은 운영 저장소가 먼저 한다(아래 「운영 저장소에 넘길 요청」). 등록 전에 준비하면 그림·사진 도구가 켜지지 않으므로, 준비 API 는 그 도구가 켜졌는지까지 보고 빠졌으면 「정책 등록 필요」 로 돌려준다 |
-| 에이전트 | 기본 에이전트 하나와 위임 대상 에이전트 하나. 기본 에이전트의 기본 도구는 첫 에이전트를 만들 때처럼 실행 공간 여부를 보고 켜지고, `image_gen` 과 `vision` 은 `AgentDefaultToolsets.enablePending` 으로 실행 공간 안에서만 켠다. 셸·파일 도구를 실행 공간 밖으로 켜는 쓰기(`AgentToolService.writeAsAdmin`)는 쓰지 않는다. Hermes 내장 위임(`delegation`, `delegate_task`)은 켜지 않는다. 켜면 모델이 자식 실행 줄이 남지 않는 내부 하위 작업을 써 위임 확인이 흔들린다. 위임 확인은 늘 켜진 Control Plane MCP 의 `agent_delegate` 로 위임 대상 에이전트의 code 를 지정해 맡긴다. 그 code 를 문항에 넣어 다른 사용자의 공개 에이전트로 가지 않게 한다. 평가 사용자의 에이전트는 기본 도구 대기 알림(`DEFAULT_TOOLS_PENDING`)에서 뺀다 |
+| 만들기 | 관리자가 품질 화면에서 「평가 사용자 준비」 를 한 번 누른다(`POST /api/v1/admin/quality/evaluation-user`). 예약 주소(`evaluation@quality.invalid` 꼴, `.invalid` 는 메일이 가지 않는 예약 도메인)로 차례대로 만든다. (1) `PersonRegistrar.register` 가 허용 목록 행과 Hermes profile, key, MCP 토큰을 만든다. (2) `UserProvisioningService.resolve` 가 `app_user`(역할 `MEMBER`)를 만들고 첫 로그인 리스너(`FirstAgentCreator`)가 첫 에이전트를 만든다. (3) 같은 트랜잭션에서 전용 `UPDATE` 로 `evaluation` 을 켠다(data-schema 「테이블을 추가하는 기준」 의 전용 `UPDATE` 규칙). (4) `AgentLifecycleService.create` 로 위임 대상 에이전트를 만든다. (5) 같은 트랜잭션에서 기본 비서의 기본 도구 대기 목록(`agent.pending_default_toolsets`)에 첫 로그인 기본 도구와 `image_gen`, `vision` 을 더한다. 첫 로그인의 백그라운드 작업이 커밋 뒤 기본 도구를 쓰고, 이어서 `AgentPendingToolsets.attempt` 가 행 잠금 안에서 그 목록을 실행 공간 안으로 켠다. 준비가 Hermes 도구 목록을 따로 읽고 통째로 쓰면 백그라운드 쓰기와 겹쳐 나중에 쓴 쪽이 다른 쪽 이름을 지우므로 직접 쓰지 않는다. 이미 있으면 빠진 것만 채우고, 도구는 같은 목록에 더한 뒤 `attempt` 를 바로 부른다. 실행 공간과 첨부 정책에 평가 profile 을 등록하는 일은 운영 저장소가 먼저 한다(아래 「운영 저장소에 넘길 요청」). 등록 전에 준비하면 그 도구가 켜지지 않으므로, 상태는 셸·파일 도구까지 모두 켜졌는지 보고 빠졌으면 「정책 등록 필요」(`POLICY_REGISTRATION_REQUIRED`), Hermes 가 목록을 돌려주지 않으면 `TOOLS_UNREADABLE` 로 돌려준다. 처음 준비한 직후에는 백그라운드 작업이 도는 중이라 잠시 「정책 등록 필요」 가 남을 수 있다 |
+| 에이전트 | 기본 에이전트 하나와 위임 대상 에이전트 하나. 기본 에이전트의 기본 도구는 첫 에이전트를 만들 때처럼 실행 공간 여부를 보고 켜지고, `image_gen` 과 `vision` 은 기본 도구 대기 목록을 거쳐 `AgentDefaultToolsets.enablePending` 으로 실행 공간 안에서만 켠다. 셸·파일 도구를 실행 공간 밖으로 켜는 쓰기(`AgentToolService.writeAsAdmin`)는 쓰지 않는다. Hermes 내장 위임(`delegation`, `delegate_task`)은 켜지 않는다. 켜면 모델이 자식 실행 줄이 남지 않는 내부 하위 작업을 써 위임 확인이 흔들린다. 위임 확인은 늘 켜진 Control Plane MCP 의 `agent_delegate` 로 위임 대상 에이전트의 code 를 지정해 맡긴다. 그 code 를 문항에 넣어 다른 사용자의 공개 에이전트로 가지 않게 한다. 평가 사용자의 에이전트는 기본 도구 대기 알림(`DEFAULT_TOOLS_PENDING`)에서 뺀다 |
 | 미리 넣는 기억 | 기억 읽기 확인용 개인 기억 한 줄. 그날 바뀌지 않는 지어낸 사실(예: 「평가 사용자가 좋아하는 색은 청록이다」)을 준비할 때 한 번 넣는다 |
 | 로그인 | 하지 않는다. Google 동의 화면에 주소를 더하지 않는다. 실행기가 `app_user` 행으로 `CurrentUser` 를 만든다 |
 | 숨기기 | 아래 「숨기는 곳」 표 |
@@ -181,7 +181,7 @@ sequenceDiagram
 
 | 상황 | 처리 |
 | --- | --- |
-| 확인을 두 번 시작 | 도는 `DEPLOY_CHECK` 를 그대로 돌려준다. 시작은 그룹 단위 잠금(`quality_run` 의 `RUNNING` 줄을 찾는 조회를 그룹의 `group_setting` 줄 잠금 안에서)으로 하나만 만든다 |
+| 확인을 두 번 시작 | 도는 `DEPLOY_CHECK` 를 그대로 돌려준다. 시작은 평가 사용자 행 잠금(`AppUserRepository.findByIdForUpdate`) 안에서 `RUNNING` 인 `DEPLOY_CHECK` 를 찾아 하나만 만든다(「실행기 구현 메모」) |
 | `USER_BUSY`, `CONVERSATION_BUSY` | 평가 전용 사용자는 실행기만 쓰므로 정상이면 일어나지 않는다. 일어나면 그 기능을 `FAILED`, 까닭 `BUSY` 로 적는다 |
 | Hermes 연결 실패, 시간 초과, 실행 실패 | 그 기능 `FAILED`, 까닭은 실행 줄의 오류 종류를 고정 코드로 옮긴다 |
 | 정리 실패 | 결과는 바꾸지 않는다. 경고 로그를 남기고 하루 정리 작업이 다시 지운다 |
@@ -196,6 +196,16 @@ sequenceDiagram
 | REQ2 | 사용자 목록, 에이전트 목록, 멘션 후보, 사용량 집계의 조회 테스트가 평가 전용 사용자를 빼는지 본다. 실행기가 다른 사용자의 데이터를 바꾸지 않는지는 e2e 에서 다른 사용자의 기억·파일·예약 수를 전후로 센다 |
 | REQ3 | 실패로 끝난 확인이 `ADMIN` 마다 알림 한 줄을 남기는지 통합 테스트. 파이프라인 알림은 운영 저장소 몫이다 |
 | REQ4 | 관리자 API 의 권한(관리자만)과 응답 모양은 통합 테스트, 화면 첫 칸은 브라우저 테스트 |
+
+## PR1 나눔
+
+PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
+
+| PR | 범위 | 남은 확인 |
+| --- | --- | --- |
+| 기반 | `app_user.evaluation`, `quality_run`, 평가 전용 사용자 준비와 관리자 API, 숨기는 곳, 기능별 규칙 판정(REQ1 의 판정, 사용량 「평가」 한 줄을 뺀 REQ2) | 배포하고 아래 요청 5 를 마친 뒤 관리자가 평가 사용자를 준비해 상태에 빠진 것이 없고, 관리자 사용자 목록에 「평가용」 줄이 하나인지 본다 |
+| 실행기 | 확인 시작·조회 API, 기능 차례 실행과 10분 마감, 실패 알림, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3) | 배포 뒤 운영에서 확인 한 번을 돌려 본다 |
+| 화면 | `/admin/quality` 첫 칸과 사용량 「평가」 한 줄(REQ4, REQ2 의 나머지). 실행기 PR 과 같은 배포에 묶는다 | 브라우저 테스트 |
 
 ## 운영 저장소에 넘길 요청
 
