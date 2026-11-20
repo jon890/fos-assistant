@@ -1,5 +1,7 @@
 package com.bifos.assistant.memory.application.dto;
 
+import java.util.List;
+
 /**
  * 에이전트가 남기려는 사실 하나다. 모양 검사를 마친 값이다.
  *
@@ -12,6 +14,7 @@ package com.bifos.assistant.memory.application.dto;
  * @param direct 바로 저장 조건을 모두 만족하는가. 민감해 보이는지와 collection 은 여기서 다시 본다
  * @param externalRead 그 대화가 이 호출 전에 바깥 글을 읽는 도구를 불렀는가. 승인 카드가 보인다
  * @param archivable 모델이 자동 보관을 허락했는가. 새 항목에만 적는다(ADR-20261015 / memory-maintenance)
+ * @param replaces 새 항목이 대신할 옛 항목 번호. 합치기가 아니면 빈 목록이다(docs/features/memory/spec.md 의 REQ6)
  */
 public record MemoryRememberRequest(
     String title,
@@ -24,12 +27,36 @@ public record MemoryRememberRequest(
     Long conversationId,
     boolean direct,
     boolean externalRead,
-    boolean archivable) {
+    boolean archivable,
+    List<Long> replaces) {
+
+    public MemoryRememberRequest {
+        replaces = replaces == null ? List.of() : List.copyOf(replaces);
+    }
+
+
+    /** 합치기가 아닌 요청이다. */
+    public MemoryRememberRequest(
+        String title,
+        String content,
+        String summary,
+        String collection,
+        boolean sensitive,
+        Long memoryId,
+        Long executionId,
+        Long conversationId,
+        boolean direct,
+        boolean externalRead,
+        boolean archivable) {
+        this(title, content, summary, collection, sensitive, memoryId, executionId, conversationId, direct, externalRead,
+            archivable, List.of());
+    }
+
 
     /** 제목과 본문을 빼고 낸다. 로그에 남기지 않는다. */
     @Override
     public String toString() {
         return "MemoryRememberRequest[collection=" + collection + ", sensitive=" + sensitive + ", memoryId="
-            + memoryId + ", executionId=" + executionId + ", direct=" + direct + ", externalRead=" + externalRead + ", archivable=" + archivable + "]";
+            + memoryId + ", executionId=" + executionId + ", direct=" + direct + ", externalRead=" + externalRead + ", archivable=" + archivable + ", replaces=" + replaces + "]";
     }
 }

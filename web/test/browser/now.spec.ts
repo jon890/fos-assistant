@@ -189,17 +189,18 @@ test.describe("지금 화면", () => {
       return route.fulfill({ status: 204 });
     });
 
-    // 모바일 머리의 알림 단추도 `notification-count` 를 그리고 넓은 폭에서도 DOM 에 남으므로 사이드바 안에서만 찾는다.
     await openNow(page);
     let sidebar = await openSidebar(page, testInfo);
-    await expect(sidebar.getByTestId("notification-count")).toHaveText("1");
+    await expect(sidebar.getByRole("link", { name: "지금 볼 것 1건, 새 알림 있음" })).toBeVisible();
     await expect(sidebar.getByTestId("now-count")).toHaveText("1");
 
-    await page.goto("/notifications");
+    if (testInfo.project.name === "mobile") await page.keyboard.press("Escape");
+    await page.getByRole("tab", { name: /^알림/ }).click();
     await page.getByRole("button", { name: "모두 읽음" }).click();
     await expect(page.getByRole("button", { name: "모두 읽음" })).toBeDisabled();
+    await expect(page.getByRole("tab", { name: /^알림/ })).toHaveAccessibleName("알림");
+    await expect(page.getByRole("tab", { name: /^할 것/ })).toHaveAccessibleName("할 것 1건");
     sidebar = await openSidebar(page, testInfo);
-    await expect(sidebar.getByTestId("notification-count")).toHaveCount(0);
     await expect(sidebar.getByTestId("now-count")).toHaveText("1");
     await expect(sidebar.getByRole("link", { name: "지금 볼 것 1건" })).toBeVisible();
 

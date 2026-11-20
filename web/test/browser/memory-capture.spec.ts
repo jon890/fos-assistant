@@ -158,3 +158,38 @@ test("바깥 글을 읽지 않은 대화의 제안 카드는 그 줄을 보이�
   );
   await expect(page.getByTestId("memory-capture-external-read")).toHaveCount(0);
 });
+
+test("합친 기록 줄과 제안 카드는 합친 수와 옛 제목을 보인다", async ({
+  page,
+}) => {
+  await open(page, "기억 기록 검사 합치기", [
+    capture(0, {
+      replacedTitles: ["첫째날 산책 메모", "둘째날 산책 메모"],
+    }),
+    capture(0, {
+      id: 2,
+      memoryId: 102,
+      kind: "PROPOSED",
+      status: "PROPOSED",
+      title: "여행 계획",
+      replacedTitles: ["제주 여행 메모"],
+    }),
+  ]);
+
+  const replaced = page.getByTestId("memory-capture-replaced");
+  await expect(replaced).toHaveCount(2);
+  await expect(replaced.first()).toContainText("2개를 합쳤어요");
+  await expect(replaced.first()).toContainText("첫째날 산책 메모");
+  await expect(replaced.first()).toContainText("둘째날 산책 메모");
+  await expect(replaced.nth(1)).toContainText("받아들이면 1개를 합쳐요");
+  await expect(replaced.nth(1)).toContainText("제주 여행 메모");
+});
+
+test("합치기가 아닌 기록 줄은 합친 제목을 보이지 않는다", async ({ page }) => {
+  await open(page, "기억 기록 검사 합치기 아님", [
+    capture(0, { replacedTitles: [] }),
+  ]);
+
+  await expect(page.getByTestId("memory-capture")).toContainText("기억했어요");
+  await expect(page.getByTestId("memory-capture-replaced")).toHaveCount(0);
+});
