@@ -352,6 +352,7 @@ test("새 대화에서 사진을 먼저 올리면 이름표와 @ 목록이 잠�
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
   await expect(agentSwitcher(page)).toHaveAttribute("data-locked", "true");
+  await expect(agentSwitcher(page)).toHaveAccessibleDescription("이미 시작한 대화라 바꿀 수 없어요");
   await agentSwitcher(page).click();
   await expect(page.getByTestId("agent-switcher-locked")).toHaveText(
     "이미 시작한 대화라 에이전트를 바꿀 수 없어요. 다른 에이전트는 새 대화에서 고를 수 있어요",

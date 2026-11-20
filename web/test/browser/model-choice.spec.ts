@@ -475,6 +475,10 @@ test("저장이 실패하면 단추가 이전 칸으로 돌아가고 알린다",
     "role",
     "alert",
   );
+  // 안내는 입력창 테두리 밖에 그린다. 아래 줄 안에 생기면 좁은 폭에서 「＋」 와 보내기가 밀린다(app-shell 스펙의 REQ8).
+  await expect(
+    page.getByTestId("composer-shell").getByTestId("model-picker-error"),
+  ).toHaveCount(0);
   await expect(trigger(page)).toHaveText("Medium");
   await expect(stop(page, "Medium")).toBeChecked();
 });

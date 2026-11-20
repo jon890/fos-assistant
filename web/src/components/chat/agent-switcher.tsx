@@ -54,6 +54,7 @@ export function AgentSwitcher({
   locked,
 }: Props) {
   const descriptionId = useId();
+  const lockedId = useId();
   const current =
     agents.find((agent) => agent.code === selectedCode) ?? agents[0];
   if (!current) return null;
@@ -65,12 +66,19 @@ export function AgentSwitcher({
       data-testid="agent-switcher"
       data-locked={locked || undefined}
       aria-label={`에이전트 고르기, 지금 ${current.name}`}
+      // 잠겼으면 이름은 그대로 두고 바꿀 수 없다는 것을 설명으로 읽힌다.
+      aria-describedby={locked ? lockedId : undefined}
       className="h-9 max-w-full min-w-0 gap-2 rounded-full px-2"
     >
       <AgentBadge agent={current} size="sm" />
       <span className="truncate text-sm font-medium">{current.name}</span>
       {locked ? (
-        <Lock aria-hidden="true" className="text-muted-foreground" />
+        <>
+          <Lock aria-hidden="true" className="text-muted-foreground" />
+          <span id={lockedId} className="sr-only">
+            이미 시작한 대화라 바꿀 수 없어요
+          </span>
+        </>
       ) : (
         <ChevronDown aria-hidden="true" className="text-muted-foreground" />
       )}

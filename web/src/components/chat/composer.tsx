@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUp, LoaderCircle, Plus, Square, X } from "lucide-react";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
@@ -21,6 +21,7 @@ import { useOutgoingNavigation } from "./use-outgoing-navigation";
 
 export function Composer(props: Props) {
   const composing = useRef(false);
+  const [tierFailed, setTierFailed] = useState(false);
   const state = useComposerState(props);
   const {
     onBlockingChange,
@@ -263,6 +264,7 @@ export function Composer(props: Props) {
               mode={modelSelectionMode}
               tier={modelTier}
               onChange={saveModelTier}
+              onFailedChange={setTierFailed}
               disabled={
                 disabled || agentCode.length === 0 || modelChoiceUnknown
               }
@@ -295,6 +297,15 @@ export function Composer(props: Props) {
           </div>
         </div>
       </div>
+      {tierFailed ? (
+        <p
+          role="alert"
+          data-testid="model-picker-error"
+          className="mt-1 px-2 text-xs text-destructive"
+        >
+          모델 단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
+        </p>
+      ) : null}
     </form>
   );
 }
