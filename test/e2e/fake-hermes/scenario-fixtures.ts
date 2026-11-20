@@ -232,6 +232,18 @@ export function specialOutputFor(input: string): string | null {
       "<script>window.__unsafeAgentHtml = true</script>",
     ].join("\n");
   }
+  if (input === "그림 보안 검사") {
+    // 웹 페이지에 조종당한 모델이 쓸 수 있는 mermaid 블록이다. 화면은 이것을 실행하지 않아야 한다.
+    return [
+      "```mermaid",
+      '%%{init: {"securityLevel": "loose", "flowchart": {"htmlLabels": true}}}%%',
+      "flowchart TD",
+      '  A["<img src=x onerror=window.__mermaidXss=1>"] --> B[끝]',
+      "  click A call window.__mermaidClick()",
+      '  click B href "javascript:window.__mermaidHref=1"',
+      "```",
+    ].join("\n");
+  }
   if (input === "답 모양 검사") {
     return [
       "열이 나도 잘 먹고 잘 놀면 급하지 않습니다.",

@@ -190,6 +190,36 @@ test("에이전트 답의 제목과 줄바꿈, 출처 절, Mermaid 그림을 읽
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport?.width ?? Number.POSITIVE_INFINITY);
 });
 
+test("에이전트 답의 Mermaid 블록에 든 HTML 라벨과 click 지시와 보안 설정 변경을 실행하지 않는다", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as typeof window & { __mermaidClick?: () => void }).__mermaidClick = () => {
+      (window as typeof window & { __mermaidClicked?: boolean }).__mermaidClicked = true;
+    };
+  });
+  await page.goto("/new");
+  await page.getByRole("textbox", { name: "메시지" }).fill("그림 보안 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const answer = page.getByTestId("assistant-body").last();
+  // strict 설정이면 그림을 그리거나 원문으로 보인다. 어느 쪽이든 아래 표식이 생기지 않아야 한다.
+  await expect(answer.getByTestId("mermaid-diagram").or(answer.getByText("그림을 그리지 못했어요"))).toBeVisible();
+  const diagram = answer.getByTestId("mermaid-diagram");
+  if ((await diagram.count()) > 0) {
+    // 노드와 링크를 모두 눌러 본다. click 지시가 살아 있으면 표식이 생긴다.
+    await diagram.evaluate((root) => {
+      root.querySelectorAll("g, a").forEach((element) => {
+        element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    });
+    await expect(diagram.locator("img[onerror], [onclick]")).toHaveCount(0);
+  }
+  const flags = await page.evaluate(() => {
+    const target = window as typeof window & { __mermaidXss?: unknown; __mermaidClicked?: unknown; __mermaidHref?: unknown };
+    return [target.__mermaidXss, target.__mermaidClicked, target.__mermaidHref];
+  });
+  expect(flags).toEqual([undefined, undefined, undefined]);
+});
+
 test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) => {
   await page.goto("/new");
   await page
