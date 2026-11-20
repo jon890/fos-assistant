@@ -1,6 +1,7 @@
 # 기억 요약과 상세 두 층 기술 설계
 
 스펙: [`spec.md`](spec.md)(확인 2026-11-20). 지금 동작은 [기능 파일](../memory.md)이 갖고, 이 설계는 바뀌는 곳만 적는다.
+PR1 은 크기 때문에 PR1a(REQ1 부터 REQ5, REQ7, REQ8)와 PR1b(REQ6)로 나눴다. 이 문서의 「PR1」 절은 둘을 함께 적고, `memory_capture.replaced_memory_ids` 칸과 합치기 지침, 대화의 기록 줄은 PR1b 가 만든다.
 PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3 의 절은 그 PR 을 시작할 때 다시 대조하고 고친다.
 
 ## 요구사항 연결
@@ -12,7 +13,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 | REQ3 | PR1 | 고르는 순서와 건너뛰기는 지금 `chooseFacts` 를 쓴다. 빠진 요약은 색인 줄의 선택 근거에 `summary-over-budget` 을 붙여 실행 기록에 남긴다 |
 | REQ4 | PR1 | `group_setting` 의 새 키 `MEMORY_CONTEXT` 와 읽는 쪽 `MemoryContextSettings`, 관리자 API `/api/v1/admin/memory-settings` |
 | REQ5 | PR1 | `memory_remember` 의 선택 인자 `summary`. 판정은 `McpMemoryRemember` 와 `MemoryCaptureService` 의 지금 자리에서 요약까지 본다 |
-| REQ6 | PR1 | `memory_remember` 의 선택 인자 `replaces`. 바로 저장이면 같은 트랜잭션에서 대체 칸을 채우고, 제안이면 `memory_capture.replaced_memory_ids` 에 두었다가 받아들일 때 채운다. 기록 목록 응답과 대화의 기록 줄이 옛 제목을 보인다 |
+| REQ6 | PR1b | `memory_remember` 의 선택 인자 `replaces`. 바로 저장이면 같은 트랜잭션에서 대체 칸을 채우고, 제안이면 `memory_capture.replaced_memory_ids` 에 두었다가 받아들일 때 채운다. 기록 목록 응답과 대화의 기록 줄이 옛 제목을 보인다 |
 | REQ7 | PR1 | `ContextAssembler.MEMORY_INSTRUCTIONS` 와 요약 구역 머리 글을 고치고, 기억 회수 측정의 합성 사례에 세 질문을 더한다 |
 | REQ8 | PR1 | 기동 이관 `MemorySummaryBackfill`. 요약 칸이 `NULL` 인 줄만 본다 |
 | REQ9 | PR2 | 목록 응답에 요약, 묶음, 「요약에 못 들어감」, 대체 정보를 더하고 사용량 API 를 둔다. 화면은 `web/src/components/memory/` |
@@ -53,7 +54,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 
 요약을 다루는 기존 경로를 모두 바꾼다.
 
-- `MemoryTextMigration` 의 `rewrite`, `verify`, `migrateRevision` 이 요약도 함께 다시 암호화하고 해시를 대조한다. 평문 줄의 평문 요약이 제목·본문만 암호화된 채 남지 않게 한다
+- `MemoryTextMigration` 의 `rewrite`, `verify`, `migrateRevision` 이 요약도 함께 다시 암호화하고 해시를 대조한다. 평문 줄의 평문 요약이 제목·본문만 암호화된 채 남지 않게 한다. 요약이 `NULL` 인 줄은 `NULL` 로 둔다(「이관 전」 표지를 지우지 않는다)
 - `MemoryRevisionWriter.saveRevision`(revision 을 남길 때 다시 암호화하는 분기 포함)과 `revise` 가 요약을 받는다. `MemoryService.revise` 와 `update` 도 요약 인자를 받는다(`null` 은 지금 값 유지)
 - 되돌리기 `MemoryCaptureService.restore` 는 이전 revision 의 본문과 함께 요약도 되돌린다. 이전 revision 의 요약이 `NULL` 이면 빈 글로 되돌린다
 - 화면 수정(`PATCH /api/v1/memories/{id}`, PR2 전까지 요약 칸이 없다)은 본문이 바뀌고 지금 요약이 옛 본문과 같으면 요약을 새 본문으로 바꾸되 새 본문이 200자를 넘으면 요약을 비운다. 요약이 옛 본문과 다르면 그대로 둔다. 이관으로 「요약 = 본문」 이 된 기억을 화면에서 고쳐도 옛 사실이 요약으로 남지 않게 한다
@@ -126,7 +127,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 
 `MemorySummaryBackfill` 이 기동 뒤 한 번 돈다. `MemoryTextMigration` 과 같은 틀이다.
 
-0. `MemoryTextMigration` 뒤에 돈다(`@Order` 로 차례를 정한다). 평문 줄에 요약 암호문을 먼저 쓰면 평문 분기가 그 암호문을 요약으로 내기 때문이다
+0. `MemoryTextMigration` 뒤에 돈다. 두 클래스 모두에 `@Order` 를 붙인다(암호화 이관 100, 요약 이관 200). 한쪽에만 붙이면 붙인 쪽이 먼저 돈다. 평문 줄에 요약 암호문을 먼저 쓰면 평문 분기가 그 암호문을 요약으로 내기 때문이다
 1. `summary IS NULL` 이고 암호화가 켜진 설치면 `data_key_id IS NOT NULL` 인 `memory` 줄의 번호를 읽는다. 아직 데이터 key 로 옮기지 못한 줄은 다음 기동에 본다
 2. 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽는다. 여전히 `NULL` 이면 아래로 정하고 암호화해 적는다. revision 번호와 갱신 시각은 바꾸지 않는다
    - 대상(스펙 REQ8: `USER`, `MEMORY`, `ACCEPTED`, `SEARCH`, 대체되지 않음, 풀림, 본문 200자 이하)이면 요약 = 본문
