@@ -1,6 +1,6 @@
 # 화면 틀과 메뉴 배치 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1-REQ7), PR2(REQ8-REQ10), PR3(REQ11-REQ15)을 설계한다. PR4 부터의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1-REQ7), PR2(REQ8-REQ10), PR3(REQ11-REQ15), PR4(REQ16-REQ18)를 설계한다. PR5 의 요구사항은 그 PR 을 시작할 때 이 문서에 절을 더한다.
 
 ## 요구사항 연결
 
@@ -21,15 +21,15 @@
 | REQ13 | 끝난 블록의 한 줄을 「쓴 것의 목록」 으로 고른다. 도는 중에는 흘러온 항목으로, 끝난 답은 메시지 조회의 `activity.uses` 로 만든다. 종류 이름은 `web/src/lib/tool-kind.ts` 가 정하고 같은 이름을 한 번만 세어 셋까지 잇는다 |
 | REQ14 | Control Plane 이 플러그인 도구의 등록 이름을 카탈로그 캐시로 서비스 이름과 도구 제목(`connector`)으로 바꿔 스트림 사건, 실행 트리, `activity.uses` 에 붙인다. 화면은 `connector` 가 있으면 그것을, 없으면 지금 문장 표와 종류 표를 쓴다 |
 | REQ15 | 펼친 목록(`ActivityTimeline`), 옆 패널, 실행 하나 화면(`ExecutionEventRow`)이 같은 `toolLabel` 에 `connector` 를 넘긴다. 끝난 줄은 종류 아이콘을, 도는 줄과 실패한 줄은 지금 상태 아이콘을 보인다 |
-| REQ16 | PR4 가 설계한다. 방향은 `/now` 화면에 탭을 두고 알림 목록 부품을 그 안으로 옮기는 것이다 |
-| REQ17 | REQ16 과 같은 PR 이 함께 설계한다 |
-| REQ18 | REQ16 과 같은 PR 이 함께 설계한다 |
+| REQ16 | `/now` page 가 머리(「지금 볼 것」)와 새 부품 `NowTabs` 를 그린다. 「할 것」 탭에는 서버가 그린 `NowScreen` 을, 「알림」 탭에는 `NotificationList` 를 둔다. 열린 탭은 주소의 `?tab=notifications` 가 정한다. `/notifications` page 는 `/now?tab=notifications` 로 넘긴다 |
+| REQ17 | `NotificationBell` 을 지운다. 새 `NowStatusProvider` 가 할 것의 수를 한곳에서 읽고, 사이드바 `NowLink`, 휴대폰 위 막대의 새 「지금 볼 것」 단추, 탭 이름이 같은 값을 쓴다. 숫자와 점은 `lib/attention.ts` 의 `nowIndicator` 가 정한다 |
+| REQ18 | 고치지 않는다. 새 대화 화면의 `AttentionLine` 과 알림 줄, 알림을 만드는 Control Plane 은 그대로다 |
 | REQ19 | PR5 가 설계한다. 방향은 화면 머리와 본문 폭을 맡는 부품 하나를 두고 대상 화면이 그것을 쓰는 것이다 |
 | REQ20 | REQ19 과 같은 PR 이 함께 설계한다 |
 
 ## 책임과 경계
 
-PR1 과 PR2 는 모두 `web` 안의 화면 틀이다. PR3 은 Control Plane 의 응답에 칸을 더한다. Hermes 는 바뀌지 않는다.
+PR1, PR2, PR4 는 모두 `web` 안의 화면 틀이다. PR3 은 Control Plane 의 응답에 칸을 더한다. Hermes 는 바뀌지 않는다.
 
 | 부품 | 맡는 것 |
 | --- | --- |
@@ -50,6 +50,10 @@ PR1 과 PR2 는 모두 `web` 안의 화면 틀이다. PR3 은 Control Plane 의 
 | `lib/tool-label.ts`(PR3) | 도는 줄과 끝난 줄의 문장. 플러그인 도구는 「서비스 이름 · 도구 제목」 |
 | `lib/tool-kind.ts`(PR3, 새 파일) | 도구를 종류로 묶는 표와 접힌 줄을 잇는 함수. 다른 모듈을 부르지 않아 노드 테스트가 직접 부른다 |
 | `components/chat/activity/activity-icon.tsx`(PR3, 새 파일) | 종류마다의 아이콘 |
+| `components/now/now-tabs.tsx`(PR4, 새 파일) | 「할 것」 과 「알림」 탭, 탭 이름의 수, 주소의 `tab` 값 |
+| `components/shell/now-status.tsx`(PR4, 새 파일) | 할 것의 수를 읽어 들고 있는 provider 와 `useNowStatus()`. 읽지 않은 알림이 있는지도 함께 내준다 |
+| `components/shell/now-badge.tsx`(PR4, 새 파일) | 「지금 볼 것」 줄과 단추에 붙는 숫자나 점 |
+| `components/notification/notification-list.tsx`(PR4) | 탭 안에 들어가도록 제목과 바깥 폭을 뺀 알림 목록 |
 | `usage/execution/application/port/ConnectorToolNames`(PR3, backend) | 등록 이름을 서비스 이름과 도구 제목으로 바꾸는 port. `connector` 가 위 패키지라 `usage` 에 두고 `connector` 가 구현한다 |
 | `connector/connection/application/ConnectorToolNameLookup`(PR3, backend) | 그 구현. 카탈로그 캐시(`ConnectorCatalogCache`)의 manifest 마다 등록 이름을 계산해 찾는다 |
 | `chat/turn/application/ChatConversationQueries`(PR3, backend) | `activity.uses` 를 만든다 |
@@ -178,6 +182,39 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 **도는 줄의 움직임은 글자 위를 지나가는 밝기다.** `activity-shimmer` 는 글자색을 그라데이션으로 칠해 옆으로 옮기고, `prefers-reduced-motion: reduce` 에서는 `animation: none` 이다.
 낭독기가 읽는 글은 단추 이름과 따로 둔 `sr-only` 의 `aria-live="polite"` 다. 단추 안에 live 영역을 두면 걸린 시간이 바뀔 때마다 읽는다.
 
+### 「지금 볼 것」 의 탭(PR4)
+
+| 탭 | 내용 | 이름 옆 표시 |
+| --- | --- | --- |
+| 할 것(처음 열린다) | 지금의 카드 화면(`NowScreen`). 서버가 그린다 | 할 것의 수(`nowCount`). 0 이면 없다 |
+| 알림 | 지금의 알림 목록(`NotificationList`). 「모두 읽음」 은 탭 안 맨 위 오른쪽이다 | 읽지 않은 알림의 수. 99 를 넘으면 「99+」(`unreadBadge`) |
+
+- 탭은 `radix-ui` 의 Tabs 로 그린다. 키보드의 좌우 이동과 `tablist` 역할을 새로 만들지 않는다. 감싸는 부품은 `components/ui/tabs.tsx` 다.
+- **열린 탭은 주소가 정한다.** page 가 `searchParams.tab` 이 `notifications` 이면 「알림」 을 연다. 탭을 바꾸면 `window.history.replaceState` 로 주소만 바꾼다. 서버를 다시 부르지 않고, 새로 고쳐도 같은 탭이 열린다.
+- 「알림」 탭의 목록은 그 탭을 처음 열 때 올라오고 그 뒤에는 내려가지 않는다. `/now` 를 열 때마다 알림 첫 쪽을 읽지 않으면서, 탭을 오가도 목록과 이어 읽은 자리가 남는다. 「할 것」 은 서버가 이미 그렸으므로 늘 올라와 있고 감춰지기만 한다.
+- 수는 낭독기가 탭 이름과 함께 읽는다. 숫자 배지는 `aria-hidden` 이고 옆의 `sr-only` 글(「3건」, 「읽지 않은 알림 2개」)이 읽힌다.
+- `/notifications` page 는 그리지 않고 `redirect("/now?tab=notifications")` 다. 로그인 확인은 `/now` page 가 한다. 웹 푸시의 열기 주소(`/n/<id>`)는 attention 기능이 따로 갖는다.
+
+### 「지금 볼 것」 의 수와 점(PR4)
+
+| 할 것 | 읽지 않은 알림 | 줄과 단추에 붙는 것 | 낭독기 이름 |
+| --- | --- | --- | --- |
+| 1 이상 | 상관없음 | 수(`now-count`) | 「지금 볼 것 3건」, 알림도 있으면 「지금 볼 것 3건, 새 알림 있음」 |
+| 0 | 1 이상 | 점(`now-dot`) | 「지금 볼 것, 새 알림 있음」 |
+| 0 | 0 | 없음 | 「지금 볼 것」 |
+
+**할 것의 수는 `NowStatusProvider` 하나가 읽는다.** 사이드바(붙박이와 서랍), 휴대폰 위 막대, 탭 이름이 같은 값을 쓴다. 각자 읽으면 한 화면에서 같은 조회가 겹치고 서로 다른 때 읽은 값이 어긋난다.
+`AppShell` 이 `NotificationsProvider` 안에 두고 켜는 조건(관리자 영역 밖)도 같다.
+
+다시 읽는 때는 셋이다.
+
+- 경로가 바뀔 때. 지금 `NowLink` 가 하던 것을 옮긴다
+- `ATTENTION_CHANGED_EVENT`. 지금 화면 안의 숨기기, 미루기, 되돌리기
+- `NOTIFICATIONS_CHANGED_EVENT`. 새 알림 사건이 오거나 알림 연결을 다시 열 때다(spec DECISION20). 승인 요청 알림이 왔는데 수가 그대로면 점과 숫자가 어긋난다
+
+읽기마다 차례 번호를 붙여 늦게 온 앞선 답을 버리는 것은 지금 `NowLink` 의 방식 그대로다. 읽지 못하면 0 이다(`readNowCount`).
+휴대폰 위 막대의 단추는 `Inbox` 아이콘의 `/now` 링크이고 알림 단추가 있던 자리(「새 대화」 왼쪽)에 둔다. 위 막대는 사이드바 틀에만 있으므로 관리자 틀과 설정 틀에는 단추가 없다.
+
 ## 실패와 일관성
 
 - 역할을 읽지 못한 상태는 지금 `shellRoleState` 그대로다. 메뉴는 열리고 「관리자 화면」 만 빠진다(DECISION19).
@@ -202,6 +239,9 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | REQ13 | 노드 테스트(`tool-kind.ts`), 브라우저 테스트 | 종류 다섯이면 「외 2」, 같은 종류 한 번, 중지와 실패의 머리말. 다시 연 대화에서 같은 줄인지, 줄에 숫자가 없는지 |
 | REQ14 | 백엔드 테스트(`ConnectorToolNameLookup`, 메시지 조회의 `uses`), 브라우저 테스트(가짜 카탈로그의 플러그인 도구) | 선언한 도구의 서비스 이름과 제목, 제목이 없는 도구, 찾지 못한 등록 이름, 카탈로그 실패. 화면 글자에 `mcp__` 가 없는지 |
 | REQ15 | 브라우저 테스트, 노드 테스트 | 펼친 목록의 아이콘과 이름, 검색어, 실패 줄의 모양, 옆 패널과 실행 하나 화면의 플러그인 도구 이름 |
+| REQ16 | 브라우저 테스트(넓은 화면, 360px) | `/now` 의 두 탭과 처음 열린 탭, `/notifications` 가 「알림」 탭으로 넘어가는지, 알림 줄을 누르면 읽음이 되고 그 대화로 가는지, 갈 곳 없는 줄과 빈 목록, 탭 이름의 두 수 |
+| REQ17 | 노드 테스트(`nowIndicator`, `nowLinkLabel`), 브라우저 테스트 | 할 것 3건이면 수, 할 것 0 에 읽지 않은 알림이면 점, 종 단추가 없는지, 360px 위 막대의 단추, 알림 사건이 오면 할 것의 수를 다시 읽는지, 알림을 모두 읽어도 수가 그대로인지 |
+| REQ18 | 기존 브라우저 테스트(`now.spec.ts` 의 새 대화 화면 한 줄) | 고치지 않은 한 줄이 그대로 보이는지 |
 
 ### 함께 고칠 문서
 
@@ -211,6 +251,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 - `docs/prd.md` 와 ADR-063 가운데 사이드바의 관리자 입구를 적은 문장(있으면 현재 원본만 고치고 ADR 의 결정은 바꾸지 않는다)
 - `docs/features/app-shell.md` 의 구현된 흐름
 - `docs/features/execution.md` 의 「작업 과정 블록」 과 「도구를 보이는 말」, `docs/features/chat.md` 의 `activity` 요약(PR3)
+- `docs/features/attention.md` 의 「화면(알림)」 과 두 수 규칙, `web/docs/code-architecture.md` 의 화면 목록과 위 막대, 알림 단추 문단(PR4)
 
 기존 브라우저 테스트 가운데 사이드바의 「주요 화면」 메뉴, `admin-entry`, 밝기 단추를 찾는 것은 새 자리로 고친다. 로그인 세션은 테스트 도우미가 쿠키로 만들므로 로그아웃 테스트는 자기 browser context 에서만 한다.
 
@@ -229,5 +270,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | DECISION9 | 플러그인 도구의 이름을 정하는 곳 | Control Plane 이 카탈로그 캐시로 붙여 보낸다 | 작성자 | 등록 이름에서 원래 이름을 되찾을 수 없어 manifest 의 서버 이름으로 계산해야 한다. 화면이 카탈로그를 따로 읽으면 연결하지 않은 사용자와 공개 에이전트에서 이름을 잃는다 |
 | DECISION10 | 끝난 답의 접힌 줄을 만드는 값 | 메시지 조회가 쓴 것의 목록(`uses`)을 보내고 화면이 종류로 묶는다 | 작성자 | 종류 표와 문장 표를 화면 한곳에 둔다. 끝난 답마다 트리를 읽으면 대화를 열 때 조회가 답 수만큼 는다 |
 | DECISION11 | 읽은 사이트의 이름(REQ15 의 대상) | 이 PR 은 보이지 않는다. 페이지 읽기의 대상은 지금처럼 사용자에게 오지 않는다 | 작성자 | 누구에게 무엇이 보이는지는 답변 품질 스펙이 정한다(spec REQ15). 그 스펙이 대상을 열면 같은 줄 아래에 보인다 |
+| DECISION12 | 열린 탭을 정하는 곳(PR4) | 주소의 `?tab=notifications`. 탭을 바꾸면 `history.replaceState` 로 주소만 바꾼다 | 작성자 | `/notifications` 넘기기가 열 탭을 주소로 넘겨야 한다. 새로 고침과 공유한 주소에도 같은 탭이 열린다. `router.replace` 는 서버 화면을 다시 받아 지금 화면 조회가 한 번 더 든다 |
+| DECISION13 | 할 것의 수를 읽는 자리(PR4) | 화면 틀의 provider 하나 | 작성자 | 사이드바 두 벌과 위 막대, 탭 이름이 같은 값을 써야 숫자와 점이 어긋나지 않는다. 알림 수가 이미 provider 로 같은 방식을 쓴다 |
 
 ADR 은 남기지 않는다. 모든 결정이 기존 관례를 따르거나 응답 칸을 빼는 것으로 되돌릴 수 있다.
