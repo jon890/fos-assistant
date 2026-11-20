@@ -11,16 +11,21 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * 모든 마이그레이션을 적용한 지금 스키마에서 관찰 표의 유일 제약, NOT NULL, cascade, 색인을 확인한다.
  *
  * <p>요청 칸을 옮기던 데이터 검사는 그 마이그레이션이 운영에 적용된 지 14일이 지나 지웠다. 기준은
  * backend/docs/data-schema.md 의 「운영에 적용된 지 14일이 지난 마이그레이션의 데이터 검사는 지운다」 에 있다.
+ *
+ * <p>마이그레이션은 클래스마다 한 번만 적용하고 검사마다 줄만 다시 넣는다. 실제 MySQL 에서 전체 적용은 한 번에 13~22초가 든다.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MediaObservationSchemaTest {
     private String[] database;
 
@@ -31,8 +36,8 @@ class MediaObservationSchemaTest {
     }
 
 
-    @BeforeEach
-    void migrate() throws SQLException {
+    @BeforeAll
+    void migrate() {
         database = createDatabase();
         var flyway = Flyway.configure()
             .dataSource(database[0], database[1], database[2])
@@ -41,8 +46,16 @@ class MediaObservationSchemaTest {
             .load();
         flyway.migrate();
         assertThat(flyway.info().pending()).isEmpty();
+    }
+
+
+    /** 앞 검사가 넣거나 지운 줄을 비우고 같은 두 첨부와 두 관찰 줄로 되돌린다. */
+    @BeforeEach
+    void resetRows() throws SQLException {
         try (var connection = connect();
             var statement = connection.createStatement()) {
+            statement.executeUpdate("delete from media_observation");
+            statement.executeUpdate("delete from chat_attachment");
             statement.executeUpdate("""
                     insert into chat_attachment (id,conversation_id,message_id,uploaded_by_user_id,original_name,
                     stored_name,content_type,byte_size,position,created_at,expires_at)
