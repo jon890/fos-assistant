@@ -182,7 +182,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 **도는 줄의 움직임은 글자 위를 지나가는 밝기다.** `activity-shimmer` 는 글자색을 그라데이션으로 칠해 옆으로 옮기고, `prefers-reduced-motion: reduce` 에서는 `animation: none` 이다.
 낭독기가 읽는 글은 단추 이름과 따로 둔 `sr-only` 의 `aria-live="polite"` 다. 단추 안에 live 영역을 두면 걸린 시간이 바뀔 때마다 읽는다.
 
-### 「지금 볼 것」 의 탭(PR4)
+### 지금 볼 것 탭
 
 | 탭 | 내용 | 이름 옆 표시 |
 | --- | --- | --- |
@@ -190,12 +190,12 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | 알림 | 지금의 알림 목록(`NotificationList`). 「모두 읽음」 은 탭 안 맨 위 오른쪽이다 | 읽지 않은 알림의 수. 99 를 넘으면 「99+」(`unreadBadge`) |
 
 - 탭은 `radix-ui` 의 Tabs 로 그린다. 키보드의 좌우 이동과 `tablist` 역할을 새로 만들지 않는다. 감싸는 부품은 `components/ui/tabs.tsx` 다.
-- **열린 탭은 주소가 정한다.** page 가 `searchParams.tab` 이 `notifications` 이면 「알림」 을 연다. 탭을 바꾸면 `window.history.replaceState` 로 주소만 바꾼다. 서버를 다시 부르지 않고, 새로 고쳐도 같은 탭이 열린다.
-- 「알림」 탭의 목록은 그 탭을 처음 열 때 올라오고 그 뒤에는 내려가지 않는다. `/now` 를 열 때마다 알림 첫 쪽을 읽지 않으면서, 탭을 오가도 목록과 이어 읽은 자리가 남는다. 「할 것」 은 서버가 이미 그렸으므로 늘 올라와 있고 감춰지기만 한다.
+- **열린 탭은 주소가 정한다.** `NowTabs` 가 `useSearchParams()` 의 `tab` 이 `notifications` 이면 「알림」 을 연다. 탭을 바꾸면 `window.history.replaceState` 로 주소만 바꾸고 Next 가 그 값을 `useSearchParams` 에 반영한다. 서버를 다시 부르지 않고, 새로 고치거나 다른 화면에서 `/now` 로 와도 주소대로 열린다. page 는 `searchParams` 를 읽지 않고 서버 부품 `NowScreen` 을 `todo` prop 으로 넘긴다.
+- 「알림」 탭의 목록은 그 탭을 처음 열 때 올라오고 그 뒤에는 내려가지 않는다. `/now` 를 열 때마다 알림 첫 쪽을 읽지 않으면서, 탭을 오가도 목록과 이어 읽은 자리가 남는다. 「할 것」 은 서버가 이미 그렸으므로 늘 올라와 있고 감춰지기만 한다. 두 탭 내용은 Radix 의 `forceMount` 로 올려 두므로 `hidden` 이 붙지 않는다. 감추는 것은 `tabs.tsx` 의 `data-[state=inactive]:hidden` 이 맡는다.
 - 수는 낭독기가 탭 이름과 함께 읽는다. 숫자 배지는 `aria-hidden` 이고 옆의 `sr-only` 글(「3건」, 「읽지 않은 알림 2개」)이 읽힌다.
 - `/notifications` page 는 그리지 않고 `redirect("/now?tab=notifications")` 다. 로그인 확인은 `/now` page 가 한다. 웹 푸시의 열기 주소(`/n/<id>`)는 attention 기능이 따로 갖는다.
 
-### 「지금 볼 것」 의 수와 점(PR4)
+### 지금 볼 것 수와 점
 
 | 할 것 | 읽지 않은 알림 | 줄과 단추에 붙는 것 | 낭독기 이름 |
 | --- | --- | --- | --- |
@@ -204,7 +204,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | 0 | 0 | 없음 | 「지금 볼 것」 |
 
 **할 것의 수는 `NowStatusProvider` 하나가 읽는다.** 사이드바(붙박이와 서랍), 휴대폰 위 막대, 탭 이름이 같은 값을 쓴다. 각자 읽으면 한 화면에서 같은 조회가 겹치고 서로 다른 때 읽은 값이 어긋난다.
-`AppShell` 이 `NotificationsProvider` 안에 두고 켜는 조건(관리자 영역 밖)도 같다.
+`AppShell` 이 `NotificationsProvider` 안에 둔다. 관리자 영역과 설정 틀에서는 끈다. 두 틀에는 「지금 볼 것」 단추가 없어 경로를 옮길 때마다 읽을 까닭이 없다.
 
 다시 읽는 때는 셋이다.
 
