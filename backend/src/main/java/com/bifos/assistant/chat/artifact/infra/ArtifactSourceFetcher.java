@@ -175,6 +175,22 @@ public class ArtifactSourceFetcher {
 
 
     private ValidSource validate(URI source) {
+        String host = checkSource(source);
+        if (!properties.allowedHosts().contains(host)) {
+            throw rejected("allowed_host", host);
+        }
+        return new ValidSource(source, host);
+    }
+
+
+    /**
+     * 허용 목록 앞까지의 주소 검사다. https, 포트 443, 사용자 정보와 조각 없음, 호스트 형식(IP 글자 금지), 제어 문자 없음을 본다.
+     * 링크 사진 받기({@link LinkImageFetcher})도 같은 검사를 쓴다. 내부망 차단을 두 벌로 만들지 않는다.
+     *
+     * @return 검사한 호스트 이름
+     * @throws ArtifactSourceRejectedException 검사에 걸렸을 때. 까닭은 {@link ArtifactSourceRejectedException#reason()} 이다
+     */
+    static String checkSource(URI source) {
         String host = source == null ? null : source.getHost();
         if (source == null || !"https".equals(source.getScheme())) {
             throw rejected("scheme", host);
@@ -196,15 +212,12 @@ public class ArtifactSourceFetcher {
                 .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
             throw rejected("host_format", host);
         }
-        if (!properties.allowedHosts().contains(host)) {
-            throw rejected("allowed_host", host);
-        }
         String raw = source.getRawPath() + (source.getRawQuery() == null ? "" : "?" + source.getRawQuery());
         String decoded = source.getPath() + (source.getQuery() == null ? "" : "?" + source.getQuery());
         if (hasControlCharacter(raw) || hasControlCharacter(decoded)) {
             throw rejected("control_character", host);
         }
-        return new ValidSource(source, host);
+        return host;
     }
 
 
@@ -214,6 +227,7 @@ public class ArtifactSourceFetcher {
     }
 
 
+    /** 공개 IP 인가. 내부망, 루프백, 링크 로컬, 예약 대역, 6to4 와 Teredo 는 아니다. */
     static boolean isPublic(InetAddress address) {
         byte[] bytes = address.getAddress();
         if (address instanceof Inet6Address && bytes.length == 16 && isV4Mapped(bytes)) {

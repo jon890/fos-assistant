@@ -17,6 +17,7 @@ from .common import (
     logger,
 )
 
+from .connector_agent_skills import _bind_skill_names
 from .connector_launch import _launcher_server
 from .connector_remote import _is_remote
 from .connector_manifest import (
@@ -116,7 +117,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
 
     붙이기는 로컬 플러그인이면 실행기 정의(보관 파일 리비전 `revision`)를 쓰고 `.env` 의 칸 줄을 지운다. 원격이면 값을 `.env` 에 쓴다.
     그리고 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
-    plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
+    plugin 의 스킬을 그 profile 의 스킬로 복사한다(에이전트용 스킬은 `_bind_skill_names`). Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
     새로 붙이기는 그 profile 에서 정책 hook plugin 이 켜져 있어야 한다. 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다.
     이미 붙은 플러그인을 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
@@ -284,10 +285,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         elif off:
             marks.pop(plugin)
         restart = restart and not keep_off and not off
-        skills = sorted(manifest["skills"])
-        for skill in skills:
-            if (skills_dir / skill).exists() and skill not in previous_skills:
-                raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
+        # 붙이기 응답은 빠진 에이전트용 스킬(`skipped_skills`)을 함께 낸다. 떼기는 그 칸이 없다(ADR-20261120 plugin-agent-skills).
+        skills, skipped_field = _bind_skill_names(profile_dir, saved, manifest, previous_skills, owned is None)
         state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
                          "mode": BIND_MODE, "vault": vault, "skills": skills}
         if guard is not None:
@@ -317,7 +316,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         new_env = "".join(kept).encode("utf-8") if originals[env_path] is not None else None
         state.pop(plugin)
         detached[plugin] = name
-        skills = []
+        skills, skipped_field = [], {}
         desired = {}
 
     # 이 플러그인이 전에 설치한 스킬의 파일 가운데 이번에 쓰지 않는 것은 지운다.
@@ -355,7 +354,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
     if all(originals[path] == value for path, value in targets.items()):
         return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False,
-                "cycle_available": False, "cycle_off": keep_off}
+                "cycle_available": False, "cycle_off": keep_off, **skipped_field}
     _write_binding_files(profile_dir, originals, targets, plugin_values, skills_dir,
                          (config_path, state_path, tool_map_path, detached_path))
     for value in removed_outputs:
@@ -371,4 +370,4 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     # 끄기 답은 반영 예정을 요구하지 않는다. 켜는 때는 Control Plane 이 정한다.
     return {"changed": True, "restart_required": restart, "plugin_updated": plugin_updated,
             "reload_pending": not restart and not plugin_updated and not keep_off,
-            "cycle_available": restart and not plugin_updated, "cycle_off": keep_off}
+            "cycle_available": restart and not plugin_updated, "cycle_off": keep_off, **skipped_field}

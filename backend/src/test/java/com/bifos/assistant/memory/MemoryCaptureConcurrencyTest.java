@@ -131,7 +131,7 @@ class MemoryCaptureConcurrencyTest {
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
             Future<MemoryRememberResult> remembering = pool.submit(() -> captureService.remember(
-                USER, CORE, new MemoryRememberRequest("산책 시간", ORIGINAL, null,
+                USER, CORE, new MemoryRememberRequest("산책 시간", ORIGINAL, null, null,
                     false, null, 903L, null, true, false, false)));
             if (!read.await(20, TimeUnit.SECONDS)) {
                 remembering.get(1, TimeUnit.SECONDS);

@@ -8,7 +8,7 @@
 - [ADR-055](../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 남은 부분(옛 환경 변수 key 로 읽기)을 이 결정이 거둔다. 그 ADR 은 전체가 대체됐다.
 - [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 의 「민감 항목은 임베딩하지 않고 제목만 쓴다」, [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 의 민감 조건, [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) 의 「민감도는 모델이 준 값 그대로 둔다」 도 이 결정이 대체한다.
 - [ADR-20261103 / memory-encryption](../../backend/docs/adr/ADR-20261103-memory-encryption.md) 이 「감당할 것」 에 남긴 평문 해시를 이 결정이 거둔다.
-- 스펙은 [`docs/features/memory/spec.md`](../features/memory/spec.md) 의 REQ5 와 DECISION1, DECISION10, DECISION17 이고, 설계는 [`design.md`](../features/memory/design.md) 의 「PR2」 절이 갖는다.
+- 스펙은 그때의 `docs/features/memory/spec.md` 의 REQ5 와 DECISION1, DECISION10, DECISION17 이고, 설계는 그때의 `design.md` 의 「PR2」 절이다. 다음 변경이 두 파일을 새로 써서 git 이력(커밋 `43af8e9ae`)에서 찾는다.
 
 ### 결정
 

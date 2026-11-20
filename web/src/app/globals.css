@@ -337,6 +337,34 @@ html {
   transition: opacity var(--duration-fast) linear;
 }
 
+/*
+ * 작업 과정의 도는 줄이다. 글자 위로 밝은 띠가 지나가 아직 하고 있다는 것을 알린다(docs/features/app-shell/spec.md REQ11).
+ * 글자색을 그라데이션으로 칠하고 그 위치를 옮긴다. 줄인 움직임 설정에서는 아래에서 멈춘다.
+ */
+@keyframes activity-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.activity-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-foreground-soft) 0%,
+    var(--color-foreground-soft) 40%,
+    var(--color-muted-foreground) 50%,
+    var(--color-foreground-soft) 60%,
+    var(--color-foreground-soft) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: activity-shimmer 2s linear infinite;
+}
+
 /* 줄인 움직임 설정에서는 이동과 크기 변화를 하지 않고 짧은 흐려짐만 남긴다. 부품마다 따로 챙기지 않는다. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -363,6 +391,11 @@ html {
   .animate-screen-in,
   .animate-fade-in {
     animation-name: fade-in !important;
+  }
+
+  /* 도는 줄의 글자는 움직이지 않는다. 한 번 흐르고 멈추는 것도 하지 않는다. */
+  .activity-shimmer {
+    animation: none !important;
   }
 
   /* 화면 전환의 가상 요소는 위의 `*` 에 잡히지 않아 따로 적는다. */

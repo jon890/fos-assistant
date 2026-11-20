@@ -31,6 +31,9 @@ public class GroupSetting {
     /** 그룹이 쓰는 Memory collection 목록을 담는 설정 종류다. 줄이 없으면 코드의 기본 목록을 쓴다. */
     public static final String MEMORY_COLLECTIONS = "MEMORY_COLLECTIONS";
 
+    /** 그룹의 기억 요약 구역 예산과 기억 전체 상한을 담는 설정 종류다. 줄이 없으면 코드의 기본값을 쓴다. */
+    public static final String MEMORY_CONTEXT = "MEMORY_CONTEXT";
+
     @EmbeddedId
     private GroupSettingId id;
 

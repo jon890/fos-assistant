@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import static com.bifos.assistant.mcp.application.McpToolService.result;
 
@@ -61,7 +62,10 @@ public class McpMemoryRemember {
         + "사용자가 이번 메시지에서 직접 말한 사실을 content 에 짧게 옮긴다. "
         + "「못」, 「안」, 「않」, 「없」, 「아니」 같은 부정은 content 에 그대로 살린다. "
         + "조건이 맞으면 바로 저장되고, 아니면 제안으로 남아 사용자가 받아들여야 한다. 결과 글대로 사용자에게 알린다. "
-        + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고친다. "
+        + "summary 에는 매 대화에 늘 보일 한 줄 요약을 200자까지 쓴다(예: 「아들 홍길동, 초등학생」). "
+        + "금방 바뀌는 진행 중인 일(지원 현황, 예약)은 summary 를 주지 않는다. "
+        + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고치고 summary 도 새 사실에 맞게 준다. "
+        + "summary 를 빈 글로 주면 요약을 지운다. "
         + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. "
         + "기간이 있는 상태나 이미 지난 일이면 archivable 을 true 로 준다(예: 「이번 주 출장 중이다」). "
         + "생일, 알레르기처럼 변하지 않는 사실이나 판단이 서지 않으면 주지 않는다. 한 번의 답에서 3개까지 남긴다.";
@@ -91,6 +95,8 @@ public class McpMemoryRemember {
                     Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_TITLE_MAX),
                     "content",
                     Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_CONTENT_MAX),
+                    "summary",
+                    Map.of("type", "string", "maxLength", Memory.SUMMARY_MAX),
                     "evidence",
                     Map.of("type", "string", "maxLength", MEMORY_EVIDENCE_MAX),
                     "memory_id",
@@ -114,6 +120,7 @@ public class McpMemoryRemember {
      * 실행이고, 부정 표지가 질문과 본문에 함께 있거나 함께 없고(ADR-20261008 / memory-remember-guard), 그 실행이 아직 바깥
      * 도구를 부르지 않았어야 한다. 하나라도 어긋나면 제안으로 내린다.
      *
+     * @param summary 매 실행의 요약 구역에 들 한 줄 요약. 주지 않았으면 null 이고, 빈 글이면 요약이 없다
      * @param evidence 판정에 쓰지 않는 옛 인자. 없으면 null
      * @param memoryId 고칠 기존 항목 번호. 없으면 null
      * @param collection 둘 collection. 없으면 null
@@ -123,6 +130,7 @@ public class McpMemoryRemember {
         McpCaller caller,
         String title,
         String content,
+        String summary,
         String evidence,
         Long memoryId,
         String collection,
@@ -141,6 +149,10 @@ public class McpMemoryRemember {
         if (!within(strippedContent, 1, MEMORY_CONTENT_MAX)) {
             return result("content 는 1자부터 2000자까지다.", true);
         }
+        String strippedSummary = summary == null ? null : summary.strip();
+        if (strippedSummary != null && !within(strippedSummary, 0, Memory.SUMMARY_MAX)) {
+            return result("summary 는 200자까지다.", true);
+        }
         if (evidence != null && !within(evidence, 0, MEMORY_EVIDENCE_MAX)) {
             return result("evidence 는 500자까지다.", true);
         }
@@ -150,13 +162,14 @@ public class McpMemoryRemember {
         // 조건 4 는 따로 계산해 기록에도 남긴다. 승인 카드가 바깥 글을 읽은 대화의 제안인지 보인다
         boolean externalRead = origin.conversationId() != null
             && executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS);
-        boolean direct = !externalRead && directAllowed(caller, origin, strippedContent);
+        boolean direct = !externalRead && directAllowed(caller, origin, strippedContent, strippedSummary);
         MemoryRememberResult remembered = memoryCaptures.remember(
             caller.user(),
             access,
             new MemoryRememberRequest(
                 strippedTitle,
                 strippedContent,
+                strippedSummary,
                 collection,
                 sensitive,
                 memoryId,
@@ -203,12 +216,17 @@ public class McpMemoryRemember {
      * <p>바깥 글은 대화 단위로 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 지금
      * 실행이 바깥 도구를 부르지 않았어도 앞 turn 에서 읽은 글이 이 호출을 시킬 수 있다. 그 판정은 호출한 쪽이 먼저 하고 기록에도 남긴다.
      */
-    private boolean directAllowed(McpCaller caller, AgentExecution origin, String content) {
+    private boolean directAllowed(McpCaller caller, AgentExecution origin, String content, String summary) {
         if (origin.parentExecutionId() != null || origin.conversationId() == null) {
             return false;
         }
         Optional<String> question = turnQuestions.questionOf(origin.id(), caller.user().id());
         if (question.isEmpty() || NegationMarkers.present(question.get()) != NegationMarkers.present(content)) {
+            return false;
+        }
+        // 요약도 매 실행에 들어가므로 같은 대조를 한다. 요약이 없으면 대조하지 않는다
+        if (summary != null && !summary.isEmpty()
+            && NegationMarkers.present(question.get()) != NegationMarkers.present(summary)) {
             return false;
         }
         return !turnQuestions.hasRunWithoutQuestion(origin.conversationId());

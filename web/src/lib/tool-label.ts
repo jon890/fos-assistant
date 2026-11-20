@@ -2,8 +2,13 @@
  * 도구 이름을 사람 말 문장으로 옮긴다.
  *
  * <p>도는 줄과 끝난 줄의 말이 다르다. 표에 없는 도구와 이름이 없는 도구는 일반 문장으로 보인다.
+ * 플러그인 도구는 Control Plane 이 붙여 보낸 서비스 이름과 도구 제목(`connector`)으로 「서비스 이름 · 도구 제목」 이다.
  * 이 파일은 다른 모듈을 부르지 않는다. 단위 테스트가 `node --test` 로 직접 불러서다.
  */
+
+/** 플러그인 도구의 서비스 이름과 도구 제목이다. Control Plane 이 플러그인 선언에서 찾아 붙인다. */
+export type ConnectorToolName = { service: string; title: string | null };
+
 type Label = { running: string; done: string };
 
 const LABELS: Record<string, Label> = {
@@ -86,7 +91,20 @@ export function bareName(toolName: string | null): string | null {
     : toolName;
 }
 
-export function toolLabel(toolName: string | null, running: boolean): string {
+/** 플러그인 도구의 이름이다. 제목을 선언하지 않은 도구는 서비스 이름만이다. */
+export function connectorLabel(connector: ConnectorToolName): string {
+  return connector.title
+    ? `${connector.service} · ${connector.title}`
+    : connector.service;
+}
+
+export function toolLabel(
+  toolName: string | null,
+  running: boolean,
+  connector?: ConnectorToolName | null,
+): string {
+  // 플러그인 도구는 도는 중이든 끝났든 같은 이름이다(spec REQ15).
+  if (connector) return connectorLabel(connector);
   const name = bareName(toolName);
   const label =
     name !== null && Object.hasOwn(LABELS, name)

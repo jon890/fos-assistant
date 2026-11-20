@@ -32,19 +32,33 @@ class MemoryRevisionWriter {
 
 
     Memory revise(CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval) {
+        // 이관 전(NULL) 줄은 지금 요약이 빈 글이라 그대로 적으면 이관 대상에서 영영 빠진다. 이관 규칙으로 정한다
+        String summary = memory.storedSummary() == null
+            ? MemorySummaryBackfill.ruleSummary(memory, content, retrieval)
+            : memory.summary();
+        return revise(user, memory, content, summary, retrieval);
+    }
+
+
+    /**
+     * 본문과 요약, 꺼내는 방식을 고친다. 고치기 전의 값을 revision 으로 남긴다.
+     *
+     * @param summary 새 요약. 빈 글이면 요약을 지운다
+     */
+    Memory revise(CurrentUser user, Memory memory, String content, String summary, MemoryRetrieval retrieval) {
         requirePlaceable(retrieval);
         if (!memory.readable()) {
             // 풀지 못한 줄은 제목도 모른다. 덮어쓰면 제목을 잃는다
             throw new ApiException(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE, "an unreadable memory cannot be revised");
         }
         // revision 을 남기기 전에 암호화한다. key 를 풀지 못하면 여기서 거절돼 revision 도 본문도 바뀌지 않는다
-        Optional<SealedMemoryText> sealed = texts.seal(memory.stored(), memory.title(), content);
+        Optional<SealedMemoryText> sealed = texts.seal(memory.stored(), memory.title(), content, summary);
         // 제안 중복 키는 주인 key 의 HMAC 이다. 평문의 해시를 남기지 않는다
         String dedupKey = memory.proposalDedupKey() == null
             ? null
             : texts.proposalDedupKey(memory.ownerUserId(), memory.title(), content);
         saveRevision(memory, MemoryChangeType.UPDATED, user);
-        memory.revise(content, sealed.orElse(null), retrieval, dedupKey, clock.instant());
+        memory.revise(content, summary, sealed.orElse(null), retrieval, dedupKey, clock.instant());
         return memories.save(memory);
     }
 
@@ -67,7 +81,8 @@ class MemoryRevisionWriter {
     private void saveRevision(Memory memory, MemoryChangeType changeType, CurrentUser user) {
         MemoryRevision revision = MemoryRevision.of(memory, changeType, user.id(), null, clock.instant());
         if (memory.dataKeyId() == null && memory.readable()) {
-            texts.seal(revision.stored(), memory.title(), memory.content()).ifPresent(revision::seal);
+            texts.seal(revision.stored(), memory.title(), memory.content(), memory.storedSummary() == null ? null : memory.summary())
+                .ifPresent(revision::seal);
         }
         revisions.save(revision);
     }

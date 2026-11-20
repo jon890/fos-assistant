@@ -181,7 +181,7 @@ async def _connector_request(request):
                     # 바인딩은 Control Plane MCP와 다른 내장 도구를 그대로 둔다.
                     configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
                                   and _entry_matches_manifest(plugin, entry)
-                                  and _bind_skills_installed(profile_dir, manifest, entry)
+                                  and _bind_skills_installed(profile_dir, manifest, entry, config)
                                   and tools_current)
                 support = await asyncio.to_thread(_guard_support, profile, manifest, entry)
                 if support["state"] == "verified" and (not configured or _policy_hook_failure(profile_dir, config, state, drift) is not None):

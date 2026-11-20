@@ -30,7 +30,7 @@ public class McpToolCatalog {
                 "name",
                 "memory_read",
                 "description",
-                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인, memory_search 결과에 있다.",
+                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 요약 구역이나 색인, memory_search 결과에 있다.",
                 "inputSchema",
                 Map.of(
                     "type",

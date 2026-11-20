@@ -8,7 +8,7 @@ package com.bifos.assistant.context.application.dto;
 public enum ContextSource {
     /** 본문까지 싣는 Memory 항상 층의 줄. */
     MEMORY_ALWAYS,
-    /** 본문까지 싣는 Memory 개인 사실 구역의 줄. */
+    /** Memory 요약 구역의 줄. 본문 대신 요약을 싣는다. */
     MEMORY_FACTS,
     /** 본문까지 싣는 Memory 질문과 관련된 기억 구역의 줄. */
     MEMORY_SEARCH,
