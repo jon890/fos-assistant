@@ -589,3 +589,12 @@ IMAGE_SERVICE = ("image_gen", "provider", "openai-codex")
 IMAGE_SERVICE_PLUGIN = "plugins/image_gen/openai-codex/__init__.py"
 IMAGE_SERVICE_CONFIG_READ = ("agent/image_gen_registry.py", 'configured_provider_name("image_gen", logger)')
 IMAGE_SERVICE_CONFIG_KEY = ("agent/provider_registry.py", 'block.get("provider")')
+
+# 그림을 고칠 바탕 사진을 넘기는 지점이다(fos-assistant ADR-20261120 / image-source). `test_generated_image_contract.py` 가 Hermes 소스에서 본다.
+# `image_generate` 가 바탕과 참고를 읽는 인자 이름과 그 자리다. plugin 은 이 두 칸을 사본 경로로 바꾼다.
+IMAGE_SOURCE_ARGS = ("tools/image_generation_tool.py", 'args.get("image_url"), args.get("reference_image_urls"), task_id)')
+# 실행 공간이 있어도 호스트에서 읽는 media cache 의 하위 폴더 목록이다. plugin 은 그 첫 칸 아래에 사본을 쓴다.
+IMAGE_SOURCE_HOST_READ = ("tools/image_source.py", "_MEDIA_CACHE_SUBDIRS")
+# 이미지 서비스(openai-codex)가 받는 입력 장수와, 넘는 것을 버리는 자리다. plugin 의 `MAX_SOURCES` 가 같은 값이다.
+IMAGE_SOURCE_LIMIT = ("plugins/image_gen/openai-codex/__init__.py", "_MAX_REFERENCE_IMAGES", 16,
+                      "collect_source_images(image_url, reference_image_urls, limit=_MAX_REFERENCE_IMAGES)")

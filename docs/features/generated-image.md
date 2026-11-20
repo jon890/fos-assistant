@@ -2,12 +2,12 @@
 
 사용자가 대화로 부탁한 그림을 비서가 만들어 답 안에 보이고 「보관한 결과물」 에 남기는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `hermes/plugins/fos-ctx/generated_image.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
+covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/mcp/**/ImageSource*`, `hermes/plugins/fos-ctx/generated_image.py`, `hermes/plugins/fos-ctx/image_source.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
 
-요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md) 와 [ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md) 가 갖는다.
+요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md), [ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md), [ADR-20261120 / image-source](../adr/ADR-20261120-image-source.md) 가 갖는다.
 
-**지금은 스펙의 PR2 까지다.** 모든 사용자의 기본 비서에 「그림 만들기」 가 켜지고, 만든 그림이 답 안에 보이고 보관함에 남는다.
-사진을 바탕으로 고치기와 블로그 원고에 넣기는 스펙의 뒤 PR 이 더한다.
+**지금은 스펙의 PR3 까지다.** 모든 사용자의 기본 비서에 「그림 만들기」 가 켜지고, 만든 그림이 답 안에 보이고 보관함에 남는다. 지금 대화의 사진과 그림을 바탕으로 고친다.
+블로그 원고에 넣기는 스펙의 PR4 가 더한다.
 
 ## 요구
 
@@ -17,6 +17,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets
 - 그림과 지시문은 그 대화의 주인만 본다.
 - 모든 사용자의 기본 비서에 「그림 만들기」 가 켜져 있다. 켜고 끄는 것은 관리자만 한다. 켜면 이미지 서비스 설정이 함께 들어간다.
 - 예약 작업과 먼저 살펴보기처럼 사람이 없는 실행에서는 그림을 만들지 않는다.
+- 지금 대화에 보낸 사진과 그 대화에서 만든 그림을 바탕으로 고친 새 그림을 만든다. 바탕 한 장에 참고 사진 여러 장을 쓴다. 다른 대화의 사진과 지운 사진은 쓰지 못하고, 하나라도 쓸 수 없으면 그림을 만들지 않고 비서가 어느 사진을 왜 쓸 수 없는지 알린다.
 
 ## 흐름
 
@@ -71,6 +72,49 @@ fos-ctx 가 올리는 계약은 [`fos-ctx` README](../../hermes/plugins/fos-ctx/
 같은 예약 작업 대화나 점검 대화라도 사람이 보낸 메시지의 turn 에서는 만든다. 대화의 종류가 아니라 그 turn 을 누가 열었는지로 본다.
 막는 자리는 fos-ctx 가 이미 묻는 도구 판정이다. 비서는 그림을 만들 수 없다는 글을 받고 결과에 그렇게 적는다.
 
+## 사진을 바탕으로 고치기
+
+비서는 바탕 한 장을 `image_url` 에, 참고를 `reference_image_urls` 에 넣는다. 값은 경로가 아니라 가리킴이다.
+올린 사진은 `attachment:<첨부 번호>`(실행 입력의 사진 참조 목록이 주는 번호), 만든 그림은 `generated:<제목>` 이다. 실행 입력의 그림 규칙 끝에 그 대화에서 파일이 남은 그림의 제목이 새것부터 20장까지 적힌다.
+
+```mermaid
+---
+config:
+  look: handDrawn
+---
+sequenceDiagram
+    participant H as Hermes
+    participant P as fos-ctx
+    participant C as Control Plane
+
+    H->>P: pre_tool_call image_generate(image_url, reference_image_urls)
+    P->>C: 도구 판정
+    loop 가리킴마다
+        P->>C: POST /internal/hermes/image-source(서명한 맥락, 가리킴)
+        C->>C: origin 실행의 사용자와 대화에서만 찾는다
+        C-->>P: 원본 바이트, 또는 422 · 410
+    end
+    alt 모두 받았다
+        P->>P: media cache 에 사본을 쓴다
+        P-->>H: 인자를 사본 경로로 바꾼 modify
+        H->>H: 이미지 서비스로 고친 그림을 만든다
+        H->>P: transform_tool_result
+        P->>P: 사본을 지우고 만든 그림을 올린다
+    else 하나라도 못 받았다
+        P-->>H: 어느 사진을 왜 쓸 수 없는지 적은 block
+    end
+```
+
+| 가리킨 것 | 결과 |
+| --- | --- |
+| 요청자가 이 대화에 보낸 사진, 이 대화에서 만든 그림 | 원본 바이트 그대로 받는다. 원본은 바뀌지 않는다 |
+| 다른 대화나 다른 사용자의 사진, 보내지 않은 사진, 없는 제목 | 이 대화의 것이 아니라고 막는다 |
+| 지웠거나 보관 기간이 지난 사진, 파일이 지워진 그림 | 쓸 수 없다고 막는다 |
+| 파일 경로, 인터넷 주소, data URL | 가리킴만 쓰라고 막는다. 실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있어 경로를 받으면 다른 대화의 사진을 쓸 수 있다 |
+| 합쳐 16장을 넘는다 | 줄여 달라고 막는다. 이미지 서비스가 받는 장수다 |
+
+고친 그림은 새 그림이라 위 흐름대로 답에 보이고 보관된다. 받기 경로의 계약은 [`fos-ctx` README](../../hermes/plugins/fos-ctx/README.md) 의 「그림을 고칠 사진을 받는다」, Hermes 가 두 인자를 받는 모양은 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「`image_generate` 의 결과와 그림 파일」, 실패 처리는 설계의 「PR3」 이 갖는다.
+
 ## 화면
 
 답 글 아래에 그림이 만든 순서대로 나란히 보인다. HTML 결과물은 지금처럼 그 아래의 파일 줄이다.
@@ -104,3 +148,4 @@ Control Plane 은 메시지 응답에서, 화면은 흐르는 답을 그릴 때 
 - 제목이 비서가 붙인 것이고 지시문이 사용자의 부탁보다 자세하다
 - 「보관한 결과물」 에 그림이 남는다. 가로나 세로가 긴 그림에서 「보관 실패」 가 나오는지 본다(설계의 「검증 전략」)
 - 휴대폰에서 그림을 크게 보고 두 손가락으로 확대한다
+- 사진 한 장을 올리고 일부만 바꿔 달라고 하면 고친 새 그림이 보이고 올린 사진은 그대로다. fos-ctx 를 Control Plane 보다 먼저 배포한다. 옛 fos-ctx 는 가리킴을 파일 경로로 읽다 실패한다
