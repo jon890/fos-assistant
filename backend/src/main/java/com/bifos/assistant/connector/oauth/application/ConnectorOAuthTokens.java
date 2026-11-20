@@ -15,6 +15,7 @@ import com.bifos.assistant.hermes.application.port.HermesConnectorOAuthClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,8 @@ public class ConnectorOAuthTokens {
     private final Map<Long, ConnectorOAuthToken> current = new ConcurrentHashMap<>();
     private final Map<String, ConnectorOAuthToken> pending = new ConcurrentHashMap<>();
     private final Map<Long, Object> locks = new ConcurrentHashMap<>();
+    /** 다시 연결하거나 칸을 지울 때마다 오른다. 그 전에 시작한 갱신의 늦은 응답이 새 칸을 덮지 못하게 한다. */
+    private final Map<Long, Integer> generations = new ConcurrentHashMap<>();
 
 
     public Optional<ConnectorOAuthToken> current(long connectionId) {
@@ -66,6 +69,7 @@ public class ConnectorOAuthTokens {
     public void promote(long connectionId, String nonce) {
         ConnectorOAuthToken token = pending.remove(pendingKey(connectionId, nonce));
         if (token != null) {
+            generations.merge(connectionId, 1, Integer::sum);
             current.put(connectionId, token);
         }
     }
@@ -78,6 +82,7 @@ public class ConnectorOAuthTokens {
 
     /** 해제했거나 붙여 넣기로 바꾼 연결의 현재 칸을 지운다. */
     public void forget(long connectionId) {
+        generations.merge(connectionId, 1, Integer::sum);
         current.remove(connectionId);
     }
 
@@ -136,6 +141,7 @@ public class ConnectorOAuthTokens {
         final ConnectorManifest manifest;
         final ConnectorOAuthApp app;
         final Token token;
+        Integer generation = generations.get(connection.id());
         try {
             manifest = ConnectorManifests.find(connectors, connection.connectorId()).orElse(null);
             app = manifest == null ? null : apps.app(manifest).orElse(null);
@@ -146,6 +152,9 @@ public class ConnectorOAuthTokens {
             token = oauth.refresh(connection.vault(), connection.connectorId(), app.credentials());
         } catch (RuntimeException ex) {
             log.warn("connector OAuth refresh failed connection={} exception={}", connection.id(), ex.getClass().getSimpleName());
+            return Outcome.UNAVAILABLE;
+        }
+        if (!Objects.equals(generation, generations.get(connection.id()))) {
             return Outcome.UNAVAILABLE;
         }
         switch (token.outcome()) {

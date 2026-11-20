@@ -223,6 +223,32 @@ class ConnectorOAuthTokenTest {
 
 
     @Test
+    @DisplayName("갱신하는 사이 다시 연결해 넣은 토큰은 늦게 온 갱신 응답이 덮거나 지우지 못한다")
+    void lateRefreshDoesNotReplaceReconnectedToken() {
+        ConnectorConnection connection = oauthConnection();
+        ConnectorOAuthToken fresh = new ConnectorOAuthToken("reconnected-token-for-test", clock.instant().plus(Duration.ofHours(8)));
+        whenRefresh(connection)
+            .thenAnswer(call -> {
+                tokens.putPending(connection.id(), "flow-nonce-1", fresh);
+                tokens.promote(connection.id(), "flow-nonce-1");
+                return new Token(Outcome.OK, ACCESS_TOKEN, clock.instant().plus(Duration.ofHours(1)));
+            })
+            .thenAnswer(call -> {
+                tokens.putPending(connection.id(), "flow-nonce-2", fresh);
+                tokens.promote(connection.id(), "flow-nonce-2");
+                return new Token(Outcome.GRANT_REVOKED, null, null);
+            });
+
+        assertThat(tokens.refresh(connection.id(), null).outcome()).isEqualTo(Outcome.UNAVAILABLE);
+        assertThat(tokens.current(connection.id())).contains(fresh);
+        assertThat(tokens.refresh(connection.id(), null).outcome()).isEqualTo(Outcome.UNAVAILABLE);
+        assertThat(tokens.current(connection.id())).contains(fresh);
+        assertThat(connections.findById(connection.id()).orElseThrow().status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(notificationsOf(owner)).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("서비스가 앱 자격을 거절하면 연결은 두고 관리자에게만 한 번 알리며 앱을 바꾸면 읽음이 된다")
     void appRejectedKeepsConnectionAndNotifiesAdminsOnce() throws Exception {
         ConnectorConnection connection = oauthConnection();
