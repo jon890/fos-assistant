@@ -315,7 +315,12 @@ public class MemoryCaptureService {
                 }
                 Memory memory = memoryService.accept(user, existing.id());
                 record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED, List.of());
-                yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
+                // 합치기 번호는 제안 때 기록한 것을 쓴다. 이번 호출의 replaces 가운데 그 밖의 번호는 대신하지 못한 것으로 알린다
+                List<Long> replaced = captures.findFirstByMemoryIdAndKindOrderByIdDesc(memory.id(), MemoryCaptureKind.PROPOSED)
+                    .map(MemoryCapture::replacedMemoryIds)
+                    .orElse(List.of());
+                yield new MemoryRememberResult(
+                    MemoryRememberOutcome.REMEMBERED, memory.id(), replaced, notReplaced(request.replaces(), replaced));
             }
         };
     }

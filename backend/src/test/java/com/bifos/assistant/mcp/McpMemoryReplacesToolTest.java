@@ -251,7 +251,9 @@ class McpMemoryReplacesToolTest {
 
         JsonNode result = call(merge("취미", "그림을 그린다", other.id()));
 
-        assertThat(text(result)).startsWith("기억했다.");
+        assertThat(text(result)).startsWith("기억했다.")
+            .contains("옛 기억(번호 " + recorded.id() + ")을 대신했다.")
+            .contains("대신하지 못함: " + other.id() + ".");
         assertThat(reread(proposal.id()).status()).isEqualTo(MemoryStatus.ACCEPTED);
         assertThat(MemorySupersedeRows.supersededBy(jdbc, recorded.id())).isEqualTo(proposal.id());
         assertThat(MemorySupersedeRows.supersededBy(jdbc, other.id())).isNull();
