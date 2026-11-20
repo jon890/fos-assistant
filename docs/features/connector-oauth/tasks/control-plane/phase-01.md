@@ -48,6 +48,7 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*Connecto
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/ConnectorOAuthAppStatus.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/dto/ConnectorOAuthSummary.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/admin/secret/presentation/ConnectorOAuthAppAdminController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/admin/secret/presentation/ConnectorOAuthAppAdminDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/application/dto/ConnectorManifest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/infra/ConnectorCatalogDecoder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorConnectionService.java` | 수정 |
