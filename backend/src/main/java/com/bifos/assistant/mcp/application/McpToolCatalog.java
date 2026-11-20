@@ -24,10 +24,12 @@ public class McpToolCatalog {
     private final McpFileSpaceTools fileSpace;
     private final McpConnectorListTool connectorList;
     private final McpTaskTools taskTools;
+    private final McpFollowUpTools followUpTools;
+    private final McpMemoryForgetTool memoryForget;
 
 
     public List<Map<String, Object>> tools() {
-        return Stream.concat(List.<Map<String, Object>>of(
+        return Stream.of(List.<Map<String, Object>>of(
             Map.of(
                 "name",
                 "memory_read",
@@ -132,7 +134,12 @@ public class McpToolCatalog {
                 "name",
                 "follow_up_propose",
                 "description",
-                "사용자가 나중에 해야 하거나 끝나기를 기다리는 일을 할 일로 제안한다. 사용자가 받아들여야 챙긴다. 대화에서 분명히 나온 후속 작업만 제안하고, 같은 대화에서 거절한 것은 다시 제안하지 않는다. due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.",
+                "사용자가 나중에 해야 하거나 끝나기를 기다리는 일을 할 일로 남긴다. 사용자가 이번 메시지에서 적어 달라고 직접 시켰거나"
+                    + "(「할 일로 적어 둬」, 「챙겨 줘」) 예약 작업의 지시문이 적어 두라고 시킨 할 일이면 requested 를 true 로 준다. 그러면 바로 챙기는 "
+                    + "할 일이 된다. 시키지 않았는데 스스로 판단한 후속 작업은 requested 없이 부른다. 그러면 제안으로 남고 사용자가 받아들여야 챙긴다. "
+                    + "결과 글이 바로 챙기는지 제안인지 알려 주므로 그대로 알리고 답에 /now 링크를 붙인다. 대화에서 분명히 나온 일만 남기고, "
+                    + "같은 대화에서 거절한 것은 다시 제안하지 않는다. due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다. "
+                    + "isError 면 남기지 못한 것이다. 남겼다고 말하지 않는다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -152,6 +159,8 @@ public class McpToolCatalog {
                         "due_at",
                         Map.of("type", "string"),
                         "waiting",
+                        Map.of("type", "boolean"),
+                        "requested",
                         Map.of("type", "boolean")),
                     "required",
                     List.of("title"))),
@@ -187,8 +196,9 @@ public class McpToolCatalog {
                             "default", 10),
                         "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
-                    List.of("query"))))
-            .stream(), taskTools.definitions().stream())
+                    List.of("query")))),
+            taskTools.definitions(), followUpTools.definitions(), List.of(memoryForget.definition()))
+            .flatMap(List::stream)
             .map(McpToolCatalog::allowRuntimeContext).toList();
     }
 
