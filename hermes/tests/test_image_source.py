@@ -202,12 +202,13 @@ class LinkTest(ImageSourceFixture):
 
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
-                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
+                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다\n  다음 방법: 다른 방법이 없으니 해 본 것을 알리고",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
             self.assertIn(line, decision["message"])
-        self.assertTrue(decision["message"].endswith("사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."))
+        # 줄마다 끝 줄이 붙고 글 전체는 마지막 문제의 끝 줄로 끝난다(tool-fallback 스펙 REQ3)
+        self.assertTrue(decision["message"].endswith("  다음 방법: 이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다"))
 
     def test_attachment_received_but_link_failed_blocks_and_forgets(self):
         """첨부는 받았어도 링크 하나를 못 받으면 막고, 받은 첨부 사본을 지우며 링크를 기억하지 않는다."""
@@ -234,7 +235,9 @@ class RejectTest(ImageSourceFixture):
         self.assertEqual(decision["action"], "block")
         for line in lines:
             self.assertIn(line, decision["message"])
-        self.assertTrue(decision["message"].endswith("사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."))
+        self.assertTrue(decision["message"].startswith("fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없어 그림을 만들지 않았다."))
+        last = decision["message"].rsplit("\n", 1)[-1].strip()
+        self.assertTrue(last.startswith("다음 방법: ") or last == "사용자에게 바로 알린다.", decision["message"])
 
     def test_paths_urls_and_data_urls_are_blocked_without_asking(self):
         """경로, 주소, data URL 은 Control Plane 에 묻지 않고 막는다. 실행 공간의 다른 대화 사진을 읽지 못한다."""

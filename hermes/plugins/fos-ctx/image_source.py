@@ -22,6 +22,7 @@ import urllib.request
 
 from .context import _read_token, build_context, logger
 from .tool_guard import guard_url
+from .next_step import alternative, ask_user
 
 TOOL = "image_generate"
 SOURCE_PATH = "image-source"
@@ -48,22 +49,23 @@ MAX_CALLS = 256
 MAX_ECHO_CHARS = 80
 EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
-NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
-                 "파일 경로와 맨 주소는 쓰지 않는다")
-TOO_MANY = "한 번에 쓸 수 있는 사진은 %d장까지다. 사용자에게 줄여 달라고 한다" % MAX_SOURCES
-UNKNOWN = "이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"
-GONE = "지웠거나 보관 기간이 지나 쓸 수 없다"
+# 문제 줄마다 끝 줄(`next_step.py`)이 붙는다. 글 전체는 마지막 문제의 끝 줄로 끝난다.
+NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
+                            "파일 경로와 맨 주소는 쓰지 않는다", "attachment:, generated:, link: 가리킴으로 고쳐 다시 부른다")
+TOO_MANY = alternative("한 번에 쓸 수 있는 사진은 %d장까지다" % MAX_SOURCES, "사진을 %d장 이하로 줄여 다시 부른다" % MAX_SOURCES)
+UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다",
+                      "이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다")
+GONE = ask_user("지웠거나 보관 기간이 지나 쓸 수 없다")
 LINK_REASONS = {
-    "IMAGE_SOURCE_LINK_BLOCKED": "열 수 없는 주소다",
-    "IMAGE_SOURCE_LINK_NO_IMAGE": "이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
-    "IMAGE_SOURCE_LINK_TOO_LARGE": "사진이 너무 크다",
-    "IMAGE_SOURCE_LINK_FAILED": "링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다",
+    "IMAGE_SOURCE_LINK_BLOCKED": ask_user("열 수 없는 주소다"),
+    "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", "다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다"),
+    "IMAGE_SOURCE_LINK_TOO_LARGE": alternative("사진이 너무 크다", "다른 방법이 없으니 해 본 것을 알리고 더 작은 사진을 올려 달라고 묻는다"),
+    "IMAGE_SOURCE_LINK_FAILED": alternative("링크를 열지 못했다. 쇼핑몰이 막았을 수 있다", "다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다"),
 }
-FAILED = "사진을 받지 못했다. 잠시 뒤 다시 부탁하라고 안내한다"
-OLD_SERVER = "이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다"
-NO_CONTEXT = "이 호출에서는 사진을 받을 수 없다. 대화에서 직접 image_generate 를 부른다"
-HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없다."
-TAIL = "그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."
+FAILED = alternative("사진을 받지 못했다", "다른 방법이 없으니 잠시 뒤 다시 해 달라고 알린다")
+OLD_SERVER = ask_user("이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다")
+NO_CONTEXT = alternative("이 호출에서는 사진을 받을 수 없다", "대화에서 직접 image_generate 를 부른다")
+HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없어 그림을 만들지 않았다. 줄마다의 다음 방법이나 바로 알림을 따른다."
 
 _copies: dict = {}
 # 호출마다 받은 링크 주소다. 사본과 같은 키로 기억하고 함께 잊는다.
@@ -80,7 +82,8 @@ def wants_sources(args) -> bool:
 
 def message(problems) -> str:
     """막을 때 모델이 받는 글이다. 문제마다 한 줄이다."""
-    return "\n".join([HEAD, *("- " + line for line in problems), TAIL])
+    # 끝 줄이 붙어 여러 줄인 문제 글은 둘째 줄부터 들여 쓴다
+    return "\n".join([HEAD, *("- " + line.replace("\n", "\n  ") for line in problems)])
 
 
 def _echo(value) -> str:

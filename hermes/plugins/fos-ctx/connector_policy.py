@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import urllib.request
+from .next_step import alternative, ask_user
 from .context import (
     CTX_VERSION,
     _read_token,
@@ -27,11 +28,12 @@ CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 MCP_PREFIX = "mcp__"
 # 코드 안에서 도구를 부르는 내장 도구다. 그 안의 호출은 이 hook 이 실행 맥락을 알 수 없다.
 CODE_EXECUTION_TOOL = "execute_code"
-POLICY_BLOCK_MESSAGE = "fos-ctx: 이 도구 호출의 사용 정책을 확인하지 못해 막았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다."
-CONTEXT_BLOCK_MESSAGE = "fos-ctx: 이 도구 호출의 실행 맥락이 없어 막았다."
-UNKNOWN_SERVER_MESSAGE = "fos-ctx: 이 연결에 등록되지 않은 도구라 막았다. 다시 부르지 않는다."
-ARGS_TOO_LARGE_MESSAGE = "fos-ctx: 인자가 너무 커서 실행하지 않았다. 나눠서 요청한다."
-CODE_EXECUTION_MESSAGE = "fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다."
+POLICY_BLOCK_MESSAGE = alternative("fos-ctx: 이 도구 호출의 사용 정책을 확인하지 못해 막았다.",
+                                   "다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다")
+CONTEXT_BLOCK_MESSAGE = ask_user("fos-ctx: 이 도구 호출의 실행 맥락이 없어 막았다.")
+UNKNOWN_SERVER_MESSAGE = ask_user("fos-ctx: 이 연결에 등록되지 않은 도구라 막았다. 다시 부르지 않는다.")
+ARGS_TOO_LARGE_MESSAGE = alternative("fos-ctx: 인자가 너무 커서 실행하지 않았다.", "인자를 나눠서 다시 부른다")
+CODE_EXECUTION_MESSAGE = alternative("fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다.", "코드 실행 밖에서 그 도구를 직접 부른다")
 # Control Plane 이 판정 응답에 싣는 결제 넘기기 맥락을 넣는 인자 이름이다. 모델이 정하지 못하게 늘 덮어쓴다.
 PAYMENT_ARG = "_fos_payment"
 PAYMENT_CONTEXT_KEYS = {"v", "handed_off_at_ms", "final_amount_krw", "expected_total_krw", "url"}

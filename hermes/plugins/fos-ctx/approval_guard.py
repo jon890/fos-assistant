@@ -16,16 +16,19 @@ import importlib
 
 from .connector_policy import _block
 from .context import logger
+from .next_step import alternative, ask_user
 
 
 TERMINAL_TOOL = "terminal"
 FILE_WRITE_TOOLS = frozenset({"write_file", "patch"})
 COMPUTER_USE_TOOL = "computer_use"
 
-DANGEROUS_COMMAND_MESSAGE = "이 명령은 위험 명령으로 분류돼 실행하지 않는다. 다시 부르지 말고 다른 방법을 찾는다."
-APPROVAL_WRITE_MESSAGE = ("이 경로는 쓰려면 사람의 승인이 필요해 쓰지 않는다. "
-                          "다시 부르지 말고 셸이나 코드 실행으로 우회하지도 않는다. 다른 방법을 찾는다.")
-COMPUTER_USE_MESSAGE = "이 환경에서는 화면 조작 도구를 쓰지 않는다. 다시 부르지 말고 다른 방법을 찾는다."
+DANGEROUS_COMMAND_MESSAGE = alternative("이 명령은 위험 명령으로 분류돼 실행하지 않는다. 다시 부르지 않는다.",
+                                        "막히지 않은 다른 명령이나 도구로 같은 일을 한다")
+APPROVAL_WRITE_MESSAGE = ask_user("이 경로는 쓰려면 사람의 승인이 필요해 쓰지 않는다. "
+                                  "다시 부르지 않고 셸이나 코드 실행으로 우회하지도 않는다.")
+COMPUTER_USE_MESSAGE = alternative("이 환경에서는 화면 조작 도구를 쓰지 않는다. 다시 부르지 않는다.",
+                                   "막히지 않은 다른 명령이나 도구로 같은 일을 한다")
 
 # Hermes 의 도구 처리기가 `task_id` 가 비면 쓰는 값이다(`tools/file_tools.py` 의 `_handle_write_file`).
 DEFAULT_TASK_ID = "default"

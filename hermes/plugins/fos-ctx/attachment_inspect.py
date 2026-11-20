@@ -12,11 +12,15 @@ import urllib.parse
 from .image_runtime import supervise, check_status
 
 from .context import build_context, _read_token, signing_key, logger, top_level_session
+from .next_step import alternative, ask_user
 
 TOOL = "attachment_inspect"
 MAX_BYTES = 10 * 1024 * 1024
 TIMEOUT = 30
-FAILURE = "원본 사진을 받지 못해 판독하지 못했다. 재업로드를 요구하지 말고 실패를 알린다."
+FAILURE = ask_user("원본 사진을 받지 못해 판독하지 못했다. 재업로드를 요구하지 말고 실패를 알린다.")
+REGION_REQUIRED = alternative("전체 원본의 안전 한도를 넘었다.",
+                              "표시 치수 안의 작은 영역을 지정한다. 위치를 모르면 overview=true로 전체 개요를 먼저 보고 원본 영역을 고른다. "
+                              "사진별 3회 안에서 다시 조회하고 실패하면 판독하지 못했다고 알린다")
 
 
 def failure(message=FAILURE, code="original_unavailable"):
@@ -117,9 +121,7 @@ def handle(args, **_):
         metadata, body = supervise(url, token, args, deadline, validate)
         if metadata.get("code"):
             if metadata["code"] == "region_required":
-                return json.dumps({**metadata, "error": "전체 원본의 안전 한도를 넘었다. 표시 치수 안의 작은 영역을 "
-                                   "지정한다. 위치를 모르면 overview=true로 전체 개요를 먼저 보고 원본 영역을 고른다. "
-                                   "사진별 3회 안에서 다시 조회하고 실패하면 판독하지 못했다고 알린다."}, ensure_ascii=False)
+                return json.dumps({**metadata, "error": REGION_REQUIRED}, ensure_ascii=False)
             return failure()
         mime = metadata["mime"]
         if mime not in {"image/png", "image/jpeg"} or not 0 < len(body) <= MAX_BYTES:
