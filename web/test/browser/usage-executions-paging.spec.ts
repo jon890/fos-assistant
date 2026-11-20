@@ -184,9 +184,10 @@ test("다음 쪽 실패 뒤 기존 기록을 지키고 재시도하며 빠른 �
   page,
 }, testInfo) => {
   const user = isolatedUser(testInfo, "usage-retry");
+  await createAdminUser(page, user);
   await provision(context, page, user);
   await replaceExecutions(page, user.email, seeds(52, "retry-model"));
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
   const more = page.getByRole("button", { name: "더 보기" });
   await expect(records(page, testInfo.project.name)).toHaveCount(50);
 
@@ -220,23 +221,4 @@ test("다음 쪽 실패 뒤 기존 기록을 지키고 재시도하며 빠른 �
   await expect(records(page, testInfo.project.name)).toHaveCount(52);
   expect(requests).toBe(1);
   await page.unroute("**/api/usage/executions/page?*");
-});
-
-test("일반 사용자는 다음 쪽까지 내부 값을 보지 않는다", async ({
-  context,
-  page,
-  isolatedMember,
-}, testInfo) => {
-  await provision(context, page, isolatedMember);
-  const hiddenModel = "internal-model-value";
-  await replaceExecutions(page, isolatedMember.email, seeds(51, hiddenModel));
-
-  await page.goto("/usage?tab=executions");
-  await expect(records(page, testInfo.project.name)).toHaveCount(50);
-  await expect(page.locator("body")).not.toContainText(hiddenModel);
-  await page.getByRole("button", { name: "더 보기" }).click();
-  await expect(records(page, testInfo.project.name)).toHaveCount(51);
-  await expect(page.locator("body")).not.toContainText(hiddenModel);
-  await expect(page.locator("body")).not.toContainText("1,234");
-  await expectNoOverflow(page, testInfo.project.name);
 });

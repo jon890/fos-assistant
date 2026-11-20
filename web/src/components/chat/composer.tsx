@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { ArrowUp, ImagePlus, LoaderCircle, Square, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUp, LoaderCircle, Plus, Square, X } from "lucide-react";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
@@ -21,6 +21,7 @@ import { useOutgoingNavigation } from "./use-outgoing-navigation";
 
 export function Composer(props: Props) {
   const composing = useRef(false);
+  const [tierFailed, setTierFailed] = useState(false);
   const state = useComposerState(props);
   const {
     onBlockingChange,
@@ -164,10 +165,12 @@ export function Composer(props: Props) {
         </p>
       ) : null}
 
+      {/* 입력창은 두 줄이다. 위 줄은 글 칸, 아래 줄은 왼쪽에 「＋」 와 모델 단계, 오른쪽에 중지와 보내기다
+          (docs/features/app-shell/spec.md 의 REQ8). 입력창 밖에 따로 떠 있는 줄을 두지 않는다. */}
       <div
         data-testid="composer-shell"
         className={cn(
-          "relative flex items-end gap-2 p-1.5 pl-4",
+          "relative flex flex-col gap-1 px-2 pt-1.5 pb-2",
           "rounded-2xl border border-input bg-card focus-within:border-ring",
         )}
       >
@@ -222,70 +225,87 @@ export function Composer(props: Props) {
           disabled={disabled}
           placeholder="무엇이든 물어보세요"
           className={cn(
-            "max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
+            "max-h-[7.5rem] min-h-10 w-full resize-none overflow-y-auto px-2 py-2",
             "bg-transparent text-base leading-6 outline-none disabled:opacity-50",
           )}
         />
-        {acceptsAttachments ? (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_TYPES.join(",")}
-              multiple
-              hidden
-              disabled={disabled || running || outgoing !== null}
-              data-testid="attachment-input"
-              onChange={(event) => void handleFiles(event)}
-            />
-            <TooltipButton
-              label="사진 첨부"
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || running || outgoing !== null}
-              className="size-10 shrink-0 rounded-full"
-            >
-              <ImagePlus aria-hidden="true" className="size-5" />
-            </TooltipButton>
-          </>
-        ) : null}
-        {running ? (
-          <TooltipButton
-            label="중지"
-            passEscape
-            variant="outline"
-            disabled={!canStop}
-            onClick={onStop}
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-          >
-            <Square aria-hidden="true" className="size-4 fill-current" />
-          </TooltipButton>
-        ) : null}
-        <TooltipButton
-          label="보내기"
-          variant="default"
-          type="submit"
-          disabled={sendDisabled || (running && !canQueue)}
-          size="icon"
-          className="size-10 shrink-0 rounded-full"
+        <div
+          data-testid="composer-actions"
+          className="flex min-w-0 items-center gap-1"
         >
-          <ArrowUp aria-hidden="true" className="size-5" />
-        </TooltipButton>
-      </div>
-      {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}
-      <div className="mt-1 flex min-w-0 px-2">
-        <div className="flex min-w-0 flex-col gap-1">
-          <ModelTierPicker
-            agentCode={agentCode}
-            mode={modelSelectionMode}
-            tier={modelTier}
-            onChange={saveModelTier}
-            disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
-          />
+          {acceptsAttachments ? (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_TYPES.join(",")}
+                multiple
+                hidden
+                disabled={disabled || running || outgoing !== null}
+                data-testid="attachment-input"
+                onChange={(event) => void handleFiles(event)}
+              />
+              {/* 「＋」 아래에 둘 것이 사진 첨부 하나라 메뉴 없이 바로 고르는 창을 연다(spec 의 DECISION16). */}
+              <TooltipButton
+                label="사진 첨부"
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || running || outgoing !== null}
+                className="size-9 shrink-0 rounded-full"
+              >
+                <Plus aria-hidden="true" className="size-5" />
+              </TooltipButton>
+            </>
+          ) : null}
+          <div className="flex min-w-0 shrink">
+            <ModelTierPicker
+              agentCode={agentCode}
+              mode={modelSelectionMode}
+              tier={modelTier}
+              onChange={saveModelTier}
+              onFailedChange={setTierFailed}
+              disabled={
+                disabled || agentCode.length === 0 || modelChoiceUnknown
+              }
+            />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {running ? (
+              <TooltipButton
+                label="중지"
+                passEscape
+                variant="outline"
+                disabled={!canStop}
+                onClick={onStop}
+                size="icon"
+                className="size-9 shrink-0 rounded-full"
+              >
+                <Square aria-hidden="true" className="size-4 fill-current" />
+              </TooltipButton>
+            ) : null}
+            <TooltipButton
+              label="보내기"
+              variant="default"
+              type="submit"
+              disabled={sendDisabled || (running && !canQueue)}
+              size="icon"
+              className="size-9 shrink-0 rounded-full"
+            >
+              <ArrowUp aria-hidden="true" className="size-5" />
+            </TooltipButton>
+          </div>
         </div>
       </div>
+      {tierFailed ? (
+        <p
+          role="alert"
+          data-testid="model-picker-error"
+          className="mt-1 px-2 text-xs text-destructive"
+        >
+          모델 단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
+        </p>
+      ) : null}
     </form>
   );
 }

@@ -587,8 +587,8 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
 
     def test_third_party_import_in_local_helper_is_reported(self):
         def change(root):
-            server = root / "scripts/get_refresh_token.py"
-            server.write_text("import requests\n" + server.read_text(encoding="utf-8"), encoding="utf-8")
+            server = root / "scripts/third_party_probe.py"
+            server.write_text("import requests\n", encoding="utf-8")
         self.assert_reported(self.broken_copy(change), "requests")
 
     def test_python_server_is_reported(self):

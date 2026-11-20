@@ -479,10 +479,11 @@ CAS 불일치는 원본 읽기와 새 암호화를 시작하기 전에 판정한
 
 | 도구 | 인자 | 실행 범위 |
 | --- | --- | --- |
+| `content_draft_image` | `{title}` | 그 대화에서 만든 그림의 사진 첨부 사본을 만들거나 있는 것을 돌려준다. 아래 「만든 그림을 원고에 넣기」 |
 | `content_draft_write` | `{requestId?,draftId?,expectedRevision?,draft}` | 생성 때 requestId 필수, 나머지 두 옵션 생략. 수정 때 requestId 금지, 나머지 둘 필수 |
 | `content_draft_read` | `{draftId,revision?}` | 생략하면 현재 revision, 있으면 지정 revision |
 
-두 도구는 기존 Control Plane MCP 서버에 등록되어 있다.
+세 도구는 기존 Control Plane MCP 서버에 등록되어 있다.
 
 새 두 도구는 최상위 선택 필드도 명시적 null을 거절한다. 기존 도구의 null 처리는 유지한다.
 write는 draftId와 expectedRevision 중 하나만 지정하면 거절한다.
@@ -539,6 +540,14 @@ preview·detail·result와 delta·text·output의 root/data 값을 통해 선택
 합성 tool.failed는 경계 시험이며 실제 Hermes 실패 사건 계약으로 가정하지 않는다.
 일반 USER와 final(message.delta), interim(message.interim)을 임의로 가리지 않으며 기존 분류·interim·reasoning 정책을 유지한다.
 subagent goal의 본문 보호 확대는 이 작업의 범위 밖이다.
+
+### 만든 그림을 원고에 넣기
+
+`content_draft_image` 는 그 대화에서 만든 그림의 제목을 받아 사진 첨부 사본을 같은 대화에 만들고 `{assetId, fileName, photoDir, title}` 을 돌려준다. 원고와 초안은 그 사본을 보통 사진처럼 가리킨다.
+사본 행은 `source_artifact_id` 에 그림 행 번호가 있고 `message_id` 가 비어 있다. 위 「권한·원본·관찰 검사」 의 「보낸 첨부」 조건은 「보낸 첨부이거나 원고용 사본」 으로 읽는다. 나머지 조건은 같다.
+사본은 사진 순번, preview 의 빠진 사진, 보내지 않은 사진 수에 들지 않는다. snapshot 입력의 `ordinal` 은 보낸 사진 뒤에 첨부 번호 순서로 잇는다.
+같은 그림의 쓸 수 있는 사본이 있으면 다시 만들지 않는다. 그림 파일이 지워졌으면 사본이 있어도 거절하고, 이미 넣은 원고는 사본 번호로 남는다. 그림 파일이 보관 기간 정리로 지워졌으면 `IMAGE_SOURCE_GONE`, 그 제목이 없으면 `IMAGE_SOURCE_UNKNOWN` 이고 두 결과 모두 고정 안내 `message` 를 함께 준다.
+사전·사후 guard 와 오류 변환은 원고 도구와 같다. 설계와 근거는 [비서가 만든 이미지 설계](generated-image/design.md) 의 「PR4: 만든 그림을 블로그 원고에 넣기」 와 [ADR-20261120 / generated-image-draft](../adr/ADR-20261120-generated-image-draft.md) 가 갖는다.
 
 ### 첫 MCP 생성의 재시도 식별
 

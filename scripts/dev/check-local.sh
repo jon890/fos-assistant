@@ -178,7 +178,7 @@ step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 if [ "${skip_browser}" = false ]; then
   step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium
 fi
-step bun-version     python3 "${ROOT}/scripts/dev/check-bun-version.py"
+step bun-version     node "${ROOT}/scripts/dev/check-bun-version.ts"
 step tossinvest-install bun install --frozen-lockfile --cwd "${ROOT}/hermes/connectors/tossinvest"
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
 step migration-versions bash -c "cd '${ROOT}' && node scripts/checks/check-migration-versions.mjs"

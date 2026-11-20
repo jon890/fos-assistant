@@ -218,7 +218,7 @@ abstract class FinancialConnectorTestBase {
     }
 
 
-    /** 이 클래스가 띄울 {@code test/e2e/financial/} 아래 fixture 다. 조건주문 검사는 조건 SDK 원본을 설치하는 fixture 를 쓴다. */
+    /** 이 클래스가 띄울 {@code hermes/tests/fixtures/} 아래 fixture 다. 조건주문 검사는 조건 SDK 원본을 설치하는 fixture 를 쓴다. */
     String pluginScript() {
         return "producer_plugin_http.py";
     }
@@ -293,7 +293,7 @@ abstract class FinancialConnectorTestBase {
 
 
         static SharedPlugin start(String script, int springPort, String token) throws Exception {
-            var process = new ProcessBuilder("python3", "../test/e2e/financial/" + script,
+            var process = new ProcessBuilder("python3", "../hermes/tests/fixtures/" + script,
                 "http://127.0.0.1:" + springPort, token).redirectError(ProcessBuilder.Redirect.INHERIT).start();
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {
