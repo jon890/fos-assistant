@@ -4,7 +4,7 @@ import test from "node:test";
 import { CONCEPTS, PLACEHOLDERS, placeholdersOf, type Question } from "./score.ts";
 
 const file = JSON.parse(readFileSync(new URL("questions.json", import.meta.url), "utf8")) as { version: number; questions: Question[] };
-const EXPECT_KEYS = ["links", "linkPrefixes", "noLinkPrefixes", "tools", "includes", "absent"];
+const EXPECT_KEYS = ["links", "linkPrefixes", "noLinkPrefixes", "tools", "includes", "absent", "instructionIncludes"];
 
 test("문항마다 id, 개념, 보낼 글, 기대가 형식에 맞고 id 가 겹치지 않는다", () => {
   assert.equal(file.version, 1);

@@ -186,7 +186,12 @@ class McpMemoryToolTest {
                 "file_space_put",
                 "connector_list",
                 "memory_remember",
-                "memory_search");
+                "memory_search",
+                "task_list",
+                "task_create",
+                "task_update",
+                "task_set_state",
+                "task_delete");
         JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)
             .filter(tool -> "memory_search".equals(tool.path("name").asString()))
             .findFirst().orElseThrow();
