@@ -29,7 +29,7 @@
 
 ### 2. 관리자 사용자 목록의 「평가용」
 
-phase 2 에서 `PersonAccess` 에 더한 칸을 `PeopleAdminDtos` 의 응답 이름 `evaluation` 으로 보낸다(phase 2 에서 DTO 를 고쳤으면 여기서는 테스트만 더한다).
+phase 2 에서 `PersonAccess` 에 더한 칸을 `PeopleAdminDtos.PersonView` 의 `evaluation` 으로 보낸다. `PeopleAdminController` 의 목록 응답이 그 값을 넘긴다.
 
 ### 3. 문서
 
@@ -58,5 +58,7 @@ scripts/dev/check-local.sh --fast
 | `backend/src/main/java/com/bifos/assistant/admin/quality/presentation/QualityAdminController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/admin/quality/presentation/QualityAdminDtos.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/admin/quality/QualityAdminControllerTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/admin/people/presentation/PeopleAdminDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/admin/people/presentation/PeopleAdminController.java` | 수정 |
 | `docs/features/agent-quality.md` | 수정 |
 | `docs/features/users.md` | 수정 |
