@@ -17,11 +17,12 @@ public record SkillListItem(
     String name, String description, SkillSource source, boolean enabled, SkillUsageSummary usage,
     String connectorTitle) {
     public static SkillListItem fromHermes(HermesSkill skill, boolean uploaded, SkillUsageSummary usage) {
+        String connectorTitle = uploaded ? null : skill.connectorTitle();
         SkillSource source = uploaded ? SkillSource.UPLOADED : SkillSource.HERMES;
-        if (skill.connectorTitle() != null) {
+        if (connectorTitle != null) {
             source = SkillSource.CONNECTOR;
         }
-        return new SkillListItem(skill.name(), skill.description(), source, skill.enabled(), usage, skill.connectorTitle());
+        return new SkillListItem(skill.name(), skill.description(), source, skill.enabled(), usage, connectorTitle);
     }
 
 

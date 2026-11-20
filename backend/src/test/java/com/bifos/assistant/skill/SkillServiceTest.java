@@ -156,6 +156,22 @@ class SkillServiceTest {
     }
 
 
+    @Test
+    @DisplayName("플러그인과 이름이 겹쳐도 올린 스킬은 설정에서 관리할 수 있다")
+    void keepsUploadedSkillManageableOnNameCollision() {
+        String name = "weekly-plan";
+        skills.save(OWNER, OWNED, name, skillMd(name), List.of());
+        when(skillClient.list(OWNED_PROFILE))
+            .thenReturn(List.of(new HermesSkill(name, "겹치는 스킬", true, "검사용 메모")));
+
+        assertThat(skills.list(OWNER, OWNED).skills()).singleElement().satisfies(item -> {
+            assertThat(item.source()).isEqualTo(SkillSource.UPLOADED);
+            assertThat(item.connectorTitle()).isNull();
+        });
+        assertThat(skills.read(OWNER, OWNED, name).body()).isEqualTo(skillMd(name));
+    }
+
+
     @BeforeEach
     void setUp() {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {
