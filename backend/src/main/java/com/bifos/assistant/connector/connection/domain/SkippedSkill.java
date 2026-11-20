@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.connection.domain;
 
 import java.util.Arrays;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -15,6 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
  * @param name 스킬 이름
  * @param reasons 대시보드가 정한 까닭 낱말. 대시보드가 낱말을 더할 수 있어 enum 으로 묶지 않는다
  */
+@Slf4j
 public record SkippedSkill(String name, List<String> reasons) {
 
     /** 모르는 칸을 받는다. 뒤 버전이 칸을 더해도 앞 버전이 읽는다. */
@@ -41,15 +43,24 @@ public record SkippedSkill(String name, List<String> reasons) {
     }
 
 
-    /** 저장된 JSON 글을 읽는다. 비었으면 빈 목록이다. 읽지 못하면 저장 오류로 전한다. */
+    /**
+     * 저장된 JSON 글을 읽는다. 비었으면 빈 목록이다.
+     *
+     * <p>안내에만 쓰는 값이라 읽지 못하면 경고를 남기고 빈 목록으로 읽는다. 저장 오류로 전하면 그 에이전트의 연결 목록 전체를 읽지 못한다.
+     */
     public static List<SkippedSkill> fromJson(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
         try {
-            return List.copyOf(Arrays.asList(JSON.readValue(json, SkippedSkill[].class)));
-        } catch (JacksonException ex) {
-            throw new IllegalStateException("cannot read skipped skills", ex);
+            SkippedSkill[] read = JSON.readValue(json, SkippedSkill[].class);
+            if (read == null || Arrays.stream(read).anyMatch(skipped -> skipped == null || skipped.name() == null)) {
+                throw new IllegalArgumentException("skipped skill without name");
+            }
+            return List.of(read);
+        } catch (JacksonException | IllegalArgumentException ex) {
+            log.warn("바인딩의 skipped_skills 를 읽지 못해 빈 목록으로 읽는다: {}", ex.getClass().getSimpleName());
+            return List.of();
         }
     }
 }
