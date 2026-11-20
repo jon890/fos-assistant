@@ -56,7 +56,7 @@
   - `GET /failures` → `{since, total, recent: [{id, userName, agentName, startedAt, errorCode, mine}]}`
   - `GET /monthly` → `{month, currency: "USD", totalExecutions, subscriptionExecutions, actualCostMicros, incomplete}`
 - 세 서울 시간대 자리의 주석에 `AdminOverviewService` 를 더하고, `AdminOverviewService` 에도 같은 주석을 단다.
-- `backend/docs/code-architecture.md` 의 API 표(`GET /api/v1/admin/workspaces` 행 근처)에 두 줄을 더한다.
+- 두 엔드포인트의 응답 모양은 설계(`docs/features/admin-area/design.md` 의 「인터페이스와 데이터」)가 갖는다. `backend/docs/code-architecture.md` 의 API 표는 파일 공간 경로만 다루므로 더하지 않는다.
 
 ### 5. 테스트
 
@@ -107,4 +107,3 @@ node --test test/repo/doc-links.test.ts test/repo/doc-code-references.test.ts
 | `backend/src/test/java/com/bifos/assistant/admin/usage/AdminOverviewRouteTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/admin/usage/AdminOverviewServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/UsageTestSupportController.java` | 수정 |
-| `backend/docs/code-architecture.md` | 수정 |

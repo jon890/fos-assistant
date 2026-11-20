@@ -2,9 +2,13 @@ package com.bifos.assistant.usage.tree.application;
 
 import com.bifos.assistant.usage.execution.application.port.ConversationPublicIds;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionCursor;
+import com.bifos.assistant.usage.tree.application.dto.FailedRoot;
+import com.bifos.assistant.usage.tree.application.dto.RecentFailures;
 import com.bifos.assistant.usage.tree.application.dto.RootExecutionPage;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,6 +18,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 사용자의 루트 실행 목록을 읽는다.
@@ -47,6 +52,25 @@ public class RootExecutionQuery {
         List<AgentExecution> page = hasNext ? fetched.subList(0, size) : fetched;
         String nextCursor = hasNext ? ExecutionCursor.of(page.getLast()).encode() : null;
         return new RootExecutionPage(page, idsHavingChildren(page), conversationPublicIds(page), nextCursor);
+    }
+
+
+    /**
+     * 사용자들의 실패한 루트 실행 수와 가장 최근 {@code limit} 건을 읽는다.
+     *
+     * <p>수와 목록을 한 트랜잭션에서 읽는다. 따로 읽으면 사이에 생긴 실패로 수보다 많은 줄이 보일 수 있다.
+     * 사용자가 없으면 질의하지 않는다. 빈 {@code in} 절은 데이터베이스마다 다르게 동작한다.
+     */
+    @Transactional(readOnly = true)
+    public RecentFailures recentFailures(Collection<Long> userIds, Instant since, int limit) {
+        if (userIds.isEmpty()) {
+            return new RecentFailures(0, List.of());
+        }
+        long total = executions.countFailedRootsSince(userIds, since);
+        List<FailedRoot> recent = executions.findFailedRootsSince(userIds, since, PageRequest.of(0, limit)).stream()
+            .map(row -> new FailedRoot(row.id(), row.userId(), row.agentName(), row.startedAt(), row.errorCode()))
+            .toList();
+        return new RecentFailures(total, recent);
     }
 
 
