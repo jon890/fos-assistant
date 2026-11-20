@@ -234,7 +234,8 @@ export function linkState(status: number | null): LinkState {
 }
 
 /** 사진이나 링크를 보내 달라고 부탁하는 말이 있는가(스펙 tool-fallback REQ7). 「사진을 올려 주세요」, 「링크를 보내 주시면」 을 받는다. 「링크를 공유합니다」 처럼 부탁이 아닌 말은 받지 않는다. */
-const PHOTO_REQUEST = /(사진|이미지|링크|주소)[^\n]{0,40}(보내|올려|첨부해|공유해|붙여) ?(주|달라)/;
+// 부탁하는 끝맺음만 받는다. 「보내 주실 필요는 없어요」, 「보내 주지 않아도 돼요」 같은 부정은 받지 않는다.
+const PHOTO_REQUEST = /(사진|이미지|링크|주소)[^\n]{0,40}(보내|올려|첨부해|공유해|붙여) ?(주세요|주시면|주실 수|주시겠|줄래|주면|달라)/;
 
 export function asksForPhoto(text: string): boolean {
   return PHOTO_REQUEST.test(text);

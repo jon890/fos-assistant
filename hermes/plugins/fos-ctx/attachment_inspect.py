@@ -77,8 +77,11 @@ def sign_request(key, ctx, issued, request_digest, top_level):
 
 
 def authorize(args, session_id, tool_call_id, isolated=False):
-    if isolated or not valid_args(args):
+    if isolated:
         return {"action": "block", "message": FAILURE}
+    if not valid_args(args):
+        # 인자만 고치면 되는 호출이다. 모델에게 고쳐 다시 부르라고 알린다(fos-assistant 스펙 tool-fallback REQ3).
+        return {"action": "block", "message": INVALID_ARGS}
     try:
         ctx = build_context(TOOL, session_id, tool_call_id)
         token = _read_token()

@@ -37,7 +37,11 @@ class AttachmentInspectTest(unittest.TestCase):
         for args in ({"attachment_id": "file:///x"}, {"attachment_id": True},
                      {"attachment_id": 7, "region": [0, 0, 1.5, 2]},
                      {"attachment_id": 7, "url": "https://example.test"}):
-            self.assertEqual(self.plugin.pre_tool_call("attachment_inspect", args)["action"], "block")
+            result = self.plugin.pre_tool_call("attachment_inspect", args)
+            self.assertEqual(result["action"], "block")
+            # 인자만 틀린 호출은 판독 실패가 아니라 인자를 고쳐 다시 부르라는 다음 방법을 받는다(tool-fallback REQ3)
+            self.assertEqual(result["message"], self.inspect.INVALID_ARGS)
+            self.assertTrue(result["message"].rsplit("\n", 1)[-1].startswith("다음 방법: "))
         self.assertIsInstance(self.inspect.handle({"attachment_id": 7}), str)
 
     def test_native_envelope_and_failure(self):
