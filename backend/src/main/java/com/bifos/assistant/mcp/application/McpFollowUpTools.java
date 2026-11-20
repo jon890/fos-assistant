@@ -15,6 +15,7 @@ import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -107,7 +108,7 @@ public class McpFollowUpTools {
     public Map<String, Object> list(McpCaller caller) {
         try {
             List<Map<String, Object>> items = requests.openOf(caller.user()).stream().map(McpFollowUpTools::item).toList();
-            return McpToolService.result(ExternalData.wrap(JSON.writeValueAsString(items)), false);
+            return McpToolService.success(ExternalData.wrap(JSON.writeValueAsString(items)));
         } catch (RuntimeException ex) {
             return unavailable(caller, ex);
         }
@@ -129,7 +130,7 @@ public class McpFollowUpTools {
                         + "follow_up_propose 에 이 title 과 due_at 을 그대로, requested 를 true 로 주어 다시 적는다.");
                     body.put("follow_up", item(finished.matches().getFirst()));
                     body.put("link", "/now");
-                    yield McpToolService.result(ExternalData.wrap(JSON.writeValueAsString(body)), false);
+                    yield McpToolService.success(ExternalData.wrap(JSON.writeValueAsString(body)));
                 }
                 case AMBIGUOUS -> failed("ambiguous", "맞는 할 일이 여럿이라 바꾸지 않았다. 어느 것인지 사용자에게 되묻고 그 id 로 다시 부른다.",
                     finished.matches());
@@ -161,7 +162,7 @@ public class McpFollowUpTools {
 
     private Map<String, Object> unavailable(McpCaller caller, RuntimeException ex) {
         log.warn("follow-up tool failed executionId={} kind={}", caller.executionId(), ex.getClass().getSimpleName());
-        return McpToolService.result(JSON.writeValueAsString(Map.of("status", "unavailable", "message", UNAVAILABLE)), true);
+        return McpToolService.jsonFailure(Map.of("status", "unavailable", "message", UNAVAILABLE), nextFor("unavailable"));
     }
 
 
@@ -170,10 +171,20 @@ public class McpFollowUpTools {
         body.put("status", status);
         body.put("message", message);
         if (candidates.isEmpty()) {
-            return McpToolService.result(JSON.writeValueAsString(body), true);
+            return McpToolService.jsonFailure(body, nextFor(status));
         }
         body.put("candidates", candidates.stream().map(McpFollowUpTools::item).toList());
-        return McpToolService.result(ExternalData.wrap(JSON.writeValueAsString(body)), true);
+        return McpToolService.jsonFailure(body, nextFor(status), true);
+    }
+
+
+    /** 할 일 도구의 실패마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(String status) {
+        return switch (status) {
+            case "not_found" -> ToolFailureText.alternative(status, "follow_up_list 로 확인해 다시 부르고, 없으면 사용자에게 되묻는다");
+            case "unavailable" -> ToolFailureText.alternative(status, "다른 방법이 없으니 /now 화면에서 하라고 안내하고 잠시 뒤 다시 해 달라고 알린다");
+            default -> ToolFailureText.askUser(status);
+        };
     }
 
 

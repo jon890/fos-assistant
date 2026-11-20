@@ -9,6 +9,7 @@ import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -36,14 +37,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventToolGuard {
 
     /** 사건 실행 트리에서 막을 때 모델이 받는 글이다. 붙은 플러그인의 읽기 도구로 이어 가게 한다. */
-    static final String EVENT_MESSAGE = "이번 실행은 사람이 보지 않는 새 사건 살펴보기라 이 도구를 쓸 수 없다. 다시 부르지 말고 붙은 플러그인의 읽기 도구로 살펴본다.";
+    static final ToolFailureText EVENT_MESSAGE = ToolFailureText.alternative(
+        "이번 실행은 사람이 보지 않는 새 사건 살펴보기라 이 도구를 쓸 수 없다. 다시 부르지 않는다.", "붙은 플러그인의 읽기 도구로 살펴본다");
     /** 사람이 없는 실행에서 그림 만들기를 막을 때 모델이 받는 글이다(스펙 generated-image REQ14). */
-    static final String IMAGE_MESSAGE = "이번 실행은 사람이 직접 부탁한 것이 아니라(예약 작업, 먼저 살펴보기, 그 결과를 전하는 실행) 그림을 만들 수 없다. "
-        + "다시 부르지 말고 결과에 그림은 만들지 못했다고 적는다. 사용자가 대화에서 직접 부탁하면 만들 수 있다.";
+    static final ToolFailureText IMAGE_MESSAGE = ToolFailureText.askUser(
+        "이번 실행은 사람이 직접 부탁한 것이 아니라(예약 작업, 먼저 살펴보기, 그 결과를 전하는 실행) 그림을 만들 수 없다. "
+            + "다시 부르지 말고 결과에 그림은 만들지 못했다고 적는다. 사용자가 대화에서 직접 부탁하면 만들 수 있다.");
     /** Hermes 의 그림 만들기 도구다. 구독 한도를 쓰므로 사람이 연 실행에서만 부른다. */
     static final String IMAGE_TOOL = "image_generate";
     /** 어느 실행인지 풀지 못해 막을 때의 글이다. */
-    static final String UNRESOLVED_MESSAGE = "이 도구 호출의 실행 맥락을 확인하지 못해 막았다. 다시 부르지 않는다.";
+    static final ToolFailureText UNRESOLVED_MESSAGE = ToolFailureText.askUser("이 도구 호출의 실행 맥락을 확인하지 못해 막았다. 다시 부르지 않는다.");
 
     private final HermesSessionBindingRepository bindings;
     private final AgentExecutionRepository executions;
@@ -100,8 +103,8 @@ public class EventToolGuard {
     }
 
 
-    private static ToolGuardAnswer blocked(String profileName, String message, String reason) {
+    private static ToolGuardAnswer blocked(String profileName, ToolFailureText message, String reason) {
         log.info("도구 호출을 막았다 profile={} reason={}", profileName, reason);
-        return ToolGuardAnswer.block(message);
+        return ToolGuardAnswer.block(message.text());
     }
 }

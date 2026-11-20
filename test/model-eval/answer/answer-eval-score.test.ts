@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
+  asksForPhoto,
   collectAnswers,
   exitCode,
   failedQuestion,
@@ -321,4 +322,23 @@ test("형식 참고 칸은 세트 통과를 바꾸지 않고 칸이 없는 옛 �
   assert.match(report, /형식 참고\(통과 기준 아님\): 어긴 문항 1\/1/);
   assert.match(report, /\| q2 \| 어김 \| 1 \| 0 \| 0 \|/);
   assert.match(report, /\| q1 \| - \| - \| - \| - \|/);
+});
+
+test("그림 참고 사진 문항은 답이 사진이나 링크를 보내 달라고 할 때만 통과하고, 미달이면 세트 사유에 든다", () => {
+  assert.equal(asksForPhoto("찾은 사진은 그림 도구에 넘길 수 없어요. 상품 사진을 올려 주시거나 링크를 보내 주시면 그걸로 그릴게요."), true);
+  assert.equal(asksForPhoto("양말을 신고 뛰노는 아이 그림을 그렸어요."), false);
+  assert.equal(asksForPhoto("찾은 사진 링크를 공유합니다."), false);
+  assert.equal(asksForPhoto("사진을 보내 주실 필요는 없어요. 설명만으로 그림을 그렸어요."), false);
+  assert.equal(asksForPhoto("사진을 보내 주지 않아도 돼요."), false);
+  assert.equal(asksForPhoto("상품 사진을 올려 주세요."), true);
+  const links = new Map<string, LinkState>();
+  const asked = scoreQuestion(question("p1", "photo-request"), ["사진을 직접 올려 주세요."], NOON, links, null);
+  const drew = scoreQuestion(question("p1", "photo-request"), ["비슷하게 그려 봤어요."], NOON, links, null);
+  assert.equal(asked.passed, true);
+  assert.equal(drew.passed, false);
+  const scores = fullSet(15);
+  scores.push(drew);
+  const set = scoreSet(scores, comparisons(6));
+  assert.equal(set.outcome, "FAIL");
+  assert.ok(set.reasons.some((reason) => reason.includes("사진이나 링크를 보내 달라고 하지 않았다")), set.reasons.join(", "));
 });

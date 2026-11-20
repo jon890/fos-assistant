@@ -47,6 +47,7 @@ type StreamEvent = { type: string; toolName?: string; detail?: string; execution
 const CONNECTION = connectionPath(DEMO_CONNECTOR.id);
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const CONTROL_PLANE_MCP = "fos-assistant";
+/** 판정 줄 검사는 답에서 판정 글의 첫 줄만 읽는다. 끝 줄(「사용자에게 바로 알린다.」)은 다음 줄에 있어 비교하지 않는다. */
 /** 연결은 쓸 수 있는데 그 에이전트에 붙인 것이 아직 반영되지 않은 호출에 Control Plane 이 답하는 글이다. 판정은 `NOT_READY` 다. */
 /** 반영 예정 없이 PENDING 으로 남은 바인딩의 호출에 Control Plane 이 답하는 글이다. */
 const BINDING_CHECK = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 외부 서비스 연결에서 연결을 확인하라고 알린다.";

@@ -12,7 +12,7 @@ import { SUBAGENT_MEMORY_PROBE } from "../fake-hermes.ts";
 export const NATIVE_DELEGATION_PROFILE = "native-delegation-group";
 
 const AGENT_CODE = "native-delegation";
-const NOT_READABLE = "Memory 항목을 읽을 수 없습니다.";
+const NOT_READABLE = "Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다";
 const INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다";
 const CHILD_ANSWER = /^하위 에이전트 session: (native-[0-9a-f-]+)$/;
 

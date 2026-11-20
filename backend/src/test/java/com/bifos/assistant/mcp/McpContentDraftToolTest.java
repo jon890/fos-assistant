@@ -305,6 +305,7 @@ class McpContentDraftToolTest {
         var failure = json.readTree(response.path("result").path("content").get(0).path("text").stringValue());
         assertThat(failure.path("code").stringValue()).isEqualTo("CONTENT_DRAFT_DUPLICATE_PHOTO");
         assertThat(failure.path("message").stringValue()).isEqualTo(ContentDraftInputReader.DUPLICATE_PHOTO_MESSAGE);
+        assertThat(failure.path("next").stringValue()).isEqualTo("다음 방법: 중복된 사진 블록을 지우고 다시 저장한다");
         assertThat(response.toString()).doesNotContain(MARKER);
     }
 

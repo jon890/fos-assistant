@@ -32,7 +32,7 @@ import tools.jackson.databind.node.ObjectNode;
 @BackendIntegrationTest
 class McpCallerInvariantTest {
     private static final String PROFILE = "caller-invariant";
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
     @LocalServerPort
     int port;

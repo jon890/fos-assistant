@@ -6,6 +6,7 @@ import sqlite3
 import urllib.parse
 
 from .connector_policy import POLICY_TIMEOUT, POLICY_URL_ENV, _block, _post_json
+from .next_step import alternative, ask_user
 from .context import (
     CTX_VERSION,
     _read_token,
@@ -30,8 +31,8 @@ VISION_TOOL = "vision_analyze"
 GUARD_PATH = "tool-guard"
 # 코드 실행 안의 호출에 만드는 판정 요청용 번호의 접두사다. Control Plane 은 이 번호를 서명 확인에만 쓴다.
 CODE_EXEC_CALL_PREFIX = "code-exec:"
-GUARD_BLOCK_MESSAGE = ("fos-ctx: 이 도구를 지금 쓸 수 있는지 확인하지 못해 막았다. "
-                       "잠시 뒤 다시 시도하라고 사용자에게 알린다.")
+GUARD_BLOCK_MESSAGE = alternative("fos-ctx: 이 도구를 지금 쓸 수 있는지 확인하지 못해 막았다.",
+                                  "다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다")
 
 
 def guard_url() -> str:
