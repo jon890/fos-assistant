@@ -1,4 +1,4 @@
-"""기동 때 이미 붙은 로컬 바인딩을 실행기 정의로 옮기는 이관을 검사한다(docs/features/connector/spec.md 의 REQ7, DECISION10)."""
+"""기동 때 이미 붙은 로컬 바인딩을 실행기 정의로 옮기는 이관을 검사한다(hermes/plugins/dashboard-profile-api/README.md 의 「보관 파일 암호화와 실행기 설계」)."""
 
 import contextlib
 import json

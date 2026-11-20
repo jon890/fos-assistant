@@ -152,10 +152,10 @@ sequenceDiagram
 | 요청한 내장 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 목록을 다시 읽고 관리자에게 알리라고 안내한다 |
 | Hermes 가 쓰기 없이 미분류 도구를 켰거나 미분류 도구만 더 켜졌다 | 적용 실패로 세지 않고 성공 응답에 그 이름을 따로 싣는다. 화면은 관리자에게 알리라고 경고한다 |
 | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸는데 운영의 실행 공간 정책이 없거나 잘못됐다 | plugin 의 409 `sandbox_unavailable` 이고 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 아무것도 바뀌지 않는다 |
-| 정책은 유효한데 이 profile 이 등록되지 않았다 | `vision`, `image_gen`, `video_gen` 을 켜거나 사진 플러그인을 설치하면 409 다. 사진 없는 셸 도구는 local 로 허용하고 이전 docker 설정을 지운다. 그 셸은 다른 사용자 파일과 서버 설정에 닿을 수 있다 |
+| 정책은 유효한데 이 profile 이 등록되지 않았다 | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸면 409 `AGENT_SANDBOX_UNAVAILABLE` 이다. 사진 플러그인 설치도 409 다. local 로 켜지 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이면 그 도구를 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
 | `image_gen` 을 켜거나 켠 채 다른 도구를 바꾼다 | 같은 쓰기에서 plugin 이 그 profile 에 이미지 서비스 설정을 넣는다. 이미 있는 설정은 그대로 둔다. 설정을 쓰지 못하거나 plugin 이 옛 버전이면 저장이 실패하고 아무것도 바뀌지 않는다. 화면은 저장 실패를 알린다([ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md)) |
 | 관리자가 기본 비서의 `image_gen` 을 끈다 | Control Plane 이 그 비서를 다시 켜지 않는다. 켜지기를 기다리던 비서를 사람이 켜도 더 기다리지 않는다 |
-| 실행 공간 도구가 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 격리한 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 local 에이전트도 같다. 셸·파일·사진 계열만 켜졌거나 주인이 그대로인 접근 변경은 막지 않는다 |
+| 실행 공간 도구가 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 격리한 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 정책 밖 profile 의 에이전트도 같다. 그런 에이전트의 셸은 기동 작업이 끈다. 셸·파일·사진 계열만 켜졌거나 주인이 그대로인 접근 변경은 막지 않는다 |
 | 올린 스킬 가운데 비밀 요청 칸이 있는 것이 있는데 실행 공간 도구를 켜거나 켠 채 둔다 | 409 `AGENT_SKILL_REQUESTS_SECRETS`. Hermes 에 쓰지 않고 메시지에 그 스킬 이름을 싣는다. 지금 버전과 표식 없이 남은 더 새 버전을 함께 본다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 

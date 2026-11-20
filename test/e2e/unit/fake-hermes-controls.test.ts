@@ -22,6 +22,10 @@ const SERVICE_CONCEPTS = new URL(
   "../../../backend/src/main/java/com/bifos/assistant/context/application/ServiceConceptsInstructions.java",
   import.meta.url,
 );
+const ANSWER_FORMAT = new URL(
+  "../../../backend/src/main/java/com/bifos/assistant/context/application/AnswerFormatInstructions.java",
+  import.meta.url,
+);
 const CONTEXT_ASSEMBLER = new URL(
   "../../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
   import.meta.url,
@@ -42,10 +46,10 @@ test("답변 형식 뒤의 도구 호출과 도구 실패, 승인 카드, 서비
 });
 
 test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상수의 제목과 순서가 같다", () => {
-  // ContextAssembler 는 답변 형식, 도구 호출, 도구 실패, 승인 카드, 서비스 개념 목록, 최신 정보와 출처, 기억을 이 순서로 잇는다.
+  // ContextAssembler 는 답변 형식(AnswerFormatInstructions), 도구 호출, 도구 실패, 승인 카드, 서비스 개념 목록, 최신 정보와 출처, 기억을 이 순서로 잇는다.
   // 같은 이름 SECTION 이 여러 파일에 있으므로 (파일, 상수) 짝의 차례로 절 제목을 모은다.
   const parts: [URL, string][] = [
-    [CONTEXT_ASSEMBLER, "RESPONSE_INSTRUCTIONS"],
+    [ANSWER_FORMAT, "RESPONSE_INSTRUCTIONS"],
     [CONTEXT_ASSEMBLER, "TOOL_CALL_INSTRUCTIONS"],
     [TOOL_FAILURE, "SECTION"],
     [APPROVAL_CARD, "SECTION"],

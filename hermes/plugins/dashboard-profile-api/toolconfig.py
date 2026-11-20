@@ -28,7 +28,6 @@ from .connector_output import (
 )
 
 from .sandbox import (
-    IMAGE_FILE_TOOLSETS,
     SANDBOX_OWNER_RE,
     SANDBOX_TOOLSETS,
     _sandbox_policy,
@@ -172,7 +171,8 @@ async def _check_config_update(request):
     owner = body.get("sandbox_owner")
     if "sandbox_owner" in body and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
         return _rejected("sandbox_owner 형식이 올바르지 않다")
-    # 참이면 정책에 없는 profile 의 셸 도구를 local 로 돌리지 않고 거절한다. 기본 도구 적용이 쓴다.
+    # 도구 저장의 판정은 바꾸지 않는다. 정책에 없는 profile 의 실행 공간 도구 저장은 이 값과 상관없이 거절한다
+    # (ADR-20261120 / no-local-shell). 옛 Control Plane 호환으로 받고, 스크립트 스킬 게시의 skill_root 검사에만 쓴다.
     require_sandbox = body.get("require_sandbox", False)
     if not isinstance(require_sandbox, bool):
         return _rejected("require_sandbox 는 참 거짓 값이다")
@@ -199,17 +199,14 @@ async def _check_config_update(request):
     if ensure_image_service and (platform is None or IMAGE_TOOLSET not in platform["api_server"]):
         return _rejected("ensure_image_service 는 image_gen 을 켜는 도구 저장에만 쓴다")
     sandbox = None
-    local_execution = False
     if platform is not None and SANDBOX_TOOLSETS & set(platform["api_server"]):
         sandbox = _sandbox_policy()
         if sandbox is None:
             return _sandbox_unavailable()
         if profile not in sandbox["profiles"]:
-            if require_sandbox or IMAGE_FILE_TOOLSETS & set(platform["api_server"]):
-                return _sandbox_unavailable()
-            sandbox = None
-            local_execution = True
-        elif owner is None:
+            # local 로 켜면 셸이 Hermes 프로세스의 사용자로 돌아 다른 profile 의 .env 와 플러그인 값 파일에 닿는다.
+            return _sandbox_unavailable("unlisted")
+        if owner is None:
             return _rejected("격리할 셸 도구에는 sandbox_owner 가 필요하다")
     skills = config.get("skills")
     skill_dirs = None
@@ -273,20 +270,10 @@ async def _check_config_update(request):
                 _sandbox_prepare_connector_output(sandbox, profile, owner)
                 prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                 updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
-                updated = _with_sandbox_approvals(saved, updated, True)
+                updated = _with_sandbox_approvals(saved, updated)
                 request.state.fos_checked_attachments = (sandbox, owner, prepared)
             except OSError:
                 return _sandbox_unavailable()
-        elif local_execution:
-            # 정책에서 빠진 profile 도 다음 도구 저장부터 local 로 돌아간다.
-            # 이미 local 인 설정은 유지하되 .env 의 backend 값보다 명시한 local 값이 이기게 한다.
-            previous = saved.get("terminal") or {}
-            if not isinstance(previous, dict):
-                raise ValueError("terminal 설정이 객체가 아니다")
-            terminal = dict(previous) if previous.get("backend", "local") == "local" else {}
-            terminal["backend"] = "local"
-            updated["terminal"] = terminal
-            updated = _with_sandbox_approvals(saved, updated, False)
         if skill_dirs is not None:
             # PUT /api/config 는 목록을 통째로 바꾼다. 운영자가 넣은 경로가 있으면 지우지 않고 멈춘다.
             if _operator_skill_dirs(saved, profile, root):

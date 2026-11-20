@@ -12,8 +12,12 @@ import test from "node:test";
 
 const ROOT = join(import.meta.dirname, "../..");
 
-/** 이름을 지우기 전의 데이터 이관 기록과, 옛 경로를 새 경로로 넘기는 페이지만 예외다. */
+/**
+ * 이름을 지우기 전의 데이터 이관 기록과, 옛 경로를 새 경로로 넘기는 페이지, 웹 푸시가 보낼 수 있는 브라우저 푸시 서비스의 호스트 목록만 예외다.
+ * 푸시 호스트는 플러그인이 아니라 브라우저가 정한 보낼 곳이고, 목록이 없으면 서버가 사용자가 준 주소로 요청을 보내는 길이 열린다.
+ */
 const EXCLUDED = new Set([
+  "backend/src/main/java/com/bifos/assistant/notification/config/PushProperties.java",
   "backend/src/main/resources/db/migration/V36__accountbook_connection.sql",
   "backend/src/main/resources/db/migration/V38__connector_connection.sql",
   "web/src/app/connections/accountbook/page.tsx",

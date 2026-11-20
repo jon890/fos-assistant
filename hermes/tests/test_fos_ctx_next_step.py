@@ -11,7 +11,7 @@ import test_fos_ctx as base
 
 # 모듈마다 모델에게 돌려주는 실패 글 상수다. 성공 글과 글을 잇는 틀(HEAD)은 넣지 않는다.
 FAILURE_CONSTANTS = {
-    "image_source": ("NOT_REFERENCE", "TOO_MANY", "UNKNOWN", "GONE", "FAILED", "OLD_SERVER", "NO_CONTEXT"),
+    "image_source": ("NOT_REFERENCE", "TOO_MANY", "UNKNOWN", "GONE", "GONE_GENERATED", "FAILED", "OLD_SERVER", "NO_CONTEXT"),
     "attachment_inspect": ("FAILURE", "REGION_REQUIRED"),
     "generated_image": ("FAILED_MESSAGE",),
     "approval_guard": ("DANGEROUS_COMMAND_MESSAGE", "APPROVAL_WRITE_MESSAGE", "COMPUTER_USE_MESSAGE"),

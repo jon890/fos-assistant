@@ -7,6 +7,7 @@ import {
   exitCode,
   failedQuestion,
   fill,
+  linkedTaskIds,
   markdown,
   scoreQuestion,
   scoreSet,
@@ -133,4 +134,19 @@ test("보고서는 문항마다 결과와 미달 까닭을 적는다", () => {
   assert.match(report, /\| q \| schedule \| 미달 \| 링크 \/tasks 가 없다 \|/);
   assert.match(report, /건너뜀/);
   assert.match(report, /모델 칸: 기본/);
+});
+
+test("답이 링크한 예약 작업 번호를 찾고, 지시문 요소는 항목마다 낱말 하나가 있으면 통과다", () => {
+  const id = "0192f6a1-0000-7000-8000-000000000001";
+  const answer = `만들었어요. [아침 날씨](/tasks/${id}) 에서 바꿀 수 있어요. 목록은 /tasks 예요.`;
+  assert.deepEqual(linkedTaskIds(answer), [id]);
+
+  const expect = { instructionIncludes: ["30만|300000", "없으면|없을 때"] };
+  const passed = scoreQuestion(question(expect), answer, node([]), ["가격이 30만 원 밑이면 알린다. 새 소식이 없으면 알리지 않는다."]);
+  const missing = scoreQuestion(question(expect), answer, node([]), ["가격을 확인해 알린다."]);
+  const none = scoreQuestion(question(expect), answer, node([]));
+  assert.equal(passed.passed, true);
+  assert.equal(missing.passed, false);
+  assert.deepEqual(missing.failures, ["지시문에 30만, 300000 가운데 하나도 없다", "지시문에 없으면, 없을 때 가운데 하나도 없다"]);
+  assert.deepEqual(none.failures, ["답이 링크한 예약 작업의 지시문이 없다"]);
 });

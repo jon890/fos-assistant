@@ -14,14 +14,14 @@ class AgentPropertiesTest {
     @Test
     @DisplayName("설정이 없으면 7일을 기다린다")
     void defaultsPurgeAfterToSevenDays() {
-        assertThat(new AgentProperties(null, null).purgeAfter()).isEqualTo(Duration.ofDays(7));
+        assertThat(new AgentProperties(null, null, null).purgeAfter()).isEqualTo(Duration.ofDays(7));
     }
 
 
     @Test
     @DisplayName("기다리는 기간이 0 이면 기동을 막는다")
     void rejectsZeroPurgeAfter() {
-        assertThatThrownBy(() -> new AgentProperties(null, Duration.ZERO))
+        assertThatThrownBy(() -> new AgentProperties(null, Duration.ZERO, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("assistant.agents.purge-after must be positive");
     }

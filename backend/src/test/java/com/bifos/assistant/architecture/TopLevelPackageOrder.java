@@ -45,6 +45,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
         "task",
         "attention",
         "workspace",
+        "quality",
         "admin");
 
     private TopLevelPackageEdges edges = TopLevelPackageEdges.of(List.of());

@@ -24,6 +24,7 @@ PHOTOS = {
     "attachment:12": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x02" * 40),
     "attachment:13": ("image/jpeg", b"\xff\xd8\xff" + b"\x03" * 40),
     "generated:수채화 고양이": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x04" * 40),
+    "generated:공원의 가족": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x07" * 40),
     "link:shop.example.com/goods/1": ("image/png", b"\x89PNG\r\n\x1a\n" + b"\x05" * 40),
     "link:https://img.example.com/p.jpg": ("image/jpeg", b"\xff\xd8\xff" + b"\x06" * 40),
 }
@@ -202,7 +203,8 @@ class LinkTest(ImageSourceFixture):
 
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
-                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다\n  다음 방법: 다른 방법이 없으니 해 본 것을 알리고",
+                     "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 같은 인물의 다음 장면을",
+                     "  다음 방법: 다른 방법이 없으니 해 본 것을 알리고 사진을 직접 올려 달라고 묻는다",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
@@ -226,6 +228,89 @@ class LinkTest(ImageSourceFixture):
         decision = self.call("link:shop.example.com/goods/1")
         self.assertEqual(decision["action"], "block")
         self.assertIn("사진을 받지 못했다", decision["message"])
+
+
+class PromptFrameTest(ImageSourceFixture):
+    """가짜 Hermes 가 그림 규칙대로 쓴 호출이 fos-ctx 를 지나 이미지 도구로 가는 모양을 본다(스펙 generated-image REQ24~REQ26).
+
+    모델 대신 규칙을 따른 인자를 넣는다. Hermes 는 `modify` 의 `args` 를 원래 인자 위에 덮으므로(`PRE_TOOL_CALL_MODIFY`) 같은 병합으로
+    이미지 도구가 받는 인자를 만든다.
+    """
+
+    SCENE = ("제목: 공원의 가족\n"
+             "인물 3명\n"
+             "- 인물1: 30대 아빠, 짧은 검은 머리, 보통 체격, 남색 니트와 청바지, 흰 운동화\n"
+             "- 인물2: 7살 여자아이, 단발머리, 노란 원피스, 줄무늬 양말과 빨간 구두\n"
+             "- 인물3: 4살 남자아이, 곱슬머리, 초록 맨투맨과 반바지, 파란 운동화\n"
+             "가을 공원 잔디밭에서 셋이 손을 잡고 걷는다. 세 사람 모두 머리부터 발까지 들어오고 얼굴이 잘 보인다. 수채화, 오후 햇살.")
+
+    def tool_args(self, args, call="call_1"):
+        decision = self.plugin.pre_tool_call(
+            tool_name="image_generate", args=args, session_id=base.VECTOR_SESSION, tool_call_id=call)
+        self.assertEqual(decision["action"], "modify")
+        return {**args, **decision["args"]}
+
+    def test_people_scene_keeps_person_lines_and_landscape(self):
+        """사람 여럿의 새 그림은 인물 수와 사람별 줄이 든 지시문과 가로 비율 그대로 이미지 도구로 간다."""
+        received = self.tool_args({"prompt": self.SCENE, "aspect_ratio": "landscape"})
+
+        self.assertEqual(received["aspect_ratio"], "landscape")
+        self.assertTrue(received["prompt"].startswith("인물 3명\n- 인물1: "), "제목 줄만 떼고 인물 줄은 그대로다")
+        self.assertEqual(received["prompt"], self.SCENE.split("\n", 1)[1])
+        self.assertEqual(self.requests, [])
+
+    def test_next_scene_takes_previous_image_and_its_link_as_references(self):
+        """다음 장면은 앞 그림과 그 그림이 쓴 링크를 참고로 받고, 바탕은 두지 않으며 인물 줄과 비율이 그대로 간다."""
+        person_lines = self.SCENE.split("\n")[1:5]
+        prompt = "\n".join(["제목: 공원의 가족 2", *person_lines, "같은 세 사람이 벤치에 앉아 도시락을 먹는다. 앞 그림과 같은 옷차림이다."])
+        received = self.tool_args({
+            "prompt": prompt,
+            "aspect_ratio": "landscape",
+            "reference_image_urls": ["generated:공원의 가족", "link:shop.example.com/goods/1"],
+        })
+
+        self.assertNotIn("image_url", received, "앞 그림은 바탕이 아니라 참고다")
+        self.assertEqual([body["source"] for body in (request["body"] for request in self.requests)],
+                         ["generated:공원의 가족", "link:shop.example.com/goods/1"])
+        self.assertEqual([pathlib.Path(path).read_bytes() for path in received["reference_image_urls"]],
+                         [PHOTOS["generated:공원의 가족"][1], PHOTOS["link:shop.example.com/goods/1"][1]])
+        self.assertEqual(received["prompt"].split("\n")[:4], person_lines)
+        self.assertEqual(received["aspect_ratio"], "landscape")
+        self.assertEqual(self.remembered_links(), ["https://shop.example.com/goods/1"])
+
+    def test_failed_link_tells_to_redraw_with_previous_image_only(self):
+        """다음 장면에서 다시 받는 링크만 실패하면 막는 글이 링크를 빼고 앞 그림만 참고로 다시 그리라고 한다(스펙 DECISION52)."""
+        self.answers = {"link:shop.example.com/goods/1": (502, "IMAGE_SOURCE_LINK_FAILED")}
+
+        decision = self.plugin.pre_tool_call(
+            tool_name="image_generate",
+            args={"prompt": self.SCENE, "aspect_ratio": "landscape",
+                  "reference_image_urls": ["generated:공원의 가족", "link:shop.example.com/goods/1"]},
+            session_id=base.VECTOR_SESSION, tool_call_id="call_1")
+
+        self.assertEqual(decision["action"], "block")
+        self.assertIn("link:shop.example.com/goods/1: 링크를 열지 못했다. 쇼핑몰이 막았을 수 있다. "
+                      "같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
+                      "image_generate 를 다시 부르고", decision["message"])
+        self.assertNotIn("generated:공원의 가족:", decision["message"])
+        self.assertEqual(self.copied(), [])
+        self.assertEqual(self.remembered_links(), [])
+
+    def test_gone_previous_image_tells_to_redraw_with_person_lines(self):
+        """앞 그림 파일이 지워졌으면 막는 글이 그 그림을 빼고 인물 줄만으로 다시 그리라고 한다. 사진이 지워진 것과는 글이 다르다."""
+        self.answers = {"generated:공원의 가족": (410, "IMAGE_SOURCE_GONE"), "attachment:13": (410, "IMAGE_SOURCE_GONE")}
+
+        decision = self.plugin.pre_tool_call(
+            tool_name="image_generate",
+            args={"prompt": self.SCENE, "aspect_ratio": "landscape",
+                  "reference_image_urls": ["generated:공원의 가족", "attachment:13"]},
+            session_id=base.VECTOR_SESSION, tool_call_id="call_1")
+
+        self.assertEqual(decision["action"], "block")
+        self.assertIn("generated:공원의 가족: 지웠거나 보관 기간이 지나 쓸 수 없다\n  다음 방법: 같은 인물의 다음 장면을 그리던 중이면 "
+                      "이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고", decision["message"])
+        self.assertIn("attachment:13: 지웠거나 보관 기간이 지나 쓸 수 없다\n", decision["message"])
+        self.assertEqual(self.copied(), [])
 
 
 class RejectTest(ImageSourceFixture):

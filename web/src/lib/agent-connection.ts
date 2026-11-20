@@ -3,10 +3,12 @@ import {
   type BindingStatus,
   type ConnectionStatus,
 } from "@/lib/connection";
+import type { SkippedSkill } from "@/lib/skipped-skill";
 
 /**
  * 에이전트 상세의 「이 에이전트가 쓰는 연결」 한 줄이다.
- * `status` 는 붙어 있지 않으면 null 이다. `toolCount` 는 플러그인이 선언한 도구 수이고 `skills` 는 붙이면 설치되는 스킬 이름이다.
+ * `status` 는 붙어 있지 않으면 null 이다. `toolCount` 는 플러그인이 선언한 도구 수이고 `skills` 는 붙이면 설치할 수 있는 스킬
+ * 이름(에이전트용 스킬 포함)이다. `skippedSkills` 는 마지막 설치가 이 에이전트에 설치하지 못한 에이전트용 스킬이고 붙어 있지 않으면 비어 있다.
  */
 export type AgentConnectionView = {
   connectorId: string;
@@ -17,6 +19,7 @@ export type AgentConnectionView = {
   restartRequired: boolean;
   toolCount: number;
   skills: string[];
+  skippedSkills: SkippedSkill[];
 };
 
 /** 붙일 수 없는 에이전트의 까닭이다. 연결은 비공개 에이전트에만 붙인다. */

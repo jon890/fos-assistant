@@ -65,4 +65,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from AppUser u where u.id = :id")
     int deletePurged(@Param("id") Long id);
+
+
+    /** 평가 전용 사용자로 표시한다. 엔티티 저장이 이 칸을 덮지 않으므로 이 쿼리로만 바꾼다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update AppUser u set u.evaluation = true, u.updatedAt = :at where u.id = :id and u.evaluation = false")
+    int markEvaluation(@Param("id") Long id, @Param("at") Instant at);
+
+
+    /** 그룹의 평가 전용 사용자다. 그룹마다 많아야 하나다. */
+    Optional<AppUser> findFirstByGroupIdAndEvaluationTrueOrderByIdAsc(Long groupId);
 }

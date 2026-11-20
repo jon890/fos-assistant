@@ -51,15 +51,6 @@ import org.springframework.stereotype.Service;
 public class ContextAssembler implements OmittedMemories {
     private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
-    private static final String RESPONSE_INSTRUCTIONS = """
-            # 답변 형식
-
-            표는 GFM 마크다운 형식으로 작성한다. 머리 줄 바로 다음에 각 열의 구분 줄을 반드시 둔다.
-            예:
-            | 항목 | 값 |
-            | --- | --- |
-            | 예시 | 내용 |
-            """.stripTrailing();
     private static final String TOOL_CALL_INSTRUCTIONS = """
             # 도구 호출
 
@@ -83,10 +74,11 @@ public class ContextAssembler implements OmittedMemories {
             환율은 기준율과 현찰 살 때·팔 때를 함께 제시한다.
             일반 상식, 글쓰기, 사용자의 개인 사정만으로 답할 수 있는 질문은 검색하지 않는다.
             비교나 계획처럼 한 번 검색으로 모자란 질문은 여러 번 찾고 서로 맞춰 본다. 검색 결과의 요약만으로 모자라면 web_extract 로 페이지를 읽는다.
-            검색으로 확인한 문장 옆에 마크다운 링크를 단다. 검색 결과를 하나라도 답에 썼으면 반드시 답 끝에 「출처」 제목 아래 제목과 링크의 목록을 둔다. 이 목록에는 web_search 와 web_extract 가 돌려준 주소만 쓰고 주소를 지어내지 않는다. 검색하지 않았으면 이 목록을 두지 않는다.
+            검색으로 확인한 문장 옆에 짧은 이름의 마크다운 링크를 단다. 검색 결과를 하나라도 답에 썼으면 반드시 답 끝에 「출처」 목록을 둔다. 이 목록에는 web_search 와 web_extract 가 돌려준 주소만 쓰고 주소를 지어내지 않는다. 검색하지 않았으면 이 목록을 두지 않는다.
+            「출처」 목록은 짧은 답에도 ### 출처 제목 줄 다음에 출처마다 - [기관 · 문서 이름](주소) 한 줄로 쓴다. 링크 글자는 사이트와 문서 이름으로 쓰고 주소를 글자로 그대로 보이지 않는다. 목록 안에서 같은 주소는 한 번만 쓴다.
             본문에 적은 출처 이름과 링크가 같은 곳을 가리키는지 확인한다.
             최종 답은 마지막에 한 메시지로 합쳐 보내고, 앞 메시지에 기대는 「앞서 전한…」 식 후속 메시지를 만들지 않는다.
-            바뀌는 사실을 물었는데 검색이 실패했거나 결과가 없거나 web_search 도구가 없으면, 답 첫머리에 검색으로 확인하지 못했다는 것과 아는 정보의 기준 시점을 밝히고 아는 만큼 답한다.
+            바뀌는 사실을 물었는데 검색이 실패했거나 결과가 없거나 web_search 도구가 없으면, 답 첫 줄에 검색으로 확인하지 못했다는 것과 아는 정보의 기준 시점을 밝히고, 그 다음에 핵심 답부터 아는 만큼 답한다.
             플러그인이나 브라우저 같은 다른 도구로 이번 실행에서 확인한 사실에는 확인하지 못했다는 말을 붙이지 않는다.
             조사를 하위 작업에 맡기면 찾은 주소를 함께 돌려받아 출처로 쓴다.
             """.stripTrailing();
@@ -132,14 +124,14 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침, 도구 실패 지침({@link ToolFailureInstructions}), 승인 카드 지침({@link ApprovalCardInstructions}), 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
+     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 형식({@link AnswerFormatInstructions})과 도구 호출 지침, 도구 실패 지침({@link ToolFailureInstructions}), 승인 카드 지침({@link ApprovalCardInstructions}), 서비스 개념 목록({@link ServiceConceptsInstructions})을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
      * 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
      * @param scope 실행을 여는 쪽이 정한 범위다. 먼저 살펴보기는 기억 지침도 받지 않는다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, InstructionScope scope) {
         // 서비스 개념 목록은 모든 범위에 같은 글로 넣는다. 범위마다 다른 절과 기억 글 앞에 두어 실행마다 같은 앞부분을 길게 한다
-        String instructions = RESPONSE_INSTRUCTIONS
+        String instructions = AnswerFormatInstructions.RESPONSE_INSTRUCTIONS
             + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS
             + ContextBudgetWriter.SEPARATOR + ToolFailureInstructions.SECTION
             + ContextBudgetWriter.SEPARATOR + ApprovalCardInstructions.SECTION
