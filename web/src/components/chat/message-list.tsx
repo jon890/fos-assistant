@@ -148,18 +148,19 @@ export function MessageList({
       setHasNewMessage(true);
     }
   }, [contentVersion, loading]);
-  // 받은 글이 그대로여도 답을 풀어 그리거나 이미지가 로드되면 실제 높이는 뒤늦게 늘어난다.
+  // 답을 풀어 그리는 동안 실제 높이는 뒤늦게 늘어난다. 끝난 답의 작업 과정을 펼친 것은 따라가지 않는다.
   useLayoutEffect(() => {
     const element = scrollRef.current;
     const content = contentRef.current;
-    if (!element || !content || loading) return;
+    if (!element || !content || loading || (!sending && !streamedAnswer))
+      return;
     const observer = new ResizeObserver(() => {
       if (shouldFollow.current) element.scrollTop = element.scrollHeight;
     });
     observer.observe(content);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [loading]);
+  }, [loading, sending, streamedAnswer]);
   const scrollToBottom = () => {
     const element = scrollRef.current;
     if (!element) return;
