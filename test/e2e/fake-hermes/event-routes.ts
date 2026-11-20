@@ -277,7 +277,17 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
             event({ event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
             event({ event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
           }
-          event({ event: "run.completed" });
+          // 붙잡은 실행은 풀리거나 중지될 때까지 끝 사건을 보내지 않는다. 실제 Hermes 는 도는 실행에 끝 사건을 보내지 않는다.
+          // 먼저 `run.completed` 를 보내면 Control Plane 이 그 끝 사건을 남겨 두었다가, 중지 뒤 조회한 cancelled 를
+          // 사용자 중지가 아니라 끊긴 실행으로 판정한다.
+          while (state.heldRunId === runId && run.status === "running" && !response.destroyed) await wait(20);
+          if (response.destroyed) return;
+          // 재기동으로 잃은 실행(`unknown`)에는 끝 사건이 없다. 실제 Hermes 처럼 연결만 끊는다.
+          if (run.status === "unknown") {
+            response.destroy();
+            return;
+          }
+          event({ event: run.status === "cancelled" ? "run.cancelled" : "run.completed" });
           response.end();
           return;
         }
