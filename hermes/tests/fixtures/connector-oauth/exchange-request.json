@@ -6,6 +6,6 @@
   "client_secret": "client-secret-example",
   "code": "code-from-redirect",
   "code_verifier": "pkce-verifier-example",
-  "redirect_uri": "https://assistant.example/api/connections/oauth/callback",
-  "token_url": "https://assistant.example/internal/connector-token/k1.signature"
+  "redirect_uri": "https://assistant.example/connections/oauth/callback",
+  "token_url": "https://assistant.example/internal/connector-token/p1.nonce-from-begin.signature"
 }

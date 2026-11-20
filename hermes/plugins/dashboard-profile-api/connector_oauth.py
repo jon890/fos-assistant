@@ -297,7 +297,11 @@ async def _connector_oauth_request(request, action: str, write_lock: asyncio.Loc
             return JSONResponse({"url": url}, status_code=200)
         vault = body["vault"]
         if action == "begin":
+            # 단추로 채우는 칸은 받지 않는다. 받으면 단추 연결의 보관 파일에 붙여 넣은 토큰이 남는다(스펙 REQ9).
+            button = set(manifest["oauth"]["fields"])
             values = _vault_values(manifest, body["values"], oauth=True)
+            if values is not None and button & set(values):
+                return _rejected("단추로 채우는 칸은 begin 에 넣지 않는다")
             if values is None:
                 return _rejected("칸 값이 그 connector 의 칸 선언과 맞지 않는다")
             async with vault_lock(vault):

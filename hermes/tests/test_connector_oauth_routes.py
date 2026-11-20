@@ -7,6 +7,7 @@
 import asyncio
 import http.server
 import json
+import pathlib
 import threading
 import unittest
 import urllib.parse
@@ -287,6 +288,33 @@ class ConnectorOAuthRoutesTest(VaultKeyTest):
         self.assertEqual(put.status_code, 200)
         self.assertFalse(done_before_release)
         self.assertEqual(slow.body["outcome"], "ok")
+
+    def test_begin_refuses_button_field_values(self):
+        """begin 은 단추로 채우는 칸 값을 받지 않는다. 받으면 단추 연결의 보관 파일에 붙여 넣은 토큰이 남는다."""
+        status, _ = self.oauth("begin", vault="c1", connector=DEMO, values={"token": "demo_ok_1111111111"})
+        self.assertEqual(status, 400)
+        self.assertFalse((self.hermes_root / "connector-vault/c1.pending").exists())
+
+    def test_shared_fixtures_match_the_routes(self):
+        """Control Plane 테스트가 읽을 예시 JSON 이 지금 경로의 본문과 응답 모양과 같다."""
+        fixtures = pathlib.Path(__file__).resolve().parent / "fixtures/connector-oauth"
+        read = lambda name: json.loads((fixtures / name).read_text(encoding="utf-8"))
+        request = read("exchange-request.json")
+        required, optional = self.plugin.connector_oauth.BODIES["exchange"]
+        self.assertTrue(required <= set(request) <= required | optional)
+        self.assertIsNone(self.plugin.connector_oauth._body_problem("exchange", request))
+        self.fake.responses[("POST", "/github/token")] = (200, {
+            "access_token": ACCESS, "refresh_token": REFRESH, "expires_in": 28800})
+        nonce = self.begin()
+        exchanged = self.exchange(nonce)[1]
+        self.assertEqual(set(read("exchange-response.json")), set(exchanged))
+        refreshed = self.oauth("refresh", vault="c1", connector=DEMO, client_id=CLIENT_ID,
+                               client_secret=CLIENT_SECRET)[1]
+        self.assertEqual(read("refresh-missing-response.json"), refreshed)
+        self.oauth("commit", vault="c1", nonce=nonce)
+        refreshed = self.oauth("refresh", vault="c1", connector=DEMO, client_id=CLIENT_ID,
+                               client_secret=CLIENT_SECRET)[1]
+        self.assertEqual(set(read("refresh-response.json")), set(refreshed))
 
     def test_routes_need_the_service_token(self):
         """Control Plane 토큰 없이 부르면 401 이다."""
