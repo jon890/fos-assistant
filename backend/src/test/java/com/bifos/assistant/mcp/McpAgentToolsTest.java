@@ -212,14 +212,13 @@ class McpAgentToolsTest {
                 .isTrue();
         assertThat(byName.get("agent_list")
             .path("inputSchema")
-            .path("additionalProperties")
-            .asBoolean())
+            .has("additionalProperties"))
                 .isFalse();
         JsonNode status = byName.get("agent_status").path("inputSchema");
         assertThat(status.path("properties").path("execution_id").path("type").asString())
             .isEqualTo("integer");
         assertThat(status.path("required").get(0).asString()).isEqualTo("execution_id");
-        assertThat(status.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(status.has("additionalProperties")).isFalse();
     }
 
 
@@ -814,7 +813,7 @@ class McpAgentToolsTest {
 
         assertThat(delegate).as("도구 목록: %s", listed).isNotNull();
         JsonNode schema = delegate.path("inputSchema");
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.has("additionalProperties")).isFalse();
         assertThat(schema.path("properties").path("agent_code").path("type").asString())
             .isEqualTo("string");
         assertThat(schema.path("properties").path("task").path("type").asString())
@@ -1114,7 +1113,7 @@ class McpAgentToolsTest {
 
         assertThat(stop).as("도구 목록: %s", listed).isNotNull();
         JsonNode schema = stop.path("inputSchema");
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.has("additionalProperties")).isFalse();
         assertThat(schema.path("properties").path("execution_id").path("type").asString())
             .isEqualTo("integer");
         assertThat(schema.path("required").get(0).asString()).isEqualTo("execution_id");
