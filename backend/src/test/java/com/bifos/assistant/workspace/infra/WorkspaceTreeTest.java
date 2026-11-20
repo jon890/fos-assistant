@@ -13,7 +13,6 @@ import com.bifos.assistant.workspace.domain.WorkspaceOpenedFile;
 import com.bifos.assistant.workspace.domain.WorkspacePath;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,7 +38,6 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /** 실행 공간을 읽을 때 링크와 특수 파일과 남의 공간을 어떻게 다루는지 실제 임시 디렉터리로 본다. */
 class WorkspaceTreeTest {
@@ -83,7 +81,7 @@ class WorkspaceTreeTest {
         "1002,true",
         "10000,true"
     })
-    @DisplayName("역순과 무작위 생성 목록을 secure와 대체 경로 모두 끝까지 누락과 중복 없이 탐색한다")
+    @DisplayName("역순과 무작위 생성 목록을 끝까지 누락과 중복 없이 탐색한다")
     void reachesEveryEntryInFullSortOrder(int count, boolean shuffled) throws IOException {
         List<WorkspaceEntry> expected = new ArrayList<>();
         List<Integer> order = new ArrayList<>(IntStream.range(0, count).boxed().toList());
@@ -114,26 +112,23 @@ class WorkspaceTreeTest {
             (WorkspaceEntry entry) -> entry.kind() != WorkspaceEntryKind.DIRECTORY)
             .thenComparing(WorkspaceEntry::name);
         expected.sort(sorted);
-        for (boolean checked : new boolean[] {false, true}) {
-            List<String> actual = new ArrayList<>();
-            String cursor = null;
-            int pages = 0;
-            do {
-                WorkspaceListing page = WorkspaceTree.list(
-                    owner, WorkspacePath.parse(""), 1_000, cursor, checked, () -> {
-                    }, System::nanoTime)
-                    .orElseThrow();
-                assertThat(page.entries()).hasSizeLessThanOrEqualTo(1_000);
-                assertThat(page.truncated()).isEqualTo(page.nextCursor() != null);
-                actual.addAll(page.entries().stream().map(WorkspaceEntry::name).toList());
-                cursor = page.nextCursor();
-                assertThat(++pages).isLessThanOrEqualTo(11);
-            } while (cursor != null);
-            assertThat(actual)
-                .containsExactlyElementsOf(
-                    expected.stream().map(WorkspaceEntry::name).toList());
-            assertThat(actual).doesNotHaveDuplicates();
-        }
+        List<String> actual = new ArrayList<>();
+        String cursor = null;
+        int pages = 0;
+        do {
+            WorkspaceListing page = WorkspaceTree.list(
+                owner, WorkspacePath.parse(""), 1_000, cursor, System::nanoTime)
+                .orElseThrow();
+            assertThat(page.entries()).hasSizeLessThanOrEqualTo(1_000);
+            assertThat(page.truncated()).isEqualTo(page.nextCursor() != null);
+            actual.addAll(page.entries().stream().map(WorkspaceEntry::name).toList());
+            cursor = page.nextCursor();
+            assertThat(++pages).isLessThanOrEqualTo(11);
+        } while (cursor != null);
+        assertThat(actual)
+            .containsExactlyElementsOf(
+                expected.stream().map(WorkspaceEntry::name).toList());
+        assertThat(actual).doesNotHaveDuplicates();
     }
 
 
@@ -206,20 +201,15 @@ class WorkspaceTreeTest {
     @DisplayName("시간 예산을 넘으면 일부 목록 대신 IOException으로 실패한다")
     void failsAtDeadlineWithoutPartialPage() throws IOException {
         Files.createFile(owner.resolve("a"));
-        for (boolean checked : new boolean[] {false, true}) {
-            AtomicLong clock = new AtomicLong();
-            assertThatThrownBy(() -> WorkspaceTree.list(
-                owner,
-                WorkspacePath.parse(""),
-                1,
-                null,
-                checked,
-                () -> {
-                },
-                () -> clock.getAndAdd(2_000_000_000L)))
-                    .isInstanceOf(IOException.class);
-            assertThat(list(owner, "").orElseThrow().entries()).hasSize(1);
-        }
+        AtomicLong clock = new AtomicLong();
+        assertThatThrownBy(() -> WorkspaceTree.list(
+            owner,
+            WorkspacePath.parse(""),
+            1,
+            null,
+            () -> clock.getAndAdd(2_000_000_000L)))
+                .isInstanceOf(IOException.class);
+        assertThat(list(owner, "").orElseThrow().entries()).hasSize(1);
     }
 
 
@@ -420,31 +410,6 @@ class WorkspaceTreeTest {
 
 
     @Test
-    @DisplayName("대체 경로에서 연 뒤 중간 디렉터리가 형제 공간 링크로 바뀌면 본문과 목록을 주지 않는다")
-    void rejectsFallbackReadWhenDirectoryIsSwappedToSiblingLink() throws IOException {
-        Path out = Files.createDirectory(owner.resolve("out"));
-        Files.writeString(out.resolve("secret.txt"), "own");
-        Files.writeString(out.resolve("mine.txt"), "own");
-        Files.createDirectory(sibling.resolve("private"));
-        Files.writeString(sibling.resolve("private/secret.txt"), "sibling secret");
-        Runnable swap = () -> swapToLink(out, sibling.resolve("private"));
-        WorkspacePath secret = WorkspacePath.parse("out/secret.txt");
-        WorkspacePath outDir = WorkspacePath.parse("out");
-
-        assertCode(() -> WorkspaceTree.open(owner, secret, true, swap), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
-        restore(out);
-        assertThat(WorkspaceTree.list(owner, outDir, 1_000, true, swap)).isEmpty();
-        restore(out);
-        assertThat(WorkspaceTree.stat(owner, secret, true, swap)).isEmpty();
-        restore(out);
-        assertThat(WorkspaceTree.list(owner, outDir, 1_000, true, () -> {
-        }))
-            .map(listing -> listing.entries().stream().map(WorkspaceEntry::name).toList())
-            .contains(List.of("mine.txt", "secret.txt"));
-    }
-
-
-    @Test
     @DisplayName("연 뒤 파일이 커져도 본문은 연 시점의 크기까지만 준다")
     void limitsBodyToSizeAtOpen() throws IOException {
         Path log = Files.writeString(owner.resolve("run.log"), "1234");
@@ -459,78 +424,71 @@ class WorkspaceTreeTest {
     }
 
 
-    @ParameterizedTest(name = "대체 경로 강제 = {0}")
-    @ValueSource(booleans = {true, false})
+    @Test
     @DisplayName("공간 밖을 가리키는 링크 파일은 LINK 이고 읽지 않는다")
-    void doesNotFollowFileLink(boolean checkedPath) throws IOException {
+    void doesNotFollowFileLink() throws IOException {
         Path outside = Files.writeString(root.resolve("outside.txt"), "outside");
         Files.createSymbolicLink(owner.resolve("link.txt"), outside);
 
-        WorkspaceEntry entry = list(owner, "", checkedPath).orElseThrow().entries().get(0);
+        WorkspaceEntry entry = list(owner, "").orElseThrow().entries().get(0);
 
         assertThat(entry.kind()).isEqualTo(WorkspaceEntryKind.LINK);
         assertThat(entry.readable()).isFalse();
         assertThat(entry.size()).isNull();
-        assertCode(() -> open(owner, "link.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertCode(() -> open(owner, "link.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
 
-    @ParameterizedTest(name = "대체 경로 강제 = {0}")
-    @ValueSource(booleans = {true, false})
+    @Test
     @DisplayName("형제 주인 디렉터리를 가리키는 링크 디렉터리 아래는 목록과 본문 모두 닿지 않는다")
-    void doesNotFollowDirectoryLinkToSibling(boolean checkedPath) throws IOException {
+    void doesNotFollowDirectoryLinkToSibling() throws IOException {
         Path link = Files.createSymbolicLink(owner.resolve("peek"), sibling);
 
-        WorkspaceListing top = list(owner, "", checkedPath).orElseThrow();
+        WorkspaceListing top = list(owner, "").orElseThrow();
         assertThat(top.entries()).extracting(WorkspaceEntry::name).containsExactly("peek");
         assertThat(top.entries().get(0).kind()).isEqualTo(WorkspaceEntryKind.LINK);
-        assertThat(list(owner, "peek", checkedPath)).isEmpty();
-        assertCode(() -> open(owner, "peek/secret.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
-        assertThat(WorkspaceTree.stat(owner, WorkspacePath.parse("peek/secret.txt"), checkedPath, () -> {
-        }))
-            .isEmpty();
+        assertThat(list(owner, "peek")).isEmpty();
+        assertCode(() -> open(owner, "peek/secret.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertThat(WorkspaceTree.stat(owner, WorkspacePath.parse("peek/secret.txt"))).isEmpty();
         assertThat(WorkspaceTree.isDirectoryNoFollow(link)).isFalse();
     }
 
 
-    @ParameterizedTest(name = "대체 경로 강제 = {0}")
-    @ValueSource(booleans = {true, false})
+    @Test
     @DisplayName("주인 디렉터리 자체가 링크면 비어 있다")
-    void refusesOwnerDirectoryLink(boolean checkedPath) throws IOException {
+    void refusesOwnerDirectoryLink() throws IOException {
         Path linkedOwner = Files.createSymbolicLink(root.resolve("u3"), sibling);
 
-        assertThat(list(linkedOwner, "", checkedPath)).isEmpty();
+        assertThat(list(linkedOwner, "")).isEmpty();
         assertThat(WorkspaceTree.isDirectoryNoFollow(linkedOwner)).isFalse();
-        assertCode(() -> open(linkedOwner, "secret.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertCode(() -> open(linkedOwner, "secret.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
 
-    @ParameterizedTest(name = "대체 경로 강제 = {0}")
-    @ValueSource(booleans = {true, false})
+    @Test
     @DisplayName("하드 링크가 둘 이상인 파일은 읽을 수 없다")
-    void refusesHardLinkedFile(boolean checkedPath) throws IOException {
+    void refusesHardLinkedFile() throws IOException {
         Path original = Files.writeString(owner.resolve("a.txt"), "shared");
         Files.createLink(owner.resolve("b.txt"), original);
 
-        assertThat(list(owner, "", checkedPath).orElseThrow().entries()).allSatisfy(entry -> {
+        assertThat(list(owner, "").orElseThrow().entries()).allSatisfy(entry -> {
             assertThat(entry.kind()).isEqualTo(WorkspaceEntryKind.FILE);
             assertThat(entry.readable()).isFalse();
         });
-        assertCode(() -> open(owner, "a.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_UNREADABLE);
+        assertCode(() -> open(owner, "a.txt"), ErrorCode.WORKSPACE_ENTRY_UNREADABLE);
     }
 
 
-    @ParameterizedTest(name = "대체 경로 강제 = {0}")
-    @ValueSource(booleans = {true, false})
+    @Test
     @Timeout(5)
     @DisplayName("FIFO 는 OTHER 이고 열지 않고 없는 것으로 답한다")
-    void refusesFifoWithoutBlocking(boolean checkedPath) throws Exception {
+    void refusesFifoWithoutBlocking() throws Exception {
         Path fifo = owner.resolve("pipe");
         Assumptions.assumeTrue(mkfifo(fifo), "mkfifo 가 없는 환경이다");
 
-        assertThat(list(owner, "", checkedPath).orElseThrow().entries().get(0).kind())
+        assertThat(list(owner, "").orElseThrow().entries().get(0).kind())
             .isEqualTo(WorkspaceEntryKind.OTHER);
-        assertCode(() -> open(owner, "pipe", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertCode(() -> open(owner, "pipe"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
 
@@ -579,42 +537,11 @@ class WorkspaceTreeTest {
     }
 
 
-    /** {@code checkedPath} 가 참이면 운영 이미지(musl)가 타는 대체 경로를 강제한다. */
-    private static Optional<WorkspaceListing> list(Path ownerDir, String path, boolean checkedPath) throws IOException {
-        return WorkspaceTree.list(ownerDir, WorkspacePath.parse(path), 1_000, checkedPath, () -> {
-        });
-    }
-
-
-    private static WorkspaceOpenedFile open(Path ownerDir, String path, boolean checkedPath) throws IOException {
-        return WorkspaceTree.open(ownerDir, WorkspacePath.parse(path), checkedPath, () -> {
-        });
-    }
-
-
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
             .isInstanceOf(ApiException.class)
             .extracting(ex -> ((ApiException)ex).code())
             .isEqualTo(expected);
-    }
-
-
-    /** 디렉터리를 옆으로 옮기고 그 자리에 링크를 둔다. 에이전트가 경로를 바꾸는 경쟁을 흉내 낸다. */
-    private void swapToLink(Path dir, Path target) {
-        try {
-            Files.move(dir, owner.resolve("out-before"));
-            Files.createSymbolicLink(dir, target);
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
-        }
-    }
-
-
-    /** 바꿔 둔 링크를 지우고 원래 디렉터리를 제자리로 돌린다. */
-    private void restore(Path dir) throws IOException {
-        Files.delete(dir);
-        Files.move(owner.resolve("out-before"), dir);
     }
 
 
