@@ -166,6 +166,27 @@ class ConnectorOAuthCheckTest {
 
 
     @Test
+    @DisplayName("갱신하는 사이 연결이 바뀌었으면 갱신이 성공해도 다시 연결 필요 표시와 끊김 알림을 그대로 둔다")
+    void recoveryKeepsANewerReconnectState() {
+        ConnectorConnection connection = connection(new ConnectionAuth("github", false));
+        stubRefresh(connection, Outcome.GRANT_REVOKED);
+        tokens.refresh(connection.id(), null);
+        // 갱신 응답을 기다리는 사이 다른 경로가 연결을 바꾼 것으로 본다(revision 이 바뀐다).
+        when(oauth.refresh(eq(connection.vault()), eq(CONNECTOR), any())).thenAnswer(call -> {
+            ConnectorConnection changed = connections.findById(connection.id()).orElseThrow();
+            changed.pending(clock.instant());
+            connections.save(changed);
+            return new Token(Outcome.OK, ACCESS_TOKEN, clock.instant().plus(Duration.ofHours(8)));
+        });
+
+        tokens.refresh(connection.id(), null);
+
+        assertThat(connections.findById(connection.id()).orElseThrow().fields().auth().reconnectRequired()).isTrue();
+        assertThat(notificationsOf(owner)).hasSize(1).allMatch(Notification::unread);
+    }
+
+
+    @Test
     @DisplayName("서비스가 갱신을 거절하면 확인 도구를 부르지 않고 자격 거절로 끝내며 다시 연결 필요로 남는다")
     void grantRevokedSkipsTheVerifyTool() {
         ConnectorConnection connection = connection(new ConnectionAuth("github", false));
