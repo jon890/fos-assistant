@@ -24,4 +24,10 @@ final class DeployCheckItems {
 
     static final String MEMORY_CONTENT = "평가 사용자가 좋아하는 색은 청록이다.";
 
+    /** 기억 읽기 확인이 답에서 찾는 낱말이다. */
+    static final String MEMORY_FACT = "청록";
+
+    /** 원본 사진 조회 확인의 합성 사진에 심은 글자다. 문항 글은 이 글자를 말하지 않는다. */
+    static final String PHOTO_MARKER = "QX-7319";
+
 }

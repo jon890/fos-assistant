@@ -26,7 +26,7 @@
   판정은 이 값만 읽는다. turn 이 여럿이면 실패·시간 초과·승인 카드는 어느 turn 하나라도 해당하면 그 까닭으로 판정한다. 기능 규칙의 답 글은 마지막 사용자 turn(사진은 둘째, 위임은 자동 turn 이 아닌 사용자 turn 의 트리와 자동 turn 의 성공)으로 본다. 예약 작업 발화는 상태가 `SUCCEEDED` 이고 `taskRunExecutionId` 가 있어야 통과다. 상태 이름 비교는 문자열 상수로 한다(다른 패키지 enum 을 import 하지 않는다).
 - 출처 절 규칙은 `test/model-eval/answer/score.ts` 의 `sourceLinks` 와 같은 뜻으로 Java 로 옮긴다: 답 끝 「출처」 절(「출처」 가 든 제목 줄이나 「출처」 로 시작하는 줄 뒤)의 마크다운 링크와 맨 주소를 센다. 절 밖 링크는 세지 않는다. 그 파일의 단위 테스트(`test/model-eval/answer/answer-eval-score.test.ts`)의 출처 사례를 같은 기대값으로 옮긴다.
 - 결과는 `FeatureVerdict(FeatureStatus status, String reasonCode)`. 까닭 코드는 `quality/domain/type/CheckReason.java` enum 으로 둔다: 공통 `TIMED_OUT`, `RUN_FAILED`, `HERMES_TIMEOUT`, `APPROVAL_REQUESTED`, `BUSY`, `INTERRUPTED` 와 기능 규칙 `NO_SEARCH`, `NO_SOURCES`, `NO_CHILD`, `CHILD_FAILED`, `NOT_DELIVERED`, `NO_VAULT_ROW`, `NO_IMAGE`, `FACT_MISSING`, `TASK_NOT_SUCCEEDED`, `NO_INSPECT`, `MARKER_MISSING`. 판정 순서: `timedOut` 이면 `TIMED_OUT`, 오류 코드가 `HERMES_RUN_TIMEOUT` 이면 `HERMES_TIMEOUT`(상태는 `TIMED_OUT`), `USER_BUSY`·`CONVERSATION_BUSY` 면 `BUSY`, 그 밖의 실패면 `RUN_FAILED`, 승인 카드면 `APPROVAL_REQUESTED`, 그다음 기능 규칙. `BUSY` 와 `INTERRUPTED` 는 실행기가 직접 적을 때도 쓴다.
-- 미리 넣는 기억의 제목·본문·확인 낱말과 합성 사진의 심은 글자, 기능별 문항 글은 `quality/application/DeployCheckItems.java` 의 상수로 둔다. **이 클래스는 package-private `final` 클래스**다(`application` 직하의 빈이 아닌 public 클래스는 `PackageLayoutRules` 가 막는다). phase 2 의 `EvaluationUserService` 가 같은 패키지라 기억 상수를 그대로 쓴다. phase 2 가 먼저 돌면 기억 상수를 그 서비스 안에 두었다가 이 phase 에서 옮긴다.
+- 미리 넣는 기억의 제목·본문·확인 낱말과 합성 사진의 심은 글자, 기능별 문항 글은 `quality/application/DeployCheckItems.java` 의 상수로 둔다. **이 클래스는 package-private `final` 클래스**다(`application` 직하의 빈이 아닌 public 클래스는 `PackageLayoutRules` 가 막는다). phase 2 가 이 클래스를 만들고 평가 사용자 고정 값을 둔다. 이 phase 는 판정이 쓰는 사진 글자와 기억 확인 낱말을 더한다.
 
 ## 의도 메모
 
@@ -61,12 +61,11 @@ cd backend && ./gradlew archTest
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/quality/application/DeployCheckJudge.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/quality/application/DeployCheckItems.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/quality/application/DeployCheckItems.java` | 수정 (사진 글자, 기억 확인 낱말) |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/CheckObservation.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/FeatureVerdict.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/TurnObservation.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/ToolObservation.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/application/dto/ChildObservation.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/quality/domain/type/CheckReason.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/quality/application/EvaluationUserService.java` | 수정 (기억 상수를 DeployCheckItems 로 옮김) |
 | `backend/src/test/java/com/bifos/assistant/quality/application/DeployCheckJudgeTest.java` | 신규 |
