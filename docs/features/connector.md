@@ -354,6 +354,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 | 잠근 뒤 그 에이전트의 주인이 바뀌었다 | `AGENT_BUSY` |
 | 지금 주인이 관리자와 같은 그룹이 아니다 | `AGENT_NOT_FOUND`. 403 과 404 가 갈리면 다른 그룹의 에이전트 코드가 있는지 드러난다 |
 | 바인딩의 재시작 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었다 | `CONNECTOR_RESTART_AGAIN`. 관리자가 목록을 본 뒤에 다시 설치돼 재시작한 gateway 가 아직 보지 못했을 수 있다 |
+| 재시작 대기 줄(껐다 켜기 단계가 아니다)이고, 잠그기 전에 읽은 gateway 기동 시각이 대기 시각보다 2초 넘게 늦지 않다 | `CONNECTOR_RESTART_NOT_DONE`. 아무것도 바꾸지 않는다. 재시작 없이 눌러 옛 값으로 `READY` 가 되는 것을 막는다. 기동 시각을 읽지 못하면 이 확인을 건너뛰고 지금처럼 진행한다 |
 | 바인딩에 재시작 시각이 없다 | 본문을 보지 않는다. 재시작이 필요 없던 바인딩의 다시 확인이다 |
 | 반영 맞추기 뒤에도 `READY` 가 아니다 | 바인딩 상태를 커밋한 뒤 까닭별 오류로 끝낸다. 외부 호출 실패만 `CONNECTOR_OPERATION_FAILED` 이고, 대응은 `ConnectorErrors.notApplied` 가 갖는다 |
 

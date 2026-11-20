@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -37,6 +38,8 @@ import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ProbeRe
 import com.bifos.assistant.hermes.application.port.HermesGatewayClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
@@ -318,6 +321,89 @@ class ConnectorGatewayRestartTest {
 
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(bindingOf(agent).restartRequired()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("재시작 대기 줄의 다시 확인은 그 대기 뒤에 gateway 가 뜨지 않았으면 아무것도 바꾸지 않고 거절한다")
+    void confirmRejectsWithoutRestart() {
+        CurrentUser admin = user(UserRole.ADMIN);
+        Agent agent = bindWaiting();
+        ConnectorBinding waiting = bindingOf(agent);
+        Instant since = waiting.restartRequiredSince();
+        clearInvocations(connector);
+        stubInstall(UNCHANGED);
+
+        for (Instant startedAt : List.of(since.minusSeconds(60), since.plusSeconds(2))) {
+            when(gateway.startedAt()).thenReturn(Optional.of(startedAt));
+            assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, since))
+                .isInstanceOfSatisfying(ApiException.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RESTART_NOT_DONE));
+        }
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        ConnectorBinding after = bindingOf(agent);
+        assertThat(after.restartRequired()).isTrue();
+        assertThat(after.updatedAt()).isEqualTo(waiting.updatedAt());
+    }
+
+
+    @Test
+    @DisplayName("재시작 대기 줄의 다시 확인은 대기 뒤에 gateway 가 떴거나 기동 시각을 모르면 지금처럼 다시 맞춰 READY 가 된다")
+    void confirmProceedsAfterRestartOrWhenUnknown() {
+        CurrentUser admin = user(UserRole.ADMIN);
+        Agent restarted = bindWaiting();
+        Agent unknown = bindWaiting();
+        stubInstall(UNCHANGED);
+        clock.advance(Duration.ofMinutes(1));
+
+        when(gateway.startedAt()).thenReturn(Optional.of(clock.instant()));
+        service.confirmApplied(admin, restarted.code(), DEMO, bindingOf(restarted).restartRequiredSince());
+        when(gateway.startedAt()).thenReturn(Optional.empty());
+        service.confirmApplied(admin, unknown.code(), DEMO, bindingOf(unknown).restartRequiredSince());
+
+        assertThat(bindingOf(restarted).status()).isEqualTo(BindingStatus.READY);
+        assertThat(bindingOf(unknown).status()).isEqualTo(BindingStatus.READY);
+    }
+
+
+    @Test
+    @DisplayName("재시작 감지가 실패 표시를 남긴 바인딩은 대기 뒤에 gateway 가 떴으면 다시 확인이 READY 로 만들고 표시를 비운다")
+    void confirmClearsFailureAfterRestart() {
+        CurrentUser admin = user(UserRole.ADMIN);
+        Agent agent = bindWaiting();
+        clock.advance(Duration.ofMinutes(1));
+        when(gateway.startedAt()).thenReturn(Optional.of(clock.instant()));
+        stubInstall(UNCHANGED);
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
+        applier.runScheduled();
+        assertThat(bindingOf(agent).applyFailedAt()).isNotNull();
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        service.confirmApplied(admin, agent.code(), DEMO, bindingOf(agent).restartRequiredSince());
+
+        ConnectorBinding ready = bindingOf(agent);
+        assertThat(ready.status()).isEqualTo(BindingStatus.READY);
+        assertThat(ready.applyFailedAt()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("껐다 켜기 단계의 바인딩은 재시작 대기여도 기동 시각으로 거절하지 않고 그 단계의 다음 설치를 보낸다")
+    void confirmInCycleIgnoresGatewayStart() {
+        CurrentUser admin = user(UserRole.ADMIN);
+        Agent agent = bindWaiting();
+        ConnectorBinding waiting = bindingOf(agent);
+        jdbc.update("UPDATE agent_connector_binding SET cycle_phase = 'OFF', cycle_at = ? WHERE id = ?",
+            Timestamp.from(T0), waiting.id());
+        when(gateway.startedAt()).thenReturn(Optional.of(T0.minus(Duration.ofHours(1))));
+        clearInvocations(connector);
+        stubInstall(UNCHANGED);
+
+        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, waiting.restartRequiredSince()))
+            .isInstanceOfSatisfying(ApiException.class,
+                ex -> assertThat(ex.code()).isNotEqualTo(ErrorCode.CONNECTOR_RESTART_NOT_DONE));
+        verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
 

@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에는 붙이거나 떼지 못한다.
  * 재시작 없이 반영될 설치는 반영 예정 시각이 지나면 {@link ConnectorBindingApplier#applyDue()} 가 스스로
- * 확인한다(ADR-20261007 / connector-live-reload). 관리자는 재시작이 필요한 바인딩만 공유 gateway 를 재시작한 뒤 반영 완료를 누른다. 붙이기와 떼기,
+ * 확인한다(ADR-20261007 / connector-live-reload). 관리자는 자동 반영이 실패한 바인딩만 다시 확인한다(ADR-20261120). 붙이기와 떼기,
  * 반영 완료, 예약 확인은 사용자 행을 먼저, 에이전트 행을 다음에 잠근다. 공개 범위 변경과 관리자 수정도 같은 에이전트 행을
  * 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
  *
@@ -73,6 +73,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final SkillPublisher skills;
     private final ConnectorActionService approvals;
     private final ConnectorInstallAttempts attempts;
+    private final ConnectorGatewayRestarts restarts;
     private final Clock clock;
 
 
@@ -101,6 +102,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         SkillPublisher skills,
         ConnectorActionService approvals,
         ConnectorInstallAttempts attempts,
+        ConnectorGatewayRestarts restarts,
         Clock clock) {
         this.bindings = bindings;
         this.connections = connections;
@@ -110,6 +112,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.skills = skills;
         this.approvals = approvals;
         this.attempts = attempts;
+        this.restarts = restarts;
         this.clock = clock;
     }
 
@@ -193,7 +196,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /** 소유자와 에이전트를 잠근 뒤 새 바인딩과 설치 입력을 함께 커밋한다. */
     private Bound bindLocked(CurrentUser user, String agentCode, String connectorId,
         Optional<ConnectorManifest> manifest, String profile, Set<String> taken) {
-        lockUser(user.id());
+        attempts.lockOwner(user.id());
         Agent agent = requireOwned(user, agentCode, true);
         if (agent.visibility() != AgentVisibility.PRIVATE) {
             throw new ApiException(
@@ -232,7 +235,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      */
     @Transactional
     public void unbind(CurrentUser user, String agentCode, String connectorId) {
-        lockUser(user.id());
+        attempts.lockOwner(user.id());
         Agent agent = requireOwned(user, agentCode, true);
         Optional<ConnectorConnection> connection = connections.findByUserIdAndConnectorId(user.id(), connectorId);
         Optional<ConnectorBinding> binding = connection.flatMap(found -> bindings.findByAgentIdAndConnectionId(agent.id(), found.id()));
@@ -250,11 +253,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
 
 
     /**
-     * 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 그 에이전트의 주인이 같은 그룹이어야 한다.
+     * 자동 반영이 실패했을 때 관리자가 누르는 다시 확인이다. 그 에이전트의 주인이 같은 그룹이어야 한다.
      *
-     * <p>{@code shownSince} 는 관리자 목록에 보였던 그 바인딩의 재시작 대기 시작 시각이다. 바인딩의 값이 그보다 늦으면 관리자가
-     * 재시작한 뒤에 다시 설치된 것이라 대기를 풀지 않고 거절한다. 두 값이 모두 비었으면 같은 값으로 본다. 마이그레이션이 채우지
-     * 못한 옛 바인딩이다. 같으면 설치를 한 번 다시 보내 반영됐는지 본다.
+     * <p>{@code shownSince} 는 관리자 목록에 보였던 그 바인딩의 재시작 대기 시작 시각이다. 바인딩의 값이 그보다 늦으면 관리자가 본 뒤에
+     * 다시 설치된 것이라 거절한다. 두 값이 모두 비었으면 같은 값으로 본다. 재시작 대기 줄은 잠그기 전에 읽은 gateway 기동 시각이 그
+     * 대기보다 늦지 않으면 {@code CONNECTOR_RESTART_NOT_DONE} 으로 거절한다. 그 밖이면 설치를 한 번 다시 보내 반영됐는지 본다.
      *
      * <p>반영을 확인한 때만 대기를 푼다. 설치를 다시 보냈는데 configured 나 probe 가 실패하면 {@code PENDING} 과 재시작
      * 대기로 남고, 그 상태를 커밋한 뒤 연결 실패로 끝낸다.
@@ -279,7 +282,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw agentNotFound();
         }
         Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
-        Confirmed confirmed = attempts.start(() -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince, manifest));
+        Optional<Instant> startedAt = restarts.readStartedAt();
+        Confirmed confirmed = attempts.start(
+            () -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince, manifest, startedAt));
         if (confirmed == null) {
             throw new ConnectorOperationFailure();
         }
@@ -297,8 +302,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      *
      * @return 결과 트랜잭션에서 대조할 설치 입력과 manifest
      */
-    private Confirmed confirmLocked(
-        CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince, Optional<ConnectorManifest> manifest) {
+    private Confirmed confirmLocked(CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince,
+        Optional<ConnectorManifest> manifest, Optional<Instant> startedAt) {
         AppUser owner = users.findByIdForUpdate(ownerId).orElse(null);
         Agent agent = agents.findByIdForUpdate(agentId)
             .filter(candidate -> !candidate.isDeleted())
@@ -323,6 +328,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(
                 ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
+        restarts.requireRestarted(binding, startedAt);
         return new Confirmed(attempts.begin(binding, manifest, true, true, false, now()), manifest.orElse(null));
     }
 
@@ -424,7 +430,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /** 결과가 버려졌거나 그 사이 떼어진 바인딩도 지금 상태로 응답한다. */
     private AgentConnectionView currentView(Long ownerId, Long agentId, String connectorId, ConnectorManifest manifest) {
         return attempts.start(() -> {
-            lockUser(ownerId);
+            attempts.lockOwner(ownerId);
             Agent agent = agents.findByIdForUpdate(agentId).filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(ConnectorBindingService::agentNotFound);
             if (!Objects.equals(agent.ownerUserId(), ownerId)) {
@@ -455,11 +461,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(ErrorCode.FORBIDDEN, "only the owner can manage connections of this agent");
         }
         return agent;
-    }
-
-
-    private void lockUser(Long userId) {
-        attempts.lockOwner(userId);
     }
 
 

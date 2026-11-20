@@ -9,6 +9,8 @@ import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.port.HermesGatewayClient;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -91,6 +93,27 @@ public class ConnectorGatewayRestarts {
             }
         }
         return applied;
+    }
+
+
+    /** 관리자 다시 확인이 잠그기 전에 기동 시각을 읽는다. 요청 스레드가 부르므로 예약 작업의 로그 상태를 바꾸지 않는다. */
+    public Optional<Instant> readStartedAt() {
+        return gateway.startedAt();
+    }
+
+
+    /**
+     * 재시작 대기 줄을 다시 확인하기 전에 그 대기 뒤에 gateway 가 다시 떴는지 본다(스펙 DECISION19). 기동 시각을 모르면 지금처럼 진행한다.
+     * 껐다 켜기 단계는 재시작이 아니라 그 단계의 다음 설치로 풀리므로 보지 않는다.
+     *
+     * @throws ApiException {@code CONNECTOR_RESTART_NOT_DONE}. 아무것도 바꾸지 않게 시작 트랜잭션 안에서 부른다
+     */
+    public void requireRestarted(ConnectorBinding binding, Optional<Instant> startedAt) {
+        Instant since = binding.restartRequiredSince();
+        if (binding.restartRequired() && binding.cyclePhase() == null && since != null && startedAt.isPresent()
+            && !restartedAfter(since, startedAt.get())) {
+            throw new ApiException(ErrorCode.CONNECTOR_RESTART_NOT_DONE, "the shared gateway has not restarted since the wait");
+        }
     }
 
 
