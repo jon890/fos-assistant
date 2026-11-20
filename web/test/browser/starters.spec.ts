@@ -1,5 +1,6 @@
 import { FAKE_STARTER_PROMPTS } from "../../../test/e2e/fake-hermes.ts";
 import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import { expectPickedAgent, pickAgent } from "./helpers.ts";
 
 const STARTERS_PATTERN = "**/api/agents/*/starters";
 
@@ -57,7 +58,7 @@ test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다
     return box!.y;
   };
   await page.goto("/new");
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
 
   // 읽는 중일 때의 자리 표시가 보이는 동안의 위치를 기준으로 삼는다.
   await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toBeVisible();
@@ -67,7 +68,7 @@ test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다
   expect(await composerTop(), "칩이 나타난 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
 
   // 추천이 없는 에이전트로 바꿔 칩이 사라져도 같은 자리다.
-  await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
+  await pickAgent(page, "성격 비서");
   await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toHaveCount(0);
   expect(await composerTop(), "칩이 사라진 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
@@ -108,9 +109,9 @@ test("에이전트를 바꾸면 늦게 온 이전 에이전트의 추천은 그�
     firstFulfilled();
   });
   await page.goto("/new");
-  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expectPickedAgent(page, "브라우저 비서");
 
-  await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
+  await pickAgent(page, "성격 비서");
   await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
 
   releaseFirst();

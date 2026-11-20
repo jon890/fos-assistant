@@ -177,7 +177,7 @@ final class ArtifactPathPolicy {
     }
 
 
-    private static List<String> writableParts(String relativePath) {
+    static List<String> writableParts(String relativePath) {
         if (relativePath == null
             || relativePath.isBlank()
             || relativePath.length() > 500
@@ -221,17 +221,6 @@ final class ArtifactPathPolicy {
             throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
         }
         return realChild;
-    }
-
-
-    static void verifyParent(Path parent, Path folder) throws IOException {
-        if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(parent)) {
-            throw storeFailure(new IOException("artifact parent is not a directory"));
-        }
-        Path realParent = parent.toRealPath();
-        if (!realParent.startsWith(folder)) {
-            throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
-        }
     }
 
 
