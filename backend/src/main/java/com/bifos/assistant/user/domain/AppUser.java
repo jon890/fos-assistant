@@ -79,9 +79,8 @@ public class AppUser extends AuditedEntity {
     @Column(name = "purchase_limit_daily_krw", nullable = false, insertable = false, updatable = false)
     private Long purchaseLimitDailyKrw;
 
-    // 결과물 자동 보관을 켰는지다(#530). DB 기본값이 켜짐이고, 비어 있으면 ArtifactAutoVaultSetting 의 기본값을 따른다.
-    // 상한처럼 일반 저장이 옛 값으로 덮지 않도록 넣기와 고치기에서 빼고 AppUserRepository 의 전용 쿼리로만 읽고 쓴다.
-    // 검사의 create-drop 스키마도 마이그레이션처럼 켜짐을 기본값으로 두도록 적는다.
+    // 옛 「결과물 자동 보관」 설정이다(#530). 스위치를 없애 더 읽거나 쓰지 않는다(스펙 workspace REQ16).
+    // 칸은 마이그레이션에 남아 있어 검사의 create-drop 스키마가 같은 칸을 갖도록 매핑만 둔다. 넣기와 고치기에서 뺀다.
     @ColumnDefault("true")
     @Column(name = "artifact_auto_vault", insertable = false, updatable = false)
     private Boolean artifactAutoVault;

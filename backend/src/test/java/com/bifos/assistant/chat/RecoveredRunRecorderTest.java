@@ -42,7 +42,6 @@ import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
-import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
@@ -131,9 +130,6 @@ class RecoveredRunRecorderTest {
 
     @Autowired
     HermesRunsClient hermes;
-
-    @Autowired
-    ArtifactAutoVaultSetting autoVaultSetting;
 
     @Autowired
     TrackingBackgroundTasks backgroundTasks;
@@ -353,9 +349,8 @@ class RecoveredRunRecorderTest {
 
 
     @Test
-    @DisplayName("자동 보관을 켠 요청자의 복구 turn 은 완료일 때만 묶은 결과물을 보관한다")
+    @DisplayName("요청자의 복구 turn 은 완료일 때만 묶은 결과물을 보관한다")
     void recoveredTurnKeepsArtifactsOnlyWhenCompleted() throws Exception {
-        autoVaultSetting.change(dad.id(), true);
         Path folder = Path.of(artifactProperties.root()).toAbsolutePath().resolve(String.valueOf(conversation.id()));
         deleteTree(folder);
         Path done = folder.resolve("done.html");
