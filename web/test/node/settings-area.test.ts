@@ -19,7 +19,7 @@ test("설정 묶음은 넷이고 예약 작업과 기억은 들지 않는다", (
 });
 
 test("설정 화면들과 실행 하나의 화면은 설정 틀이고 대화 쪽 화면은 아니다", () => {
-  for (const pathname of ["/settings", "/agents", "/agents/browser/skills/new", "/connections/x", "/browser", "/files", "/usage", "/dev-docs/docs/prd.md", "/executions/12"])
+  for (const pathname of ["/settings", "/agents", "/agents/browser/skills/new", "/connections/x", "/browser", "/files", "/files/workspace", "/usage", "/dev-docs/docs/prd.md", "/executions/12"])
     assert.equal(isSettingsArea(pathname, true), true, pathname);
   for (const pathname of ["/", "/new", "/chat/abc", "/now", "/tasks", "/tasks/1", "/memory", "/notifications", "/admin/usage", "/agentsx"])
     assert.equal(isSettingsArea(pathname, true), false, pathname);

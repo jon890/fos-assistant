@@ -110,7 +110,7 @@ class McpFinancialLimitToolsTest {
         JsonNode change = StreamSupport.stream(tools.spliterator(), false)
             .filter(tool -> "order_limit_change".equals(tool.path("name").asString())).findFirst().orElseThrow();
         assertThat(change.path("inputSchema").path("required").toString()).isEqualTo("[\"name\",\"value\"]");
-        assertThat(change.path("inputSchema").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(change.path("inputSchema").has("additionalProperties")).isFalse();
     }
 
 

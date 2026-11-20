@@ -22,7 +22,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
-import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
@@ -56,9 +55,6 @@ class ArtifactAutoVaultTest {
 
     @Autowired
     ArtifactVaultService vault;
-
-    @Autowired
-    ArtifactAutoVaultSetting setting;
 
     @Autowired
     ArtifactStore store;
@@ -103,7 +99,6 @@ class ArtifactAutoVaultTest {
             code, "공용", code, "http://agent-runtime.test/p/" + code,
             CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, dad.id()));
         momConversation = conversation(mom, shared.id());
-        setting.change(mom.id(), true);
     }
 
 
@@ -116,24 +111,17 @@ class ArtifactAutoVaultTest {
 
 
     @Test
-    @DisplayName("고른 적이 없는 사용자도 자동 보관이 켜져 있고 끈 사용자의 결과물은 보관하지 않는다")
-    void onByDefaultAndSkipsWhenTurnedOff() throws Exception {
-        assertThat(setting.isEnabled(dad.id())).isEqualTo(ArtifactAutoVaultSetting.DEFAULT_ENABLED).isTrue();
-        assertThat(jdbc.queryForObject("select artifact_auto_vault from app_user where id = ?", Boolean.class, dad.id()))
-            .as("새 사용자의 칸은 DB 기본값으로 켜짐이다")
-            .isTrue();
+    @DisplayName("자동 보관을 꺼 두었던 사용자도 새 답이 끝나면 그 결과물이 내 파일에 들어간다")
+    void keepsEvenForUserWhoTurnedItOff() throws Exception {
+        // 옛 스위치로 꺼 둔 사용자다. 스위치를 없앤 뒤에는 이 칸을 읽지 않는다(스펙 workspace REQ16).
+        jdbc.update("update app_user set artifact_auto_vault = false where id = ?", dad.id());
         Conversation dadConversation = conversation(dad, null);
         ChatArtifact kept = answerWithFile(dadConversation, "kept.html");
+
         autoVault.afterCompletedTurn(dadConversation.id(), kept.messageId());
         awaitBackground();
+
         assertThat(state(kept)).isEqualTo(AutoVaultState.DONE);
-
-        setting.change(dad.id(), false);
-        ChatArtifact skipped = answerWithFile(dadConversation, "skipped.html");
-        autoVault.afterCompletedTurn(dadConversation.id(), skipped.messageId());
-        awaitBackground();
-
-        assertThat(state(skipped)).isNull();
         assertThat(vault.list(dad.id())).extracting(ArtifactVaultItem::path).containsExactly("kept.html");
     }
 
@@ -212,7 +200,6 @@ class ArtifactAutoVaultTest {
     @Test
     @DisplayName("그룹 공개 에이전트를 쓴 대화의 결과물은 요청자에게만 보관한다")
     void keepsOnlyForRequester() throws Exception {
-        setting.change(dad.id(), true);
         ChatArtifact row = answerWithFile(momConversation, "page.html");
 
         autoVault.afterCompletedTurn(momConversation.id(), row.messageId());

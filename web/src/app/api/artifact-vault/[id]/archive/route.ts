@@ -20,7 +20,7 @@ export async function GET(
   if (!/^\d+$/.test(id))
     return errorResponse(
       "VALIDATION_FAILED",
-      "보관한 결과물 번호가 올바르지 않아요.",
+      "내 파일 번호가 올바르지 않아요.",
       400,
     );
   const opened = await forwardControlPlane(

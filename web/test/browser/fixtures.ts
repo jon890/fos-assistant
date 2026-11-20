@@ -37,7 +37,8 @@ const { expect, test: base } = playwright;
 
 const ROOT = join(import.meta.dirname, "../../..");
 const SESSION_COOKIE = "authjs.session-token";
-const HEALTH_TIMEOUT_MS = 90_000;
+// 캐시가 없는 CI 에서는 Gradle 컴파일과 마이그레이션도 포함한다. 준비되면 즉시 다음으로 간다.
+const HEALTH_TIMEOUT_MS = 180_000;
 const HERMES_CONTROL_PATH = join(
   tmpdir(),
   `fos-assistant-browser-hermes-${RUN_ID}.url`,

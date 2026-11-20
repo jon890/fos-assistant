@@ -122,7 +122,7 @@ class McpFollowUpToolTest {
 
 
     @Test
-    @DisplayName("도구 목록에 follow_up_propose가 하나 있고 title만 필수이며 모르는 키를 받지 않는다")
+    @DisplayName("도구 목록에 follow_up_propose가 하나 있고 title만 필수이며 실행 맥락을 허용한다")
     void listsFollowUpProposeSchema() throws Exception {
         JsonNode listed = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
 
@@ -135,8 +135,7 @@ class McpFollowUpToolTest {
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         JsonNode schema = tool.path("inputSchema");
         assertThat(schema.path("required").toString()).isEqualTo("[\"title\"]");
-        assertThat(schema.path("additionalProperties").isBoolean()).isTrue();
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.has("additionalProperties")).isFalse();
         assertThat(schema.path("properties").path("title").path("maxLength").asInt())
             .isEqualTo(200);
     }

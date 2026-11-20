@@ -361,7 +361,7 @@ v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../.
 
 | 확인 | 결과 |
 | --- | --- |
-| hook 이 넣은 키가 MCP `arguments` 에 도착한다 | 도착한다. Hermes 는 hook 이 더한 키를 도구 입력 규격으로 검증하지 않는다 |
+| hook 이 넣은 키가 MCP `arguments` 에 도착한다 | v0.21.5에서는 도착했다. v0.23.2는 루트가 `additionalProperties: false`인 도구의 선언되지 않은 키를 호출 전에 거절하므로, Control Plane 카탈로그는 루트의 이 제한을 제거한다([입력 스키마 계약](../../docs/hermes-contract.md#mcp-입력-스키마와-실행-맥락)) |
 | 모델이 같은 키를 넣었을 때 | hook 의 값이 이긴다 |
 | hook 에서 그 profile 의 비밀값 읽기 | `get_secret` 으로 scope 오류 없이 읽힌다 |
 | 같은 profile 에서 run 둘을 동시에 | 호출마다 자기 run 의 session 이 붙고 섞이지 않는다 |

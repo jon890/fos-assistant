@@ -10,7 +10,6 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,7 +42,6 @@ public class ArtifactAutoVault {
     private final ChatArtifactWriter writer;
     private final ArtifactVaultService vault;
     private final ConversationRepository conversations;
-    private final ArtifactAutoVaultSetting setting;
     private final BackgroundTasks backgroundTasks;
     private final AtomicBoolean sweeping = new AtomicBoolean();
 
@@ -51,7 +49,7 @@ public class ArtifactAutoVault {
     /**
      * 완료한 turn 의 답에 묶인 결과물을 자동 보관 차례에 두고 요청 밖에서 보관을 시작한다.
      *
-     * <p>요청자가 자동 보관을 끄면 아무것도 하지 않는다. 밖으로 던지지 않는다. 답은 이미 저장됐고 turn 은 그대로 끝나야 한다.
+     * <p>대화 주인이 없으면 아무것도 하지 않는다. 사용자가 끌 수 있는 설정은 없다(스펙 workspace REQ16). 밖으로 던지지 않는다. 답은 이미 저장됐고 turn 은 그대로 끝나야 한다.
      */
     public void afterCompletedTurn(Long conversationId, Long messageId) {
         if (messageId == null) {
@@ -59,7 +57,7 @@ public class ArtifactAutoVault {
         }
         try {
             Long owner = ownerOf(conversationId).orElse(null);
-            if (owner == null || !setting.isEnabled(owner)) {
+            if (owner == null) {
                 return;
             }
             if (writer.markAutoVaultPending(messageId) == 0) {
@@ -135,7 +133,7 @@ public class ArtifactAutoVault {
      * 사용자가 「다시 보관」 을 누른 결과물을 지금 보관하고 끝난 상태를 준다. 대화 주인 확인은 부르는 쪽이 한다.
      *
      * <p>실패한 줄만 처음 차례로 되돌린다. 다른 상태면 그 상태를 그대로 준다. 사용자가 고른 것이라 지운 같은 보관본도 다시
-     * 만든다. 자동 보관을 꺼도 다시 보관할 수 있다.
+     * 만든다.
      */
     public ArtifactAutoVaultStatus retry(Long conversationId, Long messageId, String path) {
         ChatArtifact row = rows.findByMessageIdAndPathAndVaultUserIdIsNull(messageId, path)
