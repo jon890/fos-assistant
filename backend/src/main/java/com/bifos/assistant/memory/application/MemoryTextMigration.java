@@ -21,6 +21,7 @@ import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -40,7 +41,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Component
+@Order(MemoryTextMigration.ORDER)
 public class MemoryTextMigration implements ApplicationRunner {
+
+    /** 기동 이관의 차례다. 요약 이관({@link MemorySummaryBackfill#ORDER})보다 먼저 돈다. 평문 줄에 요약 암호문이 먼저 쓰이지 않게 한다. */
+    public static final int ORDER = 100;
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
@@ -206,7 +211,7 @@ public class MemoryTextMigration implements ApplicationRunner {
         if (row == null || row.dataKeyId() != null) {
             return null;
         }
-        MemoryText plain = rewrite(row.stored(), row.readable(), row::title, row::content, row::seal);
+        MemoryText plain = rewrite(row.stored(), row.readable(), row::title, row::content, row::summary, row::seal);
         memories.saveAndFlush(row);
         verify(row.stored(), plain);
         return true;
@@ -218,7 +223,7 @@ public class MemoryTextMigration implements ApplicationRunner {
         if (row == null || row.dataKeyId() != null) {
             return null;
         }
-        MemoryText plain = rewrite(row.stored(), row.readable(), row::title, row::content, row::seal);
+        MemoryText plain = rewrite(row.stored(), row.readable(), row::title, row::content, row::summary, row::seal);
         revisions.saveAndFlush(row);
         verify(row.stored(), plain);
         return true;
@@ -230,12 +235,15 @@ public class MemoryTextMigration implements ApplicationRunner {
         boolean readable,
         Supplier<String> title,
         Supplier<String> content,
+        Supplier<String> summary,
         Consumer<SealedMemoryText> seal) {
         if (!readable) {
             throw new IllegalStateException("the memory text cannot be opened");
         }
-        MemoryText plain = new MemoryText(title.get(), content.get());
-        seal.accept(texts.seal(where, plain.title(), plain.content()).orElseThrow());
+        MemoryText plain = new MemoryText(title.get(), content.get(), summary.get());
+        // 이관 전 요약(NULL)은 NULL 로 둔다. 빈 글을 적으면 요약 이관이 그 줄을 다시 보지 않는다
+        String sealedSummary = where.summary() == null ? null : plain.summary();
+        seal.accept(texts.seal(where, plain.title(), plain.content(), sealedSummary).orElseThrow());
         return plain;
     }
 
@@ -248,7 +256,8 @@ public class MemoryTextMigration implements ApplicationRunner {
     private void verify(StoredMemoryText sealed, MemoryText plain) {
         MemoryText reopened = texts.open(sealed).orElseThrow(() -> new IllegalStateException("the rewritten text cannot be opened"));
         if (!Objects.equals(Sha256.hex(reopened.title()), Sha256.hex(plain.title()))
-            || !Objects.equals(Sha256.hex(reopened.content()), Sha256.hex(plain.content()))) {
+            || !Objects.equals(Sha256.hex(reopened.content()), Sha256.hex(plain.content()))
+            || !Objects.equals(Sha256.hex(reopened.summary()), Sha256.hex(plain.summary()))) {
             throw new IllegalStateException("the rewritten text does not match");
         }
     }

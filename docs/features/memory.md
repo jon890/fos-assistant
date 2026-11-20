@@ -81,7 +81,7 @@ sequenceDiagram
 | 단계 | 내용 | 결정 |
 | --- | --- | --- |
 | 0 | 측정 세 층과 악화 금지 게이트, 실행 기록의 선택 근거 컬럼(아래 「Memory 회수 측정」). 서버의 임베딩 지연은 운영 저장소가 재고 결과 수치만 여기 적는다 | [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) |
-| 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 개인 사실 구역은 그대로다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
+| 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 그때의 개인 사실 구역(지금의 요약 구역)은 그대로였다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
 | 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록. 연결 기능은 지웠고 대체만 `memory.superseded_by_memory_id` 로 남았다(아래 「기억의 대체」) | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md), [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) |
 | 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드. 모두 만들었다(아래 「참고한 기억의 단추」, 「도구 계약(Memory)」, 「정비 루프」, 「기억 화면」). 제안 모드는 후보와 근거만 기록하고 기억을 바꾸지 않는다 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
 | 4 | 정비의 자동 전환과 먼저 살펴보기 연결 | 같은 ADR |
@@ -135,7 +135,7 @@ sequenceDiagram
 
     W->>C: 질문을 보낸다
     C->>C: 질문을 저장하고 실행 줄에 잇는다
-    C->>C: 요청자와 에이전트의 collection 으로 항목을 골라 항상 층, 개인 사실 구역, 색인 층을 조립한다
+    C->>C: 요청자와 에이전트의 collection 으로 항목을 골라 항상 층, 요약 구역, 색인 층을 조립한다
     C->>H: POST /v1/runs, instructions 에 Memory 와 기억 지침
     H->>C: POST /mcp memory_read 와 서명한 _fos_ctx
     C->>C: origin 실행으로 사용자와 에이전트를 정하고 범위와 collection 을 본다
@@ -163,13 +163,13 @@ sequenceDiagram
 조립은 `ContextAssembler.assemble` 이 하고, 층을 담는 순서와 그 까닭은 그 Javadoc 이 갖는다.
 
 - 요청자의 `USER` 항목과 요청자 그룹의 `GROUP` 항목 가운데 그 에이전트가 받는 collection 의 `ACCEPTED` 항목만 고른다. 고르는 조건은 `MemoryQueries` 가 데이터베이스에서 건다
-- `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다. 짧은 개인 항목은 아래 「개인 사실 구역」 에 본문까지 싣는다
-- 조립한 Memory 문맥은 `assistant.context.max-chars` 로 제한한다. 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 싣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
+- `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 넣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 넣지 않는다. 요약 줄이 있는 개인 항목은 아래 「요약 구역」 에 요약을 넣는다
+- 조립한 Memory 문맥은 그룹의 기억 전체 상한으로 제한한다(아래 「기억 예산 설정」). 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 넣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
 - **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 찾고 `memory_read` 로 읽을 수 있다
-- 질문이 있는 조립은 개인 사실 구역 뒤에 아래 「질문과 관련된 기억 구역」 을 싣고, 색인은 관련도가 있는 항목을 점수 순으로, 그 뒤에 나머지를 번호 순으로 싣는다. 질문이 없는 조립은 색인을 번호 순으로만 싣는다
+- 질문이 있는 조립은 요약 구역 뒤에 아래 「질문과 관련된 기억 구역」 을 넣고, 색인은 관련도가 있는 항목을 점수 순으로, 그 뒤에 나머지를 번호 순으로 넣는다. 질문이 없는 조립은 색인을 번호 순으로만 넣는다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
 - 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. 대화 실행의 공통 지침에는 「최신 정보와 출처」 절이 함께 든다([`answer-quality.md`](answer-quality.md)). turn 전용 지시와 오늘 날짜 줄은 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
-- 본문이나 `retrieval` 을 고치면 고치기 전의 값을 `memory_revision` 에 남기고 버전 번호를 올린다. 지울 때도 마지막 값을 남긴다
+- 본문이나 요약, `retrieval` 을 고치면 고치기 전의 값을 `memory_revision` 에 남기고 버전 번호를 올린다. 지울 때도 마지막 값을 남긴다
 - Memory 목록은 에이전트가 남긴 줄에 남긴 에이전트를 함께 낸다. 이름은 요청자가 그 에이전트를 읽을 수 있을 때만 싣고, 지운 에이전트는 `sourceAgentDeleted` 만 낸다. 볼 수 없는 비공개 에이전트의 이름이 목록으로 새지 않게 하려는 것이다. 판정은 `MemorySources` 가 갖는다
 - 기존 개인 지식에서 들인 항목의 출처 칸(`source_type=brain`, `source_ref`, `source_date`)은 출처 기록으로 보존한다
 
@@ -182,17 +182,34 @@ sequenceDiagram
 - 같은 글이 같은 값이어야 하는 칸(제안 중복 키, 임베딩 지문)은 주인 key 에서 뽑은 HMAC 이다(`MemoryTexts`). 평문의 SHA-256 을 DB 에 두지 않는다. 기동 이관이 SHA-256 이던 값을 HMAC 으로 바꾼다. 지금 글과 맞는 임베딩 지문은 그 자리에서 바꾸고 맞지 않는 지문은 벡터째 비운다. KEK 가 없는 설치는 SHA-256 을 쓴다
 - 제목과 본문은 질의로 찾지 않는다. 검색 후보와 임베딩 원천은 엔티티를 읽어 앱에서 푼다
 
-#### 개인 사실 구역
+#### 요약 구역
 
-짧은 개인 사실을 본문까지 매 실행에 싣는 구역이다. 모델이 `memory_read` 를 부르지 않아도 이름과 관계와 선호를 안다.
-근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있다.
+기억마다 둔 요약 한 줄을 매 실행에 넣는 구역이다(코드 `MEMORY_FACTS`). 상세(본문)는 넣지 않고, 모델이 줄의 번호로 `memory_read` 를 불러 읽는다.
+스펙은 [기억 요약과 상세 두 층](memory/spec.md), 처음 근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있다.
 
-- 후보는 색인 층에 오를 항목(`MemoryService.indexedFor`) 가운데 범위 `USER`, 종류 `MEMORY` 이고 풀리며 본문이 `assistant.context.facts-item-max-chars` 이하인 것이다. 예산은 `assistant.context.facts-max-chars` 다
-- 넘치면 최근에 고친 것부터 고르고 들어가지 않는 항목은 건너뛴다. 고르지 못한 후보는 색인에 제목으로 남고 빠진 항목으로 세지 않는다
-- 고른 항목은 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다
-- 제목과 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 색인 줄도 같다. 모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 하려는 것이다
+- 요약은 `memory.summary` 칸이고 `USER` 범위의 `MEMORY` 만 가진다. 한 줄 200자까지다(`Memory.SUMMARY_MAX`). 비서는 `memory_remember` 의 `summary` 로 쓰고 고친다(아래 「도구 계약(Memory)」)
+- 후보는 색인 층에 오를 항목(`MemoryService.indexedFor`, 꺼내는 방식 `SEARCH`) 가운데 범위 `USER`, 종류 `MEMORY` 이고 풀리며 요약이 빈 글이 아닌 것이다. `ALWAYS` 항목은 항상 층에 본문이 들어가고, `ARCHIVE` 항목은 요약이 있어도 넣지 않는다
+- 한 줄은 `- [번호] 제목: 요약` 이다. 묶음 항목의 본문 칸에도 요약을 넣는다
+- 예산은 그룹의 요약 구역 예산이다(아래 「기억 예산 설정」). 머리 줄과 구분 줄까지 센다
+- 넘치면 요약이나 상세를 최근에 고친 것부터 고르고 들어가지 않는 항목은 건너뛴다. 잘라 넣지 않는다. 고르지 못한 후보는 색인에 제목으로 남고 선택 근거 `summary-over-budget-v1` 을 받는다. 질문 점수 근거보다 이 근거가 앞서 실행 기록에서 넘친 요약 수를 센다. 예산을 넘겼지만 질문 관련 구역에 상세로 든 항목은 색인에 없어 이 수에 들지 않는다. 빠진 항목으로는 세지 않는다
+- 고른 항목은 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다. 고른 규칙 이름은 `facts-recent-v2` 다
+- 제목과 요약의 줄바꿈은 공백 하나로 바꿔 한 줄로 넣는다. 색인 줄도 같다. 모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 하려는 것이다
 - 구역은 색인 몫을 쓰지 않는다. 그래서 색인 전체가 몫 안에 들면 이 구역이 색인을 밀어내지 못한다
-- 실린 항목도 `retrieval` 이 `SEARCH` 라 `memory_read` 로 읽힌다
+- 요약 구역에 든 항목도 질문 관련 구역의 후보다. 질문과 맞으면 상세가 그 구역에 함께 들어간다. 색인에는 다시 오르지 않는다
+- 머리 글은 사용자 사정이 답을 바꾸는 질문(일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정)이면 답하기 전에 관련 줄의 상세를 읽고, 진행 중인 일은 `memory_search` 로 찾으라고 안내한다(`ContextAssembler.FACTS_HEADER`)
+- 요약 칸이 `NULL` 인 줄은 배포 전에 만든 줄이다. 기동 이관 `MemorySummaryBackfill` 이 암호화 이관(`MemoryTextMigration`) 뒤에 돌며(`@Order`), 본문 200자 이하인 승인된 개인 사실(`SEARCH`, 대체되지 않음)은 요약 = 본문으로, 나머지는 빈 글로 채운다. revision 번호와 갱신 시각은 바꾸지 않는다. 풀지 못한 줄은 건너뛰고 다음 기동에 다시 본다
+- 화면(`POST /api/v1/memories`, `PATCH /api/v1/memories/{id}`)에는 아직 요약 칸이 없다(PR2 전). 만들 때와 본문을 고칠 때 이관과 같은 규칙으로 요약을 정한다. 본문 200자 이하인 승인된 개인 사실(`SEARCH`)은 본문이 요약이고 아니면 빈 글이다. 고칠 때는 비서가 쓴 요약도 덮는다. 본문이 그대로면 요약도 그대로다
+- 이관 전(`NULL`) 줄을 다른 경로(`memory_id` 수정 등)로 고칠 때도 요약을 주지 않았으면 같은 규칙으로 정한다. 빈 글로 두면 이관 대상에서 영영 빠지기 때문이다
+- 제안(`PROPOSED`)에는 요약을 두지 않는다. 제안 카드가 요약을 보이기 전(PR2)에는 사용자가 보지 못한 요약이 받아들이는 순간 매 실행에 들어가기 때문이다. 받아들인 제안은 요약이 없어 색인에 제목으로 있다
+
+#### 기억 예산 설정
+
+기억 전체 상한과 요약 구역 예산은 그룹 설정 `group_setting` 의 `MEMORY_CONTEXT` 줄이 갖고 관리자가 바꾼다. 읽고 쓰는 일은 `MemoryContextSettings` 가 한다. 설정 파일에는 두지 않는다.
+
+- 줄이 없는 그룹은 요약 4,000자, 전체 10,000자다. 모르는 버전이나 깨진 JSON 은 기본값으로 돌고 경고를 남긴다. 오류로 올리면 그 그룹의 모든 실행이 멈추기 때문이다
+- `GET`, `PUT /api/v1/admin/memory-settings` 가 지금 값과 기본값, 허용 범위를 주고받는다. `ADMIN` 만 쓴다. 경로와 칸은 `MemorySettingAdminController` 와 `MemoryAdminDtos` 가 갖는다
+- 허용 범위는 요약 1,000부터, 전체 4,000부터 40,000까지다. 요약은 전체에서 색인 몫(`assistant.context.index-budget-ratio`)을 뺀 자리와 20,000 가운데 작은 쪽을 넘지 못한다. 요약 구역은 색인 몫을 떼어 둔 나머지에 담기므로 그보다 큰 값은 실제로 담기지 않는다
+- 저장하면 다음 조립부터 쓰인다. 비울 캐시가 없다
 
 #### 질문과 관련된 기억 구역
 
@@ -200,10 +217,10 @@ sequenceDiagram
 근거는 [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
 
 - 질문은 사용자가 보낸 turn(`TurnIntent.Fresh`, `TurnIntent.Regenerate`)의 글과 위임받은 실행의 작업 글이다. 예약 작업, 위임 결과 전달, 먼저 살펴보기 turn 과 그 트리 아래의 위임 실행은 질문 없이 조립한다
-- 후보는 개인 사실 구역에 실리지 않은 색인 후보다. 키워드 순위와 의미 순위를 RRF(k=60, `assistant.memory.relevance.rrf-k`)로 합친다(`search-hybrid-v1`). 임베딩을 끄거나 질문 임베딩이 `assistant.memory.embedding.query-timeout` 안에 오지 않거나 실패하면 키워드 점수만 쓴다(`search-keyword-v1`). 어느 규칙으로 골랐는지는 선택 근거의 `selector` 에 남는다
+- 후보는 색인 후보 전체다. 요약 구역에 든 항목도 후보라 질문과 맞으면 상세가 이 구역에 든다. 키워드 순위와 의미 순위를 RRF(k=60, `assistant.memory.relevance.rrf-k`)로 합친다(`search-hybrid-v1`). 임베딩을 끄거나 질문 임베딩이 `assistant.memory.embedding.query-timeout` 안에 오지 않거나 실패하면 키워드 점수만 쓴다(`search-keyword-v1`). 어느 규칙으로 골랐는지는 선택 근거의 `selector` 에 남는다
 - 관련 있다는 판정은 키워드 쪽은 질문 토큰 가운데 그 항목에 있는 토큰의 비율이 `assistant.memory.relevance.keyword-min-coverage` 이상, 의미 쪽은 코사인이 `assistant.memory.relevance.semantic-min-similarity` 이상인 것이다. 둘 다 아니면 점수가 없다. 관련 항목이 없는 질문에는 이 구역을 싣지 않는다
 - 풀지 못한 항목은 이 구역에도 색인에도 싣지 않는다
-- 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context.search` 의 `max-items`, `item-max-chars`, `max-chars` 다. `max-items` 가 0 이면 구역을 끈다. 항목은 개인 사실 구역처럼 한 줄로 싣고, 넘치는 항목은 자르지 않고 건너뛴다. 이 구역에 실린 항목은 색인에 다시 싣지 않는다
+- 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context.search` 의 `max-items`, `item-max-chars`, `max-chars` 다. `max-items` 가 0 이면 구역을 끈다. 항목은 요약 구역처럼 한 줄로 넣고, 넘치는 항목은 자르지 않고 건너뛴다. 이 구역에 든 항목은 색인에 다시 넣지 않는다
 - 구역이 질문마다 바뀌므로 지시문 지문도 질문마다 바뀐다
 - 임베딩 서비스는 자체 서버의 로컬 모델이 OpenAI 호환 `POST /v1/embeddings` 로 받는다. 외부 임베딩 API 는 쓰지 않는다. 주소(`MEMORY_EMBEDDING_BASE_URL`)가 비어 있으면 임베딩을 끈 것이고 운영 기본값도 꺼짐이다. 주소와 띄우는 방법은 운영 저장소가 갖는다
 - 운영 모델은 BGE-M3 의 int8 ONNX(`onnx-community/bge-m3-ONNX`)이고 1024차원이다. 서비스가 글을 1024토큰에서 자르므로 그보다 긴 제목과 본문의 뒤쪽은 의미 점수에 들지 않는다. 앱은 `max-text-chars`(4,000자)까지만 보낸다
@@ -295,7 +312,8 @@ sequenceDiagram
 
 - 사용자와 범위를 인자로 받지 않는다. 주인은 origin 실행의 사용자이고 범위는 늘 `USER` 다. 「사용자가 요청했다」 같은 인자도 없다
 - `evidence` 는 판정에 쓰지 않는다. 앞선 도구 정의로 부르는 모델이 인자 오류를 받지 않게 받기만 한다
-- `memory_id` 는 같은 사실을 고칠 기존 항목 번호이고, 지시문의 개인 사실 구역이나 색인에 있는 번호다
+- `memory_id` 는 같은 사실을 고칠 기존 항목 번호이고, 지시문의 요약 구역이나 색인에 있는 번호다
+- `summary` 는 요약 구역에 들 한 줄 요약이고 200자까지다. 새 항목이면 주지 않을 때 요약이 없다. `memory_id` 로 고칠 때 주지 않으면 지금 요약을 두고, 빈 글이면 지운다. 본문과 요약이 모두 같으면 「이미 안다」 다. 같은 제목과 본문의 기존 항목은 요약이 달라도 같은 사실로 본다
 - `sensitive` 가 참이면 늘 제안이다. 저장하는 값이 아니고 바로 저장을 막는 데만 쓴다
 - `archivable` 은 자동 보관 허락 표시(`memory.archivable`)이고 기본은 거짓이다. 모델이 기간이 있는 상태나 지난 일이라고 판단할 때만 참으로 준다. 새 항목을 만들 때만 적고, `memory_id` 로 기존 항목을 고칠 때와 같은 제안이 이미 있을 때는 그 항목의 값을 바꾸지 않는다. 정비 루프가 이 값을 읽는다([ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md))
 - 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다
@@ -315,11 +333,11 @@ sequenceDiagram
 | --- | --- | --- |
 | 1 | origin 실행이 루트 실행이다 | `agent_execution` |
 | 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성, `@` 맡김만 해당한다 | `agent_execution.question_message_id` 와 그 사용자의 `USER` 메시지 |
-| 3 | 부정 표지가 질문 원문과 본문에 함께 있거나 함께 없다 | `chat_message.content`, 인자 `content` |
+| 3 | 부정 표지가 질문 원문과 본문에 함께 있거나 함께 없다. 요약이 빈 글이 아니면 요약도 같다 | `chat_message.content`, 인자 `content`, `summary` |
 | 4 | 그 대화의 어느 실행에도 안쪽 도구 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 없다 | `execution_event` |
 | 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn, 질문 메시지가 없는 실행이 여기 걸린다 | `agent_execution` 의 `question_message_id` |
 | 6 | 민감하지 않다 | 인자 `sensitive` |
-| 7 | 제목과 본문에 민감해 보이는 글이 없다 | 인자 `title`, `content` |
+| 7 | 제목과 본문, 요약에 민감해 보이는 글이 없다 | 인자 `title`, `content`, `summary` |
 
 1 부터 5 는 `McpMemoryRemember` 가, 6 과 7 은 `MemoryCaptureService` 가 본다.
 안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구이고, 목록과 넣지 않는 도구의 까닭은 `McpMemoryRemember.INTERNAL_TOOLS` 의 Javadoc 이 갖는다.
@@ -329,7 +347,7 @@ sequenceDiagram
 이 판정 뒤에 공통으로 본다.
 
 - 한 실행이 남긴 기록이 `MemoryCaptureService.PER_EXECUTION_MAX` 에 닿았거나, `collection` 이 그 에이전트가 받는 collection 이 아니면 저장하지 않는다
-- 같은 사용자의 같은 제목과 본문이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건이면 받아들인다
+- 같은 사용자의 같은 제목과 본문이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건이면 받아들인다. 다만 그 제안의 요약이 이번 호출의 요약과 다르거나 민감해 보이면 받아들이지 않는다. 대조를 거치지 않은 요약이 들어가지 않게 한다
 - 중복 후보는 번호만 찾은 뒤 쓰기 잠금으로 처음 읽는다. 잠근 뒤에도 중복 키가 같을 때 현재 상태로 수락과 기록을 정한다. 그 사이 본문이 바뀌어 키가 달라졌으면 원래 항목은 보존하고 새 항목을 만든다
 - `memory_id` 는 바로 저장 조건일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 풀리며 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
 - 상한과 새 중복 항목의 INSERT는 직렬화하지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다
@@ -443,7 +461,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | `source` | 원래 기록 | `sensitivity` | `trust` | `bodyMode` | 쓰는 곳 |
 | --- | --- | --- | --- | --- | --- |
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
-| `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
+| `MEMORY_FACTS` | 「요약 구역」 에 든 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
@@ -529,7 +547,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | 모드 | 무엇 |
 | --- | --- |
 | `none` | 기억을 싣지 않는다. 아래쪽 기준선이다 |
-| `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
+| `factsOff` | 요약 구역을 끈 조립. 요약 예산을 0 으로 준 `ContextAssembler` 를 테스트 안에서 따로 만든다(`TestContextAssemblers`) |
 | `questionOff` | 질문을 넘기지 않은 운영 기본값의 조립. 질문 기반 선별이 무엇을 더했는지 견주는 기준선이다 |
 | `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 기준 파일 게이트는 이 모드에만 건다 |
 | `linksOff` | `factsOn` 과 같은 조립에 대체(`superseded_by_memory_id`)를 적지 않는다. 대체가 옛 사실의 노출에 미친 효과를 비교하는 기준선이다. 모드 이름은 관련 연결을 지우기 전의 것을 그대로 쓴다 |
@@ -553,6 +571,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `LOAD` | 항목이 많을 때 실리는 글자와 빠지는 항목 |
 | `PREFERENCE` | 선호를 무시하면 답이 어긋나는 질문에 그 선호가 실린다(PrefEval) |
 | `RECALL_GAP` | 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목 |
+| `DETAIL` | 요약에 없고 상세에만 있는 사실을 묻는다(이직, 가계부, 여행). `factsOn` 에서 기대 항목의 상세가 질문 관련 구역에 본문으로 들지 않으면 실패다 |
 
 `forbidden` 의 `BOUNDARY` 항목은 묶음에 있으면 `OMITTED` 여도 실패다. 고르는 단계를 지났다는 뜻이기 때문이다.
 `SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. `MemoryEvalFixture` 가 이 값으로 옛 항목의 대체 칸에 새 항목을 적는다.
@@ -571,7 +590,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | 실행당 Memory 글자 수, 빠진 항목 | 조립 결과의 글자 수(공통 답변 지침은 뺀다)와 빠진 항목 수 |
 
 `questionOff` 의 recall@k 는 「질문과 무관하게 앞에 놓인 것」 의 비율이다. 질문 기반 선별과 견줄 출발점으로 읽는다.
-`MEMORY_SEARCH` 항목을 앞에 세는 것은 그 구역만 관련도 순으로 고른 본문이라서다. 개인 사실 구역은 최근 순으로 고르므로, 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5위 밖에 놓인다.
+`MEMORY_SEARCH` 항목을 앞에 세는 것은 그 구역만 관련도 순으로 고른 본문이라서다. 요약 구역은 최근 순으로 고르므로, 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5위 밖에 놓인다.
 임베딩을 켠 조립은 CI 에서 재지 않는다. 임베딩 서비스를 띄운 개발 머신에서 `./gradlew memoryEmbeddingEval` 이 같은 사례 묶음으로 `hybrid` 모드를 재고 `factsOn` 과 나란히 보고서만 남긴다(`MEMORY_EMBEDDING_BASE_URL` 이 없으면 건너뛰고, `MEMORY_EMBEDDING_MODEL` 이 없으면 운영 기본 모델 이름을 쓴다). 질문 임베딩 지연의 p50 과 p95 도 쓴다. 모델 후보를 견주고 `semantic-min-similarity` 를 정할 때 쓴다.
 
 **실패 조건은 아래와 같다.**
@@ -628,9 +647,9 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 
 | 이름 | 지표 | 읽는 컬럼 | 무엇을 정하는 근거인가 |
 | --- | --- | --- | --- |
-| `layer_items` | 층별 항목 수 | `execution_context_source` 의 `MEMORY_` 로 시작하는 `source`, `body_mode`, `selector` | 개인 사실 구역과 선별 규칙의 효과 |
+| `layer_items` | 층별 항목 수 | `execution_context_source` 의 `MEMORY_` 로 시작하는 `source`, `body_mode`, `selector` | 요약 구역과 선별 규칙의 효과 |
 | `index_read_rate` | 사용률. 색인에 제목으로 실린 항목이 같은 실행에서 읽힌 비율 | `MEMORY_INDEX` 줄과 같은 실행의 `MEMORY_READ` 줄 | 색인 층에 무엇을 올릴지 |
-| `memory_read_call_rate` | `memory_read` 호출률. 대화 루트 실행 가운데 그 도구의 `TOOL_STARTED` 사건이 있는 비율 | `agent_execution`, `execution_event` | 개인 사실 구역과 질문 기반 선별이 이 값을 줄이는지 |
+| `memory_read_call_rate` | `memory_read` 호출률. 대화 루트 실행 가운데 그 도구의 `TOOL_STARTED` 사건이 있는 비율 | `agent_execution`, `execution_event` | 요약 구역과 질문 기반 선별이 이 값을 줄이는지 |
 | `inline_correction_rate` | 정정률. 본문으로 실린 항목 가운데 처음 실린 뒤에 판 기록이 생긴 비율 | `execution_context_source`, `memory_revision.changed_at` | 실리는 기억이 틀린 정도 |
 | `never_loaded_items` | 미사용 항목. 기간 전에 만들었고 보관하지 않은 `ACCEPTED` 항목 가운데 기간 안에 한 번도 실리지 않은 비율 | `memory`, `execution_context_source` | 정비 루프의 보관 후보 |
 | `proposal_outcomes` | 수락률. 제안 기록의 지금 상태별 수. 지운 항목은 따로 센다 | `memory_capture.kind`, `memory.status` | 바로 저장 판정이 너무 좁거나 넓은지 |

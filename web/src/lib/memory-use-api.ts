@@ -3,7 +3,7 @@ import { memoryRequest } from "@/lib/memory-api";
 /**
  * 답을 만든 실행이 본문을 받은 기억 한 줄이다. `ChatDtos.MemoryUseView` 를 그대로 받는다.
  *
- * <p>`via` 는 받은 길이다. `ALWAYS` 는 항상 층, `FACTS` 는 개인 사실 구역, `SEARCH` 는 질문과 관련된 기억 구역, `LINK` 는 실린 기억과 이어진 연결된 기억 구역, `READ` 는 `memory_read` 로 읽은 것이다.
+ * <p>`via` 는 받은 길이다. `ALWAYS` 는 항상 층, `FACTS` 는 요약 구역, `SEARCH` 는 질문과 관련된 기억 구역, `LINK` 는 실린 기억과 이어진 연결된 기억 구역, `READ` 는 `memory_read` 로 읽은 것이다.
  */
 export type MemoryUse = {
   executionId: number;

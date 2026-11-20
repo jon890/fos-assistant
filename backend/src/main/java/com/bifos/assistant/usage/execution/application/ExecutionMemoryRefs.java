@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 실행들이 본문을 받은 Memory 항목을 실행 기록에서 모은다(ADR-20261008 / memory-facts).
  *
- * <p>{@code execution_context_source} 의 본문까지 실은 줄만 읽는다. 조립이 실은 항상 층과 개인 사실 구역, 질문과 관련된 기억 구역의 줄, 그리고
+ * <p>{@code execution_context_source} 의 본문까지 실은 줄만 읽는다. 조립이 실은 항상 층과 요약 구역, 질문과 관련된 기억 구역의 줄, 그리고
  * {@code memory_read} 처리가 읽은 뒤에 덧붙인 줄이다. 제목만 실은 줄과 빠진 줄은 본문을 받지 않았으므로 넣지 않는다.
  *
  * <p>{@code usage} 는 {@code context} 와 {@code memory} 를 쓰지 못하므로 출처 이름은 문자열로 비교한다.
