@@ -37,6 +37,7 @@ import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.connection.application.dto.BrowserBindingReinstall;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
@@ -69,6 +70,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -769,6 +771,65 @@ class ConnectorBindingServiceTest {
         assertThat(connection.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(service.bind(owner, agent.code(), PLAIN).bound()).isTrue();
         verify(connector).bindConnector(agent.hermesProfile(), PLAIN, connection.vault(), agent.sandboxOwner(), null);
+    }
+
+
+    @Test
+    @DisplayName("브라우저 플러그인 바인딩 전체 다시 설치는 재시작 대기 바인딩까지 다시 보내고 다른 플러그인은 건드리지 않는다")
+    void reinstallsEveryBrowserBindingOnly() {
+        CurrentUser first = user(UserRole.MEMBER, 1L);
+        CurrentUser second = user(UserRole.MEMBER, 1L);
+        Agent firstAgent = agent(first, AgentVisibility.PRIVATE);
+        Agent secondAgent = agent(second, AgentVisibility.PRIVATE);
+        connect(first, BROWSER, Map.of());
+        connect(second, BROWSER, Map.of());
+        connect(first, PLAIN, Map.of());
+        service.bind(first, firstAgent.code(), BROWSER);
+        service.bind(second, secondAgent.code(), BROWSER);
+        service.bind(first, firstAgent.code(), PLAIN);
+        assertThat(service.countBrowserBindings()).hasValue(2);
+        clearInvocations(connector);
+
+        BrowserBindingReinstall result = service.reinstallBrowserBindings();
+
+        assertThat(result).isEqualTo(new BrowserBindingReinstall(2, 2, 0, false));
+        verify(connector, times(2))
+            .bindConnector(anyString(), eq(BROWSER), anyString(), anyString(), argThat(address -> address != null && address.startsWith(GATEWAY)));
+        verify(connector, never()).bindConnector(anyString(), eq(PLAIN), anyString(), anyString(), nullable(String.class));
+        assertThat(bindings.findAllById(bindings.findIdsByConnectorIdIn(Set.of(BROWSER)))).hasSize(2)
+            .allSatisfy(binding -> assertThat(binding.restartRequired()).isTrue());
+    }
+
+
+    @Test
+    @DisplayName("한 바인딩의 다시 설치가 실패해도 다음 바인딩으로 가고 실패 수에 센다")
+    void reinstallContinuesAfterOneFailure() {
+        CurrentUser first = user(UserRole.MEMBER, 1L);
+        CurrentUser second = user(UserRole.MEMBER, 1L);
+        Agent firstAgent = agent(first, AgentVisibility.PRIVATE);
+        Agent secondAgent = agent(second, AgentVisibility.PRIVATE);
+        connect(first, BROWSER, Map.of());
+        connect(second, BROWSER, Map.of());
+        service.bind(first, firstAgent.code(), BROWSER);
+        service.bind(second, secondAgent.code(), BROWSER);
+        when(connector.bindConnector(eq(firstAgent.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenThrow(new IllegalStateException("dashboard down"));
+
+        BrowserBindingReinstall result = service.reinstallBrowserBindings();
+
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.restartPending()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("플러그인 목록을 읽지 못하면 다시 설치는 예외 없이 그렇다고 돌려주고 수는 비어 있다")
+    void reinstallReportsUnavailableCatalog() {
+        when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
+
+        assertThat(service.reinstallBrowserBindings()).isEqualTo(new BrowserBindingReinstall(0, 0, 0, true));
+        assertThat(service.countBrowserBindings()).isEmpty();
     }
 
 

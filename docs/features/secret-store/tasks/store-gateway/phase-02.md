@@ -57,14 +57,14 @@
 - `browser/application/BrowserGatewayTokensTest.java` 수정: 저장소 값으로 서명, 값을 바꾸면 재기동 없이 새 표식, 옛 비밀 표식 거절, 값이 없으면 꺼짐.
 - `browser/application/GatewaySecretServiceTest.java` 신규: 만들기 뒤 64자 16진수와 앞부분, 지우기 뒤 꺼짐.
 - `browser/application/GatewaySecretImporterTest.java` 신규: 줄 없음 → 가져옴, 줄 있음 → 건너뜀, 지운 줄 → 건너뜀, KEK 없음 → 경고만.
-- `connector/ConnectorBrowserBindingReinstallTest.java` 신규: 가짜 대시보드(`ConnectorBindingHttpFixture` 를 따른다)로 브라우저 플러그인 바인딩 둘(`READY` 하나, 재시작 대기 하나)과 브라우저 아닌 바인딩 하나. 앞의 둘만 다시 설치 요청이 가고 재시작 대기로 남는다. 한쪽 호출이 실패하면 `failed` 1 이고 다른 쪽이 진행된다. 카탈로그 읽기가 실패하면 `catalogUnavailable` 참이고 예외가 나지 않는다.
+- `connector/ConnectorBindingServiceTest.java` 에 사례 추가(그 클래스의 대시보드 대역과 준비 도우미를 쓴다): 브라우저 플러그인 바인딩 둘(`READY` 하나, 재시작 대기 하나)과 브라우저 아닌 바인딩 하나. 앞의 둘만 다시 설치 요청이 가고 재시작 대기로 남는다. 한쪽 호출이 실패하면 `failed` 1 이고 다른 쪽이 진행된다. 카탈로그 읽기가 실패하면 `catalogUnavailable` 참이고 예외가 나지 않는다.
 - `browser/application/GatewayRewriterTest.java`, `browser/application/BrowserGatewayTest.java`: 가짜 `ServerSecrets` 로 생성한다.
 - `testsupport/InMemoryServerSecrets.java` 신규: 단위 테스트용 메모리 구현.
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests 'com.bifos.assistant.browser.*' --tests 'com.bifos.assistant.connector.ConnectorBrowserBindingReinstallTest' --tests 'com.bifos.assistant.connector.ConnectorBindingGatewayOffTest' --tests 'com.bifos.assistant.connector.ConnectorBindingServiceTest' --tests 'com.bifos.assistant.connector.ConnectorConnectionServiceTest' --tests 'com.bifos.assistant.browser.presentation.BrowserGatewaySocketIntegrationTest'
+cd backend && ./gradlew test --tests 'com.bifos.assistant.browser.*' --tests 'com.bifos.assistant.connector.ConnectorBindingGatewayOffTest' --tests 'com.bifos.assistant.connector.ConnectorBindingServiceTest' --tests 'com.bifos.assistant.connector.ConnectorConnectionServiceTest' --tests 'com.bifos.assistant.browser.presentation.BrowserGatewaySocketIntegrationTest'
 cd backend && ./gradlew archTest checkstyleMain checkstyleTest spotlessCheck
 ```
 
@@ -85,7 +85,7 @@ cd backend && ./gradlew archTest checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/test/java/com/bifos/assistant/browser/application/BrowserGatewayTokensTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/browser/application/GatewaySecretServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/application/GatewaySecretImporterTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBrowserBindingReinstallTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/browser/application/GatewayRewriterTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/browser/application/BrowserGatewayTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/InMemoryServerSecrets.java` | 신규 |
