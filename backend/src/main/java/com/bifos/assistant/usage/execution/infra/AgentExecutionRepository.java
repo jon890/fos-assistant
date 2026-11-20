@@ -73,7 +73,6 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(Long userId, Pageable pageable);
 
 
-
     /** 시작 시각과 번호를 함께 써서 루트 실행을 안정적으로 다음 쪽부터 읽는다. */
     @Query("""
             select e from AgentExecution e

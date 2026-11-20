@@ -8,7 +8,7 @@ package com.bifos.assistant.admin.usage.application.dto;
  * @param subscriptionExecutions 그중 구독 경로로 돈 실행 수
  * @param actualCostMicros 예상 추가 사용 요금. 통화 단위의 100만분의 1
  * @param incomplete 가격을 찾지 못한 실행, 금액을 확인하지 못한 도우미, 도우미를 관측하지 못한 실행 가운데 하나라도 있으면 참.
- *     금액이 실제보다 적을 수 있다는 뜻이다
+ * 금액이 실제보다 적을 수 있다는 뜻이다
  */
 public record OverviewMonthly(
     String month, long totalExecutions, long subscriptionExecutions, long actualCostMicros, boolean incomplete) {
