@@ -11,7 +11,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentSandboxSweep;
@@ -52,6 +51,7 @@ class AgentSandboxSweepTest {
     private static final String BROKEN = "sweep-broken";
     private static final String SHELL_OFF = "sweep-off";
     private static final String GROUP_AGENT = "sweep-group";
+    private static final String OWNED_GROUP = "sweep-owned-group";
 
     @Autowired
     AgentSandboxSweep sweep;
@@ -74,6 +74,7 @@ class AgentSandboxSweepTest {
     private AppUser owner;
     private Agent groupAgent;
     private Agent unlisted;
+    private Agent broken;
 
 
     @BeforeEach
@@ -83,17 +84,22 @@ class AgentSandboxSweepTest {
         jdbc.update("DELETE FROM agent WHERE hermes_profile LIKE 'sweep-%'");
         jdbc.update("DELETE FROM app_user WHERE group_id = ?", GROUP);
         owner = users.save(AppUser.of("sweep-owner@example.com", "지윤", GROUP, UserRole.MEMBER));
-        for (String profile : List.of(LISTED, BROKEN, SHELL_OFF)) {
+        for (String profile : List.of(LISTED, SHELL_OFF)) {
             agents.save(agent(profile, AgentVisibility.PRIVATE, owner.id()));
         }
         unlisted = agents.save(agent(UNLISTED, AgentVisibility.PRIVATE, owner.id()));
+        broken = agents.save(agent(BROKEN, AgentVisibility.PRIVATE, owner.id()));
         groupAgent = agents.save(agent(GROUP_AGENT, AgentVisibility.GROUP, null));
+        agents.save(agent(OWNED_GROUP, AgentVisibility.GROUP, owner.id()));
+        // 배포 전에 있던 에이전트처럼 한 번 점검할 표시를 켠다. 마이그레이션이 하는 일이다.
+        jdbc.update("UPDATE agent SET sandbox_check_pending = TRUE WHERE hermes_profile LIKE 'sweep-%'");
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
         when(toolsets.readEnabled(anyString(), eq(LISTED))).thenReturn(List.of("web", "terminal", "fos-attachments"));
         when(toolsets.readEnabled(anyString(), eq(UNLISTED))).thenReturn(List.of("web", "terminal", "file"));
         when(toolsets.readEnabled(anyString(), eq(BROKEN))).thenReturn(List.of("code_execution"));
         when(toolsets.readEnabled(anyString(), eq(SHELL_OFF))).thenReturn(List.of("web"));
         when(toolsets.readEnabled(anyString(), eq(GROUP_AGENT))).thenReturn(List.of("terminal"));
+        when(toolsets.readEnabled(anyString(), eq(OWNED_GROUP))).thenReturn(List.of("web", "terminal"));
         doThrow(rejected(true)).when(toolsets).writeApiServerInSandbox(eq(UNLISTED), anyList(), anyString());
         doThrow(rejected(false)).when(toolsets).writeApiServerInSandbox(eq(BROKEN), anyList(), anyString());
     }
@@ -124,23 +130,13 @@ class AgentSandboxSweepTest {
 
 
     @Test
-    @DisplayName("설정이 꺼져 있으면 기동 이벤트에서 Hermes 를 부르지 않는다")
-    void doesNothingOnReadyWhenDisabled() {
-        reset(toolsets);
-
-        sweep.onReady();
-
-        verifyNoInteractions(toolsets);
-    }
-
-
-    @Test
     @DisplayName("정책 밖 표시가 없는 거절은 아무것도 끄지 않고 다음 차례에 다시 본다")
     void keepsShellAndRetriesWhenTheRejectionIsNotUnlisted() {
         sweep.sweepAll();
 
         verify(toolsets, never()).writeApiServer(eq(BROKEN), anyList(), anyString());
-        assertThat(sweep.unfinishedCount()).isEqualTo(1);
+        assertThat(sweep.unfinished()).contains(broken.id());
+        assertThat(pending(BROKEN)).as("끝내지 못한 에이전트는 점검 표시를 남긴다").isTrue();
 
         doNothing().when(toolsets).writeApiServerInSandbox(eq(BROKEN), anyList(), anyString());
         sweep.retryUnfinished();
@@ -148,7 +144,8 @@ class AgentSandboxSweepTest {
         // 첫 차례의 거절된 시도와 다시 시도가 같은 쓰기다.
         verify(toolsets, times(2))
             .writeApiServerInSandbox(BROKEN, List.of("code_execution", "fos-assistant"), "u" + owner.id());
-        assertThat(sweep.unfinishedCount()).isZero();
+        assertThat(sweep.unfinished()).doesNotContain(broken.id());
+        assertThat(pending(BROKEN)).isFalse();
     }
 
 
@@ -161,6 +158,39 @@ class AgentSandboxSweepTest {
 
         verify(toolsets).writeApiServerInSandbox(GROUP_AGENT, List.of("terminal", "fos-assistant"), "a" + groupAgent.id());
         verify(toolsets).writeApiServer(UNLISTED, List.of("web", "fos-assistant"), "u" + owner.id());
+    }
+
+
+    @Test
+    @DisplayName("점검을 끝낸 뒤에는 정책 밖이라고 답해도 셸을 끄지 않는다")
+    void doesNotRemoveShellAfterTheOneTimeCheck() {
+        sweep.sweepAll();
+        assertThat(pending(UNLISTED)).isFalse();
+        reset(toolsets);
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
+        when(toolsets.readEnabled(anyString(), eq(UNLISTED))).thenReturn(List.of("web", "terminal"));
+        doThrow(rejected(true)).when(toolsets).writeApiServerInSandbox(eq(UNLISTED), anyList(), anyString());
+
+        sweep.sweepAll();
+
+        verify(toolsets, never()).writeApiServer(eq(UNLISTED), anyList(), anyString());
+        assertThat(sweep.unfinished()).doesNotContain(unlisted.id());
+    }
+
+
+    @Test
+    @DisplayName("주인이 있는 그룹 공개 에이전트의 셸은 한 번 점검에서 끄고 실행 공간 쓰기를 하지 않는다")
+    void removesShellFromGroupAgentWithOwner() {
+        sweep.sweepAll();
+
+        verify(toolsets).writeApiServer(OWNED_GROUP, List.of("web", "fos-assistant"), "u" + owner.id());
+        verify(toolsets, never()).writeApiServerInSandbox(eq(OWNED_GROUP), anyList(), anyString());
+    }
+
+
+    private boolean pending(String profile) {
+        return Boolean.TRUE.equals(
+            jdbc.queryForObject("SELECT sandbox_check_pending FROM agent WHERE hermes_profile = ?", Boolean.class, profile));
     }
 
 

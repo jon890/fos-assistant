@@ -27,7 +27,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * local 인지 모르므로 실행 공간 도구가 켜진 에이전트를 모두 다시 저장한다. 정책에 있으면 docker 로 바뀌고, plugin 이 정책 밖이라고
  * 답하면 그 도구를 끈다.
  *
- * <p>매 기동 돈다. 정책이 그대로면 다시 써도 결과가 같다. Hermes 가 함께 재시작되는 중이라 실패한 에이전트는 메모리에 두고 기다리는
+ * <p>셸을 끄는 일은 배포 때 한 번이다. 마이그레이션이 그 전에 있던 에이전트에만 {@code sandbox_check_pending} 을 켜고, 점검을 끝낸
+ * 에이전트는 그 표시를 지운다. 그 뒤로 운영이 정책에서 profile 을 빼거나 정책을 잘못 고친 채 재시작해도 셸을 끄지 않는다(스펙
+ * agent-tools DECISION17). 정책 안 profile 을 docker 로 다시 쓰는 일은 매 기동 돈다. 정책이 그대로면 다시 써도 결과가 같다. Hermes 가 함께 재시작되는 중이라 실패한 에이전트는 메모리에 두고 기다리는
  * 기본 도구 주기에 끝날 때까지 다시 본다. 에이전트 하나는 행을 잠근 한 트랜잭션 안에서 본다. 사람의 도구 저장과 겹치지 않게 하려는
  * 것이다.
  */
@@ -107,9 +109,9 @@ public class AgentSandboxSweep {
     }
 
 
-    /** 끝내지 못한 에이전트 수다. 0 이면 실행 공간 도구가 켜진 에이전트를 모두 바로잡았다. */
-    public int unfinishedCount() {
-        return unfinished.size();
+    /** 끝내지 못한 에이전트 번호다. 비어 있으면 실행 공간 도구가 켜진 에이전트를 모두 바로잡았다. */
+    public Set<Long> unfinished() {
+        return Set.copyOf(unfinished);
     }
 
 
@@ -118,6 +120,10 @@ public class AgentSandboxSweep {
         if (agent == null || agent.isDeleted()) {
             return null;
         }
-        return defaults.reapplySandbox(agent);
+        SandboxReapplyOutcome outcome = defaults.reapplySandbox(agent, agent.sandboxCheckPending());
+        if (agent.sandboxCheckPending()) {
+            agents.clearSandboxCheckPending(agentId);
+        }
+        return outcome;
     }
 }

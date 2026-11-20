@@ -109,12 +109,14 @@ public class AgentDefaultToolsets {
      * 실행 공간 도구가 켜져 있으면 지금 목록 그대로 실행 공간 쓰기로 다시 저장한다(ADR-20261120 / no-local-shell).
      *
      * <p>이미 local 로 켜진 셸을 바로잡는 기동 작업이 부른다. 공개 범위와 올린 스킬로 제외하지 않는다. 그런 에이전트도 이미 셸이
-     * 켜져 있다면 local 로 남아서는 안 되기 때문이다. plugin 이 정책에 없는 profile 이라 거절했을 때만 실행 공간 도구를 빼고
-     * 다시 쓴다. 정책이 없거나 틀린 거절과 Hermes 실패는 그대로 올려 부르는 쪽이 다음에 다시 보게 한다.
+     * 켜져 있다면 local 로 남아서는 안 되기 때문이다. plugin 이 정책에 없는 profile 이라 거절했고 {@code mayRemoveShell} 이
+     * 참일 때만 실행 공간 도구를 빼고 다시 쓴다. 정책이 없거나 틀린 거절과 Hermes 실패는 그대로 올려 부르는 쪽이 다음에 다시 보게
+     * 한다.
      *
+     * @param mayRemoveShell 배포 때 한 번 점검하는 에이전트다. 거짓이면 정책 밖이어도 셸을 끄지 않는다
      * @throws ApiException 정책 밖 거절이 아닌 실패. 아무것도 바꾸지 않았다
      */
-    public SandboxReapplyOutcome reapplySandbox(Agent agent) {
+    public SandboxReapplyOutcome reapplySandbox(Agent agent, boolean mayRemoveShell) {
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         if (!AgentToolPolicy.hasSandboxToolset(enabled)) {
             return SandboxReapplyOutcome.NOT_NEEDED;
@@ -127,6 +129,10 @@ public class AgentDefaultToolsets {
         if (enabled.contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
             desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
         }
+        if (mayRemoveShell && agent.visibility() == AgentVisibility.GROUP && agent.ownerUserId() != null) {
+            // 옛 데이터로 셸이 켜진 그룹 공개 에이전트다. 실행 공간이 주인의 것이라 그룹 사용자가 주인의 파일을 본다.
+            return removeShell(agent, desired, "그룹 공개 에이전트의 실행 공간이 주인 공간이라");
+        }
         try {
             toolsets.writeApiServerInSandbox(agent.hermesProfile(), List.copyOf(desired), agent.sandboxOwner());
             return SandboxReapplyOutcome.REWRITTEN;
@@ -135,12 +141,21 @@ public class AgentDefaultToolsets {
                 throw rejected;
             }
         }
+        if (!mayRemoveShell) {
+            log.warn(
+                "실행 공간 정책에 없는 profile 이지만 이미 점검한 에이전트라 셸을 끄지 않았다. 정책을 확인한다 agent={} profile={}",
+                agent.code(),
+                agent.hermesProfile());
+            return SandboxReapplyOutcome.UNLISTED_KEPT;
+        }
+        return removeShell(agent, desired, "실행 공간 정책에 없는 profile 이라");
+    }
+
+
+    private SandboxReapplyOutcome removeShell(Agent agent, Set<String> desired, String reason) {
         toolsets.writeApiServer(
             agent.hermesProfile(), AgentToolPolicy.withoutSandboxToolsets(List.copyOf(desired)), agent.sandboxOwner());
-        log.warn(
-            "실행 공간 정책에 없는 profile 이라 셸·파일·코드 실행·사진 도구를 껐다 agent={} profile={}",
-            agent.code(),
-            agent.hermesProfile());
+        log.warn("{} 셸·파일·코드 실행·사진 도구를 껐다 agent={} profile={}", reason, agent.code(), agent.hermesProfile());
         return SandboxReapplyOutcome.SHELL_REMOVED;
     }
 

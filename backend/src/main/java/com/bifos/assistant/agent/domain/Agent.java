@@ -134,6 +134,16 @@ public class Agent extends AuditedEntity {
     private String pendingDefaultToolsets;
 
     /**
+     * 기동 작업이 local 로 켜졌을 수 있는 셸을 한 번 점검해야 하는가(ADR-20261120 / no-local-shell).
+     *
+     * <p>배포 전에 있던 에이전트만 마이그레이션이 참으로 둔다. 점검을 끝내면 거짓이 되고, 그 뒤로는 정책 밖이어도 셸을 끄지 않는다.
+     * 쓰기는 {@code AgentRepository} 의 전용 쿼리만 한다.
+     */
+    @Column(name = "sandbox_check_pending", insertable = false, updatable = false)
+    @Getter(AccessLevel.NONE)
+    private Boolean sandboxCheckPending;
+
+    /**
      * 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다.
      */
     @Transient
@@ -244,6 +254,13 @@ public class Agent extends AuditedEntity {
      */
     public String sandboxOwner() {
         return ownerUserId != null ? "u" + ownerUserId : "a" + id;
+    }
+
+
+    /** 기동 작업이 local 셸을 한 번 점검해야 하는 에이전트인가(ADR-20261120 / no-local-shell). */
+    public boolean sandboxCheckPending() {
+        // 저장 직후 다시 읽기 전에는 값이 없다. 새 에이전트는 점검 대상이 아니다.
+        return Boolean.TRUE.equals(sandboxCheckPending);
     }
 
 
