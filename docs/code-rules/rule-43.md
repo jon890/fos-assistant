@@ -2,7 +2,7 @@
 
 포맷은 고정된 formatter와 바뀐 파일 범위로 적용한다.
 
-검사: [spotlessCheck](../../backend/build.gradle.kts), [format:check](../../web/package.json), [포맷 회귀](../../test/spotless-jdt.test.py)
+검사: [spotlessCheck](../../backend/build.gradle.kts), [format:check](../../web/package.json), [포맷 회귀](../../test/spotless-jdt.test.ts)
 
 ## 까닭
 
