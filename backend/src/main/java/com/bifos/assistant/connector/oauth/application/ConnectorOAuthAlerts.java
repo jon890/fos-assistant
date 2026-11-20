@@ -65,6 +65,27 @@ public class ConnectorOAuthAlerts {
     }
 
 
+    /**
+     * 다시 연결 필요였던 연결이 새 토큰을 받았다. 표시를 지우고 끊김 알림을 읽음으로 바꾼다. 표시가 없으면 아무것도 하지 않는다.
+     * 연결의 revision 은 바꾸지 않는다. 연결 확인의 뒤 트랜잭션이 앞에서 읽은 revision 과 대조한다.
+     */
+    public void recovered(long connectionId) {
+        transactions.executeWithoutResult(status -> {
+            Long userId = connections.findById(connectionId).map(ConnectorConnection::userId).orElse(null);
+            if (userId == null || users.findByIdForUpdate(userId).isEmpty()) {
+                return;
+            }
+            ConnectorConnection connection = connections.findById(connectionId).orElse(null);
+            if (connection == null || !connection.fields().auth().usesOAuth() || !connection.fields().auth().reconnectRequired()) {
+                return;
+            }
+            connection.reconnectResolved();
+            connections.save(connection);
+            reconnected(userId, connectionId);
+        });
+    }
+
+
     /** 다시 연결했거나 해제했거나 붙여 넣기로 바꿨다. 그 연결의 끊김 알림을 읽음으로 바꾼다. 부르는 쪽의 트랜잭션에 참여한다. */
     public void reconnected(long userId, long connectionId) {
         notifications.resolve(userId, NotificationKind.CONNECTOR_RECONNECT_REQUIRED, connectionSource(connectionId));

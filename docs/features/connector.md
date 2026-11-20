@@ -578,7 +578,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 `outcome` 은 `CONNECTED`, `REAUTHORIZE`(함께 온 `authorizeUrl` 로 한 번 더 보낸다), `DENIED`, `INVALID_STATE`, `SCOPE_DENIED`, `APP_REJECTED`, `VERIFY_FAILED`(`reason` 에 확인 도구의 오류 코드), `SUPERSEDED`, `UNAVAILABLE` 가운데 하나다. `connectorId` 는 돌아갈 연결 화면의 플러그인이고 상태 값을 믿을 수 없으면 비어 있다.
 단추 연결은 확인을 통과한 뒤 등록과 같은 길로 저장한다. 사용자 행 잠금 안에서 보관 파일 쓰기 자리에 대시보드 commit 을 하고 붙은 바인딩을 다시 설치한다. 시작한 흐름이 끝나기 전의 연결 행은 `DISCONNECTED` 다.
-값을 붙여 넣어 다시 등록하거나 해제하면 그 연결의 토큰 통로는 닫히고 끊김 알림은 읽음이 된다. 단추 연결의 「연결 다시 확인」 은 본 자리의 토큰 통로 주소로 확인 도구를 부른다.
+값을 붙여 넣어 다시 등록하거나 해제하면 그 연결의 토큰 통로는 닫히고 끊김 알림은 읽음이 된다. 단추 연결의 「연결 다시 확인」 은 토큰을 먼저 새로 받고 본 자리의 토큰 통로 주소로 확인 도구를 부른다. 서비스가 갱신을 거절했으면 확인 도구 없이 `CONNECTOR_CREDENTIAL_REJECTED`, 서비스나 앱 설정 문제로 받지 못했으면 `CONNECTOR_UNAVAILABLE` 이다. 다시 연결 필요였던 연결이 새 토큰을 받으면 그 표시가 지워진다.
 순서와 실패 처리, 표식과 갱신, 끊김 알림은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
 
 ### 관리자 OAuth 앱 설정

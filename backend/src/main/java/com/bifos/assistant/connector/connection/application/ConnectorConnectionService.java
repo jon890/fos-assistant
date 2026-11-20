@@ -83,7 +83,7 @@ public class ConnectorConnectionService {
      * @param vault 확인 도구가 값을 읽을 보관 파일. 값이 보관 파일에 없거나 해제된 연결이면 null
      * @param oauth 단추 연결이면 확인 도구가 토큰을 받을 본 자리. 붙여 넣은 연결이면 null
      */
-    private record Prepared(String vault, Instant revision, VaultAccess oauth) {
+    private record Prepared(long connectionId, String vault, Instant revision, VaultAccess oauth) {
     }
 
     /**
@@ -318,7 +318,7 @@ public class ConnectorConnectionService {
      * 보관 파일의 값으로 확인 도구를 부르고, 붙은 바인딩마다 설치와 반영을 맞춘다.
      *
      * <p>트랜잭션을 나눈다. 먼저 잠금 안에서 연결의 보관 파일 상태와 revision을 읽는다.
-     * 다음으로 트랜잭션 밖에서 확인 도구를 부른다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다. 끝으로 다시
+     * 다음으로 트랜잭션 밖에서 확인 도구를 부른다. 단추 연결은 그 전에 토큰을 새로 받고, 받지 못하면 그 오류로 끝낸다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다. 끝으로 다시
      * 잠그고 revision을 대조해 설치 시작을 커밋한 뒤 트랜잭션 밖에서 바인딩마다 설치를 맞춘다. 이 메서드에 {@code @Transactional} 을 붙이지 않는다.
      *
      * <p>확인 도구가 실패하면 연결을 {@code PENDING} 으로 커밋하고 공통 어휘의 오류로 끝낸다.
@@ -333,20 +333,9 @@ public class ConnectorConnectionService {
             if (prepared == null) {
                 throw new ConnectorOperationFailure();
             }
-            ApiException verifyFailure = null;
-            boolean verified = false;
-            ListedTools listedTools = null;
-            if (prepared.vault() != null && manifest.isPresent()) {
-                ConnectorVerified result = verifier.vault(user.id(), manifest.get(), prepared.vault(), prepared.oauth());
-                verifyFailure = result.failure();
-                listedTools = result.listed();
-                verified = verifyFailure == null;
-            }
-            ApiException failure = verifyFailure;
-            boolean ready = verified;
-            ListedTools listed = listedTools;
-            Checked checked = bindingService.start(
-                () -> recordCheck(user, connectorId, manifest, prepared.revision(), new CheckResult(ready, failure, listed)));
+            CheckResult outcome = prepared.vault() == null || manifest.isEmpty()
+                ? new CheckResult(false, null, null) : verify(user, manifest.get(), prepared);
+            Checked checked = bindingService.start(() -> recordCheck(user, connectorId, manifest, prepared.revision(), outcome));
             if (checked == null) {
                 throw new ConnectorOperationFailure();
             }
@@ -365,15 +354,27 @@ public class ConnectorConnectionService {
     }
 
 
+    /** 단추 연결이면 토큰을 먼저 새로 받는다(스펙 DECISION19). 받지 못하면 확인 도구를 부르지 않고 연결 상태도 여기서 더 바꾸지 않는다. */
+    private CheckResult verify(CurrentUser user, ConnectorManifest manifest, Prepared prepared) {
+        if (prepared.oauth() != null) {
+            oauth.refreshForCheck(prepared.connectionId()).ifPresent(error -> {
+                throw ConnectorErrors.of(error);
+            });
+        }
+        ConnectorVerified result = verifier.vault(user.id(), manifest, prepared.vault(), prepared.oauth());
+        return new CheckResult(result.failure() == null, result.failure(), result.listed());
+    }
+
+
     /** 연결 확인의 앞 트랜잭션이다. */
     private Prepared prepare(CurrentUser user, String connectorId, boolean known) {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, known);
         if (connection.status() == ConnectionStatus.DISCONNECTED) {
-            return new Prepared(null, connection.updatedAt(), null);
+            return new Prepared(connection.id(), null, connection.updatedAt(), null);
         }
         return new Prepared(
-            connection.vaultStored() ? connection.vault() : null, connection.updatedAt(),
+            connection.id(), connection.vaultStored() ? connection.vault() : null, connection.updatedAt(),
             connection.fields().auth().usesOAuth() ? VaultAccess.CURRENT : null);
     }
 
@@ -430,7 +431,9 @@ public class ConnectorConnectionService {
     /** 관리자가 보는 같은 그룹 사용자의 바인딩들이다. 반영 완료는 바인딩마다 누른다. */
     @Transactional(readOnly = true)
     public List<AdminConnectionSnapshot> listForAdmin(CurrentUser admin) {
-        requireAdmin(admin);
+        if (!admin.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
+        }
         Map<Long, String> names = users.findAll().stream()
             .filter(user -> user.groupId().equals(admin.groupId()))
             .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
@@ -480,13 +483,6 @@ public class ConnectorConnectionService {
 
     private AppUser lock(Long userId) {
         return bindingService.lockOwner(userId);
-    }
-
-
-    private static void requireAdmin(CurrentUser admin) {
-        if (!admin.isAdmin()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
-        }
     }
 
 

@@ -188,7 +188,14 @@ sequenceDiagram
 
 **확인 도구**: 지금 등록의 확인 경로를 쓰되 `oauth: "pending"` 으로 부른다. 통과하면 commit, 메모리 대기 칸을 현재 칸으로 옮기기, 연결 `READY` 와 `auth.method=oauth`, 붙은 바인딩 다시 설치 순서다. 나머지는 지금 등록 표([connector.md](../connector.md) 「연결의 등록, 확인, 해제」)와 같다. 방식을 바꾸지 않은 다시 연결은 서버 정의가 그대로라 재시작 대기가 생기지 않는다. 붙여 넣기에서 단추로 바꾸면 보관 파일이 바뀌어 지금처럼 재시작 대기가 된다.
 
-**「연결 다시 확인」**(OAuth 연결): `oauth: "current"` 로 확인 도구를 부른다. 확인 전의 강제 갱신은 해제 때 취소와 함께 다음 Control Plane PR 에서 넣는다. 그 뒤의 동작은 이렇다. 먼저 갱신을 한 번 강제로 하고, `ok` 면 `oauth: "current"` 로 확인 도구를 부른다(스펙 DECISION19). `grant_revoked` 면 확인 도구 없이 다시 연결 필요로 남는다.
+**「연결 다시 확인」**(OAuth 연결): 먼저 갱신을 한 번 강제로 하고, 결과에 따라 확인 도구를 부를지 정한다(스펙 DECISION19). 강제 갱신은 확인 도구를 부를 때만 한다. 보관 파일이 없거나 카탈로그에서 빠진 플러그인이면 지금 확인과 같이 끝난다.
+
+| 갱신 결과 | 다시 확인이 하는 일 |
+| --- | --- |
+| `ok` | `auth.reconnectRequired` 였으면 표시를 지우고 끊김 알림을 읽음으로 바꾼 뒤 `oauth: "current"` 로 확인 도구를 부른다. 표시를 지울 때 연결의 revision 은 바꾸지 않는다 |
+| `grant_revoked` | 확인 도구 없이 `CONNECTOR_CREDENTIAL_REJECTED` 로 끝낸다. 연결은 다시 연결 필요로 남는다(「끊김과 알림」) |
+| `app_rejected`, `unavailable` | 확인 도구 없이 `CONNECTOR_UNAVAILABLE` 로 끝낸다. 연결 상태는 그대로다. `app_rejected` 는 관리자 알림을 남긴다 |
+| `missing` | 막지 않고 확인 도구를 부른다. 확인 도구의 실패가 연결을 `PENDING` 으로 남겨 다시 연결하게 한다 |
 
 ### 갱신 주기
 

@@ -91,5 +91,6 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthConnections.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/oauth/application/ConnectorOAuthAlerts.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorOAuthCheckTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorOAuthFlowTest.java` | 수정 (다시 확인 사례에 갱신 대역을 더한다) |
 | `docs/features/connector-oauth/design.md` | 수정 |
 | `docs/features/connector.md` | 수정 |
