@@ -53,15 +53,18 @@ async function captures(context: Context, conversationId: string): Promise<Captu
   ).json<Capture[]>();
 }
 
-/** 색인 줄의 모양이다. 개인 사실 줄도 이것으로 시작하므로 어느 구역에도 없음을 볼 때 쓴다. */
+/** 색인 줄의 모양이다. 요약 구역의 줄도 이것으로 시작하므로 어느 구역에도 없음을 볼 때 쓴다. */
 function indexLine(memory: { id: number; title: string }): string {
   return `- [${memory.id}] ${memory.title}`;
 }
 
-/** 짧은 개인 항목이 실리는 개인 사실 구역의 줄이다. */
-function factLine(memory: { id: number; title: string; content: string }): string {
-  return `${indexLine(memory)}: ${memory.content}`;
+/** 요약 줄이 있는 개인 항목이 들어가는 요약 구역의 줄이다. 목록 응답에는 아직 요약이 없어 남길 때 준 요약을 받는다. */
+function factLine(memory: { id: number; title: string }, summary: string): string {
+  return `${indexLine(memory)}: ${summary}`;
 }
+
+const DIRECT_SUMMARY = "다른 사람 홍길동";
+const NEGATED_SUMMARY = "강아지 고기 선호";
 
 export const memoryRememberMcpScenario: Scenario = {
   name: "기억 남기기 도구",
@@ -153,7 +156,7 @@ export const memoryRememberMcpScenario: Scenario = {
 
       step("도구 정의를 읽은 대화에서 사용자가 말한 사실을 남기면 바로 저장하고 CREATED 기록이 생긴다");
       context.hermes.setMemoryRememberCall(DIRECT_TEXT,
-        { title: DIRECT_TITLE, content: "다른 사람은 홍길동이다", evidence: "다른 사람은 홍길동이야" });
+        { title: DIRECT_TITLE, content: "다른 사람은 홍길동이다", summary: DIRECT_SUMMARY, evidence: "다른 사람은 홍길동이야" });
       const direct = await send(context, DIRECT_TEXT, discovery.conversationId);
       expect(direct.assistantText.startsWith(REMEMBERED), `바로 저장의 답이 다르다: ${direct.assistantText}`);
       const saved = (await memories(context)).filter((m) => m.title === DIRECT_TITLE);
@@ -166,16 +169,17 @@ export const memoryRememberMcpScenario: Scenario = {
         `CREATED 기록이 아니다: ${JSON.stringify(directCaptures)}`);
       const directCapture = directCaptures[0]!;
 
-      step("다음 turn 의 instructions 에 기억 지침과 저장한 사실이 개인 사실 구역에 본문까지 실린다");
+      step("다음 turn 의 instructions 에 기억 지침과 저장한 사실의 요약이 요약 구역에 들어간다");
       await send(context, "색인 확인용 안부", direct.conversationId);
       const instructions = context.hermes.lastSubmittedInstructions();
       expect(instructions !== undefined, "다음 turn 의 요청에 instructions 가 없다");
       expect(instructions.includes("# 기억"), `공통 지침에 「# 기억」 절이 없다:\n${instructions}`);
-      expect(instructions.includes("# 지금 묻는 사람에 대해 기억한 것"), `개인 사실 구역이 없다:\n${instructions}`);
-      expect(instructions.includes(factLine(savedMemory)), `개인 사실 구역에 저장한 사실이 없다:\n${instructions}`);
+      expect(instructions.includes("# 지금 묻는 사람에 대해 기억한 것"), `요약 구역이 없다:\n${instructions}`);
+      expect(instructions.includes(factLine(savedMemory, DIRECT_SUMMARY)), `요약 구역에 저장한 사실이 없다:\n${instructions}`);
 
-      step("부정이 사라진 본문은 제안으로 남고 받아들이면 개인 사실 구역에 실린다");
-      context.hermes.setMemoryRememberCall(NEGATED_TEXT, { title: NEGATED_TITLE, content: "강아지는 고기를 좋아한다" });
+      step("부정이 사라진 본문은 제안으로 남고 받아들이면 요약 구역에 들어간다");
+      context.hermes.setMemoryRememberCall(
+        NEGATED_TEXT, { title: NEGATED_TITLE, content: "강아지는 고기를 좋아한다", summary: NEGATED_SUMMARY });
       const negated = await send(context, NEGATED_TEXT, direct.conversationId);
       expect(negated.assistantText.startsWith(PROPOSED),
         `부정이 사라진 본문이 제안으로 남지 않았다: ${negated.assistantText}`);
@@ -195,8 +199,8 @@ export const memoryRememberMcpScenario: Scenario = {
         "제안 받아들이기",
       );
       await send(context, "제안 승인 뒤 확인", direct.conversationId);
-      expect((context.hermes.lastSubmittedInstructions() ?? "").includes(factLine(proposedMemory)),
-        "받아들인 제안이 개인 사실 구역에 실리지 않았다");
+      expect((context.hermes.lastSubmittedInstructions() ?? "").includes(factLine(proposedMemory, NEGATED_SUMMARY)),
+        "받아들인 제안이 요약 구역에 들어가지 않았다");
 
       step("같은 대화의 앞 turn 이 바깥 도구를 썼으면 근거가 있어도 제안으로 내려간다");
       context.hermes.setOutsideToolRun(OUTSIDE_SEARCH_TEXT);
