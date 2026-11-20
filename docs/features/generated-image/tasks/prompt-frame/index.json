@@ -1,0 +1,29 @@
+{
+  "name": "prompt-frame",
+  "description": "그림 지시문 틀: 인물 수와 사람별 줄, 이어지는 장면의 참고, 기본 비율과 구도",
+  "pr_scope": "스펙 PR6(REQ24~REQ26)을 PR 하나로 낸다. 계획 폴더는 이 PR 에서 구현이 끝나면 지운다.",
+  "deferred": [
+    {
+      "what": "운영에서 사람 여럿이 나오는 그림과 이어지는 장면을 그려 Codex 결과와 비교",
+      "why": "품질은 가짜 Hermes 로 확인하지 못한다(스펙 DECISION42)",
+      "after": "이 PR 이 배포된 뒤 코디네이터가 한다"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-20",
+  "spec": "docs/features/generated-image/spec.md",
+  "design": "docs/features/generated-image/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ24", "REQ25", "REQ26"],
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": ["REQ24", "REQ25", "REQ26"],
+      "status": "pending"
+    }
+  ]
+}
