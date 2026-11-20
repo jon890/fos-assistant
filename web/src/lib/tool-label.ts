@@ -98,12 +98,6 @@ export function connectorLabel(connector: ConnectorToolName): string {
     : connector.service;
 }
 
-/** 지금 문장 표에 있는 도구인가. `mcp__` 를 뗀 이름으로 찾는다. */
-export function hasLabel(toolName: string | null): boolean {
-  const name = bareName(toolName);
-  return name !== null && Object.hasOwn(LABELS, name);
-}
-
 export function toolLabel(
   toolName: string | null,
   running: boolean,
