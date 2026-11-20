@@ -2295,8 +2295,11 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 | 제목 인자 | 없다. 인자는 지시문과 비율, 이미지 서비스가 받는 것뿐이고 서비스의 능력에 따라 달라진다 | 같은 함수 |
 | `modify` 의 인자 병합 | `pre_tool_call` 이 돌려준 `args` 를 원래 인자 뒤에 얕게 병합한다. 내장 도구와 MCP 도구를 나누지 않는다 | `hermes_cli/plugins.py` |
 | 결과 hook 이 받는 인자 | `transform_tool_result` 는 도구 인자를 `args` 로 받는다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
+| 바탕과 참고 사진 | 바탕 한 장 `image_url` 과 참고 목록 `reference_image_urls`(글 하나도 받는다)를 받는다. 값은 주소, data URL, 파일 경로다. 실행 공간이 있는 profile 은 Hermes 홈의 media cache(`cache/` 등) 안의 경로를 호스트에서 읽고 그 밖의 경로는 실행 공간 안에서 읽는다. 2026-11-20 에 v0.23.2 소스로 확인했다 | `tools/image_generation_tool.py` 의 `_handle_image_generate`, `_confine_source_images`, `tools/image_source.py` 의 `_MEDIA_CACHE_SUBDIRS` |
+| 입력 장수 | openai-codex 는 바탕과 참고를 이어 앞의 16장(`_MAX_REFERENCE_IMAGES`)만 `images/edits` 로 보내고 넘는 것은 말없이 버린다. 입력 하나는 25MB 까지이고 PNG, JPEG, GIF, WebP 만 받는다 | `plugins/image_gen/openai-codex/__init__.py` 의 `_normalize_input_images`, `plugins/image_gen/_common.py` 의 `collect_source_images` |
 
-Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자, 이미지 서비스를 읽는 설정 자리와 그 서비스 plugin 을 새 버전의 소스에서 다시 본다.
+Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자, 이미지 서비스를 읽는 설정 자리와 그 서비스 plugin, 바탕 사진의 두 인자와 호스트에서 읽는 media cache, 입력 장수를 새 버전의 소스에서 다시 본다.
+`fos-ctx` 는 실행 공간의 경로를 받지 않고 바탕 사진을 Control Plane 에서 받아 media cache 의 사본 경로로 바꾼다([ADR-20261120 / image-source](../../docs/adr/ADR-20261120-image-source.md)). 실행 공간에는 그 사용자의 모든 대화의 사진이 붙어 있기 때문이다.
 
 ### 네트워크
 

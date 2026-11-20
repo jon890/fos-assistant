@@ -21,6 +21,7 @@ from .context import (
 )
 from .handoff import report_handoff
 from .generated_image import TOOL as IMAGE_TOOL, _failed as image_upload_failed, publish as publish_image, strip_title
+from .image_source import FAILED as SOURCE_FAILED, message as source_message, prepare as prepare_sources, release as release_sources
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 
 
@@ -87,13 +88,32 @@ def _delegate_images_allowed(args):
 def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", task_id="", **_):
     decision = _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id)
     if decision is None and tool_name == IMAGE_TOOL:
-        # 판정을 통과한 그림 만들기만 지시문의 제목 줄을 뗀다. 막힌 호출은 그 결과를 그대로 돌려준다.
-        try:
-            return strip_title(args, session_id or "", tool_call_id or "")
-        except Exception as exc:  # noqa: BLE001 - 제목을 떼지 못해도 그림은 만든다
-            logger.warning("fos-ctx: 그림 지시문의 제목 줄을 떼지 못했다: %s", type(exc).__name__)
-            return None
+        return _image_generate(args, session_id or "", tool_call_id or "")
     return decision
+
+
+def _image_generate(args, session_id: str, tool_call_id: str):
+    """판정을 통과한 그림 만들기의 바탕 사진을 받고 지시문의 제목 줄을 뗀다. 막힌 호출은 여기 오지 않는다.
+
+    사진을 받지 못하면 그림을 만들지 않는다(fos-assistant ADR-20261120 / image-source). 제목을 떼지 못해도 그림은 만든다.
+    """
+    try:
+        sources = prepare_sources(args, session_id, tool_call_id)
+    except Exception as exc:  # noqa: BLE001 - 예외를 던지면 가리킴이 그대로 Hermes 로 가 실행 공간의 경로로 읽힌다
+        logger.warning("fos-ctx: 그림 바탕 사진을 받지 못했다: %s", type(exc).__name__)
+        release_sources(session_id, tool_call_id)
+        return _block(source_message([SOURCE_FAILED]))
+    if isinstance(sources, str):
+        return _block(sources)
+    changed = dict(sources or {})
+    try:
+        titled = strip_title(args, session_id, tool_call_id)
+    except Exception as exc:  # noqa: BLE001 - 제목을 떼지 못해도 그림은 만든다
+        logger.warning("fos-ctx: 그림 지시문의 제목 줄을 떼지 못했다: %s", type(exc).__name__)
+        titled = None
+    if titled:
+        changed.update(titled["args"])
+    return {"action": "modify", "args": changed} if changed else None
 
 
 def _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id):
@@ -177,6 +197,11 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
     대응 파일의 서버와 맞는 도구의 결과에 화면 넘기기 칸이 있으면 감싸기 전에 Control Plane 에 알린다(`handoff.py`).
     """
     if tool_name == IMAGE_TOOL:
+        # 바탕 사진의 사본은 결과가 어떻든 지운다. 그 뒤 만든 그림을 올린다.
+        try:
+            release_sources(session_id, tool_call_id)
+        except Exception as exc:  # noqa: BLE001 - 남은 사본은 다음 받기가 나이로 지운다
+            logger.warning("fos-ctx: 그림 바탕 사진의 사본을 지우지 못했다: %s", type(exc).__name__)
         # 만든 그림을 Control Plane 에 올리고 경로 없는 결과로 바꾼다. 예외를 던지면 Hermes 가 경로가 든 원래 결과를 모델에게 준다.
         try:
             return publish_image(args, result, session_id or "", tool_call_id or "")
