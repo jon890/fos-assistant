@@ -29,7 +29,13 @@ function extensionOf(path: string): string {
  * 접힌 채 있다가 누르면 비서가 이미지 도구에 넘긴 지시문과 참고한 링크를 보인다. 둘 다 없으면 그리지 않는다.
  * 링크는 새 창으로 열고 이 화면의 정보를 넘기지 않는다. `https://` 로 시작하지 않는 값은 링크로 만들지 않는다.
  */
-function PromptDetails({ prompt, sourceLinks }: { prompt?: string | null; sourceLinks?: string[] }) {
+function PromptDetails({
+  prompt,
+  sourceLinks,
+}: {
+  prompt?: string | null;
+  sourceLinks?: string[];
+}) {
   const links = sourceLinks ?? [];
   if (!prompt && links.length === 0) return null;
   return (
@@ -43,13 +49,21 @@ function PromptDetails({ prompt, sourceLinks }: { prompt?: string | null; source
         </p>
       ) : null}
       {links.length > 0 ? (
-        <div data-testid="generated-image-source-links" className="mt-1 rounded-md bg-muted p-2 leading-5">
+        <div
+          data-testid="generated-image-source-links"
+          className="mt-1 rounded-md bg-muted p-2 leading-5"
+        >
           <p className="text-muted-foreground">참고한 링크</p>
           <ul className="mt-0.5 space-y-0.5">
             {links.map((link, index) => (
               <li key={`${index}-${link}`} className="break-all">
                 {link.startsWith("https://") ? (
-                  <a href={link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4"
+                  >
                     {link}
                   </a>
                 ) : (
@@ -204,7 +218,10 @@ export function GeneratedImages({
                 />
               ) : null}
             </figcaption>
-            <PromptDetails prompt={image.prompt} sourceLinks={image.sourceLinks} />
+            <PromptDetails
+              prompt={image.prompt}
+              sourceLinks={image.sourceLinks}
+            />
           </figure>
         );
       })}
@@ -265,7 +282,10 @@ export function GeneratedImages({
                 />
               )}
             </div>
-            <PromptDetails prompt={opened.prompt} sourceLinks={opened.sourceLinks} />
+            <PromptDetails
+              prompt={opened.prompt}
+              sourceLinks={opened.sourceLinks}
+            />
           </DialogContent>
         ) : null}
       </Dialog>
