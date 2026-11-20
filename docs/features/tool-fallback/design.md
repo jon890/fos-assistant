@@ -6,7 +6,7 @@
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `ContextAssembler` 에 「도구가 실패했을 때」 지침 글 `TOOL_FAILURE_INSTRUCTIONS` 를 둔다. 지금 `TOOL_CALL_INSTRUCTIONS` 는 「# 도구 호출」 과 「# 승인 카드」 두 절을 한 상수에 담으므로, 글은 바꾸지 않고 두 상수로 나눠 「도구 호출」, 「도구가 실패했을 때」, 「승인 카드」 차례로 모든 범위에 넣는다(스펙 REQ1 의 「도구 호출」 아래, DECISION6). 글의 뜻은 아래 「지침 글」 이 갖는다 |
+| REQ1 | 「도구가 실패했을 때」 지침 글을 `context.application.ToolFailureInstructions.SECTION` 에 둔다. `ContextAssembler.java` 가 파일 길이 상한(500줄)에 닿아 있어 서비스 개념 목록(`ServiceConceptsInstructions.SECTION`)처럼 따로 둔다. 지금 `TOOL_CALL_INSTRUCTIONS` 는 「# 도구 호출」 과 「# 승인 카드」 두 절을 한 상수에 담으므로, 「승인 카드」 절을 글 그대로 `ApprovalCardInstructions.SECTION` 으로 떼고 「도구 호출」, 「도구가 실패했을 때」, 「승인 카드」 차례로 모든 범위에 넣는다(스펙 REQ1 의 「도구 호출」 아래, DECISION6). 글의 뜻은 아래 「지침 글」 이 갖는다 |
 | REQ2 | 같은 지침 글이 바로 알릴 실패를 나열한다. 그 실패를 내는 글(승인 대기, 사람 손이 필요한 화면, 결과를 알 수 없는 실행, 결제·구매 상한, 연결 준비 안 됨, 보안·정책 막힘)은 「사용자에게 바로 알린다」 줄을 단다. 지금 글의 「다시 부르지 않는다」 는 지우지 않는다 |
 | REQ3 | 모델이 받는 실패 글을 만드는 자리를 Java 와 Python 에 하나씩 둔다. Control Plane MCP 의 실패는 도구 결과(`McpToolService.result`)와 JSON-RPC 오류(`McpRpc.invalidParams`, `McpRpc.error`) 두 길로 나가므로 둘 다 이 값만 받게 한다. Java 는 `shared.util.ToolFailureText`, Python 은 `hermes/plugins/fos-ctx/next_step.py` 다. 실패 글은 그 자리의 두 factory(다음 방법, 바로 알림)로만 만든다. 대상 글은 아래 「바꾸는 실패 글」 이 갖는다 |
 | REQ4 | PR2. `LinkPageParts` 가 대표 사진 하나 대신 후보 목록(`og:image`, `og:image:secure_url`, `twitter:image`, JSON-LD `Product.image`)을 차례대로 돌려주고, `LinkImageFetcher.fetchLink` 가 후보마다 지금의 `follow` 와 사진 판정을 거쳐 처음 받아진 사진을 쓴다. 넘기는 때는 스펙 DECISION7 이 갖는다 |
@@ -31,7 +31,7 @@ Hermes 내장 도구의 실패 글도 바꾸지 않는다. Hermes core 를 고�
 
 ### 지침 글
 
-`TOOL_FAILURE_INSTRUCTIONS` 의 뜻이다. 정확한 글은 구현이 정하고 단위 테스트가 아래 뜻의 문장이 든 것을 본다.
+`ToolFailureInstructions.SECTION` 의 뜻이다. 절 본문에는 빈 줄을 두지 않는다. E2E 의 가짜 Hermes 가 지침 제목 뒤 한 문단씩 벗겨 내기 때문이다(`test/e2e/fake-hermes/scenario-fixtures.ts` 의 `MODEL_GUIDE_HEADERS`). 정확한 글은 구현이 정하고 단위 테스트가 아래 뜻의 문장이 든 것을 본다.
 
 ```text
 # 도구가 실패했을 때
@@ -77,7 +77,7 @@ Control Plane 판정 글은 Control Plane 이 이미 끝 줄을 붙여 보내므
 | `image_source.py` | `IMAGE_SOURCE_LINK_BLOCKED` | 바로 알림(DECISION9) |
 | `image_source.py` | `IMAGE_SOURCE_LINK_TOO_LARGE` | 다음 방법: 다른 방법이 없으니 해 본 것을 알리고 더 작은 사진을 올려 달라고 묻는다 |
 | `image_source.py` | `FAILED` | 다음 방법: 다른 방법이 없으니 잠시 뒤 다시 해 달라고 알린다(DECISION10) |
-| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 가리킴으로 고쳐 다시 부르기, `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴 찾기, `TOO_MANY` 는 장수를 줄여 다시 부르기, `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. `TAIL` 은 「사용자에게 알린다」 를 빼고 문제 줄마다의 끝 줄을 따른다 |
+| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 가리킴으로 고쳐 다시 부르기, `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴 찾기, `TOO_MANY` 는 장수를 줄여 다시 부르기, `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. 「그림을 만들지 않았다」 는 `TAIL` 대신 `HEAD` 로 옮기고 `TAIL` 을 없앤다. 그래야 문제가 여럿인 글도 마지막 문제의 끝 줄로 끝난다(스펙 REQ3) |
 | `attachment_inspect.py` | `FAILURE` | 바로 알림. 재업로드를 요구하지 않는 지금 뜻을 지킨다(DECISION8). `region_required` 와 한도 초과의 다시 조회 안내는 이미 다음 방법이라 꼴만 맞춘다 |
 | `generated_image.py` | `FAILED_MESSAGE` | 바로 알림 |
 | `approval_guard.py` | `DANGEROUS_COMMAND_MESSAGE`, `COMPUTER_USE_MESSAGE` | 다음 방법: 막히지 않은 다른 명령이나 도구로 같은 일을 한다(DECISION9) |
@@ -141,7 +141,7 @@ PR2 는 같은 `fetchLink` 를 고치는 「종류를 잘못 적은 사진도 �
 | --- | --- | --- | --- | --- |
 | DECISION1 | 끝 줄을 만드는 자리 | Java 는 `shared.util.ToolFailureText`, Python 은 `fos-ctx/next_step.py`. MCP 결과 함수가 그 값만 받게 해 컴파일로 막는다 | 작성자 | 실패 글이 여러 기능에 흩어져 있어 한 자리에서 꼴을 정해야 빠지는 글이 없다. 문자열 검사만으로는 새 글을 놓친다 |
 | DECISION2 | Control Plane 판정 글의 범위 | 플러그인 호출을 막는 판정 글은 REQ3 대상에 넣는다. 승인한 실행의 복구 안내와 `[승인 대기]` 는 넣지 않는다 | 작성자 | 판정 글은 fos-ctx 가 그대로 모델에게 돌려주는 실패 글이다. 복구 안내는 ADR-092 의 플러그인 어휘이고 스펙 DECISION3 이 그대로 두기로 했다 |
-| DECISION3 | 지침을 둘 자리 | 지금 상수를 「도구 호출」 과 「승인 카드」 두 상수로 글 그대로 나누고 그 사이에 새 상수를 둔다 | 작성자 | 스펙 REQ1 이 「도구 호출」 아래를 정했다. 승인 카드 글은 다른 기능이 갖는 뜻이라 섞지 않는다. 모든 범위에 같은 자리라 캐시 앞부분이 그대로 이어진다 |
+| DECISION3 | 지침을 둘 자리 | 「승인 카드」 절을 글 그대로 `ApprovalCardInstructions.SECTION` 으로, 새 절을 `ToolFailureInstructions.SECTION` 으로 떼어 「도구 호출」, 「도구가 실패했을 때」, 「승인 카드」 차례로 잇는다 | 작성자 | 스펙 REQ1 이 「도구 호출」 아래를 정했다. 승인 카드 글은 다른 기능이 갖는 뜻이라 섞지 않는다. `ContextAssembler.java` 가 파일 길이 상한(500줄)에 닿아 있어 서비스 개념 목록과 같이 따로 둔다. 모든 범위에 같은 자리라 캐시 앞부분이 그대로 이어진다 |
 | DECISION4 | 링크 사진 후보에 `og:image:secure_url` 을 넣을지 | 넣는다. `og:image` 바로 뒤 | 작성자 | 지금 `PREVIEW_NAMES` 가 이미 읽는 이름이다. 스펙 REQ4 의 차례(og, twitter, JSON-LD)를 바꾸지 않는다 |
 | DECISION5 | PR2 의 시작 시점 | 머리 바이트 판정 작업이 main 에 들어간 뒤 | 작성자 | 같은 메서드를 고쳐 충돌하고, 후보마다 같은 판정을 써야 한다 |
 | DECISION6 | JSON 실패 결과의 끝 줄 | JSON 에 `next` 칸 하나를 더한다 | 작성자 | 글 끝에 붙이면 JSON 이 깨진다. 칸을 더하는 것은 있던 칸을 바꾸지 않고, 읽는 쪽은 모델뿐이다. 스펙이 막은 것은 프로그램이 읽는 다음 방법 코드이고 이 칸은 사람 말 한 줄이다 |
@@ -152,5 +152,5 @@ PR2 는 같은 `fetchLink` 를 고치는 「종류를 잘못 적은 사진도 �
 | 결정 | 종류 | ADR 또는 필요 없음의 이유 | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | 스펙 DECISION1 | architecture | 새 ADR 은 필요 없다. PR2 가 [ADR-20261120 / link-image-source](../../adr/ADR-20261120-link-image-source.md) 의 결정 표에서 받는 것 행을 고친다. 보안 경계는 바뀌지 않는다 | `LinkPageParts`, `LinkImageFetcher` |
-| 스펙 DECISION2, DECISION9, DECISION10 | prompt-policy | 필요 없다. 되돌리기 쉬운 지침 글이고 원본이 한 곳이다 | `ContextAssembler.TOOL_FAILURE_INSTRUCTIONS` |
+| 스펙 DECISION2, DECISION9, DECISION10 | prompt-policy | 필요 없다. 되돌리기 쉬운 지침 글이고 원본이 한 곳이다 | `ToolFailureInstructions.SECTION` |
 | DECISION1 | code-structure | 필요 없다. 기존 관례(`shared.util` 의 공용 값)를 따른다 | `ToolFailureText`, `next_step.py` |
