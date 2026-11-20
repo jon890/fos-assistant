@@ -558,6 +558,19 @@ class ProfileApiRouteTest(unittest.TestCase):
         mcp["mcpServers"][server]["env"][name] = "${%s}" % name
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
+    def declare_oauth(self, connector, server="demo", oauth=None):
+        """시험 플러그인 사본이 단추 연결(`oauth`)을 선언하게 한다(docs/features/connector-oauth/design.md 의 「선언」).
+
+        기본은 GitHub 선언이고 비밀 칸 `token` 을 단추로 채우며 통로 주소를 `DEMO_TOKEN_URL` 로 받는다.
+        """
+        oauth = oauth or {"provider": "github", "fields": ["token"], "token_env": "DEMO_TOKEN_URL"}
+        declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
+        declared["oauth"] = oauth
+        (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((connector / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"][server]["env"][oauth["token_env"]] = "${%s}" % oauth["token_env"]
+        (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+
     def declare_owner_browser(self, connector, server="demo", name="DEMO_BROWSER_URL"):
         """시험 플러그인 사본이 브라우저 중계 주소를 받는 env 를 선언하게 한다(ADR-20261008 browser-gateway-token)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
@@ -610,7 +623,15 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request("/api/profiles", "POST", token="valid",
                             body=body if body is not None else {"name": "alice", "no_skills": True})
 
-    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None, full_response=False, skills_payload=None):
+    def request(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None,
+                full_response=False, *, skills_payload=None):
+        response = asyncio.run(self.send(
+            path, method, token, cookie, body, query_profiles, query, skills_payload=skills_payload))
+        return response if full_response else response.status_code
+
+    async def send(self, path, method, token=None, cookie=False, body=None, query_profiles=(), query=None,
+                   *, skills_payload=None):
+        """미들웨어를 한 번 거친 응답이다. 요청 둘을 한 이벤트 루프에서 함께 보낼 때 쓴다."""
         pairs = [("profile", value) for value in query_profiles] + list((query or {}).items())
 
         class QueryParams:
@@ -669,8 +690,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                 target.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return types.SimpleNamespace(status_code=204 if authenticated else 200)
 
-        response = asyncio.run(self.gate(request, call_next))
-        return response if full_response else response.status_code
+        return await self.gate(request, call_next)
 
     def assert_rolled_back(self, status, deleted=("alice",)):
         self.assertEqual(status, 500)

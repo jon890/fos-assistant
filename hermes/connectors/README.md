@@ -89,6 +89,7 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 
 - 자격 증명은 `fields` 에 선언한 env 로만 받는다. 파일에서 읽거나 파일에 쓰지 않는다
 - 토큰, secret, 비밀번호, key 를 받는 칸은 `"secret": true` 다
+- **단추로 연결하는 플러그인(`oauth` 선언)은 `token_env` 의 주소에서 도구를 부를 때마다 토큰을 받는다.** 받은 토큰을 파일이나 로그에 쓰지 않는다. 주소가 빈 값이면 붙여 넣은 칸 값을 쓴다([ADR-20261120 / connector-oauth](../../docs/adr/ADR-20261120-connector-oauth.md))
 - 결과와 로그와 오류 글에 자격 증명과 서비스가 준 오류 원문을 싣지 않는다. 오류는 코드만 내고 `errors` 표로 공통 어휘에 잇는다
 - 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 플러그인 문서에 적는다
 - `operator_secrets` 를 두지 않는다
@@ -392,10 +393,11 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책이 적용되는 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
 | `event_watch` | 선택. 사건 감지 선언이다. Control Plane 이 모델 없이 새 항목이 있는지 볼 때 대시보드의 `POST /api/connectors/<id>/events` 가 이 선언대로 조회 도구를 부른다. 칸과 검증은 아래 「사건 감지 선언」 이 갖는다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)) |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 플러그인을 카탈로그에 내지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
+| `oauth` | 선택. 「GitHub 으로 연결」 같은 단추로 연결할 수 있다는 선언이다. `provider` 는 `github` 나 `google` 이다. `scopes` 는 Google 만 받는 비지 않은 scope 목록이다. `fields` 는 단추로 연결하면 비워 두는 `"secret": true` 칸 key 목록이다. `token_env` 는 토큰 통로 주소를 받을 env 이름이다. 제공자 주소는 선언하지 않고 대시보드 plugin 의 제공자 표가 갖는다. 틀린 선언은 그 칸만 버리고 경고 로그를 남기며 입력 칸 연결은 남는다. 원격 MCP 플러그인은 받지 않는다([ADR-20261120 / connector-oauth](../../docs/adr/ADR-20261120-connector-oauth.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
-- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 플러그인을 카탈로그에 내지 않는다
+- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `oauth.token_env` 의 합과 같아야 한다. 이 이름들은 겹치지 않는다. `oauth.token_env` 값도 다른 칸처럼 `${이름}` 참조다. 하나라도 다르면 그 플러그인을 카탈로그에 내지 않는다
 - `icon`, `link`, `readme_url`이 아래 「아이콘과 링크」를 어기면 그 칸만 null로 내고 경고 로그를 남긴다. 플러그인은 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
