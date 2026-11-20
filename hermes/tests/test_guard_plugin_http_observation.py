@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 
 
-SOURCE = pathlib.Path(__file__).resolve().parents[2] / "test/e2e/financial/guard_plugin_http.py"
+SOURCE = pathlib.Path(__file__).resolve().parent / "fixtures/guard_plugin_http.py"
 SPEC = importlib.util.spec_from_file_location("guard_plugin_http_observation", SOURCE)
 FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)

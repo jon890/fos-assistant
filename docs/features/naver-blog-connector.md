@@ -603,7 +603,7 @@ CI 에서 돌지 않는다. 사진 안내, 블로그 스킬, 사진 입력을 �
 | --- | --- |
 | `scenarios.json` | 시나리오마다 보낼 메시지의 차례, 글, 붙일 사진 |
 | `photos/photos.json` | 합성 사진마다 그 사진에만 있는 정답 글자와 허용 표기 |
-| `photos/*.jpg` | 합성 사진. `make_photos.py` 가 만든 것을 커밋한다 |
+| `photos/*.jpg` | 합성 사진. 커밋된 JPEG 를 그대로 쓴다. 생성 조건은 `test/model-eval/blog/photos/README.md` 를 본다 |
 | `run.ts` | `send` 는 대화를 만들고 메시지를 보낸다. `score` 는 결과를 읽어 판정하고 보고서를 쓴다 |
 | `score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수이고 `test/model-eval/blog/blog-photo-eval-score.test.ts` 가 검사한다 |
 

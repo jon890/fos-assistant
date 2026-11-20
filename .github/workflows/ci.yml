@@ -475,7 +475,7 @@ jobs:
           package-manager-cache: false
       - run: node --test 'test/**/*.test.ts' 'scripts/**/*.test.ts'
       - name: 로컬 검사 스크립트 회귀 테스트
-        run: python3 -I test/e2e/financial/test_local_check.py
+        run: node --test test/e2e/financial/test_local_check.ts
       - name: 마이그레이션 버전 검사
         env:
           # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
@@ -541,7 +541,7 @@ jobs:
             bun run --cwd "$connector" build
           done
       # 테스트 모듈마다 프로세스를 나눠 동시에 돌린다. 모듈 목록은 unittest discover 와 같다.
-      - run: python scripts/checks/run-hermes-python-tests.py -j 4
+      - run: bun scripts/checks/run-hermes-python-tests.ts -j 4
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 버전 소스에서 확인한다(ADR-088).
       - run: bash scripts/checks/check-hermes-contract.sh
 
@@ -599,8 +599,6 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
         if: needs.changes.outputs.quality == 'true'
-      - run: python3 test/spotless-jdt.test.py
-        if: needs.changes.outputs.quality == 'true'
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
         with:
@@ -612,6 +610,8 @@ jobs:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
+      - run: node test/spotless-jdt.test.ts
+        if: needs.changes.outputs.quality == 'true'
       - run: cd web && pnpm install --frozen-lockfile
         id: install
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'

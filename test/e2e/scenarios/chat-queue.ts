@@ -97,6 +97,11 @@ export async function holdTurn(
   const turn = await openStream(context, text, agentCode, conversationId);
   await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 turn 의 실행을 받지 않았다");
   const started = await within(turn.started, 5_000, "turn 의 started 사건을 받지 못했다");
+  // 가짜 Hermes 가 제출을 받은 때에는 Control Plane 이 아직 그 run 번호를 모른다. 번호를 적은 뒤에 사건 스트림을 열므로
+  // 그것까지 기다린다. 그 전에 보낸 글은 끼우지 못하고 대기 줄로 가서 steer 단계가 가끔 실패했다.
+  const held = context.hermes.heldRun();
+  if (held === undefined) fail("붙잡은 turn 의 run 이 없다");
+  await within(context.hermes.waitForRunEvents(held.runId), 5_000, "Control Plane 이 붙잡은 run 의 사건 스트림을 열지 않았다");
   return { turn, started };
 }
 
