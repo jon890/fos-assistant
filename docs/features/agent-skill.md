@@ -376,7 +376,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 일반 경로는 올린 스킬(`UPLOADED`)과 플러그인이 실제 설치한 스킬(`CONNECTOR`)을 준다. 플러그인 항목에는 `connectorTitle`을 추가한다. 설정에서는 읽기 전용으로 보인다. Hermes 기본 스킬(`HERMES`)은 관리자 영역의 경로가 준다.
 목록은 그 에이전트를 쓸 수 있는 사람이 본다. 호출 합계(`usage`)와 올린 스킬의 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 할 수 있다.
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」). Hermes 는 올린 스킬과 모델이 만든 로컬 스킬을 모두 출처 `agent` 로 주므로 그 칸을 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」). Hermes 는 올린 스킬과 모델이 만든 로컬 스킬을 모두 출처 `agent` 로 주므로 그 칸을 쓰지 않는다. 올린 스킬 이름이 `UPLOADED` 다. 그 밖에는 플러그인 출처(`connector_id`)가 있는 스킬이 `CONNECTOR`, 나머지가 `HERMES` 다. 이름이 겹치면 `UPLOADED` 를 우선한다.
 올린 스킬 이름은 지금 버전과, 그보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 Hermes 가 이미 가리키고 있을 수 있어서, 그 이름도 올린 스킬로 보이고 다시 저장하거나 지울 수 있다.
 지금 버전에 있는데 대시보드 목록에 없는 스킬도 올린 것으로 넣고 켜진 것으로 보인다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬도 화면에서 지울 수 있어야 하기 때문이다.
 
