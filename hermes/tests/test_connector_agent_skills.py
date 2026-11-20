@@ -73,12 +73,30 @@ class AgentSkillPlanTest(ConnectorGateCase):
         """`external_dirs` 의 같은 이름은 소유 기록과 상관없이 겹침이다. 문자열 하나로 둔 경로도 읽는다."""
         uploaded = self.profile.parent / "uploaded" / "alice" / "v1"
         (uploaded / RUNNER).mkdir(parents=True)
+        (uploaded / RUNNER / "SKILL.md").write_text("---\nname: %s\n---\n올린 스킬\n" % RUNNER, encoding="utf-8")
         for external in ([str(uploaded)], str(uploaded)):
             with self.subTest(external=type(external).__name__):
                 config = {**shell(env=FULL_ENV), "skills": {"external_dirs": external}}
                 install, skipped = self.plan(config, owned=[RUNNER])
                 self.assertEqual(install, {REPORT})
                 self.assertEqual(skipped, {RUNNER: ["name_taken"]})
+
+    def test_name_taken_by_a_skill_under_a_category_folder(self):
+        """분류 폴더 아래 스킬도 디렉터리 이름이나 앞머리 `name` 이 같으면 겹침이다. Hermes 의 `skill_view` 가 둘 다 고르지 못한다."""
+        nested = self.profile / "skills" / "local" / "my-report"
+        nested.mkdir(parents=True)
+        (nested / "SKILL.md").write_text("---\nname: %s\ndescription: 모델이 만든 스킬\n---\n본문\n" % REPORT,
+                                         encoding="utf-8")
+        self.assertEqual(self.plan(shell(env=FULL_ENV), owned=[REPORT])[1], {REPORT: ["name_taken"]})
+        (nested / "SKILL.md").write_text("본문\n", encoding="utf-8")
+        nested.rename(self.profile / "skills" / "local" / RUNNER)
+        self.assertEqual(self.plan(shell(env=FULL_ENV))[1], {RUNNER: ["name_taken"]})
+
+    def test_only_the_shell_backend_is_missing(self):
+        """터미널과 env 가 있어도 셸 설정이 실행 공간이 아니면 그 까닭 하나만 낸다."""
+        config = shell(env=FULL_ENV)
+        config["terminal"]["backend"] = "local"
+        self.assertEqual(self.plan(config)[1], {RUNNER: ["sandbox_unregistered"]})
 
     def test_malformed_config_does_not_raise(self):
         """설정 칸의 모양이 틀려도 예외 없이 조건을 못 채운 것으로 본다."""

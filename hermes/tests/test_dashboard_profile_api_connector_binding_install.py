@@ -620,7 +620,7 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
 
     def setUp(self):
         super().setUp()
-        self.agent_skill_fixture()
+        self.demo, _ = self.agent_skill_fixture()
         self.skills = self.root / "alice/skills"
 
     def configured(self):
@@ -671,6 +671,21 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
         self.assertIs(self.configured(), False)
         self.assertEqual(self.bind().body["skipped_skills"], [{"name": "demo-runner", "reasons": ["terminal_off"]}])
         self.assertFalse((self.skills / "demo-runner").exists())
+        self.assertIs(self.configured(), True)
+
+    def test_new_plugin_version_is_seen_as_drift_and_installed_by_reinstall(self):
+        """새 버전이 에이전트용 스킬을 더하거나 본문을 바꾸면 어긋남이고, 다시 설치가 깐다(REQ4)."""
+        self.set_shell(env={"CLAUDE_PLUGIN_ROOT": "/plugin"})
+        self.assertEqual(self.bind().status_code, 200)
+        added = self.demo / "agent-skills" / "extra"
+        added.mkdir()
+        (added / "SKILL.md").write_text("---\nname: demo-extra\n---\n새 스킬\n", encoding="utf-8")
+        (self.demo / "agent-skills/report/SKILL.md").write_text("---\nname: demo-report\n---\n바뀐 본문\n",
+                                                                encoding="utf-8")
+        self.assertIs(self.configured(), False)
+        self.assertEqual(self.bind().body["skipped_skills"], [])
+        self.assertEqual(self.installed(), ["demo", "demo-extra", "demo-report", "demo-runner"])
+        self.assertIn("바뀐 본문", (self.skills / "demo-report/SKILL.md").read_text(encoding="utf-8"))
         self.assertIs(self.configured(), True)
 
     def test_disabled_agent_skill_stays_disabled_after_reinstall(self):

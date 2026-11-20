@@ -41,26 +41,55 @@ def _shell_reasons(config: dict, required: frozenset) -> list:
     return reasons
 
 
-def _name_taken(profile_dir: pathlib.Path, config: dict, name: str, owned_skills) -> bool:
-    """이 플러그인이 설치하지 않은 같은 이름의 스킬이 있는가. 읽지 못하는 자리는 없는 것으로 본다.
+def _skill_names(directory: pathlib.Path, skip: frozenset = frozenset()) -> set:
+    """디렉터리 아래 모든 `SKILL.md` 의 스킬 이름이다. 분류 폴더 아래(`<분류>/<이름>/`)도 찾고 링크는 따라가지 않는다.
 
-    profile `skills/` 의 같은 이름은 소유 기록에 있으면 이 플러그인이 설치한 것이다.
-    `external_dirs` 에는 플러그인이 설치하지 않으므로 같은 이름이 있으면 늘 다른 스킬이다(올린 스킬).
+    Hermes 의 `skill_view` 는 디렉터리 이름이나 앞머리 `name` 이 같은 후보가 둘 이상이면 거절하므로 둘 다 이름으로 센다.
+    `skip` 은 맨 위에서 건너뛸 디렉터리 이름(이 플러그인이 설치한 스킬)이다. 읽지 못하는 자리는 없는 것으로 본다.
+    """
+    import os
+    import re
+    names = set()
+    try:
+        walker = os.walk(directory)
+        for current, dirs, files in walker:
+            here = pathlib.Path(current)
+            if here == directory:
+                dirs[:] = [child for child in dirs if child not in skip]
+            if "SKILL.md" not in files:
+                continue
+            names.add(here.name)
+            try:
+                head = (here / "SKILL.md").read_text(encoding="utf-8", errors="replace")[:4096]
+            except OSError:
+                continue
+            front = re.match(r"\ufeff?---\s*\n(.*?)\n---", head, re.S)
+            found = re.search(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", front.group(1), re.M) if front else None
+            if found:
+                names.add(found.group(1))
+    except OSError:
+        pass
+    return names
+
+
+def _taken_names(profile_dir: pathlib.Path, config: dict, owned_skills) -> set:
+    """이 플러그인이 설치하지 않은 스킬의 이름 전체다. 같은 이름의 에이전트용 스킬은 깔지 않는다.
+
+    profile `skills/` 는 맨 위의 이 플러그인 소유 디렉터리를 빼고 본다.
+    `external_dirs` 에는 플러그인이 설치하지 않으므로 늘 다른 스킬이다(올린 스킬).
     """
     # `connector_state` 는 manifest 읽기를 거쳐 이 모듈을 부르므로 함수 안에서 읽는다.
     from .connector_state import PROFILE_SKILLS_DIR
+    skills_dir = profile_dir / PROFILE_SKILLS_DIR
+    taken = _skill_names(skills_dir, frozenset(owned_skills))
     try:
-        if name not in owned_skills and (profile_dir / PROFILE_SKILLS_DIR / name).exists():
-            return True
+        # `SKILL.md` 가 없어도 맨 위의 같은 이름 디렉터리는 설치가 쓸 자리를 차지한다.
+        taken |= {child.name for child in skills_dir.iterdir() if child.name not in owned_skills}
     except OSError:
         pass
     for directory in _external_skill_dirs(config):
-        try:
-            if (directory / name).is_dir():
-                return True
-        except OSError:
-            continue
-    return False
+        taken |= _skill_names(directory)
+    return taken
 
 
 def _agent_skill_plan(profile_dir: pathlib.Path, config: dict, manifest: dict, owned_skills) -> tuple[set, dict]:
@@ -70,12 +99,13 @@ def _agent_skill_plan(profile_dir: pathlib.Path, config: dict, manifest: dict, o
     까닭은 터미널, 실행 공간, env, 이름 겹침 차례로 해당하는 것을 모두 낸다. 셸 조건은 요구 env 가 있는 스킬만 본다.
     플러그인 스킬은 보지 않는다. 그 겹침은 바인딩 설치가 지금처럼 거절한다.
     """
-    owned = set(owned_skills or ())
+    agent_skills = manifest.get("agent_skills") or {}
+    taken = _taken_names(profile_dir, config, set(owned_skills or ())) if agent_skills else set()
     install = set()
     skipped = {}
-    for name, required in (manifest.get("agent_skills") or {}).items():
+    for name, required in agent_skills.items():
         reasons = _shell_reasons(config, required) if required else []
-        if _name_taken(profile_dir, config, name, owned):
+        if name in taken:
             reasons.append(NAME_TAKEN)
         if reasons:
             skipped[name] = reasons
