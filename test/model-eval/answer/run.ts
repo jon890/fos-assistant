@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ControlPlane, TIERS } from "../control-plane.ts";
 import {
+  collectAnswers,
   exitCode,
   failedQuestion,
   linkState,
@@ -168,15 +169,15 @@ async function score(values: Record<string, unknown>): Promise<number> {
     let result: QuestionScore;
     try {
       if (run.error) throw new Error(run.error);
-      // 마지막으로 보낸 turn 의 루트 실행에 묶인 답만 본다. 위임 결과를 전하는 자동 turn 의 답은 보지 않는다
+      // 질문 뒤의 자동 turn 답도 함께 읽는다. 도구 수와 시간은 마지막 사용자 turn 의 실행 트리로 본다
       const executionId = run.executionIds.at(-1);
       if (!run.conversationId || executionId == null) throw new Error("보낸 실행 번호가 없다");
       const messages = await api.messages(run.conversationId);
-      const answer = messages.findLast((message) => message.role === "ASSISTANT" && message.executionId === executionId);
-      if (!answer?.content) throw new Error("그 실행의 답을 찾지 못했다");
-      for (const url of sourceLinks(answer.content)) if (!links.has(url)) links.set(url, await checkLink(url));
+      const answer = collectAnswers(messages, run.executionIds);
+      if (answer.length === 0) throw new Error("그 실행의 답을 찾지 못했다");
+      for (const url of sourceLinks(answer)) if (!links.has(url)) links.set(url, await checkLink(url));
       const tree = await api.tree(executionId);
-      result = scoreQuestion(question, answer.content, new Date(run.startedAt), links, tree.root);
+      result = scoreQuestion(question, answer, new Date(run.startedAt), links, tree.root);
     } catch (error) {
       if (error instanceof UsageError) throw error;
       const earlier = previous.get(question.id);

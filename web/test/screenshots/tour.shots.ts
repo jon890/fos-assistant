@@ -14,6 +14,7 @@ import {
   JWT_SECRET,
   TEST_EMAIL,
 } from "../browser/settings.ts";
+import { pickAgent } from "../browser/helpers.ts";
 
 /**
  * README 의 「한눈에 보기」 에 싣는 화면을 찍는다.
@@ -206,7 +207,7 @@ test("데모 데이터를 넣는다", async ({ page }) => {
 /** 새 대화 화면에서 에이전트와 단계를 고르고 글을 보낸다. */
 async function send(page: Page, text: string): Promise<void> {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "생활 비서" }).click();
+  await pickAgent(page, "생활 비서");
   await page.getByTestId("model-tier-medium").click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
@@ -214,7 +215,7 @@ async function send(page: Page, text: string): Promise<void> {
 
 test("새 대화", async ({ page }) => {
   await page.goto("/new");
-  await page.getByRole("radio", { name: "생활 비서" }).click();
+  await pickAgent(page, "생활 비서");
   await page.getByTestId("model-tier-medium").click();
   await expect(
     page.getByRole("button", { name: PLAN_QUESTION, exact: true }),
@@ -482,7 +483,7 @@ test("사용량과 비용", async ({ page }) => {
     (await page.request.post(support, { headers, data: seeds })).ok(),
   ).toBeTruthy();
 
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
   await expect(page.getByTestId("breakdown-table")).toContainText("생활 비서");
   await shot(page, "tour-07-usage");
 });

@@ -51,9 +51,16 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
     List<ChatAttachment> findByConversationIdOrderByMessageIdAscPositionAsc(Long conversationId);
 
 
-    /** 아직 메시지에 묶이지 않았고 지워지지 않은 첨부의 수. 한 번 보낼 때의 장수 상한을 이것으로 본다. */
+    /** 그 대화에서 그림 행 하나로 만든 원고용 사본들. 새것부터다(ADR-20261120 / generated-image-draft). */
+    List<ChatAttachment> findByConversationIdAndSourceArtifactIdOrderByIdDesc(Long conversationId, Long sourceArtifactId);
+
+
+    /**
+     * 아직 메시지에 묶이지 않았고 지워지지 않은 첨부의 수. 한 번 보낼 때의 장수 상한을 이것으로 본다.
+     * 원고에 넣으려고 만든 그림 사본은 보낼 사진이 아니라 세지 않는다.
+     */
     @Query("select count(a) from ChatAttachment a where a.conversationId = :conversationId"
-        + " and a.messageId is null and a.deletedAt is null and a.deletionRequestedAt is null")
+        + " and a.messageId is null and a.sourceArtifactId is null and a.deletedAt is null and a.deletionRequestedAt is null")
     long countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(Long conversationId);
 
 
@@ -62,7 +69,7 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
     List<ChatAttachment> findByExpiresAtBeforeAndDeletedAtIsNullOrderByIdAsc(Instant now);
 
 
-    /** 아직 묶이지 않았고 지워지지 않은 첨부 하나를 지정한 자리로 묶는다. */
+    /** 아직 묶이지 않았고 지워지지 않은 첨부 하나를 지정한 자리로 묶는다. 원고용 그림 사본은 메시지에 묶지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update ChatAttachment a
@@ -71,6 +78,7 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
              where a.id = :attachmentId
                and a.conversationId = :conversationId
                and a.messageId is null
+               and a.sourceArtifactId is null
                and a.deletedAt is null
                and a.deletionRequestedAt is null
             """)

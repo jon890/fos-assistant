@@ -24,7 +24,7 @@ class ArtifactStoreWriteTest {
     @Test
     @DisplayName("HTML과 CSS를 대화 폴더에 쓰고 UTF 8 크기를 돌려준다")
     void writesHtmlAndCssToConversationFolderAndReturnsUtf8Size(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, true);
+        ArtifactStore store = store(root);
 
         long htmlSize = store.write(10L, "test/index.html", "한글".getBytes(StandardCharsets.UTF_8));
         long cssSize = store.write(10L, "test/style.css", "p{}".getBytes(StandardCharsets.UTF_8));
@@ -39,7 +39,7 @@ class ArtifactStoreWriteTest {
     @Test
     @DisplayName("같은 경로를 다시 쓰면 새 본문으로 교체한다")
     void replacesWithNewBodyWhenSamePathIsWrittenAgain(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, true);
+        ArtifactStore store = store(root);
         store.write(10L, "index.html", "이전".getBytes(StandardCharsets.UTF_8));
 
         long size = store.write(10L, "index.html", "최신 본문".getBytes(StandardCharsets.UTF_8));
@@ -50,20 +50,9 @@ class ArtifactStoreWriteTest {
 
 
     @Test
-    @DisplayName("강제한 ATOMIC MOVE 대체 경로도 저장한다")
-    void storesOnFallbackPathWhenAtomicMoveIsForced(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, true);
-
-        store.write(10L, "nested/index.html", "대체 경로".getBytes(StandardCharsets.UTF_8));
-
-        assertThat(Files.readString(root.resolve("10/nested/index.html"))).isEqualTo("대체 경로");
-    }
-
-
-    @Test
     @DisplayName("기본 경로도 저장한다")
     void storesOnDefaultPathToo(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, false);
+        ArtifactStore store = store(root);
 
         store.write(10L, "index.html", "본문".getBytes(StandardCharsets.UTF_8));
 
@@ -75,7 +64,7 @@ class ArtifactStoreWriteTest {
     @DisplayName("Linux에서는 SecureDirectoryStream 경로를 쓴다")
     void usesSecureDirectoryStreamPathOnLinux(@TempDir Path root) throws IOException {
         Assumptions.assumeTrue(System.getProperty("os.name").toLowerCase().contains("linux"));
-        ArtifactStore store = store(root, false);
+        ArtifactStore store = store(root);
         Path target = store.resolveForWrite(10L, "index.html");
 
         try (DirectoryStream<Path> directory = Files.newDirectoryStream(target.getParent())) {
@@ -88,32 +77,9 @@ class ArtifactStoreWriteTest {
 
 
     @Test
-    @DisplayName("원자 교체가 실패하면 기존 파일을 보존하고 임시 파일을 지운다")
-    void keepsExistingFileAndDeletesTempWhenAtomicReplaceFails(@TempDir Path root) throws IOException {
-        ArtifactStore initial = store(root, true);
-        initial.write(10L, "index.html", "이전 본문".getBytes(StandardCharsets.UTF_8));
-        ArtifactStore failing = new ArtifactStore(
-            new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null), true, (source, target) -> {
-                throw new IOException("forced replacement failure");
-            });
-
-        assertThatThrownBy(() -> failing.write(10L, "index.html", "새 본문".getBytes(StandardCharsets.UTF_8)))
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
-
-        Path folder = root.resolve("10");
-        assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("이전 본문");
-        try (var files = Files.list(folder)) {
-            assertThat(files.map(path -> path.getFileName().toString()))
-                .noneMatch(name -> name.startsWith(".artifact-"));
-        }
-    }
-
-
-    @Test
     @DisplayName("위험한 경로는 거절하고 폴더 밖을 바꾸지 않는다")
     void rejectsDangerousPathWithoutChangingOutsideFolder(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, true);
+        ArtifactStore store = store(root);
         Path outside = root.resolve("outside.html");
         Files.writeString(outside, "보존");
 
@@ -130,7 +96,7 @@ class ArtifactStoreWriteTest {
     @Test
     @DisplayName("대화 폴더와 부모 폴더와 대상 링크를 거절한다")
     void rejectsConversationFolderParentFolderAndTargetLink(@TempDir Path root) throws IOException {
-        ArtifactStore store = store(root, true);
+        ArtifactStore store = store(root);
         Path outside = root.resolve("outside");
         Files.createDirectories(outside);
         Files.writeString(outside.resolve("secret.html"), "비밀");
@@ -154,16 +120,15 @@ class ArtifactStoreWriteTest {
     void failsSaveWhenStoreRootCannotBeCreated(@TempDir Path root) throws IOException {
         Path blockedRoot = root.resolve("blocked");
         Files.writeString(blockedRoot, "기존 파일");
-        ArtifactStore store = store(blockedRoot, true);
+        ArtifactStore store = store(blockedRoot);
 
         assertStoreFailure(() -> store.write(10L, "index.html", new byte[0]));
         assertThat(Files.readString(blockedRoot)).isEqualTo("기존 파일");
     }
 
 
-    private static ArtifactStore store(Path root, boolean forceAtomicMoveFallback) {
-        return new ArtifactStore(
-            new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null), forceAtomicMoveFallback);
+    private static ArtifactStore store(Path root) {
+        return new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30, null));
     }
 
 

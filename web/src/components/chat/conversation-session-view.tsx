@@ -1,18 +1,19 @@
 "use client";
 
-import { AgentBadge } from "@/components/agent/agent-badge";
 import Link from "next/link";
-import { cn } from "cn";
 import { Composer } from "./composer";
-import { StartScreenHeader, StarterPrompts } from "./start-screen";
+import { ConversationHeader } from "./conversation-header";
+import {
+  StartAgentSwitcher,
+  StartScreenHeader,
+  StarterPrompts,
+} from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
 import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
 import { ActivityPanel } from "./activity/activity-panel";
 import { ArtifactPanel } from "./artifact/artifact-panel";
-import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { agentLabel } from "@/lib/format";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
 import { useDelegateTarget } from "./use-delegate-target";
 import { useConversationTodo } from "./use-conversation-todo";
@@ -131,50 +132,27 @@ export function ConversationSessionView({
     <section className="relative flex h-full min-h-0 min-w-0">
       {startScreen ? null : <h1 className="sr-only">대화</h1>}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {startScreen ? null : (
-          <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-            <div
-              className={cn(
-                "flex min-w-0 flex-1 items-center gap-3 overflow-hidden",
-                "text-xs text-muted-foreground",
-              )}
-            >
-              {/* 좁은 화면의 잠긴 대화는 글자를 숨기고 이름표만 보인다. 이름은 읽기 프로그램에 남긴다(spec 의 DECISION15) */}
-              <div className="flex min-w-0 items-center gap-2">
-                <AgentBadge agent={answerAgent} size="sm" />
-                <span
-                  className={
-                    agentLocked ? "shrink-0 max-md:hidden" : "shrink-0"
-                  }
-                >
-                  에이전트
-                </span>
-                <span
-                  className={
-                    agentLocked ? "truncate max-md:sr-only" : "truncate"
-                  }
-                  title={agentMissing ? agentLabel(null) : currentAgent?.name}
-                >
-                  {agentMissing
-                    ? agentLabel(null)
-                    : (currentAgent?.name ?? "등록된 에이전트가 없어요")}
-                </span>
-              </div>
-            </div>
-            {currentConversation?.purpose === "CHECK" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                disabled={sending}
-                loading={checkStarting}
-                loadingText="시작하는 중"
-                onClick={() => void startCheck()}
-              >
-                지금 살펴보기
-              </Button>
-            ) : null}
-          </div>
+        {startScreen ? (
+          <StartAgentSwitcher
+            agents={agents}
+            loading={agentsLoading}
+            agentsError={agentsError}
+            selectedCode={agentCode}
+            onSelect={onAgentCodeChange}
+            locked={agentLocked}
+          />
+        ) : (
+          <ConversationHeader
+            answerAgent={answerAgent}
+            agentLocked={agentLocked}
+            agentMissing={agentMissing}
+            agentName={currentAgent?.name}
+            check={
+              currentConversation?.purpose === "CHECK"
+                ? { sending, starting: checkStarting, start: startCheck }
+                : null
+            }
+          />
         )}
         {startScreen || checkError === null ? null : (
           <Notice variant="error" role="alert" className="mt-3">
@@ -263,9 +241,6 @@ export function ConversationSessionView({
               loading={agentsLoading}
               agentsError={agentsError}
               onRetryAgents={onRetryAgents}
-              selectedCode={agentCode}
-              onSelect={onAgentCodeChange}
-              locked={agentLocked}
             />
           ) : null}
           {error || observing ? (

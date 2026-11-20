@@ -187,7 +187,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
 
   useEffect(() => {
     if (state.kind === "not-found")
-      router.replace(isAdmin ? "/admin/usage" : "/usage");
+      router.replace(isAdmin ? "/admin/usage" : "/now");
   }, [state.kind, router, isAdmin]);
 
   if (state.kind === "loading" || state.kind === "not-found") {

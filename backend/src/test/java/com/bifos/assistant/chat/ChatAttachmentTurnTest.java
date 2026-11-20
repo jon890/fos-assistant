@@ -889,7 +889,7 @@ class ChatAttachmentTurnTest {
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */
     private String artifactPreamble(Long conversationId) {
         return artifactService.agentPreamble(
-            conversations.findById(conversationId).orElseThrow());
+            conversations.findById(conversationId).orElseThrow(), false);
     }
 
 
