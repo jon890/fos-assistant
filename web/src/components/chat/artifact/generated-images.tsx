@@ -40,7 +40,7 @@ function PromptDetails({ prompt }: { prompt?: string | null }) {
   );
 }
 
-/** 크게 보기 화면의 「보관」 단추다. 보관본이 없는 그림에만 그린다. 보관하면 「보관한 결과물」 에 남는다. */
+/** 크게 보기 화면의 「보관」 단추다. 보관본이 없는 그림에만 그린다. 보관하면 「내 파일」 에 남는다. */
 function KeepButton({
   conversationId,
   path,
@@ -107,7 +107,7 @@ function KeepButton({
  * 답 안에 비서가 만든 그림을 그린다(스펙 generated-image REQ1~REQ3, REQ5, REQ7, REQ9).
  *
  * <p>그림은 만든 순서대로 나란히 보이고, 누르면 화면 가득 크게 보인다. 크게 보기에는 제목과 「내려받기」, 지시문, 보관 상태가 있다.
- * 보관 기간이 지나 원본이 지워진 그림은 안내와, 보관본이 있으면 「보관함에서 보기」 를 보인다. 지시문은 그대로 남는다.
+ * 보관 기간이 지나 원본이 지워진 그림은 안내와, 보관본이 있으면 「내 파일에서 보기」 를 보인다. 지시문은 그대로 남는다.
  */
 export function GeneratedImages({
   images,
@@ -143,10 +143,10 @@ export function GeneratedImages({
                 <p>보관 기간이 지나 대화에서는 볼 수 없어요.</p>
                 {image.vaultItemId ? (
                   <Link
-                    href={`/files?tab=vault&item=${image.vaultItemId}`}
+                    href={`/files?item=${image.vaultItemId}`}
                     className="underline underline-offset-4"
                   >
-                    보관함에서 보기
+                    내 파일에서 보기
                   </Link>
                 ) : null}
               </div>
@@ -223,10 +223,10 @@ export function GeneratedImages({
               </Button>
               {opened.vaultItemId ? (
                 <Link
-                  href={`/files?tab=vault&item=${opened.vaultItemId}`}
+                  href={`/files?item=${opened.vaultItemId}`}
                   className="text-xs underline underline-offset-4"
                 >
-                  보관함에서 보기
+                  내 파일에서 보기
                 </Link>
               ) : opened.autoVault === "PENDING" ||
                 opened.autoVault === "RUNNING" ? null : (

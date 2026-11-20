@@ -257,6 +257,21 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<ArtifactVaultRow> listVaulted(@Param("userId") Long userId);
 
 
+    /** 주인의 살아 있는 보관 뿌리 행 하나다. 목록 한 줄과 같은 모양이고 본문은 읽지 않는다. 남의 번호는 빈 값이다. */
+    @Query("""
+            select a.id as id, a.path as path, a.byteSize as byteSize, a.createdAt as createdAt,
+                   a.conversationId as conversationId, a.vaultMeta as vaultMeta, a.vaultMetaKeyId as vaultMetaKeyId,
+                   (select count(p.id) from ChatArtifact p where p.vaultBundleId = a.id) as partCount,
+                   (select coalesce(sum(p.byteSize), 0) from ChatArtifact p where p.vaultBundleId = a.id) as partBytes
+              from ChatArtifact a
+             where a.id = :id
+               and a.vaultUserId = :userId
+               and a.vaultBundleId is null
+               and a.deletedAt is null
+            """)
+    Optional<ArtifactVaultRow> findVaulted(@Param("id") Long id, @Param("userId") Long userId);
+
+
     Optional<ChatArtifact> findByIdAndVaultUserId(Long id, Long vaultUserId);
 
 
