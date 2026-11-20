@@ -76,10 +76,8 @@ from .connector_schema import (
 
 from .connector_owner_env import _connector_owner_env
 
-from .connector_skills import (
-    _connector_skills,
-    _skill_name,
-)
+from .connector_agent_skills import _catalog_agent_skills, _plugin_and_agent_skills
+from .connector_skills import _connector_skills, _skill_name
 
 
 def _appearance_or_none(connector_id: str, name: str, read):
@@ -220,7 +218,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
         skill_dirs.append(path.resolve())
-    installed_skills = _connector_skills(skill_dirs)
+    installed_skills, agent_skills = _plugin_and_agent_skills(root, declared, skill_dirs)
 
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     # 표준 플러그인은 도구 정책을 선언하지 않는다. Control Plane 이 그 서버의 도구를 모두 호출마다 승인으로 판정한다.
@@ -266,7 +264,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "errors": errors,
         "error_contracts": error_contracts,
         **_connector_binding_flags(declared),
-        "skills": installed_skills,
+        "skills": installed_skills, "agent_skills": agent_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset(option_tools if standard else {verify["tool"]} | option_tools),
         "tools": tools,
@@ -365,7 +363,7 @@ def _connector_catalog_response(include_standard: bool = False):
     옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하므로, schema 3 을 아는 쪽이 query 로 청한다
     (rule-66).
 
-    `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
+    `skills` 는 붙인 에이전트에 설치할 수 있는 스킬의 이름이다(에이전트용 스킬 포함, `_catalog_agent_skills`). 이름 순이다.
     `owner_browser` 는 사용자 브라우저를 쓰는 플러그인인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
     """
     from starlette.responses import JSONResponse
@@ -378,6 +376,7 @@ def _connector_catalog_response(include_standard: bool = False):
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
+          **_catalog_agent_skills(manifest),
           # 결과를 모르는 코드와 그 재시도 식별자 칸 이름이다. Control Plane 이 504 본문을 이 선언과 대조한다
           # (ADR-20261013 unknown-retry-key). `retry_key` 를 선언하지 않은 코드는 null 이다.
           "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")

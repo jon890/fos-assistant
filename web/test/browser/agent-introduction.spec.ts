@@ -1,4 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
+import { agentSwitcher } from "./helpers.ts";
 import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
@@ -113,4 +114,19 @@ test("주인이 아닌 사용자는 그룹 공개 에이전트의 소개를 읽�
     data: { name: "바꾼 이름", description: null, icon: null, color: null },
   });
   expect(denied.status()).toBe(403);
+});
+
+test("준비된 플러그인과 스킬이 없는 에이전트는 비서 고르기 목록에서 한 줄 소개를 보인다", async ({ page }) => {
+  const code = await createAgent(page);
+  await page.goto(`/agents/${code}`);
+  const section = introductionSection(page);
+  await section.getByLabel("한 줄 소개").fill("기차표 조회를 맡아요");
+  await section.getByRole("button", { name: "소개 저장" }).click();
+  await expect(section.getByText("저장했어요.")).toBeVisible();
+
+  await page.goto("/new");
+  await agentSwitcher(page).click();
+  await expect(
+    page.getByTestId("agent-switcher-list").getByRole("menuitemradio", { name: NAME, exact: true }),
+  ).toHaveAccessibleDescription("기차표 조회를 맡아요");
 });

@@ -53,6 +53,7 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
           kind: "tool",
           key: event.sequence,
           toolName: event.toolName,
+          connector: event.connector ?? null,
           durationMs: null,
           detail: event.detail,
           finished: false,
@@ -69,13 +70,15 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
         const row = pendingByTool.get(name)?.shift();
         if (row) {
           row.durationMs = event.durationMs;
-          row.detail = event.detail ?? row.detail;
+          row.connector = row.connector ?? event.connector ?? null;
+          row.detail = event.detail || row.detail;
           row.finished = true;
         } else {
           rows.push({
             kind: "tool",
             key: event.sequence,
             toolName: event.toolName,
+            connector: event.connector ?? null,
             durationMs: event.durationMs,
             detail: event.detail,
             finished: true,
