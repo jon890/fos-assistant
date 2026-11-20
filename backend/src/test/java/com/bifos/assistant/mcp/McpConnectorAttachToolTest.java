@@ -314,6 +314,37 @@ class McpConnectorAttachToolTest {
 
 
     @Test
+    @DisplayName("다른 사용자가 연결한 서비스는 내 연결이 아니라서 카드 없이 연결 화면 링크를 준다")
+    void othersConnectionIsNotMine() throws Exception {
+        AppUser other = users.save(AppUser.of("attach-mom-" + UUID.randomUUID() + "@example.com", "엄마", 4472L, UserRole.MEMBER));
+        connectionService.register(current(other), DEMO, Map.of("token", "demo_ok_0123456789"));
+
+        JsonNode result = call(DEMO);
+
+        assertThat(isError(result)).isTrue();
+        assertThat(text(result)).contains("not_connected");
+        assertThat(actions.findAll()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("붙이는 도중 끊겨 실행 중으로 남은 줄은 다시 실행하지 않고 결과를 확인하지 못했다는 알림 줄을 남긴다")
+    void interruptedAttachLeavesUnknownNotice() throws Exception {
+        connect();
+        call(DEMO);
+        ConnectorAction card = actions.findAll().getFirst();
+        jdbc.update("UPDATE connector_action SET status = 'EXECUTING', decided_at = ? WHERE id = ?", java.sql.Timestamp.from(Instant.now()), card.id());
+
+        assertThat(actionService.markInterrupted(Instant.now())).isEqualTo(1);
+
+        assertThat(actions.findById(card.id()).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(bindings.findAll()).isEmpty();
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        assertThat(notices()).containsExactly("「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 그 화면에서 상태를 확인해 주세요");
+    }
+
+
+    @Test
     @DisplayName("카드를 띄운 뒤 에이전트를 그룹에 공개하면 승인해도 붙지 않고 실패로 끝난다")
     void rechecksVisibilityAtApproval() throws Exception {
         connect();
