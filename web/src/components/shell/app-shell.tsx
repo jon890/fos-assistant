@@ -14,7 +14,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Menu, PanelLeft, SquarePen } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { AdminShell } from "./admin-shell";
 import { LAST_CONVERSATION_KEY } from "./back-to-chat";
 import {
@@ -36,8 +36,8 @@ import {
   subscribeCollapsed,
   updateCollapsed,
 } from "./sidebar-collapsed";
-import { NotificationBell } from "@/components/notification/notification-bell";
 import { NotificationsProvider } from "@/components/notification/notifications-provider";
+import { MobileTopBar } from "./mobile-top-bar";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
 import { TooltipButton } from "@/components/ui/tooltip-button";
@@ -238,34 +238,12 @@ function ShellBody({
               </Link>
             </header>
           ) : null}
-          <header
-            className={cn(
-              "flex flex-nowrap items-center gap-3 md:hidden",
-              "h-14 shrink-0 px-4",
-              "border-b border-border",
-            )}
-          >
-            <TooltipButton
-              label="사이드바 열기"
-              size="icon"
-              onClick={() => setDrawerOpen(true)}
-            >
-              <Menu aria-hidden="true" className="size-5" />
-            </TooltipButton>
-            <Link
-              href="/"
-              aria-label={`${appName} 홈`}
-              className="flex h-full min-w-0 flex-1 items-center justify-center rounded-md px-2 text-sm font-medium hover:bg-muted active:bg-accent"
-            >
-              <span className="min-w-0 truncate">{title ?? appName}</span>
-            </Link>
-            <NotificationBell size="icon" />
-            <TooltipButton label="새 대화" size="icon" asChild>
-              <Link href={NEW_CONVERSATION_PATH} onClick={startNew}>
-                <SquarePen aria-hidden="true" className="size-5" />
-              </Link>
-            </TooltipButton>
-          </header>
+          <MobileTopBar
+            title={title ?? appName}
+            appName={appName}
+            onOpenDrawer={() => setDrawerOpen(true)}
+            onStartNew={startNew}
+          />
           {/* 서버의 첫 그림에는 아직 동작이 붙지 않았다. 폭을 읽은 뒤 준비 상태를 낭독기에도 알린다. */}
           <main
             aria-busy={wide === null}
