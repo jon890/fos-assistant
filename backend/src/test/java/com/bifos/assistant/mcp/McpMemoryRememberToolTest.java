@@ -163,8 +163,7 @@ class McpMemoryRememberToolTest {
         JsonNode tool = matches.getFirst();
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         assertThat(tool.path("inputSchema").path("required").toString()).isEqualTo("[\"title\",\"content\"]");
-        assertThat(tool.path("inputSchema").path("additionalProperties").asBoolean())
-            .isFalse();
+        assertThat(tool.path("inputSchema").has("additionalProperties")).isFalse();
         assertThat(tool.path("description").asString()).contains("작업 기록").contains("부정은 content 에 그대로 살린다");
     }
 

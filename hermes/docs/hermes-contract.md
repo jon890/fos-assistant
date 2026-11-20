@@ -1613,6 +1613,13 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 
 실제 모델 turn, native `delegate_task` 의 전체 왕복, 공유 gateway 의 전체 HTTP 왕복은 실행하지 않았다. 그 셋은 소스로만 확인했다.
 
+### MCP 입력 스키마와 실행 맥락
+
+Hermes v0.23.2의 `tools/arg_validation.py` `_closed_schema_refusal`은 내장 도구가 아닌 도구의 루트 입력 스키마가 `additionalProperties: false`이면 선언하지 않은 인자를 도구 호출 전에 거절한다. MCP 도구와 plugin이 등록한 도구 모두 같은 검사를 받는다.
+`fos-ctx`는 Control Plane MCP 호출에 `_fos_ctx`를 덮어쓰므로, `McpToolCatalog`는 도구 목록을 내보낼 때 루트의 `additionalProperties: false`를 제거한다.
+`attachment_inspect`도 hook이 `_fos_ctx`와 `_fos_inspect`를 덮어쓰므로 등록 스키마의 루트를 열고, handler의 `valid_args`가 모르는 키를 거절한다.
+서명 인자를 모델이 채울 속성이나 필수 인자로 노출하지 않는다. 중첩 객체의 스키마와 Control Plane의 인자·서명 검사는 그대로 적용한다.
+
 ### MCP 도구의 등록 이름
 
 Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
