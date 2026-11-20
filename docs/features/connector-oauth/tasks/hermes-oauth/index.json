@@ -29,13 +29,56 @@
   "spec": "docs/features/connector-oauth/spec.md",
   "design": "docs/features/connector-oauth/design.md",
   "verification_plan": "verification-plan.md",
-  "requirements": ["REQ1", "REQ6"],
+  "requirements": [
+    "REQ1",
+    "REQ4",
+    "REQ5",
+    "REQ6",
+    "REQ7",
+    "REQ8",
+    "REQ9"
+  ],
   "total_phases": 4,
   "current_phase": 1,
   "phases": [
-    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ1"]},
-    {"number": 2, "file": "phase-02.md", "execution_profile": "deep", "requirements": ["REQ6"]},
-    {"number": 3, "file": "phase-03.md", "execution_profile": "deep", "requirements": ["REQ6"]},
-    {"number": 4, "file": "phase-04.md", "execution_profile": "deep", "requirements": ["REQ6"]}
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ6",
+        "REQ8",
+        "REQ9"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ4",
+        "REQ5",
+        "REQ6",
+        "REQ7",
+        "REQ8"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ4",
+        "REQ6"
+      ]
+    }
   ]
 }

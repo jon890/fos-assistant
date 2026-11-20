@@ -24,6 +24,7 @@
 - 제공자 주소는 플러그인 선언이 아니라 이 파일의 표가 갖는다(ADR-20261120 / connector-oauth). 선언에 주소 칸을 받지 않는다
 - `token_env` 가 env 이름으로는 맞는데 `oauth` 의 다른 칸이 틀리면, env 합 검사는 그 이름을 받아 플러그인을 살리고 `oauth` 만 null 로 낸다. 플러그인 전체를 빼면 붙여 넣기 연결까지 끊긴다(스펙 DECISION11)
 - 원격 MCP(`type: http`) 플러그인의 `oauth` 는 범위 밖이라 null 과 경고다(스펙 「범위 밖」)
+- `.mcp.json` 의 `token_env` 값은 다른 칸처럼 `${이름}` 참조로 검사한다. 설치한 정의에서 그 값을 빈 값으로 바꾸는 일은 phase 04 가 한다
 
 ## 작업 항목
 
@@ -31,15 +32,22 @@
 
 제공자 표를 둔다. 표준 라이브러리만 쓴다.
 
-```python
-PROVIDERS = {
-    "github": {"app_scope": "plugin", "scopes": False, "refresh_rotates": True, ...},
-    "google": {"app_scope": "shared", "scopes": True, "refresh_rotates": False, ...},
-}
-```
+| 칸 | `github` | `google` |
+| --- | --- | --- |
+| `app_scope` | `plugin` | `shared` |
+| `accepts_scopes` | 거짓 | 참 |
+| `install_url` | `https://github.com/apps/{slug}/installations/new` | 없음 |
+| `authorize_url` | `https://github.com/login/oauth/authorize` | `https://accounts.google.com/o/oauth2/v2/auth` |
+| `token_url` | `https://github.com/login/oauth/access_token`. 요청에 `Accept: application/json`. 오류도 HTTP 200 본문의 `error` 로 온다 | `https://oauth2.googleapis.com/token`. 오류는 HTTP 400·401 본문의 `error` |
+| `revoke` | 토큰 하나 `DELETE https://api.github.com/applications/{client_id}/token`, 허락 전체 `DELETE https://api.github.com/applications/{client_id}/grant`. 둘 다 client ID·secret 기본 인증과 본문 `{"access_token"}` | `POST https://oauth2.googleapis.com/revoke` 에 `token=<refresh token>` |
+| `refresh_rotates` | 참 | 거짓 |
+| `grant_errors`(→ `grant_revoked`) | `bad_refresh_token`, `bad_verification_code` | `invalid_grant` |
+| `app_errors`(→ `app_rejected`) | `incorrect_client_credentials`, `redirect_uri_mismatch` | `invalid_client`, `unauthorized_client`, `redirect_uri_mismatch` |
+| `settings_url` | `https://github.com/settings/apps/authorizations` | `https://myaccount.google.com/permissions` |
+| `install_settings_url` | `https://github.com/settings/installations` | 없음 |
 
-- 칸: 앱 줄 단위(`plugin`·`shared`), scope 를 받는지, 로그인 주소(GitHub 은 App 설치 화면 `https://github.com/apps/{slug}/installations/new` 와 허락 화면 `https://github.com/login/oauth/authorize`, Google 은 `https://accounts.google.com/o/oauth2/v2/auth`), 토큰 주소, 취소 방식, 사용자가 허락을 거두는 설정 화면 주소(GitHub `https://github.com/settings/apps/authorizations`, 설치 화면 `https://github.com/settings/installations`, Google `https://myaccount.google.com/permissions`)
-- `_normalize_oauth(declared_oauth, fields, remote) -> dict` 를 둔다. 맞으면 `{"provider", "scopes", "fields", "token_env"}`, 틀리면 `ValueError(까닭)` 이다. 규칙은 설계 「선언」 표를 따른다: 모르는 제공자, Google 의 빈 `scopes`, GitHub 의 `scopes`, 빈 `fields`, `fields` 의 key 가 `secret: true` 칸이 아님, `token_env` 가 `ENV_NAME_RE` 가 아니거나 칸·`operator_env`·주인 env 와 겹침, 원격 플러그인
+표에 없는 오류 낱말은 `unavailable` 로 본다. 테스트가 주소를 가짜 서버로 바꿀 수 있게 표를 모듈 변수로 둔다.
+- `_normalize_oauth(declared_oauth, fields, taken_env, remote) -> dict` 를 둔다. `taken_env` 는 칸 env, `operator_env`, 주인 env 의 합이다. 맞으면 `{"provider", "scopes", "fields", "token_env"}`, 틀리면 `ValueError(까닭)` 이다. 규칙은 설계 「선언」 표를 따른다: 모르는 제공자, Google 의 빈 `scopes`, GitHub 의 `scopes`, 빈 `fields`, `fields` 의 key 가 `secret: true` 칸이 아님, `token_env` 가 `ENV_NAME_RE` 가 아니거나 `taken_env`·`BASE_ENV_KEYS` 와 겹치거나 실행기 앞머리(`FOS_ASSISTANT_CONNECTOR_VAULT_`)로 시작함, 원격 플러그인
 
 ### 2. `hermes/plugins/dashboard-profile-api/connector_manifest.py` 수정
 

@@ -10,7 +10,7 @@ refresh token 과 토큰 통로 주소를 담는 OAuth 파일과 대기 파일�
 
 ## 컨텍스트
 
-**요구사항**: REQ6
+**요구사항**: REQ6, REQ8, REQ9 의 Hermes 쪽(OAuth 파일 보관, 해제 때 지우기, 붙여 넣기로 바꿀 때 지우기)
 
 **근거 문서**: `docs/features/connector-oauth/design.md` 의 「OAuth 파일」, 「실패와 일관성」, `docs/adr/ADR-20261120-connector-oauth.md`
 
@@ -31,22 +31,27 @@ refresh token 과 토큰 통로 주소를 담는 OAuth 파일과 대기 파일�
 ### 1. `hermes/plugins/dashboard-profile-api/connector_oauth_store.py` 신규
 
 - 파일 자리: `_vault_dir()` 아래 `<보관 파일 id>.oauth`, `<보관 파일 id>.oauth.pending`, `<보관 파일 id>.pending`(단추 밖 칸의 대기 보관 파일, 보관 파일과 같은 형식)
-- OAuth 파일 형식: 보관 파일과 같은 key 로 암호화한 JSON `{provider, refresh_token, granted_scopes, token_url}`, 대기 파일은 여기에 `nonce` 를 더하고 `refresh_token` 이 빌 수 있다. AAD 는 `connector-oauth:<보관 파일 id>:<플러그인 id>` 다. 쓰기는 `connector_vault.py` 의 `_durable_private_write` 를 쓴다
-- 함수: `_read_oauth(vault, pending=False)`, `_write_oauth(vault, connector, data, pending=False)`, `_begin(vault, connector, values) -> nonce`(대기 보관 파일과 토큰 없는 대기 OAuth 파일), `_fill_pending(vault, nonce, data)`(nonce 가 다르면 `NonceMismatch`), `_commit(vault, nonce)`(대기 보관 파일 값을 `_write_vault` 로 쓰고 대기 OAuth 파일을 rename), `_discard(vault, nonce)`, `_delete_all(vault)`(보관 파일 빼고 셋을 지움), `_sweep_pending(max_age=600)`
+- OAuth 파일 형식: 보관 파일과 같은 key 로 암호화한 JSON `{provider, refresh_token, granted_scopes, token_url}`, 대기 파일은 여기에 `nonce` 를 더하고 `refresh_token` 이 빌 수 있다. AAD 는 `connector-oauth:<보관 파일 id>:<플러그인 id>` 다. 글 모양 검사와 풀기(`_parse_oauth`, `_unseal_oauth`)는 실행기가 plugin 패키지 없이 읽을 수 있게 처음부터 `connector_vault_format.py` 에 둔다. 쓰기는 `connector_vault.py` 의 `_durable_private_write` 를 쓴다
+- 함수: `_read_oauth(vault, pending=False)`, `_write_oauth(vault, connector, data, pending=False)`, `_begin(vault, connector, values) -> nonce`(대기 보관 파일과 토큰 없는 대기 OAuth 파일), `_fill_pending(vault, nonce, data)`(nonce 가 다르면 `NonceMismatch`), `_commit(vault, nonce)`(대기 보관 파일 값을 `_write_vault` 로 쓰고 대기 OAuth 파일을 rename), `_discard(vault, nonce)`, `_delete_all(vault)`(보관 파일 빼고 셋을 지움), `_sweep_pending(max_age=600)`. `_begin` 이 쓰기 전에 `_sweep_pending` 을 부른다
 - 보관 파일 id 마다의 잠금: `VAULT_LOCKS: dict[str, asyncio.Lock]` 와 `vault_lock(vault)` 를 둔다
 
 ### 2. `hermes/plugins/dashboard-profile-api/connector_vault.py` 수정
 
 - `_vault_values(manifest, values, oauth=False)`: `oauth` 가 참이면 `manifest["oauth"]["fields"]` 의 칸을 필수에서 뺀다
-- `PUT` 은 본문에 `oauth`(boolean, 선택)를 받아 위 판정에 넘긴다. `oauth` 가 거짓인 쓰기는 OAuth 파일을 지운다(붙여 넣기로 바꾸기, 스펙 REQ9)
+- `PUT` 은 본문에 선택 키 `oauth`(boolean)를 받아 위 판정에 넘긴다. 본문 키 검사를 「`vault`, `connector`, `values` 가 모두 있고 그 밖에는 `oauth` 만 된다」 로 바꾼다. `oauth` 가 없으면 지금 키 집합과 같다. `oauth` 가 거짓인 쓰기는 OAuth 파일을 지운다(붙여 넣기로 바꾸기, 스펙 REQ9)
 - `DELETE` 는 `_delete_all` 도 부른다
-- 기동 때 `_sweep_pending` 을 부른다(기존 기동 이관 `connector_vault_migration.py` 를 부르는 자리 옆)
+- 기동 정리: `connector_binding_migration.py` 의 `_migrate_connectors` 가 `_migrate_vault_files` 를 부른 뒤 `_sweep_pending` 을 부른다
+- key 이관: `connector_vault_migration.py` 가 `.oauth`, `.oauth.pending`, `.pending` 도 새 key 로 다시 쓰고 「옛 key 파일 수」 에 센다. 이관하지 않으면 운영자가 옛 key 를 지운 뒤 OAuth 연결을 풀 수 없게 된다
 
 ### 3. `hermes/plugins/dashboard-profile-api/routes.py` 수정
 
-보관 파일 경로(`VAULT_ROUTES`)는 `vault_lock(body 의 vault)` 를 먼저 잡고 `PROFILE_WRITE_LOCK` 을 잡는다. 본문을 두 번 읽지 않도록 `_connector_vault_request` 가 잠금을 받는 모양으로 바꾼다.
+보관 파일 경로(`VAULT_ROUTES`)는 `vault_lock(body 의 vault)` 를 먼저 잡고 `PROFILE_WRITE_LOCK` 을 잡는다. 본문을 두 번 읽지 않도록 `_connector_vault_request` 가 잠금을 받는 모양으로 바꾼다. 바인딩 설치(`PUT /api/connectors`)는 지금처럼 `PROFILE_WRITE_LOCK` 만 잡는다. 설치가 보관 파일 잠금을 잡으면 잡는 순서가 거꾸로 되어 교착이 생긴다.
 
-### 4. `hermes/tests/test_connector_oauth_store.py` 신규
+### 4. `hermes/plugins/dashboard-profile-api/README.md` 수정
+
+「플러그인」 의 보관 파일 `PUT` 줄에 선택 키 `oauth` 를, 보관 파일 절에 OAuth 파일과 대기 파일의 자리, 지우는 때, key 이관을 더한다.
+
+### 5. `hermes/tests/test_connector_oauth_store.py` 신규
 
 `hermes/tests/test_connector_vault_encryption.py` 의 `VaultKeyTest` 를 이어받는다.
 
@@ -55,6 +60,8 @@ refresh token 과 토큰 통로 주소를 담는 OAuth 파일과 대기 파일�
 - 보관 파일 `DELETE` 가 OAuth 파일과 대기 파일을 지운다
 - `oauth: true` 인 `PUT` 은 단추 칸이 비어도 받고, `oauth` 없는 `PUT` 은 지금처럼 거절하며 OAuth 파일을 지운다
 - 10분 지난 대기 파일만 `_sweep_pending` 이 지운다
+- key 를 바꿔 기동하면 OAuth 파일과 대기 파일도 새 key 로 다시 쓰이고 옛 key 파일 수에 들어간다
+- 같은 보관 파일의 `PUT` 과 바인딩 설치를 동시에 보내도 둘 다 끝난다(교착 없음)
 - OAuth 파일 원문에 refresh token 평문이 없다(key 를 준 경우)
 
 ## 검증
@@ -62,6 +69,8 @@ refresh token 과 토큰 통로 주소를 담는 OAuth 파일과 대기 파일�
 ```bash
 python3 -m unittest discover -s hermes/tests -p 'test_connector_oauth_store.py'
 python3 -m unittest discover -s hermes/tests -p 'test_connector_vault_*.py'
+python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_connector_vault*.py'
+python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_connector_binding_*.py'
 ```
 
 ## 변경 파일
@@ -70,6 +79,9 @@ python3 -m unittest discover -s hermes/tests -p 'test_connector_vault_*.py'
 |---|---|
 | `hermes/plugins/dashboard-profile-api/connector_oauth_store.py` | 신규 |
 | `hermes/plugins/dashboard-profile-api/connector_vault.py` | 수정 (`oauth` 칸 예외, 붙여 넣기 쓰기와 지우기의 OAuth 파일 정리) |
-| `hermes/plugins/dashboard-profile-api/connector_vault_migration.py` | 수정 (기동 때 대기 파일 정리) |
+| `hermes/plugins/dashboard-profile-api/connector_vault_format.py` | 수정 (OAuth 파일 모양과 풀기) |
+| `hermes/plugins/dashboard-profile-api/connector_vault_migration.py` | 수정 (OAuth 파일 key 이관과 셈) |
+| `hermes/plugins/dashboard-profile-api/connector_binding_migration.py` | 수정 (기동 때 대기 파일 정리) |
+| `hermes/plugins/dashboard-profile-api/README.md` | 수정 (보관 파일 `PUT` 의 `oauth`, OAuth 파일의 자리) |
 | `hermes/plugins/dashboard-profile-api/routes.py` | 수정 (보관 파일 잠금 순서) |
 | `hermes/tests/test_connector_oauth_store.py` | 신규 |

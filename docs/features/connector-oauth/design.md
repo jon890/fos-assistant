@@ -89,7 +89,7 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 
 ### OAuth 파일
 
-보관 파일(`<보관 파일 id>`) 옆에 **OAuth 파일** `<보관 파일 id>.oauth` 을 둔다. 보관 파일과 같은 key 로 암호화하고 형식은 따로다.
+보관 파일(`<보관 파일 id>`) 옆에 **OAuth 파일** `<보관 파일 id>.oauth` 을 둔다. 보관 파일과 같은 key 로 암호화하고 형식은 따로다. 풀기는 실행기가 plugin 패키지 없이 읽는 `connector_vault_format.py` 에 둔다. 보관 파일 key 를 바꿀 때 기동 이관이 OAuth 파일과 대기 파일도 새 key 로 다시 쓰고 「옛 key 파일 수」 에 센다.
 보관 파일의 `values` 는 문자열 사전만 받고(`connector_vault_format.py`) 리비전이 파일 메타데이터의 해시(`connector_launch.py` 의 `_vault_revision`)라 둘 다 OAuth 상태를 담기에 맞지 않는다.
 
 | 칸 | 뜻 |
@@ -102,16 +102,16 @@ Control Plane 이 아는 것은 이름과 그 이름의 앱 줄 이름 규칙(Gi
 
 begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pending` 과, 토큰 없이 `nonce` 만 담은 대기 OAuth 파일 `<보관 파일 id>.oauth.pending` 을 만든다. 교환은 `nonce` 가 같을 때만 대기 OAuth 파일에 토큰을 채운다. commit 은 대기 보관 파일의 값을 지금 보관 파일 쓰기(`_write_vault`)로 본 자리에 써서 값이 같으면 파일을 바꾸지 않고, 대기 OAuth 파일만 rename 한다. 보관 파일을 rename 하면 값이 같아도 리비전(inode, 수정 시각, 크기)이 바뀌어 재시작 대기가 되기 때문이다. 대시보드가 기동할 때와 대기 파일을 쓸 때 10분 지난 대기 파일을 지운다.
 
-**보관 파일 id 마다 잠금을 두고, 잡는 순서는 보관 파일 잠금이 먼저, 전역 `PROFILE_WRITE_LOCK` 이 나중이다.** 갱신, begin, commit, discard, 취소, 보관 파일 `PUT`·`DELETE`, 바인딩 설치(그 바인딩의 보관 파일을 읽을 때)가 모두 보관 파일 잠금 안에서 읽고 고쳐 쓴다. 갱신과 취소는 보관 파일 잠금만 잡고 서비스를 부르며 전역 잠금은 잡지 않는다. 그래서 서비스 응답을 기다리는 동안 다른 profile 쓰기가 멈추지 않고, 같은 보관 파일을 쓰려는 요청만 전역 잠금 밖에서 기다린다. 바뀐 refresh token 을 잃지 않으려고 갱신은 서비스 호출부터 파일 쓰기까지 잠금을 놓지 않는다.
+**보관 파일 id 마다 잠금을 두고, 잡는 순서는 보관 파일 잠금이 먼저, 전역 `PROFILE_WRITE_LOCK` 이 나중이다.** 갱신, begin, commit, discard, 취소, 보관 파일 `PUT`·`DELETE` 가 모두 보관 파일 잠금 안에서 읽고 고쳐 쓴다. 본 보관 파일을 쓰는 commit 과 `PUT`·`DELETE` 는 보관 파일 잠금 다음 전역 잠금을 잡는다. 바인딩 설치는 지금처럼 전역 잠금만 잡고 보관 파일 잠금을 잡지 않는다. 그래서 설치가 보관 파일과 리비전을 읽는 동안 본 보관 파일이 바뀌지 않고, 잡는 순서가 거꾸로 되는 일이 없다. 갱신과 취소는 보관 파일 잠금만 잡고 서비스를 부르며 전역 잠금은 잡지 않는다. 그래서 서비스 응답을 기다리는 동안 다른 profile 쓰기가 멈추지 않고, 같은 보관 파일을 쓰려는 요청만 전역 잠금 밖에서 기다린다. 바뀐 refresh token 을 잃지 않으려고 갱신은 서비스 호출부터 파일 쓰기까지 잠금을 놓지 않는다.
 
 ### 실행기와 직접 실행
 
 | 경로 | 바꿀 것 |
 | --- | --- |
-| 실행기 정의(`connector_launch.py`) | OAuth 를 선언한 플러그인이면 실행기 인자에 `@oauth=<token_env>` 를 더한다. 값은 넣지 않는다. 인자는 연결 방식과 상관없이 늘 같아 방식을 바꿔도 정의가 그대로다 |
+| 실행기 정의(`connector_launch.py`) | OAuth 를 선언한 플러그인이면 실행기 인자에 `@oauth=<token_env>` 를 더하고, 정의 env 의 `token_env` 는 주인 env 처럼 빈 값으로 둔다. `${이름}` 참조를 두면 profile `.env` 에 값이 없을 때 그 글자가 그대로 프로세스에 간다. 인자는 연결 방식과 상관없이 늘 같아 방식을 바꿔도 정의가 그대로다 |
 | 정의 해석(`connector_launch.py` 의 `_launcher_parts`, `_launcher_current`, `_launcher_inner`) | `@oauth=` 인자를 칸과 따로 읽는다. 낡은 정의 판정과 `${..}` env 만들기에서 칸으로 세지 않는다 |
 | 실행기(`connector_launcher.py` 의 `_parse_args`) | `@oauth` 가 있으면 OAuth 파일을 풀어 `token_url` 을 그 env 에 넣는다. 파일이 없으면(붙여 넣기 연결) 빈 값이다 |
-| 직접 실행(`connector_run.py` 의 `_binding_env`) | 승인한 쓰기와 금융 준비도 같은 OAuth 파일을 읽어 넣는다 |
+| 직접 실행(`connector_run.py` 가 부르는 `connector_launch.py` 의 `_binding_env`) | 승인한 쓰기와 금융 준비도 같은 OAuth 파일을 읽어 넣는다 |
 | 확인·선택지 호출(`call`, `list`) | 본문 모양 검사에 `oauth` key 를 더한다. `oauth: "current"` 면 본 자리의 보관 파일과 OAuth 파일을, `oauth: "pending"` 이면 대기 보관 파일의 칸 값과 대기 OAuth 파일의 `token_url` 을 넣는다. 처음 연결은 본 자리 보관 파일이 없어도 된다 |
 
 ### 대시보드 plugin 경로(서비스 토큰)
@@ -127,7 +127,7 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | `POST /api/connector-oauth/revoke` | 보관 파일 id, client ID·secret, access token(있으면) | `outcome`. GitHub 은 access token 이 없으면 먼저 갱신해 받는다. 파일은 지우지 않는다. 지금 해제 경로의 보관 파일 `DELETE` 가 보관 파일과 OAuth 파일, 대기 파일 둘을 함께 지운다. 취소를 건너뛰거나 실패해도 refresh token 이 남지 않는다 |
 | `POST /api/connector-oauth/token-url` | 보관 파일 id, 새 통로 주소 | OAuth 파일의 `token_url` 만 바꾼다(서명 비밀 교체) |
 
-`outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable` 가운데 하나다. 서비스 응답 원문과 토큰은 로그에 쓰지 않는다. 카탈로그 응답은 플러그인마다 정규화한 `oauth` 와 제공자의 설정 화면 주소를 함께 낸다.
+`outcome` 은 `ok`, `grant_revoked`, `app_rejected`, `scope_denied`, `unavailable`, `missing`(갱신할 OAuth 파일이 없음) 가운데 하나다. 교환 응답에 refresh token 이 없으면 앱 설정(GitHub App 의 토큰 만료 끄기 등) 문제로 보고 `app_rejected` 다. 서비스 응답 원문과 토큰은 로그에 쓰지 않는다. 카탈로그 응답은 플러그인마다 정규화한 `oauth` 와 제공자의 설정 화면 주소를 함께 낸다.
 
 ### Control Plane API
 

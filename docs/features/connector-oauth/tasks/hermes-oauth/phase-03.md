@@ -10,7 +10,7 @@ Control Plane 이 서비스 토큰으로 부르는 `connector-oauth` 경로 여�
 
 ## 컨텍스트
 
-**요구사항**: REQ6
+**요구사항**: REQ6, 그리고 REQ4, REQ5, REQ7, REQ8 의 Hermes 쪽(교환, 부분 허락 거절, 오류 분류, 취소)
 
 **근거 문서**: `docs/features/connector-oauth/design.md` 의 「대시보드 plugin 경로(서비스 토큰)」, 「취소 범위」, 「흐름」 의 PKCE, `docs/adr/ADR-20261120-connector-oauth.md`
 
@@ -36,16 +36,16 @@ Control Plane 이 서비스 토큰으로 부르는 `connector-oauth` 경로 여�
 | --- | --- |
 | `POST /api/connector-oauth/authorize-url` | 본문 `{connector, mode, client_id, app_slug?, redirect_uri, state, code_challenge?}`. 카탈로그의 `oauth` 가 없으면 404. GitHub `install` 은 설치 화면에 `state` 를, `authorize` 는 허락 화면에 `client_id`, `redirect_uri`, `state`, `code_challenge`, `code_challenge_method=S256` 을 붙인다. Google 은 `scope`(선언 scope 를 공백으로 이음), `access_type=offline`, `prompt=consent`, `include_granted_scopes=false`, `response_type=code` 를 더한다. `{"url"}` 을 답한다 |
 | `POST /api/connector-oauth/begin` | 본문 `{vault, connector, values}`. `_vault_values(manifest, values, oauth=True)` 로 검사하고 `_begin` 을 부른다. `{"nonce"}` |
-| `POST /api/connector-oauth/exchange` | 본문 `{vault, connector, nonce, client_id, client_secret, code, code_verifier?, redirect_uri, token_url}`. 토큰 주소에 코드를 보낸다. Google 은 응답 `scope` 가 선언 scope 를 모두 담지 않으면 `scope_denied` 이고 파일을 쓰지 않는다. 성공하면 `_fill_pending` 으로 refresh token, 받은 scope, `token_url` 을 쓰고 `{"outcome": "ok", "access_token", "expires_at"}` |
+| `POST /api/connector-oauth/exchange` | 본문 `{vault, connector, nonce, client_id, client_secret, code, code_verifier?, redirect_uri, token_url}`. 토큰 주소에 코드를 보낸다. Google 은 응답 `scope` 가 선언 scope 를 모두 담지 않으면 `scope_denied` 이고 파일을 쓰지 않는다. 응답에 refresh token 이 없으면 `app_rejected` 이고 파일을 쓰지 않는다(GitHub App 의 토큰 만료를 꺼 둔 경우). 로그 까닭은 `no_refresh_token` 이다. 성공하면 `_fill_pending` 으로 refresh token, 받은 scope, `token_url` 을 쓰고 `{"outcome": "ok", "access_token", "expires_at"}` |
 | `POST /api/connector-oauth/commit` | 본문 `{vault, nonce}`. `_commit`. nonce 가 다르면 409 |
 | `POST /api/connector-oauth/discard` | 본문 `{vault, connector, nonce, client_id, client_secret, access_token}`. GitHub 은 그 access token 하나를 취소(`DELETE /applications/{client_id}/token`, 기본 인증)하고, 결과와 상관없이 `_discard` |
 | `POST /api/connector-oauth/refresh` | 본문 `{vault, connector, client_id, client_secret}`. OAuth 파일이 없으면 `{"outcome": "missing"}`. 있으면 refresh token 으로 갱신하고, 응답에 새 refresh token 이 있으면 OAuth 파일에 쓴 뒤 `{"outcome": "ok", "access_token", "expires_at"}` |
 | `POST /api/connector-oauth/revoke` | 본문 `{vault, connector, client_id, client_secret, access_token?}`. GitHub 은 access token 이 없으면 먼저 갱신해 받고 `DELETE /applications/{client_id}/grant` 를 보낸다. Google 은 refresh token 으로 취소 주소를 부른다. 파일은 지우지 않는다 |
 | `POST /api/connector-oauth/token-url` | 본문 `{vault, token_url}`. OAuth 파일의 `token_url` 만 바꾼다 |
 
-- `outcome` 분류: 서비스가 `invalid_grant`, `bad_refresh_token`, `bad_verification_code` 처럼 사용자 허락 쪽을 거절하면 `grant_revoked`, `invalid_client`, `unauthorized_client`, `incorrect_client_credentials` 처럼 앱 자격을 거절하면 `app_rejected`, 연결 실패·시간 초과·5xx 는 `unavailable`. 정확한 오류 낱말은 제공자 표가 갖는다
+- `outcome` 분류: 응답 본문의 `error` 를 phase 01 제공자 표의 `grant_errors`, `app_errors` 와 대조한다. GitHub 은 오류도 HTTP 200 본문으로 오므로 상태 코드가 아니라 본문의 `error` 를 먼저 본다. 표에 없는 낱말, 연결 실패, 시간 초과, 5xx 는 `unavailable` 이다. 갱신할 OAuth 파일이 없으면 `missing` 이다
 - `expires_at` 은 epoch 초다. 서비스가 만료를 주지 않으면 null 이다
-- 모든 경로는 `vault_lock(vault)` 안에서 파일을 읽고 쓴다. `PROFILE_WRITE_LOCK` 은 잡지 않는다
+- 모든 경로는 `vault_lock(vault)` 안에서 파일을 읽고 쓴다. 본 보관 파일을 쓰는 `commit` 만 그 다음 `PROFILE_WRITE_LOCK` 을 잡는다(서비스를 부르지 않아 짧다). 나머지는 전역 잠금을 잡지 않는다
 - 서비스 호출 시간 제한은 10초다
 
 ### 2. `hermes/plugins/dashboard-profile-api/routes.py` 수정
@@ -62,13 +62,14 @@ Control Plane 이 서비스 토큰으로 부르는 `connector-oauth` 경로 여�
 
 ### 5. `hermes/tests/fixtures/connector-oauth/` 신규
 
-Control Plane 테스트가 같은 모양을 쓰도록 경로마다 요청과 응답 예시 JSON 을 둔다(`exchange-request.json`, `exchange-response.json`, `refresh-response.json`). 뒤 계획의 Control Plane 가짜 대시보드가 이 파일을 읽는다.
+Control Plane 테스트가 같은 모양을 쓰도록 경로마다 요청과 응답 예시 JSON 을 둔다(`exchange-request.json`, `exchange-response.json`, `refresh-response.json`, `refresh-missing-response.json`). 뒤 계획의 Control Plane 가짜 대시보드가 이 파일을 읽는다.
 
 ### 6. `hermes/tests/test_connector_oauth_routes.py` 신규
 
-로컬 HTTP 서버로 가짜 GitHub 과 가짜 Google 을 띄우고 제공자 표의 주소를 그 서버로 바꿔 돈다(`hermes/tests/fixtures/conditional_plugin_http.py` 처럼 표준 라이브러리 HTTP 서버).
+로컬 HTTP 서버로 가짜 GitHub 과 가짜 Google 을 띄우고(가짜 GitHub 은 실제처럼 오류도 HTTP 200 본문의 `error` 로 보내고 `Accept: application/json` 이 없으면 400 으로 답한다) 제공자 표의 주소를 그 서버로 바꿔 돈다(`hermes/tests/fixtures/conditional_plugin_http.py` 처럼 표준 라이브러리 HTTP 서버).
 
 - authorize-url: GitHub `install` 에 challenge 가 없고 `authorize` 와 Google 에 있다. Google 에 `access_type=offline` 이 있다
+- exchange: refresh token 없는 응답은 `app_rejected` 이고 대기 OAuth 파일에 토큰이 없다
 - exchange: 성공하면 대기 OAuth 파일에 refresh token 이 있고 응답에 refresh token 이 없다. Google 부분 scope 는 `scope_denied` 이고 대기 OAuth 파일에 토큰이 없다. 다른 nonce 는 409
 - refresh: GitHub 이 새 refresh token 을 주면 OAuth 파일이 바뀐다. `invalid_grant` 는 `grant_revoked`, `invalid_client` 는 `app_rejected`, 서버 중단은 `unavailable`
 - refresh 중 OAuth 파일 쓰기가 실패하면 `unavailable` 이고 access token 이 없다
@@ -96,4 +97,5 @@ python3 -m unittest discover -s hermes/tests -p 'test_connector_oauth_*.py'
 | `hermes/tests/fixtures/connector-oauth/exchange-request.json` | 신규 |
 | `hermes/tests/fixtures/connector-oauth/exchange-response.json` | 신규 |
 | `hermes/tests/fixtures/connector-oauth/refresh-response.json` | 신규 |
+| `hermes/tests/fixtures/connector-oauth/refresh-missing-response.json` | 신규 |
 | `hermes/tests/test_connector_oauth_routes.py` | 신규 |
