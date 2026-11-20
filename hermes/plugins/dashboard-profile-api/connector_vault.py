@@ -147,15 +147,18 @@ def _durable_private_write(path: pathlib.Path, value: bytes) -> None:
         os.close(directory)
 
 
-def _vault_values(manifest: dict, values) -> dict | None:
+def _vault_values(manifest: dict, values, oauth: bool = False) -> dict | None:
     """보관할 칸 값을 manifest 의 칸으로 검사한다. 맞으면 빈 선택 칸을 뺀 값이고, 틀리면 None 이다.
 
     모르는 키, 문자열이 아닌 값, 두 줄 이상인 값을 받지 않는다. 필수 칸은 비어 있지 않아야 한다.
     형식은 `call` 과 같게 본다. 비운 선택 칸은 형식을 보지 않는다.
+    `oauth` 가 참이면 단추로 채우는 칸(`oauth.fields`)을 선택 칸으로 본다(docs/features/connector-oauth/design.md 의 「선언」).
     """
     if not isinstance(values, dict):
         return None
-    fields = {field["key"]: field for field in manifest["fields"]}
+    button = set(manifest["oauth"]["fields"]) if oauth and manifest.get("oauth") else set()
+    fields = {field["key"]: ({**field, "required": False} if field["key"] in button else field)
+              for field in manifest["fields"]}
     kept = {}
     for key, value in values.items():
         field = fields.get(key)
@@ -171,39 +174,58 @@ def _vault_values(manifest: dict, values) -> dict | None:
     return kept
 
 
-async def _connector_vault_request(request):
-    """보관 파일을 쓰고 지운다. 값과 경로를 응답과 로그에 싣지 않는다."""
+async def _connector_vault_request(request, write_lock: asyncio.Lock):
+    """보관 파일을 쓰고 지운다. 값과 경로를 응답과 로그에 싣지 않는다.
+
+    본문을 읽은 뒤 그 보관 파일의 잠금, 전역 `write_lock` 순서로 잡는다(docs/features/connector-oauth/design.md 의 「OAuth 파일」).
+    `PUT` 의 선택 키 `oauth` 가 참이면 단추로 채우는 칸이 비어도 받고, 거짓이거나 없으면 OAuth 파일을 지운다(스펙 REQ9).
+    `DELETE` 는 OAuth 파일과 대기 파일까지 지운다.
+    """
     from starlette.responses import JSONResponse
+    from .connector_oauth_store import _delete_all, _delete_oauth, vault_lock
 
     path = request.url.path
     method = request.method.upper()
     body = await _json_object(request)
     expected = {(VAULT_PATH, "PUT"): {"vault", "connector", "values"}, (VAULT_PATH, "DELETE"): {"vault"}}[(path, method)]
-    if (body is None or set(body) != expected
+    optional = {"oauth"} if method == "PUT" else set()
+    if (body is None or not expected <= set(body) <= expected | optional
             or not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])
             or ("connector" in body and (not isinstance(body["connector"], str)
-                                         or not CONNECTOR_ID_RE.match(body["connector"])))):
+                                         or not CONNECTOR_ID_RE.match(body["connector"])))
+            or not isinstance(body.get("oauth", False), bool)):
         return _rejected("%s 만 필요하다" % ", ".join(sorted(expected)))
     vault = body["vault"]
     try:
         if method == "DELETE":
             def delete():
                 target = _vault_path(vault)
-                if not target.exists():
-                    return False
-                target.unlink()
-                return True
+                existed = target.exists()
+                target.unlink(missing_ok=True)
+                _delete_all(vault)
+                return existed
 
-            return JSONResponse({"changed": await asyncio.to_thread(delete)}, status_code=200)
+            async with vault_lock(vault), write_lock:
+                return JSONResponse({"changed": await asyncio.to_thread(delete)}, status_code=200)
 
         connector = body["connector"]
         manifest = _connector_manifest(connector) if connector in _connector_roots() else None
         if manifest is None:
             return _rejected("쓸 수 있는 connector 가 아니다")
-        values = _vault_values(manifest, body["values"])
+        oauth = body.get("oauth", False)
+        if oauth and manifest.get("oauth") is None:
+            return _rejected("단추로 연결하는 connector 가 아니다")
+        values = _vault_values(manifest, body["values"], oauth=oauth)
         if values is None:
             return _rejected("칸 값이 그 connector 의 칸 선언과 맞지 않는다")
-        await asyncio.to_thread(_write_vault, vault, connector, values)
+
+        def write():
+            _write_vault(vault, connector, values)
+            if not oauth:
+                _delete_oauth(vault)
+
+        async with vault_lock(vault), write_lock:
+            await asyncio.to_thread(write)
         return JSONResponse({"ok": True}, status_code=200)
     except FileExistsError:
         return _rejected("다른 connector 의 보관 파일이다", 409)

@@ -16,6 +16,8 @@ from .connector_vault import (
     _vault_dir,
 )
 
+from .connector_vault_format import _parse_oauth, _unseal_oauth, _unseal_vault
+
 from .connector_vault_key import (
     _vault_key_file_shared,
     _vault_keys,
@@ -23,7 +25,8 @@ from .connector_vault_key import (
 
 
 # 이관이 보는 파일 이름이다. 쓰기 중의 임시 파일(`.connector-`)과 다른 이름은 건너뛴다.
-VAULT_FILE_RE = re.compile(r"^(c[1-9][0-9]{0,18})\.json$")
+# 보관 파일 옆의 OAuth 파일과 대기 파일도 같은 key 로 암호화하므로 함께 옮긴다. 안 옮기면 옛 key 를 지운 뒤 풀지 못한다.
+VAULT_FILE_RE = re.compile(r"^(c[1-9][0-9]{0,18})(\.json|\.pending|\.oauth|\.oauth\.pending)$")
 # 기동 로그에 남기는 수의 이름이다. 운영은 배포 뒤 `plain` 과 `old_key` 가 0 인지 본다(REQ3).
 # `kept` 는 손대지 않은 활성 key 의 파일이고, key 가 준비되지 않았을 때는 암호화한 파일 모두다.
 MIGRATION_COUNTS = ("kept", "from_plain", "from_old_key", "plain", "old_key", "unopened", "temp_removed")
@@ -62,13 +65,13 @@ def _migrate_vault_files() -> dict:
             continue
         vault = match.group(1)
         try:
-            outcome = _migrate_vault_file(vault, keys)
+            outcome = _migrate_vault_file(vault, keys, match.group(2))
         except Exception as error:
-            logger.warning("dashboard-profile-api: 보관 파일 %s 를 이관하지 못했다: %s", vault, type(error).__name__)
+            logger.warning("dashboard-profile-api: 보관 파일 %s 를 이관하지 못했다: %s", name, type(error).__name__)
             outcome = "plain"
         counts[outcome] += 1
         if outcome in ("plain", "old_key", "unopened"):
-            left.append(vault)
+            left.append(vault if match.group(2) == ".json" else name)
     logger.info("dashboard-profile-api: 보관 파일 이관: key=%s 필수=%s, 그대로 둔 암호화 파일 %d, v1 에서 옮김 %d, 옛 key 에서 옮김 %d, "
                 "남은 평문 파일 %d, 남은 옛 key 파일 %d, 풀지 못한 파일 %d, 지운 임시 파일 %d",
                 keys.state, "참" if keys.required else "거짓", counts["kept"], counts["from_plain"], counts["from_old_key"],
@@ -82,14 +85,31 @@ def _migrate_vault_files() -> dict:
     return counts
 
 
-def _migrate_vault_file(vault: str, keys) -> str:
-    """보관 파일 하나를 분류하고 필요하면 다시 쓴다. 결과는 `MIGRATION_COUNTS` 의 이름 하나다."""
-    path = _vault_dir() / ("%s.json" % vault)
+def _file_codec(suffix: str):
+    """파일 종류마다 `(모양 검사, 푼 내용, 글 만들기)` 다. 보관 파일과 대기 보관 파일은 같은 형식이다."""
+    from .connector_oauth_store import _oauth_bytes
+
+    if suffix in (".json", ".pending"):
+        def opened(vault, stored, keys):
+            return stored["values"] if stored["v"] == 1 else _unseal_vault(vault, stored, keys)["values"]
+
+        return _parse_vault, opened, _vault_bytes
+
+    def opened_oauth(vault, stored, keys):
+        return _unseal_oauth(vault, stored, keys)["oauth"]
+
+    return _parse_oauth, opened_oauth, _oauth_bytes
+
+
+def _migrate_vault_file(vault: str, keys, suffix: str = ".json") -> str:
+    """보관 파일이나 그 옆 파일 하나를 분류하고 필요하면 다시 쓴다. 결과는 `MIGRATION_COUNTS` 의 이름 하나다."""
+    parse, opened, dump = _file_codec(suffix)
+    path = _vault_dir() / (vault + suffix)
     if path.is_symlink() or not path.is_file():
         return "plain"
     original = path.read_bytes()
     try:
-        stored = _parse_vault(original)
+        stored = parse(original)
     except ValueError:
         # 깨진 파일은 건드리지 않고 평문 파일로 센다(스펙 DECISION5).
         return "plain"
@@ -97,21 +117,26 @@ def _migrate_vault_file(vault: str, keys) -> str:
         # key 가 준비되지 않으면 다시 쓰지 않고 세기만 한다. 평문으로 바꿔 쓰는 일이 없게 한다.
         return "plain" if stored["v"] == 1 else "kept"
     if stored["v"] == 1:
-        values = stored["values"]
+        content = opened(vault, stored, keys)
         moved = "from_plain"
     else:
         old = stored["key_id"] != keys.active_id
         try:
-            values = _read_vault(vault, keys)["values"]
+            content = opened(vault, stored, keys)
         except ValueError:
             return "old_key" if old else "unopened"
         if not old:
             return "kept"
         moved = "from_old_key"
-    _durable_private_write(path, _vault_bytes(vault, stored["connector"], values, keys))
+    _durable_private_write(path, dump(vault, stored["connector"], content, keys))
     try:
-        written = _read_vault(vault, keys)
-        same = written["connector"] == stored["connector"] and written["values"] == values and written["v"] == 2
+        if suffix == ".json":
+            written = _read_vault(vault, keys)
+            same = written["connector"] == stored["connector"] and written["values"] == content and written["v"] == 2
+        else:
+            written = parse(path.read_bytes())
+            same = (written["connector"] == stored["connector"] and written["v"] == 2
+                    and opened(vault, written, keys) == content)
     except ValueError:
         same = False
     if same:
