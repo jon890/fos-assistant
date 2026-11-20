@@ -276,6 +276,27 @@ class ConnectorOAuthTokenTest {
 
 
     @Test
+    @DisplayName("같은 앱을 쓰는 두 연결이 동시에 자격을 거절당해도 관리자 알림은 한 건이다")
+    void concurrentAppRejectionsNotifyOnce() throws Exception {
+        ConnectorConnection first = oauthConnection();
+        ConnectorConnection second = oauthConnection();
+        CountDownLatch both = new CountDownLatch(2);
+        when(oauth.refresh(any(), eq(CONNECTOR), any())).thenAnswer(call -> {
+            both.countDown();
+            assertThat(both.await(10, TimeUnit.SECONDS)).isTrue();
+            return new Token(Outcome.APP_REJECTED, null, null);
+        });
+
+        CompletableFuture<Outcome> one = CompletableFuture.supplyAsync(() -> tokens.refresh(first.id(), null).outcome());
+        CompletableFuture<Outcome> other = CompletableFuture.supplyAsync(() -> tokens.refresh(second.id(), null).outcome());
+
+        assertThat(one.get(10, TimeUnit.SECONDS)).isEqualTo(Outcome.APP_REJECTED);
+        assertThat(other.get(10, TimeUnit.SECONDS)).isEqualTo(Outcome.APP_REJECTED);
+        assertThat(notificationsOf(admin)).hasSize(1);
+    }
+
+
+    @Test
     @DisplayName("대시보드나 서비스가 잠시 답하지 않으면 상태와 알림을 바꾸지 않는다")
     void unavailableChangesNothing() throws Exception {
         ConnectorConnection connection = oauthConnection();

@@ -73,10 +73,11 @@ public class ConnectorOAuthAlerts {
 
     /**
      * 서비스가 앱 자격을 거절했다. 연결 주인 그룹의 차단되지 않은 관리자마다, 같은 앱의 읽지 않은 알림이 없을 때만 하나를 남긴다.
+     * 같은 앱을 쓰는 두 연결이 함께 거절돼도 한 번만 남기도록 확인과 저장, 커밋을 이 객체에서 직렬화한다(서버 한 대 전제).
      *
      * @param secretName 그 앱의 서버 비밀값 줄 이름
      */
-    public void appRejected(long ownerId, String secretName, String title) {
+    public synchronized void appRejected(long ownerId, String secretName, String title) {
         transactions.executeWithoutResult(status -> {
             AppUser owner = users.findById(ownerId).orElse(null);
             if (owner == null) {
