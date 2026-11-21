@@ -128,3 +128,35 @@ test("mermaid 는 flowchart 를 손그림과 classDef 색으로, sequence 를 �
   await expect(article(page).getByText("그림을 그리지 못했어요")).toBeVisible();
   await expect(article(page).getByText("A[[[ 틀린 문법")).toBeVisible();
 });
+
+test("mermaid 그림을 누르면 화면을 덮는 창에서 원래 크기로 보이고 Esc 와 바깥 누르기로 닫힌다", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/dev-docs/docs/features/other.md");
+  const flow = article(page).getByRole("button", { name: "그림 크게 보기" }).first();
+  await expect(flow.locator("svg")).toBeVisible();
+
+  await flow.click();
+  const dialog = page.getByRole("dialog", { name: "그림 크게 보기" });
+  await expect(dialog).toBeVisible();
+  const dialogBox = (await dialog.boundingBox())!;
+  expect(dialogBox.width).toBeGreaterThan(1440 * 0.9);
+  // 창 안의 그림은 viewBox 폭 그대로 그린다. 본문 폭에 맞춰 줄이지 않는다.
+  const sizes = await dialog.getByTestId("mermaid-dialog-diagram").locator("svg").evaluate((svg) => ({
+    natural: (svg as SVGSVGElement).viewBox.baseVal.width,
+    drawn: svg.getBoundingClientRect().width,
+  }));
+  expect(Math.abs(sizes.drawn - sizes.natural)).toBeLessThanOrEqual(1);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(flow).toBeFocused();
+
+  await flow.click();
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(dialog).toHaveCount(0);
+
+  await flow.click();
+  await dialog.getByRole("button", { name: "그림 닫기" }).click();
+  await expect(dialog).toHaveCount(0);
+});

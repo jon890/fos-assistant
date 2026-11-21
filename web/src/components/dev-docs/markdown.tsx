@@ -121,7 +121,8 @@ function docComponents(
       const source = String(children);
       if (language || source.endsWith("\n")) {
         const text = source.replace(/\n$/, "");
-        if (language === "mermaid") return <MermaidBlock source={text} />;
+        if (language === "mermaid")
+          return <MermaidBlock source={text} expandable />;
         return (
           <pre className="my-3 overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs leading-5">
             <code>{text}</code>
