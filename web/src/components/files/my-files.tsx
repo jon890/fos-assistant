@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { useMediaQuery } from "@/components/ui/use-media-query";
 import { describeFailure } from "@/components/error-message";
 import { MyFilePreview } from "@/components/files/my-file-preview";
 import { MyFileRow } from "@/components/files/my-file-row";
@@ -40,7 +39,6 @@ const SEARCH_DELAY_MS = 300;
 export function MyFiles() {
   const params = useSearchParams();
   const router = useRouter();
-  const wide = useMediaQuery("(min-width: 1024px)");
   const [now] = useState(() => new Date());
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -50,6 +48,8 @@ export function MyFiles() {
     title: string;
   } | null>(null);
   const [preview, setPreview] = useState<VaultItem | null>(null);
+  // 미리보기를 연 줄의 단추다. Safari 는 눌러도 단추에 포커스를 주지 않아 activeElement 로 알 수 없다.
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
   const [deleting, setDeleting] = useState<VaultItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,7 +61,14 @@ export function MyFiles() {
     return () => clearTimeout(timer);
   }, [text]);
 
-  useLinkedItem(linked, setPreview, setNotice);
+  useLinkedItem(
+    linked,
+    (item) => {
+      setOpener(null);
+      setPreview(item);
+    },
+    setNotice,
+  );
   const sentinel = useEndSentinel(list.nextCursor, list.loadMore);
 
   function closePreview() {
@@ -134,7 +141,10 @@ export function MyFiles() {
                   item={item}
                   now={now}
                   selected={preview?.id === item.id}
-                  onOpen={() => setPreview(item)}
+                  onOpen={(button) => {
+                    setOpener(button);
+                    setPreview(item);
+                  }}
                   onConversation={(id, title) => setConversation({ id, title })}
                   onDelete={() => setDeleting(item)}
                 />
@@ -165,7 +175,7 @@ export function MyFiles() {
         <MyFilePreview
           key={preview.id}
           item={preview}
-          wide={wide}
+          opener={opener}
           onClose={closePreview}
           onDelete={() => setDeleting(preview)}
         />
