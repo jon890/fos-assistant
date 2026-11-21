@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatElapsed, formatWhen } from "@/lib/format";
@@ -82,8 +83,16 @@ export function QualityCheckRow({
   const status = STATUS[check.status];
   return (
     <li data-testid="quality-check" className="rounded-md border border-border">
-      <details open={check.status === "FAILED" ? true : undefined}>
-        <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
+      <details
+        className="group"
+        open={check.status === "FAILED" ? true : undefined}
+      >
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
+          {/* flex 로 바꾸면 기본 펼침 삼각형이 사라져 아이콘으로 열림을 보인다. */}
+          <ChevronRight
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+          />
           <span className="tabular-nums">{formatWhen(check.startedAt)}</span>
           <span className="text-muted-foreground">
             {TRIGGER[check.trigger]}

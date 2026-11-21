@@ -27,17 +27,21 @@ export function EvaluationUserPanel({
   const [profile, setProfile] = useState(status.hermesProfile ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const missingUser = status.missing.includes("USER");
 
   async function prepare() {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await prepareEvaluationUser(profile);
       const payload = (await response.json().catch(() => ({}))) as
         EvaluationUserStatus | { code?: string; message?: string };
       if (response.ok) {
-        onPrepared(payload as EvaluationUserStatus);
+        const next = payload as EvaluationUserStatus;
+        if (!next.ready) setNotice("다시 준비했어요. 아직 빠진 것이 있어요.");
+        onPrepared(next);
       } else {
         const failure = payload as { code?: string; message?: string };
         setError(
@@ -89,7 +93,7 @@ export function EvaluationUserPanel({
           <Input
             id="evaluation-profile"
             value={profile}
-            disabled={!missingUser || busy}
+            disabled={(!missingUser && status.hermesProfile !== null) || busy}
             onChange={(event) => setProfile(event.target.value)}
             placeholder="실행 공간에 등록한 profile 이름"
           />
@@ -103,6 +107,11 @@ export function EvaluationUserPanel({
           {missingUser ? "평가 사용자 준비" : "다시 준비"}
         </Button>
       </div>
+      {notice ? (
+        <Notice variant="info" role="status">
+          {notice}
+        </Notice>
+      ) : null}
       {error ? (
         <Notice variant="error" role="alert">
           {error}

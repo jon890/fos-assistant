@@ -53,7 +53,7 @@ export function OverviewMonthlyCard() {
                 {`${monthly.evaluation.executions.toLocaleString("ko-KR")}건 · ${formatAmount(
                   monthly.evaluation.actualCostMicros,
                   monthly.currency,
-                )}`}
+                )}${monthly.evaluation.incomplete ? " 이상" : ""}`}
               </span>
             </p>
           ) : null}

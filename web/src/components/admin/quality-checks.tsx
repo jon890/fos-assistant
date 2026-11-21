@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { describeAdminError } from "@/components/error-message";
 import { EvaluationUserPanel } from "@/components/admin/evaluation-user-panel";
 import { QualityCheckRow } from "@/components/admin/quality-check-row";
@@ -26,6 +28,8 @@ type Loaded = {
   nextCursor: string | null;
 };
 
+type Message = { error: boolean; text: string };
+
 async function readJson<T>(response: Promise<Response>): Promise<T | null> {
   try {
     const resolved = await response;
@@ -45,8 +49,6 @@ async function readFirst(): Promise<Loaded | null> {
   return { evaluation, checks: page.items, nextCursor: page.nextCursor };
 }
 
-type Message = { error: boolean; text: string };
-
 /** 다시 읽은 첫 쪽을 지금 목록에 합친다. 「더 보기」 로 펼친 뒤쪽 기록은 남긴다. */
 function merged(current: Loaded, page: QualityCheckPage): Loaded {
   const fresh = new Set(page.items.map((check) => check.publicId));
@@ -55,6 +57,19 @@ function merged(current: Loaded, page: QualityCheckPage): Loaded {
     ...current,
     checks: [...page.items, ...older],
     nextCursor: older.length > 0 ? current.nextCursor : page.nextCursor,
+  };
+}
+
+/** 다음 쪽을 뒤에 붙인다. 이미 있는 줄은 다시 붙이지 않는다. */
+function appended(current: Loaded, page: QualityCheckPage): Loaded {
+  const seen = new Set(current.checks.map((check) => check.publicId));
+  return {
+    ...current,
+    checks: [
+      ...current.checks,
+      ...page.items.filter((check) => !seen.has(check.publicId)),
+    ],
+    nextCursor: page.nextCursor,
   };
 }
 
@@ -88,16 +103,16 @@ async function startOutcome(request: Promise<Response>): Promise<Message> {
 }
 
 /**
- * 관리자 「품질」 화면의 첫 칸, 배포 뒤 확인 기록이다(docs/features/agent-quality/spec.md 의 REQ4).
+ * 품질 화면의 읽기와 다시 읽기다. 도는 확인이 있으면 끝날 때까지 확인 목록만 다시 읽는다.
  *
- * <p>평가 사용자가 없으면 기록 대신 준비 칸만 보인다. 도는 확인이 있으면 끝날 때까지 목록을 다시 읽는다.
+ * <p>다시 읽기가 실패해도 지금 그림을 그대로 두고 다음 차례를 건다. 한 번 실패로 줄이 「확인 중」 에 멈추지 않게 한다.
  */
-export function QualityChecks() {
+function useQualityChecks() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const [pollTick, setPollTick] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,22 +130,62 @@ export function QualityChecks() {
     loaded?.checks.some((check) => check.status === "RUNNING") ?? false;
   useEffect(() => {
     if (!running) return;
+    let cancelled = false;
     const timer = setTimeout(() => {
       void readJson<QualityCheckPage>(fetchQualityChecks()).then((page) => {
-        // 다시 읽기는 확인 목록만 읽는다. 실패하면 지금 그림을 그대로 두고 다음 차례에 다시 읽는다.
+        if (cancelled) return;
         if (page !== null)
           setLoaded((current) =>
             current === null ? current : merged(current, page),
           );
+        setPollTick((value) => value + 1);
       });
     }, POLL_MS);
-    return () => clearTimeout(timer);
-  }, [running, loaded]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [running, pollTick]);
 
   const reload = useCallback(() => {
     setFailed(false);
     setAttempt((value) => value + 1);
   }, []);
+
+  /** 다음 쪽을 읽는다. 읽는 동안 다시 누르면 무시한다. 읽지 못하면 거짓이다. */
+  async function more(cursor: string): Promise<boolean> {
+    if (loadingMore) return true;
+    setLoadingMore(true);
+    const page = await readJson<QualityCheckPage>(fetchQualityChecks(cursor));
+    setLoadingMore(false);
+    if (page === null) return false;
+    setLoaded((current) =>
+      current === null ? current : appended(current, page),
+    );
+    return true;
+  }
+
+  function setEvaluation(evaluation: EvaluationUserStatus) {
+    setLoaded((current) =>
+      current === null ? current : { ...current, evaluation },
+    );
+  }
+
+  return { loaded, failed, running, loadingMore, reload, more, setEvaluation };
+}
+
+/**
+ * 관리자 「품질」 화면의 첫 칸, 배포 뒤 확인 기록이다(docs/features/agent-quality/spec.md 의 REQ4).
+ *
+ * <p>평가 사용자가 없으면 기록 대신 준비 칸만 보인다.
+ */
+export function QualityChecks() {
+  const { loaded, failed, running, loadingMore, reload, more, setEvaluation } =
+    useQualityChecks();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+  const hasUser =
+    loaded !== null && !loaded.evaluation.missing.includes("USER");
 
   async function start(request: Promise<Response>) {
     setBusy(true);
@@ -140,62 +195,45 @@ export function QualityChecks() {
     reload();
   }
 
-  async function more(cursor: string) {
-    const page = await readJson<QualityCheckPage>(fetchQualityChecks(cursor));
-    if (page === null) {
+  async function readMore(cursor: string) {
+    if (!(await more(cursor)))
       setMessage({ error: true, text: "다음 기록을 불러오지 못했어요." });
-      return;
-    }
-    setLoaded((current) =>
-      current === null
-        ? current
-        : {
-            ...current,
-            checks: [...current.checks, ...page.items],
-            nextCursor: page.nextCursor,
-          },
-    );
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
-      <h1 className="text-xl font-semibold">품질</h1>
-      {failed ? (
-        <Notice variant="error" role="alert">
-          <p>불러오지 못했어요</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={reload}>
-            다시 읽기
+    <PageFrame
+      title="품질"
+      description="배포가 끝날 때마다 비서의 기능이 실제로 동작하는지 확인한 기록이에요."
+      action={
+        hasUser ? (
+          <Button
+            size="sm"
+            disabled={busy || running}
+            onClick={() => void start(startQualityCheck())}
+          >
+            확인 시작
           </Button>
-        </Notice>
+        ) : undefined
+      }
+    >
+      {failed ? (
+        <LoadFailure message="불러오지 못했어요" onRetry={reload} />
       ) : loaded === null ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <ListSkeleton />
       ) : (
-        <>
+        <div className="space-y-4">
           {loaded.evaluation.ready ? null : (
             <EvaluationUserPanel
               key={loaded.evaluation.missing.join(",")}
               status={loaded.evaluation}
-              onPrepared={(evaluation) =>
-                setLoaded((current) =>
-                  current === null ? current : { ...current, evaluation },
-                )
-              }
+              onPrepared={setEvaluation}
             />
           )}
-          {loaded.evaluation.missing.includes("USER") ? null : (
+          {hasUser ? (
             <section aria-labelledby="deploy-checks" className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="deploy-checks" className="text-base font-semibold">
-                  배포 뒤 확인
-                </h2>
-                <Button
-                  size="sm"
-                  disabled={busy || running}
-                  onClick={() => void start(startQualityCheck())}
-                >
-                  확인 시작
-                </Button>
-              </div>
+              <h2 id="deploy-checks" className="text-base font-semibold">
+                배포 뒤 확인
+              </h2>
               {message ? (
                 <Notice
                   variant={message.error ? "error" : "info"}
@@ -227,15 +265,17 @@ export function QualityChecks() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => void more(loaded.nextCursor!)}
+                  loading={loadingMore}
+                  loadingText="불러오는 중…"
+                  onClick={() => void readMore(loaded.nextCursor!)}
                 >
                   더 보기
                 </Button>
               ) : null}
             </section>
-          )}
-        </>
+          ) : null}
+        </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

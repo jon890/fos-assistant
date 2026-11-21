@@ -78,6 +78,32 @@ test("관리자 메뉴의 품질은 확인 기록을 최근 순으로 보이고 
   await expect(checks.nth(1).getByTestId("quality-feature").getByRole("link")).toHaveCount(0);
 });
 
+test("도는 확인을 다시 읽다 한 번 실패해도 다음 차례에 다시 읽어 결과를 보인다", async ({ page }) => {
+  await page.clock.install();
+  const running = { ...FAILED_CHECK, status: "RUNNING", finishedAt: null, elapsedMs: null, results: [] };
+  let reads = 0;
+  await page.route("**/api/admin/quality/evaluation-user", (route) => route.fulfill({ status: 200, json: READY }));
+  await page.route("**/api/admin/quality/checks", (route) => {
+    reads += 1;
+    // 처음은 도는 확인, 두 번째 다시 읽기는 500, 세 번째부터 끝난 확인이다.
+    if (reads === 1) return route.fulfill({ status: 200, json: { items: [running], nextCursor: null } });
+    if (reads === 2) return route.fulfill({ status: 500, json: { code: "INTERNAL_ERROR", message: "x" } });
+    return route.fulfill({ status: 200, json: { items: [FAILED_CHECK], nextCursor: null } });
+  });
+  await page.goto("/admin/quality");
+
+  const row = page.getByTestId("quality-check");
+  await expect(row.getByText("확인 중", { exact: true })).toBeVisible();
+  await page.clock.runFor(10_000);
+  await expect.poll(() => reads).toBe(2);
+  await expect(row.getByText("확인 중", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+
+  await page.clock.runFor(10_000);
+  await expect(row.getByText("실패", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "확인 시작" })).toBeEnabled();
+});
+
 test("이미 도는 확인이 있으면 「다시 확인」 이 그 사실을 알린다", async ({ page }) => {
   await fakeQuality(page, () => READY, [FAILED_CHECK]);
   await page.route(`**/api/admin/quality/checks/${FAILED_CHECK.publicId}/retry`, (route) =>
@@ -136,7 +162,7 @@ test("요약의 이번 달 사용량 카드는 평가 사용자의 실행을 「
         subscriptionExecutions: 4,
         actualCostMicros: 0,
         incomplete: false,
-        evaluation: { executions: 7, actualCostMicros: 0 },
+        evaluation: { executions: 7, actualCostMicros: 0, incomplete: false },
       },
     }),
   );
