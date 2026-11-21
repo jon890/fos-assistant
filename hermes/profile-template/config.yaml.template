@@ -68,18 +68,24 @@ agent:
   browser_control:
     enabled: false
 
-# Web search and page extraction backends for the `web` toolset. Left unset on purpose: Hermes then
-# picks a keyed backend if one is configured and a keyless one otherwise. The value was chosen by
-# the answer-quality evaluation (docs/features/answer-quality.md in the fos-assistant repository).
-# Measured 2026-11-18: openai-native produced 0 of 17 answers with source links versus 13 of 17
-# for the automatic choice, so the value stays unset.
-#   search_backend: openai-native   OpenAI's server-side search. Works only on the ChatGPT
-#                                   subscription (Codex) route, and the search is not reported as a
-#                                   tool event, so the Control Plane records no query for it.
-#   extract_backend: <name>         Page reads for web_extract. openai-native does not cover this.
-# web:
-#   search_backend:
-#   extract_backend:
+# Web search and page extraction for the `web` toolset (docs/features/answer-quality.md in the
+# fos-assistant repository, section 「검색 서비스」).
+#   search_backend / extract_backend stay unset on purpose: Hermes then picks a keyed backend when a
+#   key is set and a keyless free tier otherwise. Measured 2026-11-18: openai-native produced 0 of
+#   17 answers with source links versus 13 of 17 for the automatic choice.
+#   Keyed backends, in Hermes' automatic order: TAVILY_API_KEY, PERPLEXITY_API_KEY, EXA_API_KEY,
+#   PARALLEL_API_KEY, KEENABLE_API_KEY, FIRECRAWL_API_KEY. A key is read from the profile's .env or
+#   from the administrator-managed .env that Hermes applies to every profile; never put it here.
+#   keyless_rescue: when a keyed call fails (rate limit 429 included), serve that one call from the
+#   keyless free tier. The next call tries the keyed backend again.
+#   extract_timeout: seconds one web_extract dispatch may take (Hermes default 120). A slow page
+#   then fails fast and the agent reads another source instead of stalling the answer. It caps the
+#   first backend only: with a keyed backend, a timed-out call goes on to the keyless retry above,
+#   which has no cap of its own. Without a key the keyless tier is the first backend, so the cap
+#   covers the whole call.
+web:
+  keyless_rescue: true
+  extract_timeout: 20
 
 # Memory lives in the Control Plane database, which injects what the caller may see as
 # per-run instructions. See ADR-003 in the fos-assistant repository.
