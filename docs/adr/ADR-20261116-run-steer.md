@@ -4,7 +4,7 @@
 - Date: 2026-11-16
 - **decision-type**: `architecture`
 - **areas**: `security, data, operations`
-- **현재 규칙의 원본**: 설계 [`docs/features/chat/design.md`](../features/chat/design.md), 스펙 [`docs/features/chat/spec.md`](../features/chat/spec.md)(사용자 확인 2026-11-16), 기능 파일 [`docs/features/chat.md`](../features/chat.md) 의 「대기열과 중지」
+- **현재 규칙의 원본**: 운영 정책은 [기능 파일의 「응답 중 대기열」](../features/chat.md#응답-중-대기열) 이 갖는다. 설정을 켰을 때의 동작은 [기능 파일의 「도는 실행에 끼워 넣기」](../features/chat.md#도는-실행에-끼워-넣기) 와 [설계](../features/chat/design.md) 가 갖는다. [당시 스펙](../features/chat/spec.md)은 2026-11-16 에 확인했다
 - [ADR-048](ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「적용 범위」 가 미룬 steer 를 그 대기열 위에 얹는다. ADR-048 의 나머지 결정은 그대로다
 
 ### 운영 결정 대체 (2026-11-21)
