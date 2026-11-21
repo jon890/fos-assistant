@@ -79,7 +79,10 @@ agent:
 #   keyless_rescue: when a keyed call fails (rate limit 429 included), serve that one call from the
 #   keyless free tier. The next call tries the keyed backend again.
 #   extract_timeout: seconds one web_extract dispatch may take (Hermes default 120). A slow page
-#   then fails fast and the agent reads another source instead of stalling the answer.
+#   then fails fast and the agent reads another source instead of stalling the answer. It caps the
+#   first backend only: with a keyed backend, a timed-out call goes on to the keyless retry above,
+#   which has no cap of its own. Without a key the keyless tier is the first backend, so the cap
+#   covers the whole call.
 web:
   keyless_rescue: true
   extract_timeout: 20

@@ -84,6 +84,7 @@ OpenAI 내장 검색(`web.search_backend: openai-native`)으로 같은 평가를
 **무료 등급의 429 한도는 유료 key 로 넘는다**(2026-11-21, 스펙 DECISION34). 서비스를 고르는 값은 그대로 비워 두고, key 가 있으면 Hermes 가 그 서비스를 먼저 고른다. key 로 부른 호출이 실패하면 그 호출만 무료 등급으로 다시 해 본다(profile 틀의 `web.keyless_rescue`).
 key 는 운영이 profile 의 `.env` 나 Hermes 의 관리용 `.env` 에 넣는다. 저장소와 Control Plane 데이터베이스에는 두지 않는다. Hermes 프로세스의 환경 변수로는 profile 에 보이지 않는다. 어느 key 를 어떤 순서로 고르는지는 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md#웹-검색-서비스) 가 갖는다.
 본문 읽기 한 번의 제한 시간은 profile 틀의 `web.extract_timeout` 20초다(Hermes 기본 120초). 느린 페이지 하나가 답을 붙잡지 않고 실패로 돌아와 다른 출처를 읽게 한다.
+이 제한은 첫 서비스에만 걸린다. key 가 없는 지금은 호출 전체가 20초 안에 끝난다. key 를 넣은 뒤에는 key 서비스가 20초를 넘기면 무료 등급으로 다시 해 보는 시간이 더해진다. 429 를 넘기는 길을 지키려고 다시 해 보기를 끄지 않았다(스펙 DECISION34).
 
 ## 답변 품질 평가
 
