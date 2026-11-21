@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorRestart
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionsView;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
@@ -19,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -165,7 +167,8 @@ public final class ConnectionDtos {
         int undeclaredTools,
         Integer listedTools,
         Integer readOnlyTools,
-        AuthView auth) {
+        AuthView auth,
+        OAuthRevokeView oauthRevoke) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -178,7 +181,19 @@ public final class ConnectionDtos {
                 value.listedTools(),
                 value.readOnlyTools(),
                 new AuthView(
-                    value.auth().usesOAuth() ? "oauth" : "manual", value.auth().provider(), value.auth().reconnectRequired()));
+                    value.auth().usesOAuth() ? "oauth" : "manual", value.auth().provider(), value.auth().reconnectRequired()),
+                OAuthRevokeView.from(value.oauthRevoke()));
+        }
+    }
+
+    /**
+     * 단추 연결을 해제할 때 서비스 쪽 허락을 취소한 결과다. {@code status} 는 {@code revoked} 나 {@code failed} 다. {@code failed} 면
+     * 화면이 {@code settingsUrl} 로 직접 거두는 길을 안내한다. {@code installSettingsUrl} 은 앱 설치를 지울 수 있는 화면이다.
+     */
+    public record OAuthRevokeView(String status, String settingsUrl, String installSettingsUrl) {
+        static OAuthRevokeView from(ConnectionOAuthRevoke value) {
+            return value == null ? null
+                : new OAuthRevokeView(value.status().name().toLowerCase(Locale.ROOT), value.settingsUrl(), value.installSettingsUrl());
         }
     }
 

@@ -66,7 +66,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-069](ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) | 사용자 전체 실행 한도는 turn 자리와 실행 줄을 사용자 잠금 하나에서 센다 | backend, frontend | Accepted |
 | [ADR-070](ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) | 알림은 Control Plane 의 `notification` 표가 원장이고 웹은 사용자 단위 SSE 로 받는다 | backend, frontend | Accepted |
 | [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted. 매일 루프 판정을 후보 기록에 더하는 부분은 [ADR-20261008 / daily-loop](archive/ADR-20261008-daily-loop.md) 이 정했고, 그 ADR 은 대체됐다 |
-| [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted |
+| [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted. 결정 1 은 [ADR-20261120 / agent-service-writes](../../backend/docs/adr/ADR-20261120-agent-service-writes.md) 가 사용자가 직접 시킨 할 일로 좁혔다 |
 | [ADR-075](ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md) | 결과 전달은 묶음과 시도로 남기고 사용자가 저장된 결과만 다시 전달한다 | backend, frontend | Accepted. ADR-040 의 「turn 이 실패해도 같은 결과로 다시 깨우지 않는다」 는 그대로 두고 사용자가 요청하는 복구를 더한다 |
 | [ADR-078](ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md) | 예약 작업의 결과는 실행마다 새 대화가 기본이고 목록은 작업으로 묶는다 | backend, frontend | Accepted. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted. ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 에 살펴보기 트리의 예외를 둔다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |

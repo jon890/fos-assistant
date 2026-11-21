@@ -13,7 +13,7 @@
 
 - 대시보드 plugin 이 원격 도구 오류의 최상위 `{code, message, details}` 모양에서 선언한 코드와 세부를 읽는다
 - 워크벤치 플러그인 모양(Claude Code·Codex manifest, 헤더 없는 `.mcp.json`, 헤더를 선언한 `assistant.json`)을 받는지 지키는 검사
-- 옛 로컬 커넥터 디렉터리와 그 빌드·소유·무시 설정, 운영자 기준 주소 예외(ADR-20261025)를 걷어 낸다
+- 옛 로컬 커넥터 디렉터리와 그 빌드·소유·무시 설정, 운영자 기준 주소 예외([ADR-20261025 / connector-operator-base-url](../../../hermes/docs/adr/archive/ADR-20261025-connector-operator-base-url.md))를 걷어 낸다
 - 기능 파일과 ADR, 플러그인 README 를 원격 플러그인 기준으로 고친다
 
 이번 PR 에 넣지 않는 것:
@@ -38,7 +38,7 @@
 | R1 | 대시보드 plugin 이 도구 오류의 최상위 `{code, details}` 모양을 읽는다 | 검사용 선언 기준으로, 승인 실행이 `isError` 결과 `{"code": "PROPOSAL_LIMIT", "message": "...", "details": {"max": 200, "pending": 200}}` 를 받으면, `errors` 에 선언한 코드와 복구 어휘, 선언한 정수 세부(`max`, `pending`)만 응답에 싣고 `message` 는 싣지 않는다. `error` 객체가 있으면 지금처럼 그 객체만 본다. 선언하지 않은 코드는 지금처럼 `unavailable` 이다. `outcome_unknown` 코드의 `retry_key` 도 같은 모양에서 읽는다 |
 | R2 | 워크벤치 플러그인 모양이 카탈로그에 오르고 원격으로 설치된다 | 검사용 사본(`hermes/tests/fixtures/valuation-ontology/`)을 운영 목록 `{root, url}` 로 올리면 카탈로그 항목이 `id` `valuation-ontology`, `schema: 2`, 제목 「금융 워크벤치」, 가리는 필수 칸 하나(`FINANCIAL_WORKBENCH_TOKEN`), `verify.tool` `get_connection` 이다. 설치한 서버 정의의 `url` 은 운영 목록 값이고 `.mcp.json` 의 주소가 아니며, 헤더는 `Authorization: Bearer ${칸 env}` 하나다. 조회 도구는 승인이 없고 `record_trades`, `submit_proposals`, `propose_ontology_change` 는 `WRITE`, `required`, 대화 허락이다. 스킬 네 개가 읽힌다 |
 | R3 | 옛 로컬 커넥터와 운영자 기준 주소 예외를 걷어 낸다 | `hermes/connectors/financial-workbench/` 가 없고, 커넥터 이미지 빌드와 `.gitignore`, `.dockerignore`, `CODEOWNERS` 에 그 경로가 없다. `hermes/tests/test_connectors_contract.py` 는 이 저장소의 어느 플러그인에도 `operator_env` 를 허락하지 않는다. 커넥터 공통 검사와 묶음 검사가 통과한다 |
-| R4 | 문서가 원격 플러그인을 설명한다 | ADR-20261025 는 `superseded` 로 `hermes/docs/adr/archive/` 에 있고 목록의 「보관」 표에 있다. ADR-20261026 「옮기는 순서」 의 2단계가 끝난 것으로 적혀 있다. 기능 파일 `docs/features/financial-workbench.md` 는 등록 칸, 도구와 정책, 오류, 보안, 실제 계정 확인을 원격 플러그인 기준으로 갖고 `covers:` 가 R2 의 검사를 가리킨다. 문서 검사(`test/repo/`)가 통과한다 |
+| R4 | 문서가 원격 플러그인을 설명한다 | [ADR-20261025 / connector-operator-base-url](../../../hermes/docs/adr/archive/ADR-20261025-connector-operator-base-url.md) 는 `superseded` 로 `hermes/docs/adr/archive/` 에 있고 목록의 「보관」 표에 있다. [ADR-20261026 / remote-mcp-plugin](../../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 「옮기는 순서」 의 2단계가 끝난 것으로 적혀 있다. 기능 파일 `docs/features/financial-workbench.md` 는 등록 칸, 도구와 정책, 오류, 보안, 실제 계정 확인을 원격 플러그인 기준으로 갖고 `covers:` 가 R2 의 검사를 가리킨다. 문서 검사(`test/repo/`)가 통과한다 |
 
 ## 설계
 
@@ -81,8 +81,8 @@
 
 ### R4 문서
 
-- ADR-20261025 는 `superseded` 로 바꾸고 `archive/` 로 옮긴다. 이 ADR 을 가리키던 링크는 ADR-20261026 으로 바꾼다
-- ADR-20261026 의 결정 표에 「도구 오류 모양」 줄을 더하고, 「옮기는 순서」 2단계를 「머지」 로 바꾼다
+- [ADR-20261025 / connector-operator-base-url](../../../hermes/docs/adr/archive/ADR-20261025-connector-operator-base-url.md) 는 `superseded` 로 바꾸고 `archive/` 로 옮긴다. 이 ADR 을 가리키던 링크는 [ADR-20261026 / remote-mcp-plugin](../../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 으로 바꾼다
+- [ADR-20261026 / remote-mcp-plugin](../../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 결정 표에 「도구 오류 모양」 줄을 더하고, 「옮기는 순서」 2단계를 「머지」 로 바꾼다
 - 기능 파일은 이름을 `financial-workbench.md` 로 바꾸고, 로컬 서버의 인자 검사와 HTTP 대응을 지운 뒤 워크벤치 저장소의 계약을 가리킨다
 - `hermes/connectors/README.md` 와 루트 README 두 개에서 운영자 기준 주소 예외와 로컬 커넥터 설명을 고친다
 
