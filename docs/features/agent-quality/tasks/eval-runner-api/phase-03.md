@@ -13,7 +13,7 @@
 - API 표의 원본은 `docs/features/agent-quality/design.md` 의 「평가 실행 API」 다.
 - 관리자 컨트롤러 관례: `admin/quality/presentation/QualityAdminController.java` 는 `currentUser.requireAdmin()` 뒤 `quality.application` 만 부른다(rule-5 의 `admin` 규칙, `ADMIN_USES_ONLY_FEATURE_APPLICATION`). 조회 값은 `quality/application/dto` 의 record 다.
 - PR1 의 확인 API(`DeployCheckService`, `DeployCheckApiTest`)와 오류 코드(`EVALUATION_USER_MISSING`, `shared/error/ErrorCode.java`)를 따른다.
-- e2e: `test/e2e/run.ts` 의 맨 끝 등록 관례(PR1 의 `test/e2e/scenarios/deploy-check.ts`), 플러그인 승인 카드를 띄우는 가짜 Hermes 의 MCP 호출(`test/e2e/scenarios/connector-policy.ts`, `test/e2e/fake-hermes/mcp.ts`).
+- e2e: `test/e2e/run.ts` 의 맨 끝 등록 관례(PR1 의 `test/e2e/scenarios/deploy-check.ts`), 승인 카드 처리는 평가 사용자에게 플러그인을 연결할 길이 e2e 에 없어 `EvalRunnerTest` 가 본다(design 「검증 전략」 REQ16).
 
 **요구사항**: REQ5, REQ9, REQ15, REQ16, REQ17
 
@@ -41,7 +41,7 @@
 ### 4. 테스트
 
 - `EvalApiTest`(통합): `MEMBER` 는 403, 관리자는 202 와 줄, 두 번째 시작은 200 과 같은 `publicId`, 묶음을 비우면 전체 묶음이 고른 묶음으로 적힘, 모르는 묶음 400, 모르는 단계 400, 고른 단계가 줄에 적힘, 평가 사용자 없으면 409, 다른 사용자의 대화 메시지는 404, 목록이 최근 순.
-- e2e `test/e2e/scenarios/eval-run.ts`: 테스트 묶음 `test/e2e/fixtures/quality-bundles/e2e.json`(통과 문항 하나, 실패 문항 하나, 승인 카드를 띄우고 `card: approve` 하는 문항 하나, `card: reject` 하는 문항 하나)으로 평가를 시작해 끝날 때까지 읽는다. 결과 상태, 문항 결과, 카드 줄의 상태, 통과 대화 404·실패 대화 200, 다른 사용자의 기억·할 일·예약 작업·대화 수가 전후로 같은지 본다. `test/e2e/run.ts` 의 맨 끝에 등록하고 러너가 묶음 위치(`ASSISTANT_QUALITY_BUNDLE_LOCATION`)와 문항 상한(`ASSISTANT_QUALITY_EVAL_TIMEOUT_OVERRIDE`) 환경 변수를 넘긴다.
+- e2e `test/e2e/scenarios/eval-run.ts`: 테스트 묶음 `test/e2e/fixtures/quality-bundles/e2e.json`(통과 문항 하나, 실패 문항 하나)으로 평가를 시작해 끝날 때까지 읽는다. 결과 상태, 문항 결과, 통과 문항의 대화가 결과에서 빠지고 실패 대화는 관리자가 읽는지, 다른 사용자의 기억·할 일·예약 작업·대화 수가 전후로 같은지 본다. `test/e2e/run.ts` 의 맨 끝에 등록하고 러너가 묶음 위치(`ASSISTANT_QUALITY_BUNDLE_LOCATION`)와 문항 상한(`ASSISTANT_QUALITY_EVAL_TIMEOUT_OVERRIDE`) 환경 변수를 넘긴다.
 
 ## 검증
 
