@@ -241,6 +241,7 @@ class ImageSourceEndpointTest {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("content-type")).contains("image/png");
         assertThat(response.headers().firstValue("x-image-source-link")).contains("https://shop.example.com/goods/1");
+        assertThat(response.headers().firstValue("x-image-source-found")).as("사용자가 보낸 링크에는 표시가 없다").isEmpty();
         assertThat(response.body()).containsExactly(png);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM chat_attachment WHERE conversation_id = ?", Long.class, conversation.id()))
             .as("받은 사진은 첨부로 남지 않는다").isZero();

@@ -24,6 +24,9 @@ VECTOR_SIG = "d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee"
 # 위 값에 참고한 링크 두 개의 여덟째 줄을 더한 확인 값이다. 서버 쪽 `VECTOR_LINKS_SIG` 와 같아야 한다.
 VECTOR_LINKS_SIG = "83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d"
 LINKS = ["https://shop.example.com/goods/1", "https://img.example.com/p.png"]
+# 위 링크 가운데 둘째를 비서가 찾은 주소로 아홉째 줄에 더한 확인 값이다. 서버 쪽 `VECTOR_FOUND_SIG` 와 같아야 한다.
+VECTOR_FOUND_SIG = "17c5d8291617836751c5f1a4491fda52a7e186e9138809060ba56fa802e5f9fd"
+FOUND = [LINKS[1]]
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x01" * 64
 PROMPT = "창가에 앉은 고양이를 수채화로, 부드러운 오후 햇살, 배경은 흐리게"
 
@@ -236,6 +239,11 @@ class PublishTest(GeneratedImageFixture):
                 base.POLICY_VECTOR_KEY, base.POLICY_VECTOR_ROOT, base.POLICY_VECTOR_SESSION, base.POLICY_VECTOR_CALL,
                 hashlib.sha256(b"image-bytes").hexdigest(), "수채화 고양이", "창가에 앉은 고양이", LINKS),
             VECTOR_LINKS_SIG)
+        self.assertEqual(
+            self.plugin.sign_generated_image(
+                base.POLICY_VECTOR_KEY, base.POLICY_VECTOR_ROOT, base.POLICY_VECTOR_SESSION, base.POLICY_VECTOR_CALL,
+                hashlib.sha256(b"image-bytes").hexdigest(), "수채화 고양이", "창가에 앉은 고양이", LINKS, FOUND),
+            VECTOR_FOUND_SIG)
 
     def test_remembered_links_are_uploaded_with_eighth_signature_line(self):
         """링크를 받아 둔 호출의 결과 hook 은 사본을 지우기 전에 링크를 읽어 `source_links` 와 여덟째 서명 줄로 올린다."""
@@ -250,6 +258,29 @@ class PublishTest(GeneratedImageFixture):
             self.plugin.signing_key(base.FAKE_MCP_CREDENTIAL), base.VECTOR_ROOT, base.VECTOR_SESSION, "call_1",
             hashlib.sha256(PNG).hexdigest(), "양말 신은 아이", PROMPT, LINKS))
         self.assertEqual(sources.links_for(base.VECTOR_SESSION, "call_1"), [], "올린 뒤에는 잊는다")
+
+    def test_found_links_are_uploaded_with_ninth_signature_line(self):
+        """찾은 주소로 받은 링크는 `found_links` 와 아홉째 서명 줄로 함께 올린다(스펙 agent-found-image REQ5)."""
+        sources = sys.modules[self.plugin.__name__ + ".image_source"]
+        sources._remember(base.VECTOR_SESSION, "call_1", [], LINKS, FOUND)
+
+        self.transform(self.result(self.image()), prompt="제목: 양말 신은 아이\n" + PROMPT)
+
+        meta = json.loads(self.uploads[0]["parts"]["meta"])
+        self.assertEqual((meta["source_links"], meta["found_links"]), (LINKS, FOUND))
+        self.assertEqual(meta["sig"], self.plugin.sign_generated_image(
+            self.plugin.signing_key(base.FAKE_MCP_CREDENTIAL), base.VECTOR_ROOT, base.VECTOR_SESSION, "call_1",
+            hashlib.sha256(PNG).hexdigest(), "양말 신은 아이", PROMPT, LINKS, FOUND))
+        self.assertEqual(sources.found_links_for(base.VECTOR_SESSION, "call_1"), [], "올린 뒤에는 잊는다")
+
+    def test_links_without_found_have_no_found_links(self):
+        """사용자가 보낸 링크만 쓴 그림은 `found_links` 없이 여덟 줄 서명이다. 옛 Control Plane 과 같은 모양이다."""
+        sources = sys.modules[self.plugin.__name__ + ".image_source"]
+        sources._remember(base.VECTOR_SESSION, "call_1", [], LINKS)
+
+        self.transform(self.result(self.image()), prompt="제목: 양말 신은 아이\n" + PROMPT)
+
+        self.assertNotIn("found_links", json.loads(self.uploads[0]["parts"]["meta"]))
 
     def test_upload_without_links_has_no_source_links(self):
         """링크가 없는 그림은 `source_links` 없이 지금 일곱 줄 서명으로 올린다."""

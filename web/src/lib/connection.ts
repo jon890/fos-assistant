@@ -1,3 +1,9 @@
+import type {
+  ConnectionAuth,
+  ConnectionOAuthRevoke,
+  ConnectorOAuth,
+} from "@/lib/connection-oauth";
+
 export type ConnectionStatus = "DISCONNECTED" | "PENDING" | "READY";
 
 /**
@@ -72,6 +78,8 @@ export type ConnectorSummary = {
   singleBinding?: boolean;
   /** 사용자 브라우저를 쓰는 플러그인인가. 대화의 「에이전트 화면 보기」 단추가 쓴다. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
   ownerBrowser?: boolean;
+  /** 단추 연결(OAuth)을 선언한 플러그인만 있다. 옛 Control Plane 과 선언하지 않은 플러그인은 null 이다. */
+  oauth?: ConnectorOAuth | null;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -91,6 +99,8 @@ export type ConnectorConnection = {
   listedTools: number | null;
   /** 그 가운데 서버가 읽기만 한다고 표시한 도구 수다. 한 번 승인한 뒤 계속 허락할 수 있다. */
   readOnlyTools: number | null;
+  auth?: ConnectionAuth;
+  oauthRevoke?: ConnectionOAuthRevoke | null;
 };
 
 /**
@@ -126,6 +136,8 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_ACTION_EXECUTING:
     "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
   CONNECTOR_NOT_CONNECTED: "서비스 연결에서 연결을 확인해 주세요.",
+  CONNECTOR_OAUTH_NOT_CONFIGURED:
+    "관리자가 아직 단추 연결을 설정하지 않았어요. 값을 직접 입력해 연결해 주세요.",
   CONNECTOR_PROFILE_NOT_READY:
     "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
   CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",

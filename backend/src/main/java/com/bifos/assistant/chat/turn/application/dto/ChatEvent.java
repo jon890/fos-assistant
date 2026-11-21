@@ -469,23 +469,18 @@ public record ChatEvent(
     /** 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. */
     public static ChatEvent pending(UUID conversationId) {
         return new ChatEvent(
-            "pending",
-            null,
-            null,
-            null,
-            conversationId,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
+            "pending", null, null, null, conversationId, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+
+    /**
+     * 비서가 만든 그림을 대화 폴더에 저장했다. 화면이 답이 끝나기 전에 그 그림을 흐르는 답에 그린다(generated-image 설계의 PR7).
+     *
+     * @param path 결과물 폴더 안의 그림 경로. {@code detail} 칸에 넣는다
+     */
+    public static ChatEvent image(UUID conversationId, String path) {
+        return new ChatEvent(
+            "image", null, null, path, conversationId, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
 

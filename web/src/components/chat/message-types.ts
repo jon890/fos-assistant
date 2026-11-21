@@ -41,6 +41,8 @@ export type MessageArtifact = {
   title?: string | null;
   /** 그림을 만들 때 참고한 링크 주소다. 쓴 순서다. 그림이 아니거나 없으면 빈 배열이고 옛 서버 응답에는 없다 */
   sourceLinks?: string[];
+  /** `sourceLinks` 가운데 비서가 웹에서 찾은 주소다. 같은 순서다. 화면이 「비서가 찾음」 을 붙인다. 옛 서버 응답에는 없다 */
+  foundSourceLinks?: string[];
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */

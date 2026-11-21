@@ -195,10 +195,11 @@ public final class ChatDtos {
      * @param vaultItemId 그 그림이나 넣은 파일의 살아 있는 보관본 번호. 없으면 null
      * @param title {@code FILE} 의 제목. 없으면 null 이고 화면이 파일 이름을 쓴다
      * @param sourceLinks 그림을 만들 때 참고한 링크 주소. 쓴 순서다. 그림이 아니거나 없으면 빈 목록이다
+     * @param foundSourceLinks {@code sourceLinks} 가운데 비서가 찾은 주소. 같은 순서다. 화면이 「비서가 찾음」 을 붙인다. 없으면 빈 목록이다
      */
     public record ArtifactView(
         String path, long byteSize, boolean deleted, String autoVault, String autoVaultError, String kind, String prompt,
-        Long vaultItemId, String title, List<String> sourceLinks) {
+        Long vaultItemId, String title, List<String> sourceLinks, List<String> foundSourceLinks) {
         static ArtifactView from(ChatArtifact artifact, GeneratedImageDetail image) {
             return new ArtifactView(
                 artifact.path(),
@@ -210,13 +211,15 @@ public final class ChatDtos {
                 image == null ? null : image.prompt(),
                 image == null ? null : image.vaultItemId(),
                 null,
-                image == null ? List.of() : image.sourceLinks());
+                image == null ? List.of() : image.sourceLinks(),
+                image == null ? List.of() : image.foundSourceLinks());
         }
 
 
         static ArtifactView from(PutFileDetail file) {
             return new ArtifactView(
-                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title(), List.of());
+                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title(), List.of(),
+                List.of());
         }
     }
 
@@ -341,23 +344,19 @@ public final class ChatDtos {
         }
     }
 
-    /**
-     * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
-     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code SEARCH}, {@code READ} 이고 본문은 싣지 않는다.
-     */
     /** 「참고한 기억」 항목 단추의 요청이다. 어느 답의 어느 기억인지와 누른 단추만 받는다. */
     public record MemoryUseReactionRequest(
         @NotNull Long executionId, @NotNull Long memoryId, @NotNull MemoryUseReaction reaction) {
     }
 
-    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
+    /** 작업 과정의 「참고한 기억」 에 보일 기억 하나다(ADR-20261008 / memory-facts). 본문은 내지 않는다. */
+    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope) {
         static MemoryUseView from(MemoryUse use) {
             return new MemoryUseView(
                 use.executionId(),
                 use.memoryId(),
                 use.title(),
-                use.scope().name(),
-                use.via().name());
+                use.scope().name());
         }
     }
 }

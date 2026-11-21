@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,15 +38,19 @@ function readableLink(link: string): string {
 /**
  * 접힌 채 있다가 누르면 비서가 이미지 도구에 넘긴 지시문과 참고한 링크를 보인다. 둘 다 없으면 그리지 않는다.
  * 링크는 새 창으로 열고 이 화면의 정보를 넘기지 않는다. `https://` 로 시작하지 않는 값은 링크로 만들지 않는다.
+ * 비서가 웹에서 찾은 링크에는 「비서가 찾음」 을 붙인다. 사용자가 보낸 링크에는 붙이지 않는다.
  */
 function PromptDetails({
   prompt,
   sourceLinks,
+  foundSourceLinks,
 }: {
   prompt?: string | null;
   sourceLinks?: string[];
+  foundSourceLinks?: string[];
 }) {
   const links = sourceLinks ?? [];
+  const found = new Set(foundSourceLinks ?? []);
   if (!prompt && links.length === 0) return null;
   return (
     <details data-testid="generated-image-prompt" className="mt-1 text-xs">
@@ -78,6 +83,15 @@ function PromptDetails({
                 ) : (
                   link
                 )}
+                {found.has(link) ? (
+                  <Badge
+                    variant="outline"
+                    data-testid="generated-image-found-link"
+                    className="ml-1 align-middle"
+                  >
+                    비서가 찾음
+                  </Badge>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -230,6 +244,7 @@ export function GeneratedImages({
             <PromptDetails
               prompt={image.prompt}
               sourceLinks={image.sourceLinks}
+              foundSourceLinks={image.foundSourceLinks}
             />
           </figure>
         );
@@ -294,6 +309,7 @@ export function GeneratedImages({
             <PromptDetails
               prompt={opened.prompt}
               sourceLinks={opened.sourceLinks}
+              foundSourceLinks={opened.foundSourceLinks}
             />
           </DialogContent>
         ) : null}

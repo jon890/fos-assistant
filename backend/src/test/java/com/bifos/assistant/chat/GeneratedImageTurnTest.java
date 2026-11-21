@@ -22,6 +22,8 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.turn.application.ConversationEventHub;
+import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -35,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -93,6 +96,9 @@ class GeneratedImageTurnTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ConversationEventHub hub;
+
     private final List<Long> folders = new ArrayList<>();
     private AppUser owner;
     private Conversation conversation;
@@ -139,6 +145,31 @@ class GeneratedImageTurnTest {
 
 
     @Test
+    @DisplayName("새로 저장한 그림은 답이 끝나기 전에 대화 단위 SSE 로 경로를 알리고 되풀이한 올리기는 다시 알리지 않는다")
+    void publishesImageEventWhenStored() {
+        List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
+        try {
+            save("call_1", "수채화 고양이", png(1));
+            save("call_1", "수채화 고양이", png(1));
+            save("call_2", "수채화 고양이", png(2));
+        } finally {
+            unsubscribe.run();
+        }
+
+        assertThat(received).extracting(ChatEvent::type).containsExactly("image", "image");
+        assertThat(received).extracting(ChatEvent::detail)
+            .containsExactly("generated/수채화 고양이.png", "generated/수채화 고양이 2.png");
+        assertThat(received).extracting(ChatEvent::conversationId).containsOnly(conversation.publicId());
+        assertThat(rows.findAll().stream().filter(row -> conversation.id().equals(row.conversationId())))
+            .allSatisfy(row -> assertThat(row.messageId()).isNull());
+        // 사건의 순서가 뒤바뀌어도 화면이 다시 읽는 목록은 저장한 순서다.
+        assertThat(images.unboundPaths(conversation.id()))
+            .containsExactly("generated/수채화 고양이.png", "generated/수채화 고양이 2.png");
+    }
+
+
+    @Test
     @DisplayName("참고한 링크는 암호화해 두고 응답에 올린 순서대로 들며 링크 없는 그림은 빈 목록이다")
     void keepsSourceLinksInOrderAndEncrypted() {
         List<String> links = List.of("https://shop.example.com/goods/1", "https://img.example.com/p.png");
@@ -170,11 +201,13 @@ class GeneratedImageTurnTest {
         artifactService.recordTurn(conversation.id(), first.id(), NOW.plusSeconds(60));
         // 부모 turn 이 끝난 뒤 맡긴 실행이 올린 그림이다.
         save("call_2", "맡긴 그림", png(2));
+        assertThat(images.unboundPaths(conversation.id())).containsExactly("generated/맡긴 그림.png");
         ChatMessage second = answer("결과를 전하는 답");
         artifactService.recordTurn(conversation.id(), second.id(), NOW.plusSeconds(600));
 
         assertThat(bound(first)).extracting(ChatArtifact::path).containsExactly("generated/남은 그림.png");
         assertThat(bound(second)).extracting(ChatArtifact::path).containsExactly("generated/맡긴 그림.png");
+        assertThat(images.unboundPaths(conversation.id())).isEmpty();
     }
 
 

@@ -40,6 +40,7 @@ public final class AdminOverviewDtos {
      * 그룹 전체의 이번 달 합계다.
      *
      * @param incomplete 금액을 확인하지 못한 실행이나 도우미가 있어 금액이 실제보다 적을 수 있으면 참
+     * @param evaluation 평가 전용 사용자의 합계. 위 칸에서 빠진다. 평가 사용자가 없으면 null
      */
     public record MonthlyView(
         String month,
@@ -47,7 +48,8 @@ public final class AdminOverviewDtos {
         long totalExecutions,
         long subscriptionExecutions,
         long actualCostMicros,
-        boolean incomplete) {
+        boolean incomplete,
+        EvaluationView evaluation) {
 
         static MonthlyView of(OverviewMonthly monthly) {
             return new MonthlyView(
@@ -56,7 +58,22 @@ public final class AdminOverviewDtos {
                 monthly.totalExecutions(),
                 monthly.subscriptionExecutions(),
                 monthly.actualCostMicros(),
-                monthly.incomplete());
+                monthly.incomplete(),
+                monthly.evaluation() == null
+                    ? null
+                    : new EvaluationView(
+                        monthly.evaluation().executions(),
+                        monthly.evaluation().actualCostMicros(),
+                        monthly.evaluation().incomplete()));
         }
+    }
+
+    /**
+     * 평가 전용 사용자의 이번 달 합계다. 그룹 합계에서 빠져 「평가」 한 줄로 보인다.
+     *
+     * @param actualCostMicros 예상 추가 사용 요금. 통화 단위의 100만분의 1
+     * @param incomplete 금액을 확인하지 못한 평가 실행이 있어 금액이 실제보다 적을 수 있으면 참
+     */
+    public record EvaluationView(long executions, long actualCostMicros, boolean incomplete) {
     }
 }
