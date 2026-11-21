@@ -2,7 +2,7 @@
 
 최신 정보를 검색해 확인하고 출처를 붙여 답하게 하는 지침과, 답변 품질을 운영에서 재는 평가를 다룬다.
 
-covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java`, `backend/src/main/java/com/bifos/assistant/context/application/TurnDate.java`, `backend/src/main/java/com/bifos/assistant/context/application/dto/InstructionScope.java`, `test/model-eval/answer/`, `test/model-eval/control-plane.ts`
+covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java`, `backend/src/main/java/com/bifos/assistant/context/application/VerifyBeforeAnswerInstructions.java`, `backend/src/main/java/com/bifos/assistant/context/application/TurnDate.java`, `backend/src/main/java/com/bifos/assistant/context/application/dto/InstructionScope.java`, `test/model-eval/answer/`, `test/model-eval/control-plane.ts`
 
 요구와 결정은 스펙 [`answer-quality/spec.md`](answer-quality/spec.md), 구조는 설계 [`answer-quality/design.md`](answer-quality/design.md)가 갖는다.
 지금은 지침과 평가까지 들어갔다. 검색 서비스는 값을 정하지 않고 Hermes 자동 선택을 유지하기로 했다. 출처 문항이 기준에 아직 모자라 PR1 은 끝나지 않았고, 「깊이 조사」 와 조사 진행 표시, 맥락과 기억은 뒤 PR 이 한다.
@@ -14,7 +14,7 @@ covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAs
 - 비서가 오늘 날짜를 안다
 - 됐는지는 정해진 질문 세트를 운영에서 돌린 숫자와, 사용자가 같은 질문을 ChatGPT 와 나란히 본 결과로 본다
 
-하지 않는 것: 유료 검색 API, 출처를 카드로 그리는 화면, 다른 모델에게 답을 채점시키기, 질문 종류에 따라 모델 칸을 자동으로 바꾸기. 근거는 스펙의 「범위」 에 있다.
+하지 않는 것: 저장소나 Control Plane 이 유료 검색 key 를 다루기, 출처를 카드로 그리는 화면, 다른 모델에게 답을 채점시키기, 질문 종류에 따라 모델 칸을 자동으로 바꾸기. 근거는 스펙의 「범위」 에 있다.
 
 ## 지침
 
@@ -22,13 +22,15 @@ Control Plane 이 실행마다 넣는 공통 답변 지침에 「최신 정보�
 지금 살 만한 제품·모델과 가격을 묻는 추천·비교·구매 조언은 판매 모델과 가격이, 여행 일정·장소 추천은 운영 시간과 행사가 바뀌므로 검색 도구가 있으면 검색해 확인하도록 명시한다.
 제품 비교·추천은 가격과 별도로 실측 리뷰나 비교 기사를 찾아 사용시간·무게·단점으로 비교하고, 성능 근거가 없으면 추천을 미룬다.
 세금·법률·의료·금융은 공식 출처를 하나 이상 확인해 본문에 붙이고 블로그는 보조로만 쓴다. 본문의 출처 이름과 링크가 같은 곳을 가리키는지 확인하고, 환율은 기준율과 현찰 살 때·팔 때를 함께 제시한다.
+서로 기대지 않는 검색은 한 차례에 5~8개, 읽을 페이지는 주소마다 `web_extract` 를 따로 함께 부르고, `execute_code` 안에서 웹 도구를 반복문으로 부르지 않게 한다(스펙 DECISION33).
 「오늘·이번 주·이번 주말」 질문은 날짜 범위를 넣어 검색해 그 기간에만 있는 것을 먼저 제시한다. 최종 답은 마지막에 한 메시지로 합치고 앞 메시지에 기대는 후속 메시지를 만들지 않는다.
 검색 결과를 하나라도 답에 썼으면 문장 옆 링크와 함께 답 끝에 반드시 「출처」 목록을 두도록 한다. 목록에는 검색과 본문 읽기 도구가 돌려준 주소만 쓴다.
+대화 실행에는 그 바로 뒤에 「확인을 마치고 답하기」 절이 든다. 글의 원본은 `VerifyBeforeAnswerInstructions` 다. 답하기 전에 무엇이 확인돼야 하는지 정하고, 근거가 없거나 하나뿐이면 반대 근거를 포함해 폭넓게 검색해 교차 확인한다. 도구로 확인할 수 있는 「미확인」 은 먼저 확인하러 가고, 「미확인」 은 답 하나에 한 번만 적고, 사용자만 줄 수 있는 사실은 하나만 묻고, 맡긴 결과가 오면 합친 결론 하나로 답하게 한다(스펙 DECISION31).
 실행을 여는 쪽이 범위(`InstructionScope`)를 정해 넘기고, 범위에 따라 넣는 것이 다르다.
 
 | 범위 | 넣는 것 | 드는 실행 |
 | --- | --- | --- |
-| `CONVERSATION` | 기억 지침, 「최신 정보와 출처」 절, 오늘 날짜 줄 | 사용자 대화 turn(새 질문, 다시 생성, 맡김), 사람이 있는 트리의 결과를 전하는 자동 turn, 그 트리에서 Control Plane 이 맡긴 자식 실행 |
+| `CONVERSATION` | 기억 지침, 「최신 정보와 출처」 절, 「확인을 마치고 답하기」 절, 오늘 날짜 줄 | 사용자 대화 turn(새 질문, 다시 생성, 맡김), 사람이 있는 트리의 결과를 전하는 자동 turn, 그 트리에서 Control Plane 이 맡긴 자식 실행 |
 | `SCHEDULED` | 기억 지침 | 예약 작업 turn, 사람이 없는 트리의 결과를 전하는 turn, 예약 트리의 자식 실행 |
 | `PROACTIVE` | 없음 | 먼저 살펴보기 turn 과 그 트리의 자식, 살펴보기의 지문 다시 계산 |
 
@@ -52,6 +54,7 @@ Control Plane 이 실행마다 넣는 공통 답변 지침에 「최신 정보�
 ## 답 모양
 
 공통 「답변 형식」 지침(`RESPONSE_INSTRUCTIONS`)은 모든 실행(대화, 예약 작업, 먼저 살펴보기)에 든다. 첫머리의 핵심 답, 두세 문장의 짧은 문단, 긴 답의 `##` 제목, 목록과 표, 글로 따라가기 어려운 흐름의 Mermaid, 이름 링크를 시키고, 쓰지 않을 때도 함께 적는다. 기준은 스펙 REQ16 이다.
+정품인지, 살 만한지 같은 판단 질문은 첫 줄에 판단과 확신 정도, 끝에 「현재 판단」 한 줄과 바로 할 행동 하나를 두고, 근거는 당사자와 관계없는 근거와 당사자 주장을 나눈 「항목 | 확인 내용 | 평가」 표로 보이게 한다. 평가 칸은 확인, 주장, 미확인 중 하나다(스펙 DECISION32).
 
 대화 화면은 이 모양을 아래처럼 그린다. 부품은 `web/src/components/chat/markdown.tsx` 와 `markdown-components.tsx`, 플러그인은 `markdown-plugins.ts` 다.
 
@@ -76,7 +79,11 @@ Control Plane 이 실행마다 넣는 공통 답변 지침에 「최신 정보�
 
 **값을 정하지 않고 Hermes 자동 선택(지금은 key 없는 Exa)을 유지한다**(2026-11-18, [ADR-20261118 / web-search-backend](../../hermes/docs/adr/ADR-20261118-web-search-backend.md)).
 OpenAI 내장 검색(`web.search_backend: openai-native`)으로 같은 평가를 돌렸더니 평가 세트 20문항 모두(검색 문항 17 포함) 답에 출처 링크가 없었고, 실행 사건에도 검색이 남지 않았다. 스펙 DECISION2 의 규칙대로 지금 서비스(출처 13문항)보다 낮아(0문항) 되돌렸다.
-링크가 없는 까닭(서버 검색이 돌지 않았는지, 인용이 응답의 annotation 으로만 오고 본문에 쓰이지 않았는지)은 확인하지 않았다. 유료 검색 API 는 스펙 범위 밖이다.
+링크가 없는 까닭(서버 검색이 돌지 않았는지, 인용이 응답의 annotation 으로만 오고 본문에 쓰이지 않았는지)은 확인하지 않았다.
+
+**무료 등급의 429 한도는 유료 key 로 넘는다**(2026-11-21, 스펙 DECISION34). 서비스를 고르는 값은 그대로 비워 두고, key 가 있으면 Hermes 가 그 서비스를 먼저 고른다. key 로 부른 호출이 실패하면 그 호출만 무료 등급으로 다시 해 본다(profile 틀의 `web.keyless_rescue`).
+key 는 운영이 profile 의 `.env` 나 Hermes 의 관리용 `.env` 에 넣는다. 저장소와 Control Plane 데이터베이스에는 두지 않는다. Hermes 프로세스의 환경 변수로는 profile 에 보이지 않는다. 어느 key 를 어떤 순서로 고르는지는 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md#웹-검색-서비스) 가 갖는다.
+본문 읽기 한 번의 제한 시간은 profile 틀의 `web.extract_timeout` 20초다(Hermes 기본 120초). 느린 페이지 하나가 답을 붙잡지 않고 실패로 돌아와 다른 출처를 읽게 한다.
 
 ## 답변 품질 평가
 
@@ -104,6 +111,7 @@ CI 와 배포에서는 돌지 않는다. 지침이나 검색 서비스를 바꾸
 | 그림 참고 사진 문항(`photo-request`) | 비서가 사진을 찾아 그 사진을 참고로 그려 달라는 문항이다. 실행 트리에 실패 없이 끝난 `image_generate` 가 있으면(그림을 만들었으면) 통과다. 사진을 받지 못해 그리지 않고, 답이 사진이나 링크를 보내 달라고 부탁해도 통과다. 둘 다 아니면 세트가 미달이다. 그림이 찾은 사진을 실제로 참고했는지는 보지 않는다([비서가 찾은 사진 스펙](agent-found-image/spec.md) 의 REQ9, [도구 실패 뒤 다른 방법 스펙](tool-fallback/spec.md) 의 REQ7. 사용자 결정 2026-11-21) |
 | 도구 수 | 실행 트리 전체의 끝 사건(`TOOL_COMPLETED`)만 센다. `web_search` 와 `web_extract` 의 수와 실패 수를 참고로 낸다 |
 | 걸린 시간 | 루트 실행의 `latencyMs` |
+| 도구 차례 | 참고 값이다. 실행마다 사건 순서대로 읽어 끝 사건 없이 이어진 `TOOL_STARTED` 를 한 차례로 센다. 한 응답이 함께 부른 도구가 한 차례다. 문항마다 차례 수와 호출 수를, 세트 요약에 평균 걸린 시간, 차례당 도구 수, 출처 링크 합을 낸다. 아주 빨리 끝난 도구가 묶음 중간에 끝 사건을 내면 한 차례가 둘로 세어질 수 있다 |
 | 형식 참고 | 통과 기준에 들지 않는다(스펙 REQ20). 출처 절이 있으면 `#` 제목 아래 `- [이름](주소)` 목록인지, 코드 밖에 주소가 글자로 보이는지(맨 주소와 링크 글자가 주소인 링크), 출처 절 안에 같은 주소가 반복되는지(scheme 과 host 대소문자, 끝 `/`, `#` 뒤 무시), 네 문장 이상인 문단(목록, 표, 인용, 제목, 코드 제외)이 있는지. 세트 요약에 하나라도 어긴 문항 수를 낸다. 칸이 생기기 전 보고서를 다시 쓴 문항은 「-」 다 |
 
 세트의 통과 기준은 스펙 DECISION10 이 갖는다. 기준을 계산하는 코드는 `score.ts` 의 `scoreSet` 이다.
