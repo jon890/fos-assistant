@@ -4,6 +4,7 @@ import com.bifos.assistant.notification.application.dto.NotificationCreated;
 import com.bifos.assistant.notification.config.PushProperties;
 import com.bifos.assistant.notification.domain.PushDevice;
 import com.bifos.assistant.notification.domain.PushEndpointPolicy;
+import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.infra.PushDeviceRepository;
 import com.bifos.assistant.notification.infra.PushResponse;
 import com.bifos.assistant.notification.infra.VapidKeys;
@@ -77,7 +78,8 @@ public class PushDispatcher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCreated(NotificationCreated event) {
         try {
-            if (!keys.enabled()) {
+            // 기기를 비웠다는 알림은 푸시로 보내지 않는다. 푸시를 받지 못하게 된 사용자에게 알리는 글이다.
+            if (event.kind() == NotificationKind.PUSH_DEVICES_RESET || !keys.enabled()) {
                 return;
             }
             background.start("push-" + event.publicId(), () -> deliver(event));

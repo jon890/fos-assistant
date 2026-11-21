@@ -66,6 +66,26 @@ class ConnectorOAuthSignerTest {
 
 
     @Test
+    @DisplayName("새로 만들면 바꾼 사람을 남기고 옛 비밀로 만든 표식과 상태 값을 받지 않는다")
+    void regenerateInvalidatesMarksAndStatesOfTheOldSecret() {
+        ConnectorOAuthSigner signer = signer(GATEWAY, NOW);
+        String mark = signer.currentUrl(7).orElseThrow().substring(TOKEN_BASE.length());
+        String random = signer.newRandom();
+        ConnectorOAuthState claim = signer.parseState(signer.state(3, "demo-notes", random, REDIRECT, NONCE).orElseThrow()).orElseThrow();
+        String old = secrets.read(ConnectorOAuthSigner.SECRET_NAME).orElseThrow();
+
+        signer.regenerate(42L);
+
+        assertThat(secrets.read(ConnectorOAuthSigner.SECRET_NAME).orElseThrow()).matches("[0-9a-f]{64}").isNotEqualTo(old);
+        assertThat(secrets.find(ConnectorOAuthSigner.SECRET_NAME).orElseThrow().updatedBy()).isEqualTo(42L);
+        assertThat(signer.verifyMark(mark)).isEmpty();
+        assertThat(signer.stateMatches(claim, REDIRECT, NONCE)).isFalse();
+        String renewed = signer.currentUrl(7).orElseThrow().substring(TOKEN_BASE.length());
+        assertThat(signer.verifyMark(renewed)).contains(new ConnectorOAuthMark(7, null));
+    }
+
+
+    @Test
     @DisplayName("중계 주소가 없으면 통로 주소를 만들지 않는다")
     void buildsNoPassageAddressWithoutGatewayAddress() {
         ConnectorOAuthSigner signer = signer("", NOW);
