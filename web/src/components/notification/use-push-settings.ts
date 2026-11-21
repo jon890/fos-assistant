@@ -187,11 +187,14 @@ export function usePushSettings() {
         return;
       }
     } catch (error) {
+      const timedOut = error instanceof PushSubscribeTimeoutError;
       setActionError(
-        error instanceof PushSubscribeTimeoutError
+        timedOut
           ? SUBSCRIBE_TIMEOUT_MESSAGE
           : "이 기기를 등록하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
       );
+      // 시간 초과 뒤 다시 읽기가 멈춰도 단추는 바로 되살린다.
+      if (timedOut) setBusy(false);
     } finally {
       await reload();
       setBusy(false);
