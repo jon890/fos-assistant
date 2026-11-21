@@ -43,6 +43,8 @@ class ImageSourceFixture(base.PluginFixture):
         self.requests = []
         self.answers = {}
         self.links = dict(LINKS)
+        # Control Plane 이 `X-Image-Source-Found: 1` 을 붙이는 가리킴이다. 비서가 찾은 주소로 받은 링크다.
+        self.found = set()
         self.guard_answer = b'{"decision": "allow"}'
         test = self
 
@@ -50,11 +52,13 @@ class ImageSourceFixture(base.PluginFixture):
             def log_message(self, *args):
                 pass
 
-            def reply(self, status, content_type, payload, link=None):
+            def reply(self, status, content_type, payload, link=None, found=False):
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
                 if link:
                     self.send_header("X-Image-Source-Link", link)
+                if found:
+                    self.send_header("X-Image-Source-Found", "1")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
@@ -72,7 +76,7 @@ class ImageSourceFixture(base.PluginFixture):
                     self.reply(status, "application/json", json.dumps({"code": code}).encode("utf-8"))
                     return
                 content_type, payload = PHOTOS[source]
-                self.reply(200, content_type, payload, test.links.get(source))
+                self.reply(200, content_type, payload, test.links.get(source), source in test.found)
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -105,6 +109,9 @@ class ImageSourceFixture(base.PluginFixture):
 
     def remembered_links(self, call="call_1"):
         return sys.modules[self.plugin.__name__ + ".image_source"].links_for(base.VECTOR_SESSION, call)
+
+    def remembered_found(self, call="call_1"):
+        return sys.modules[self.plugin.__name__ + ".image_source"].found_links_for(base.VECTOR_SESSION, call)
 
 
 class FetchTest(ImageSourceFixture):
@@ -204,13 +211,71 @@ class LinkTest(ImageSourceFixture):
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
                      "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 같은 인물의 다음 장면을",
-                     "  다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과",
+                     "  다음 방법: 상품, 사물, 장소처럼 찾을 수 있는 대상이면 검색·읽기 결과에 나온 다른 사진",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
             self.assertIn(line, decision["message"])
         # 줄마다 끝 줄이 붙고 글 전체는 마지막 문제의 끝 줄로 끝난다(tool-fallback 스펙 REQ3)
         self.assertTrue(decision["message"].endswith("사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"))
+
+    def test_link_reasons_ask_retry_with_other_photo(self):
+        """받지 못한 까닭 넷 모두 다른 사진으로 다시 부르게 하고, 상한과 사용자가 보낸 링크의 길을 적는다(스펙 agent-found-image REQ6)."""
+        for code in ("IMAGE_SOURCE_LINK_BLOCKED", "IMAGE_SOURCE_LINK_NO_IMAGE",
+                     "IMAGE_SOURCE_LINK_TOO_LARGE", "IMAGE_SOURCE_LINK_FAILED"):
+            self.answers = {"link:shop.example.com/goods/1": (422, code)}
+            message = self.call(None, ["link:shop.example.com/goods/1"])["message"]
+            for part in ("다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 image_generate 를 다시 부른다",
+                         "그림 한 장에 다른 사진 3장까지다",
+                         "보낸 링크 대신 찾은 사진을 썼다고 답에 적는다",
+                         "실존 인물의 얼굴, 로고, 캐릭터 자체를 참고하려던 것이면 찾지 않는다",
+                         "설명만으로 비슷하게 그려 넣지 말고"):
+                self.assertIn(part, message, code)
+
+    def test_unknown_link_asks_to_read_page_directly(self):
+        """대화에 없는 주소면 그 페이지를 web_extract 로 직접 읽고 본문의 사진 주소로 다시 부르게 한다(운영 실행에서 겪은 일)."""
+        self.answers = {"link:shop.example.com/goods/1": (422, "IMAGE_SOURCE_UNKNOWN")}
+
+        message = self.call(None, ["link:shop.example.com/goods/1"])["message"]
+
+        self.assertIn("execute_code 안에서 얻은 주소였으면 web_search 나 web_extract 를 직접 불러", message)
+        self.assertIn("결과 본문에 나온 사진 주소로 다시 부른다", message)
+
+    def test_all_links_failing_blocks_without_copies(self):
+        """고른 사진이 모두 열리지 않으면 그림을 만들지 않고 사본도 남기지 않는다. 예외 없이 막는 글로 끝난다(스펙 agent-found-image REQ6)."""
+        self.answers = {"link:shop.example.com/goods/1": (502, "IMAGE_SOURCE_LINK_FAILED"),
+                        "link:https://img.example.com/p.jpg": (422, "IMAGE_SOURCE_LINK_NO_IMAGE")}
+
+        decision = self.call(None, ["link:shop.example.com/goods/1", "link:https://img.example.com/p.jpg"])
+
+        self.assertEqual(decision["action"], "block")
+        self.assertEqual(self.copied(), [])
+        self.assertEqual((self.remembered_links(), self.remembered_found()), ([], []))
+
+    def test_retry_with_second_found_photo_draws(self):
+        """첫 사진이 열리지 않아 막힌 뒤 둘째 사진으로 다시 부르면 그 사진으로 받는다(스펙 agent-found-image REQ6)."""
+        self.answers = {"link:shop.example.com/goods/1": (502, "IMAGE_SOURCE_LINK_FAILED")}
+        self.found = {"link:shop.example.com/goods/1", "link:https://img.example.com/p.jpg"}
+
+        first = self.call(None, ["link:shop.example.com/goods/1"], call="call_1")
+        second = self.call(None, ["link:https://img.example.com/p.jpg"], call="call_2")
+
+        self.assertEqual(first["action"], "block")
+        self.assertEqual(second["action"], "modify")
+        self.assertEqual(pathlib.Path(second["args"]["reference_image_urls"][0]).read_bytes(),
+                         PHOTOS["link:https://img.example.com/p.jpg"][1])
+        self.assertEqual(self.remembered_found("call_2"), ["https://img.example.com/p.jpg"])
+
+    def test_found_header_marks_only_found_links(self):
+        """`X-Image-Source-Found` 가 붙은 링크만 찾은 주소로 기억한다. 사용자가 보낸 링크와 첨부는 아니다."""
+        self.found = {"link:https://img.example.com/p.jpg"}
+
+        decision = self.call("attachment:11", ["link:shop.example.com/goods/1", "link:https://img.example.com/p.jpg"])
+
+        self.assertEqual(decision["action"], "modify")
+        self.assertEqual(self.remembered_links(),
+                         ["https://shop.example.com/goods/1", "https://img.example.com/p.jpg"])
+        self.assertEqual(self.remembered_found(), ["https://img.example.com/p.jpg"])
 
     def test_attachment_received_but_link_failed_blocks_and_forgets(self):
         """첨부는 받았어도 링크 하나를 못 받으면 막고, 받은 첨부 사본을 지우며 링크를 기억하지 않는다."""

@@ -7,11 +7,14 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
@@ -68,6 +71,8 @@ class GeneratedImageEndpointTest {
     private static final String VECTOR_SIG = "d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee";
     /** `hermes/tests/test_generated_image.py` 의 `VECTOR_LINKS_SIG` 와 같은 확인 값이다. 참고한 링크 두 개의 여덟째 줄이 붙는다. */
     private static final String VECTOR_LINKS_SIG = "83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d";
+    /** `hermes/tests/test_generated_image.py` 의 `VECTOR_FOUND_SIG` 와 같은 확인 값이다. 둘째 링크를 찾은 주소로 아홉째 줄에 더한다. */
+    private static final String VECTOR_FOUND_SIG = "17c5d8291617836751c5f1a4491fda52a7e186e9138809060ba56fa802e5f9fd";
     private static final List<String> LINKS = List.of("https://shop.example.com/goods/1", "https://img.example.com/p.png");
     private static final byte[] PNG = png(64);
 
@@ -100,6 +105,12 @@ class GeneratedImageEndpointTest {
 
     @Autowired
     ArtifactStore store;
+
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    ChatMessageRepository messages;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -156,6 +167,43 @@ class GeneratedImageEndpointTest {
         assertThat(hmac(key, signed)).isEqualTo(VECTOR_SIG);
         assertThat(hmac(key, signed + "\n" + sha256(String.join("\n", LINKS).getBytes(StandardCharsets.UTF_8))))
             .isEqualTo(VECTOR_LINKS_SIG);
+        assertThat(hmac(key, signed + "\n" + sha256(String.join("\n", LINKS).getBytes(StandardCharsets.UTF_8))
+            + "\n" + sha256(LINKS.get(1).getBytes(StandardCharsets.UTF_8))))
+                .isEqualTo(VECTOR_FOUND_SIG);
+    }
+
+
+    @Test
+    @DisplayName("찾은 주소가 든 올리기는 아홉째 줄 서명으로 받아 링크마다 표시를 남기고, 링크 밖의 찾은 주소와 여덟 줄 서명은 거절한다")
+    void acceptsFoundLinksWithNinthSignatureLine() throws Exception {
+        String root = "fos-" + UUID.randomUUID();
+        Conversation conversation = conversation();
+        running(root, conversation.id(), ExecutionStatus.RUNNING);
+
+        ObjectNode eightLines = linked(root, "call_8", LINKS, png(73));
+        eightLines.set("found_links", json.valueToTree(List.of(LINKS.get(1))));
+        assertThat(send(token, eightLines.toString(), png(73)).statusCode()).as("찾은 주소가 있는데 여덟 줄 서명이다").isEqualTo(403);
+        ObjectNode outside = found(root, "call_out", LINKS, List.of("https://other.example.com/x.png"), png(74));
+        assertThat(send(token, outside.toString(), png(74)).statusCode()).as("링크 밖의 찾은 주소").isEqualTo(403);
+
+        HttpResponse<String> response = send(token, found(root, "call_1", LINKS, List.of(LINKS.get(1)), PNG).toString(), PNG);
+
+        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
+        ChatArtifact row = rows.findAll().stream().filter(it -> it.conversationId().equals(conversation.id())).findFirst().orElseThrow();
+        assertThat(row.generationFoundLinkFlags()).isEqualTo("01");
+
+        ChatMessage answer = messages.save(ChatMessage.fromAssistant(conversation.id(), "그렸어요", null, NOW));
+        artifactService.recordTurn(conversation.id(), answer.id(), NOW);
+        HttpResponse<String> listed = get("/api/v1/chat/conversations/" + conversation.publicId() + "/messages", owner);
+        assertThat(listed.statusCode()).as("응답: %s", listed.body()).isEqualTo(200);
+        var image = json.readTree(listed.body()).findParents("foundSourceLinks").stream()
+            .filter(node -> "IMAGE".equals(node.path("kind").asString()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(image.path("sourceLinks").values()).extracting(node -> node.asString()).containsExactlyElementsOf(LINKS);
+        assertThat(image.path("foundSourceLinks").values()).as("메시지 응답에는 찾은 주소만 든다")
+            .extracting(node -> node.asString())
+            .containsExactly(LINKS.get(1));
     }
 
 
@@ -353,6 +401,25 @@ class GeneratedImageEndpointTest {
             sha256("양말".getBytes(StandardCharsets.UTF_8)),
             sha256("지시문".getBytes(StandardCharsets.UTF_8)),
             sha256(String.join("\n", links).getBytes(StandardCharsets.UTF_8)))));
+        return meta;
+    }
+
+
+    /** 참고한 링크와 그 가운데 찾은 주소를 넣고 아홉째 줄까지 서명한 meta 다. */
+    private ObjectNode found(String root, String call, List<String> links, List<String> foundLinks, byte[] image) {
+        ObjectNode meta = linked(root, call, links, image);
+        meta.set("found_links", json.valueToTree(foundLinks));
+        meta.put("sig", hmac(sha256(token.getBytes(StandardCharsets.UTF_8)), String.join(
+            "\n",
+            "v1-generated-image",
+            root,
+            root,
+            call,
+            sha256(image),
+            sha256("양말".getBytes(StandardCharsets.UTF_8)),
+            sha256("지시문".getBytes(StandardCharsets.UTF_8)),
+            sha256(String.join("\n", links).getBytes(StandardCharsets.UTF_8)),
+            sha256(String.join("\n", foundLinks).getBytes(StandardCharsets.UTF_8)))));
         return meta;
     }
 
