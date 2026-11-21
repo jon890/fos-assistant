@@ -24,7 +24,6 @@ import com.bifos.assistant.connector.handoff.application.ConnectorHandoffs;
 import com.bifos.assistant.connector.handoff.application.dto.HandoffView;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
-import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
