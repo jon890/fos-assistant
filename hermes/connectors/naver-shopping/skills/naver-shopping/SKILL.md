@@ -32,7 +32,6 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 5. 결과는 승인 결과를 전하는 메시지로 온다
    - 결제 화면을 넘겼다는 결과면 최종 결제 금액과 승인한 예상 합계를 알리고, 「내 브라우저」 의 주문서 탭에서 직접 결제한 뒤 결제 카드의 「결제했어요」 를, 사지 않으려면 「사지 않을래요」 를 눌러 달라고 한다
    - 승인보다 금액이 커서 넘기지 않았다(`PURCHASE_AMOUNT_CHANGED`)면 두 금액을 알리고 다시 살지 묻는다
-   - 상한에 걸렸다(`PURCHASE_LIMIT`)면 걸린 상한과 남은 한도를 알리고, 「외부 서비스 연결」 에서 상한을 바꿀 수 있다고 안내한다. 상한을 바꾸는 도구는 없다
    - 승인한 뒤 가격이 올랐다(`NAVER_SHOPPING_PRICE_CHANGED`)면 주문서를 열지 않았다고 알리고 다시 살지 묻는다
    - 품절이다(`NAVER_SHOPPING_SOLD_OUT`)면 고른 옵션이 승인 뒤 품절됐다고 알린다
    - `NAVER_SHOPPING_CLAIM_REJECTED`, `NAVER_SHOPPING_CHECKOUT_FAILED` 면 주문서를 열지 못했고 결제 화면도 넘기지 않았다고 알리고 다시 살지 묻는다
@@ -50,7 +49,6 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 | `NAVER_SHOPPING_OPTIONS_UNKNOWN` | 옵션 목록을 읽지 못했다. 「내 브라우저」 의 상품 화면에서 확인해 달라고 한다 |
 | `NAVER_SHOPPING_SOLD_OUT` | 고른 옵션이 품절이다 |
 | `NAVER_SHOPPING_NOT_BUYABLE` | 지금 네이버페이로 바로 살 수 없는 상품이다 |
-| 상한을 정해 달라는 거절 | 「외부 서비스 연결」 의 네이버 쇼핑 연결에서 구매 상한 두 칸을 정해 달라고 한다 |
 
 상품 화면이 예상과 달라 멈추면 아래 「막혔을 때」 의 `NAVER_SHOPPING_PAGE_CHANGED` 줄을 따른다.
 

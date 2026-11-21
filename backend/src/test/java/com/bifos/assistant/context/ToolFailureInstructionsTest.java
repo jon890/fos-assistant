@@ -63,7 +63,7 @@ class ToolFailureInstructionsTest {
     @DisplayName("사람이 정하거나 손을 써야 하는 실패와 보안 막힘은 바로 알린다")
     void asksAtOnceForHumanOnlyFailures(InstructionScope scope) {
         assertThat(instructions(scope))
-            .contains("승인 대기", "로그인·보안문자·기기 인증", "사용자가 거절한 것", "실행 여부를 알 수 없는 것", "결제와 구매 상한", "다시 연결해야 하는 플러그인")
+            .contains("승인 대기", "로그인·보안문자·기기 인증", "사용자가 거절한 것", "실행 여부를 알 수 없는 것", "결제", "다시 연결해야 하는 플러그인")
             .contains("다른 도구로 같은 대상을 다시 노리지 않는다.")
             .contains("막히지 않은 다른 대상으로 같은 일을 하는 것은 된다.");
     }

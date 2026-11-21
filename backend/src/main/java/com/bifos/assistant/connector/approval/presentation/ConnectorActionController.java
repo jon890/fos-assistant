@@ -67,7 +67,7 @@ public class ConnectorActionController {
             views.stream().filter(view -> FinancialLimitChanges.TOOL.equals(view.toolName())).map(view -> view.actionId()).toList());
         // 위임 자식처럼 대화의 에이전트와 다른 에이전트가 요청한 줄은 그 이름표를 붙인다.
         var requesters = actions.requestersOf(user, id, actionIds);
-        // 주문서 준비 줄(PURCHASE)은 저장한 snapshot 의 요약과 오늘 남은 구매 한도를 붙인다(ADR-20261113 / purchase-checkout).
+        // 주문서 준비 줄(PURCHASE)은 저장한 snapshot 의 주문서 요약을 붙인다(ADR-20261113 / purchase-checkout).
         var checkouts = financialSummaries.checkouts(user,
             views.stream().filter(view -> view.risk() == ToolRisk.PURCHASE).map(view -> view.actionId()).toList());
         return views.stream()

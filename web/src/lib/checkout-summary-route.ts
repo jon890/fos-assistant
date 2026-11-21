@@ -12,7 +12,6 @@ const UNAVAILABLE_CHECKOUT: CheckoutSummary = {
   expectedTotalKrw: null,
   regionalExtraFee: null,
   url: null,
-  remainingTodayKrw: null,
 };
 
 /** 원 단위 금액이다. 0 이상 10억 미만 정수만 받는다. Control Plane 의 주문서 검증과 같은 범위다. */
@@ -74,13 +73,6 @@ function openCheckout(value: unknown): CheckoutSummary {
     expectedTotalKrw: won(item.expectedTotalKrw),
     regionalExtraFee: item.regionalExtraFee,
     url: httpsUrl(item.url),
-    remainingTodayKrw:
-      item.remainingTodayKrw === null || item.remainingTodayKrw === undefined
-        ? null
-        : typeof item.remainingTodayKrw === "number" &&
-            Number.isSafeInteger(item.remainingTodayKrw)
-          ? item.remainingTodayKrw
-          : null,
   };
 }
 
