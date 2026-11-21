@@ -145,7 +145,7 @@ class DeployCheckJudgeTest {
     void photoInspect(String toolName) {
         TurnObservation upload = turn("받았어요", List.of());
         assertVerdict(
-            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("글자는 QX-7319 입니다", List.of(ok(toolName)))),
+            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("글자는 QX-7319 입니다", List.of(ok(toolName))))),
             FeatureStatus.PASSED,
             null);
         assertVerdict(
@@ -153,7 +153,7 @@ class DeployCheckJudgeTest {
             FeatureStatus.FAILED,
             "NO_INSPECT");
         assertVerdict(
-            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("읽지 못했어요", List.of(ok(toolName)))),
+            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("읽지 못했어요", List.of(ok(toolName))))),
             FeatureStatus.FAILED,
             "MARKER_MISSING");
     }
