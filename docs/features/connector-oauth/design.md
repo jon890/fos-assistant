@@ -228,8 +228,9 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 | `POST /api/connections/{id}/oauth/start` | 같은 출처 검사 뒤 요청의 `Origin`(없으면 앞단이 넘긴 host 와 scheme)으로 돌아오는 주소 `/connections/oauth/callback` 을 만들어 Control Plane 에 넘긴다. 화면이 돌아오는 주소를 정하지 못한다. 받은 `authorizeUrl` 은 `https://` 만 옮긴다 |
 | `/connections/oauth/callback` | 검색어 `state`, `code`, `error`, `setup_action` 을 `POST /api/connections/oauth/complete` 로 한 번 넘긴다. `REAUTHORIZE` 면 받은 주소로 다시 보내고, 플러그인을 알면 `/connections/{id}?oauth=<결과>&reason=<코드>` 로 간다. 모르면 그 자리에 까닭을 보인다 |
 | `/connections/{id}` | 결과 검색어를 읽어 보이고 주소에서 지운다(`?agent=` 는 남긴다). 단추를 누를 때 비밀 아닌 칸 값과 시작한 에이전트 번호를 그 탭의 `sessionStorage` 에 15분 두고, 돌아오면 칸 값을 되살리고 돌아오는 화면이 에이전트 번호를 다시 붙인다. 비밀 칸은 두지 않는다. 관리자 안내는 서버가 읽은 역할로 정한다. 단추가 대신하는 칸은 `oauth.fields` 로 고른다 |
+| `/admin/secrets` | 앱 줄과 서명 비밀 줄을 서버 비밀값 목록과 따로 읽는다. 앱 줄은 저장할 때마다 client secret 을 다시 받고, 플러그인마다인 앱(GitHub)에만 App 이름 칸을 둔다. 서명 비밀은 확인 창을 거쳐 새로 만든다 |
 
-제공자의 화면 이름(GitHub, Google)은 웹의 `connection-oauth.ts` 가 갖는다. 주소와 토큰은 다루지 않는다.
+제공자의 화면 이름(GitHub, Google)은 웹의 `connection-oauth.ts` 가, App 이름 칸이 필요한 제공자는 `connector-oauth-admin-api.ts` 가 갖는다. 주소와 토큰은 다루지 않는다.
 
 ## 실패와 일관성
 

@@ -148,3 +148,69 @@ test("VAPID 키가 있으면 기기 해제 확인 창을 거쳐 새로 만든다
     /^\/api\/admin\/secrets\/vapid\/regenerate$/,
   );
 });
+
+test("단추 연결 앱 줄은 client ID 와 App 이름을 원문으로, secret 은 앞부분만 보이고 저장하면 세 값을 보낸다", async ({ page }) => {
+  const app = {
+    connectorId: "career",
+    connectorTitle: "커리어",
+    provider: "github",
+    clientId: "Iv1.public",
+    appSlug: "career-app",
+    set: true,
+    prefix: "abcd",
+    updatedBy: { id: 1, name: "관리자" },
+    updatedAt: "2026-11-21T01:00:00Z",
+  };
+  const signing = {
+    storeAvailable: true,
+    set: true,
+    updatedBy: null,
+    updatedAt: "2026-11-21T01:00:00Z",
+    passageConfigured: true,
+    connectionCount: 2,
+  };
+  let saved: unknown;
+  await page.route("**/api/admin/secrets", (route) => json(route, overview(true)));
+  await page.route("**/api/admin/secrets/connector-oauth/apps", (route) =>
+    json(route, { storeAvailable: true, apps: [app] }),
+  );
+  await page.route("**/api/admin/secrets/connector-oauth/apps/career", (route) => {
+    saved = route.request().postDataJSON();
+    return json(route, app);
+  });
+  await page.route("**/api/admin/secrets/connector-oauth/signing", (route) => json(route, signing));
+  await page.route("**/api/admin/secrets/connector-oauth/signing/regenerate", (route) =>
+    json(route, { signing, rewrite: { total: 2, failed: 1 } }),
+  );
+  await page.goto("/admin/secrets");
+
+  const row = page.getByTestId("secret-oauth-app-career");
+  await expect(row.getByText("GitHub 앱(커리어)")).toBeVisible();
+  await expect(row.getByText("Iv1.public")).toBeVisible();
+  await expect(row.getByText("career-app")).toBeVisible();
+  await expect(row.getByText("abcd…")).toBeVisible();
+  await row.getByLabel("GitHub 앱(커리어) client secret").fill("secret-value");
+  await clickAndWaitForResponse(
+    page,
+    row.getByRole("button", { name: "저장" }),
+    "PUT",
+    /^\/api\/admin\/secrets\/connector-oauth\/apps\/career$/,
+  );
+  expect(saved).toEqual({ clientId: "Iv1.public", clientSecret: "secret-value", appSlug: "career-app" });
+  await expect(page.getByText("앱 설정을 저장했어요.")).toBeVisible();
+  await expect(row.getByLabel("GitHub 앱(커리어) client secret")).toHaveValue("");
+
+  const signingRow = page.getByTestId("secret-oauth-signing");
+  await expect(signingRow.getByText("자동 관리")).toBeVisible();
+  await signingRow.getByRole("button", { name: "새로 만들기" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByText(/^단추 연결 2개의 토큰 통로 주소를 다시 써요/)).toBeVisible();
+  await clickAndWaitForResponse(
+    page,
+    dialog.getByRole("button", { name: "새로 만들기" }),
+    "POST",
+    /^\/api\/admin\/secrets\/connector-oauth\/signing\/regenerate$/,
+  );
+  await expect(page.getByText("단추 연결 1개의 통로 주소를 다시 썼어요.")).toBeVisible();
+  await expect(page.getByText(/1개는 다시 쓰지 못했어요/)).toBeVisible();
+});
