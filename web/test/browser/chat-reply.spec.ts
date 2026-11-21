@@ -135,3 +135,111 @@ test("답을 만드는 중에는 집은 것이 있으면 보내기가 꺼지고 
   await expect(page.getByTestId("reply-wait")).toHaveText("답이 끝나면 보낼 수 있어요");
   await expect(page.getByRole("button", { name: "보내기" })).toBeDisabled();
 });
+
+/** 첫 내 메시지에 사진 한 장을, 둘째 내 메시지에 그 답을 집은 상자를 붙인 것처럼 이력 응답을 바꾼다. */
+async function withPhotoAndReply(page: Page, conversationId: string, imageGone = false) {
+  await page.route(`**/api/chat/conversations/${conversationId}/messages`, async (route) => {
+    const response = await route.fetch();
+    const messages = (await response.json()) as { id: number; role: string; attachments: unknown[]; reply?: unknown }[];
+    const users = messages.filter((message) => message.role === "USER");
+    const answer = messages.find((message) => message.role === "ASSISTANT");
+    users[0].attachments = [
+      { id: 990001, originalName: "신발.png", byteSize: PNG.length, visible: true, expiresAt: "2999-01-01T00:00:00Z" },
+    ];
+    if (users[1] && answer)
+      users[1].reply = {
+        messageId: answer.id, role: "ASSISTANT", excerpt: "앞 줄", available: true,
+        images: [{ kind: "GENERATED", path: "generated/지운 그림.png", attachmentId: null, deleted: imageGone }],
+      };
+    await route.fulfill({ response, json: messages });
+  });
+  await page.route(`**/api/chat/conversations/${conversationId}/attachments/**`, (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+}
+
+async function longPress(page: Page, target: ReturnType<Page["getByTestId"]>) {
+  const rect = (await target.boundingBox())!;
+  await target.dispatchEvent("pointerdown", {
+    pointerType: "touch", bubbles: true, clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2,
+  });
+  await page.waitForTimeout(700);
+}
+
+test.describe("휴대폰 사진과 메뉴", () => {
+  test.use({ hasTouch: true, isMobile: true });
+
+  test("내 메시지의 사진을 길게 누르면 메뉴가 하나만 열리고 그 사진 한 장이 집히며, 메뉴 밖을 누르면 닫힌다", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "터치 사례는 휴대폰 폭에서 본다");
+    const conversationId = await openConversation(page);
+    await withPhotoAndReply(page, conversationId);
+    await page.goto(`/chat/${conversationId}`);
+
+    await longPress(page, page.getByTestId("message-attachment").first());
+    await expect(page.getByTestId("reply-menu")).toHaveCount(1);
+    // 손가락을 뗄 때의 클릭은 열린 직후 0.4초 동안 무시한다. 그 뒤의 바깥 누르기만 닫는다.
+    await page.waitForTimeout(500);
+    await page.getByTestId("reply-menu-backdrop").click({ position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("reply-menu")).toHaveCount(0);
+
+    await longPress(page, page.getByTestId("message-attachment").first());
+    await page.getByTestId("reply-menu").getByRole("menuitem", { name: "답장", exact: true }).click();
+    await expect(page.getByTestId("reply-chip").getByTestId("reply-image")).toHaveCount(1);
+    await expect(page.getByTestId("reply-chip")).toContainText("내 메시지");
+  });
+});
+
+test("보낸 답장 상자의 그림 파일이 지워졌으면 보관 기간이 지났다고 보인다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "넓은 화면에서 본다");
+  const conversationId = await openConversation(page);
+  const second = await page.request.post("/api/chat", { data: { conversationId, text: "둘째 질문", agentCode: "browser" } });
+  expect(second.ok()).toBeTruthy();
+  await withPhotoAndReply(page, conversationId, true);
+  await page.goto(`/chat/${conversationId}`);
+  await expect(page.getByTestId("reply-box").getByTestId("reply-image-gone")).toHaveText("보관 기간이 지나 볼 수 없어요.");
+});
+
+test("내 메시지에 키보드로 초점을 옮기면 「답장」 이 보이고, 새로 집으면 칩이 바뀐다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "키보드 사례는 넓은 화면에서 본다");
+  const conversationId = await openConversation(page);
+  await withImages(page, conversationId);
+  await page.goto(`/chat/${conversationId}`);
+  const mine = page.locator("li[data-message-id]").filter({ has: page.getByTestId("user-message") }).first();
+  await mine.focus();
+  const reply = mine.getByRole("button", { name: "답장", exact: true });
+  await expect.poll(() => reply.evaluate((element) => getComputedStyle(element.parentElement!).opacity)).toBe("1");
+  await reply.click();
+  await expect(page.getByTestId("reply-chip")).toContainText("내 메시지");
+
+  await page.getByRole("button", { name: "수채화 고양이 크게 보기" }).click();
+  await page.getByTestId("generated-image-viewer").getByRole("button", { name: "답장", exact: true }).click();
+  await expect(page.getByTestId("reply-chip")).toContainText("비서의 답");
+  await expect(page.getByTestId("reply-chip").getByTestId("reply-image")).toHaveCount(1);
+});
+
+test("답이 끝나면 집은 것과 함께 보내기가 켜지고, 글이 없으면 꺼져 있다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "넓은 화면에서 본다");
+  const conversationId = await openConversation(page);
+  await page.goto(`/chat/${conversationId}`);
+  let release = () => {};
+  await page.route("**/api/chat/stream", (route) => new Promise<void>((resolve) => {
+    release = () => {
+      void route.continue();
+      resolve();
+    };
+  }), { times: 1 });
+  await page.getByRole("textbox", { name: "메시지" }).fill("먼저 보내는 글");
+  await page.getByRole("button", { name: "보내기" }).click();
+  const answer = page.getByTestId("assistant-message").first();
+  await answer.hover();
+  await answer.getByRole("button", { name: "답장", exact: true }).click();
+  const send = page.getByRole("button", { name: "보내기" });
+  await page.getByRole("textbox", { name: "메시지" }).fill("이걸로 답장");
+  await expect(send).toBeDisabled();
+
+  release();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(2);
+  await expect(page.getByTestId("reply-wait")).toHaveCount(0);
+  await expect(send).toBeEnabled();
+  await page.getByRole("textbox", { name: "메시지" }).fill("");
+  await expect(send).toBeDisabled();
+});

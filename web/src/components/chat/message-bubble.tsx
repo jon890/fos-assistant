@@ -182,6 +182,7 @@ export function MessageBubble({
             onReply={
               canReply ? (attachmentId) => pick({ attachmentId }) : undefined
             }
+            copyText={turn.content}
           />
           {sentAt ? (
             // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
@@ -288,6 +289,7 @@ export function MessageBubble({
       <AttachmentGallery
         conversationId={conversationId}
         attachments={attachments}
+        copyText={turn.content}
       />
       <GeneratedImages
         images={(turn.artifacts ?? []).filter(
@@ -296,6 +298,7 @@ export function MessageBubble({
         conversationId={conversationId}
         messageId={turn.id}
         onReply={canReply ? (imagePath) => pick({ imagePath }) : undefined}
+        copyText={turn.content}
       />
       <PutFiles
         files={(turn.artifacts ?? []).filter(

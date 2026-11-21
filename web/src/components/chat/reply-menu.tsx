@@ -24,6 +24,8 @@ export function useReplyMenu({
 }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  // 길게 누른 손가락을 뗄 때 생기는 클릭이 바로 메뉴를 닫지 않게 연 시각을 둔다.
+  const openedAt = useRef(0);
   const cancel = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -33,9 +35,14 @@ export function useReplyMenu({
         // 터치로 누른 것만 센다. 마우스는 단추 줄을 쓴다(설계 chat-reference DECISION5).
         onPointerDown: (event: React.PointerEvent) => {
           if (event.pointerType !== "touch") return;
+          // 사진처럼 안쪽에서 먼저 받은 누르기를 바깥 말풍선이 다시 받지 않게 한다.
+          event.stopPropagation();
           const point = { x: event.clientX, y: event.clientY };
           cancel();
-          timer.current = setTimeout(() => setAt(point), LONG_PRESS_MS);
+          timer.current = setTimeout(() => {
+            openedAt.current = Date.now();
+            setAt(point);
+          }, LONG_PRESS_MS);
         },
         onPointerUp: cancel,
         onPointerCancel: cancel,
@@ -48,12 +55,15 @@ export function useReplyMenu({
       }
     : { className: "" };
   const close = () => setAt(null);
+  const closeOutside = () => {
+    if (Date.now() - openedAt.current > 400) close();
+  };
   const menu =
     at && onReply ? (
       <div
         className="fixed inset-0 z-50"
         data-testid="reply-menu-backdrop"
-        onClick={close}
+        onClick={closeOutside}
       >
         <div
           role="menu"

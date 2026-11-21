@@ -162,6 +162,7 @@ export function GeneratedImages({
   conversationId,
   messageId,
   onReply,
+  copyText = "",
 }: {
   images: MessageArtifact[];
   conversationId: string | null;
@@ -169,6 +170,8 @@ export function GeneratedImages({
   messageId: number | string;
   /** 그림 한 장을 집는다(스펙 chat-reference REQ1, REQ2). 크게 보기의 「답장」 과 휴대폰의 길게 누르기다 */
   onReply?(path: string): void;
+  /** 길게 누르기 메뉴의 「복사」 가 복사할 답 글이다(스펙 chat-reference REQ3) */
+  copyText?: string;
 }) {
   const [openPath, setOpenPath] = useState<string | null>(null);
   // 메시지를 다시 읽기 전에는 보관본 번호가 오지 않는다. 그동안 보관한 그림을 기억한다.
@@ -204,7 +207,7 @@ export function GeneratedImages({
             ) : (
               <ReplyPress
                 onReply={onReply ? () => onReply(image.path) : undefined}
-                copyText={title}
+                copyText={copyText}
               >
                 <button
                   type="button"

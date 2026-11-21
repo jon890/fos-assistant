@@ -12,9 +12,12 @@ export function AttachmentGallery({
   conversationId,
   attachments,
   onReply,
+  copyText,
 }: {
   conversationId: string | null;
   attachments: MessageAttachment[];
+  /** 길게 누르기 메뉴의 「복사」 가 복사할 메시지 글이다 */
+  copyText: string;
   /** 사진 한 장을 집는다(스펙 chat-reference REQ1). 넓은 화면은 사진 위 단추, 휴대폰은 길게 누르기다 */
   onReply?(attachmentId: number): void;
 }) {
@@ -28,6 +31,7 @@ export function AttachmentGallery({
             conversationId={conversationId}
             attachment={attachment}
             onReply={onReply ? () => onReply(attachment.id) : undefined}
+            copyText={copyText}
           />
         ) : (
           <div
@@ -47,13 +51,15 @@ function Photo({
   conversationId,
   attachment,
   onReply,
+  copyText,
 }: {
   conversationId: string;
   attachment: MessageAttachment;
   onReply?(): void;
+  copyText: string;
 }) {
   const url = `/api/chat/conversations/${conversationId}/attachments/${attachment.id}`;
-  const menu = useReplyMenu({ onReply, copyText: attachment.originalName });
+  const menu = useReplyMenu({ onReply, copyText });
   return (
     <span
       {...menu.bind}
