@@ -159,6 +159,16 @@ public class ConnectorOAuthSigner {
     }
 
 
+    /**
+     * 관리자가 서명 비밀을 새로 만든다. 옛 비밀로 서명한 표식과 상태 값은 바로 무효다. 통로 주소를 다시 쓰는 일은 부르는 쪽이 잇는다.
+     *
+     * @throws com.bifos.assistant.shared.error.ApiException KEK 가 없으면 {@code SECRET_STORE_UNAVAILABLE}
+     */
+    public synchronized void regenerate(Long adminId) {
+        secrets.write(SECRET_NAME, newSecret(), Map.of(), adminId);
+    }
+
+
     /** 줄이 비어 있으면 한 번 만든다. 두 요청이 함께 만들지 않게 이 객체에서 직렬화한다. */
     private Optional<String> secret() {
         if (!secrets.available()) {
@@ -173,12 +183,17 @@ public class ConnectorOAuthSigner {
             if (again.isPresent()) {
                 return again;
             }
-            byte[] bytes = new byte[32];
-            RANDOM.nextBytes(bytes);
-            String created = HexFormat.of().formatHex(bytes);
+            String created = newSecret();
             secrets.write(SECRET_NAME, created, Map.of(), null);
             return Optional.of(created);
         }
+    }
+
+
+    private static String newSecret() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
 
