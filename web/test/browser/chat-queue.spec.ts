@@ -96,7 +96,7 @@ test("답이 오는 동안 보내면 대기 줄에 쌓이고 답이 끝나면 �
   await queueByButton(page, "대기 줄 셋째 글", 2);
   await expect(messageBox(page)).toHaveValue("");
   await expect(page.getByTestId("pending-queue")).toContainText(
-    "답이 끝나면 보내요.",
+    "답이 끝나면 이어서 보내요.",
   );
   await expect(page.getByTestId("user-message")).toHaveCount(1);
 
