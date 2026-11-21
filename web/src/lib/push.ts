@@ -1,3 +1,4 @@
+import { PushSubscribeTimeoutError, withTimeout } from "@/lib/with-timeout";
 import { base64UrlToBytes, sameKey } from "@/lib/push-device";
 
 /**
@@ -103,14 +104,36 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
  *
  * <p>기존 구독이 다른 키로 만든 것이면 끊고 새로 만든다. 서버가 키를 바꾼 뒤 옛 구독을 등록하면 거절된다.
  */
-export async function subscribe(publicKey: string): Promise<PushSubscription> {
+export async function subscribe(
+  publicKey: string,
+  timeoutMs = SUBSCRIBE_TIMEOUT_MS,
+): Promise<PushSubscription> {
+  const attempt = { expired: false };
+  return withTimeout(subscribeUnbounded(publicKey, attempt), timeoutMs).catch(
+    (error: unknown) => {
+      // 시간 초과로 끝난 시도가 뒤늦게 이어져 구독을 바꾸지 못하게 막는다.
+      attempt.expired = true;
+      throw error;
+    },
+  );
+}
+
+/** 구독이 이 시간 안에 끝나지 않으면 포기한다. 푸시 서비스에 닿지 못하는 브라우저는 응답도 거절도 없이 멈춘다 */
+export const SUBSCRIBE_TIMEOUT_MS = 20_000;
+
+async function subscribeUnbounded(
+  publicKey: string,
+  attempt: { expired: boolean },
+): Promise<PushSubscription> {
   await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: "/" });
   const registration = await navigator.serviceWorker.ready;
   const key = base64UrlToBytes(publicKey);
   const existing = await registration.pushManager.getSubscription();
+  if (attempt.expired) throw new PushSubscribeTimeoutError();
   if (existing) {
     if (sameKey(existing.options.applicationServerKey, key)) return existing;
     await existing.unsubscribe();
+    if (attempt.expired) throw new PushSubscribeTimeoutError();
   }
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
