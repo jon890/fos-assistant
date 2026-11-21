@@ -12,6 +12,8 @@ import com.bifos.assistant.quality.domain.type.QualityFeature;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class DeployCheckJudgeTest {
 
@@ -85,10 +87,11 @@ class DeployCheckJudgeTest {
     }
 
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"file_space_put", "mcp__fos_assistant__file_space_put"})
     @DisplayName("파일 넣기는 file_space_put 이 끝나고 보관 줄이 생겨야 통과다")
-    void filePut() {
-        TurnObservation put = turn("넣었다", List.of(ok("file_space_put")));
+    void filePut(String toolName) {
+        TurnObservation put = turn("넣었다", List.of(ok(toolName)));
         assertVerdict(
             judge.judge(QualityFeature.FILE_PUT, new CheckObservation(List.of(put), 1, false, null, null, false)),
             FeatureStatus.PASSED,
@@ -136,12 +139,13 @@ class DeployCheckJudgeTest {
     }
 
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"attachment_inspect", "mcp__fos_assistant__attachment_inspect"})
     @DisplayName("사진 조회는 묻는 turn 이 원본 조회 도구를 끝내고 심은 글자를 답해야 통과다")
-    void photoInspect() {
+    void photoInspect(String toolName) {
         TurnObservation upload = turn("받았어요", List.of());
         assertVerdict(
-            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("글자는 QX-7319 입니다", List.of(ok("attachment_inspect"))))),
+            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("글자는 QX-7319 입니다", List.of(ok(toolName)))),
             FeatureStatus.PASSED,
             null);
         assertVerdict(
@@ -149,7 +153,7 @@ class DeployCheckJudgeTest {
             FeatureStatus.FAILED,
             "NO_INSPECT");
         assertVerdict(
-            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("읽지 못했어요", List.of(ok("attachment_inspect"))))),
+            judge.judge(QualityFeature.PHOTO_INSPECT, of(upload, turn("읽지 못했어요", List.of(ok(toolName)))),
             FeatureStatus.FAILED,
             "MARKER_MISSING");
     }
