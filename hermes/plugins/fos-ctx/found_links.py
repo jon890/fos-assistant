@@ -128,6 +128,9 @@ def _extract_pages(parsed) -> list:
         url, content = item.get("url"), item.get("content")
         if not isinstance(url, str) or not isinstance(content, str):
             continue
+        if len(url) > MAX_LINK_CHARS:
+            # 기준 주소가 상한을 넘으면 Control Plane 이 본문 전체를 거절한다. 그 항목만 건너뛴다.
+            continue
         # 항목의 `url` 은 비서가 적어 넣은 주소라 후보가 아니다. 상대 주소를 푸는 기준으로만 보낸다.
         found.append({"base": url, "links": absolute_links(content) + relative_links(content)})
     return found

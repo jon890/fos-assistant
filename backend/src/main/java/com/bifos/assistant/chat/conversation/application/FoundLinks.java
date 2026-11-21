@@ -55,11 +55,15 @@ public class FoundLinks {
             URI base = absolute(page.base());
             String own = base == null ? null : LinkTarget.of(base.toString()).map(LinkTarget::hash).orElse(null);
             for (String link : page.links()) {
-                for (String form : forms(link, base)) {
-                    LinkTarget.of(form)
-                        .map(LinkTarget::hash)
-                        .filter(hash -> !hash.equals(own) && !excluded.contains(hash))
-                        .ifPresent(hashes::add);
+                // 후보에서 만든 꼴 가운데 하나라도 페이지 자신이나 적어 넣은 주소면 그 후보의 꼴을 모두 뺀다.
+                // 꼴마다 따로 빼면 본문이 자기 주소를 &amp; 로 되풀이했을 때 적힌 꼴이 남는다.
+                List<String> formed = forms(link, base).stream()
+                    .map(LinkTarget::of)
+                    .flatMap(Optional::stream)
+                    .map(LinkTarget::hash)
+                    .toList();
+                if (formed.stream().noneMatch(hash -> hash.equals(own) || excluded.contains(hash))) {
+                    hashes.addAll(formed);
                 }
             }
         }

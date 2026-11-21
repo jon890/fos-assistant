@@ -150,6 +150,16 @@ class PagesTest(FoundLinksFixture):
         self.assertEqual(self.found_links.typed_urls("web_search", {"query": "https://t.example.com/a"}), [])
         self.assertEqual(self.found_links.typed_urls("web_extract", None), [])
 
+    def test_page_with_too_long_url_is_skipped(self):
+        """기준 주소가 상한을 넘는 항목은 건너뛰고 나머지 항목은 그대로 낸다. 서버가 본문 전체를 거절하지 않게 한다."""
+        result = json.dumps({"results": [
+            {"url": "https://a.example.com/" + "x" * 2048, "title": "", "content": "https://a.example.com/1", "error": None},
+            {"url": "https://b.example.com/p", "title": "", "content": "https://b.example.com/2", "error": None},
+        ]})
+
+        self.assertEqual(self.found_links.pages("web_extract", result),
+                         [{"base": "https://b.example.com/p", "links": ["https://b.example.com/2"]}])
+
     def test_other_shapes_yield_nothing(self):
         """JSON 이 아니거나 모양이 다른 결과, 다른 도구는 빈 목록이다."""
         for tool, result in (("web_search", "not json"), ("web_search", "[]"), ("web_extract", json.dumps({"results": "x"})),

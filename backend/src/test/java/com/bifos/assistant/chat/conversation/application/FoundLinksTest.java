@@ -141,6 +141,23 @@ class FoundLinksTest {
 
 
     @Test
+    @DisplayName("본문이 자기 주소나 적어 넣은 주소를 엔티티 꼴로 되풀이해도 적힌 꼴까지 남기지 않는다")
+    void excludesEveryFormOfThePageItself() {
+        links.record(
+            conversationId,
+            List.of(new FoundPage(
+                "https://shop.example.com/goods?a=1&b=2",
+                List.of("https://shop.example.com/goods?a=1&amp;b=2", "https://typed.example.com/x?a=1&amp;b=2", "/img/a.png"))),
+            List.of("https://typed.example.com/x?a=1&b=2"));
+
+        assertThat(links.find(conversationId, "https://shop.example.com/goods?a=1&amp;b=2")).isEmpty();
+        assertThat(links.find(conversationId, "https://shop.example.com/goods?a=1&b=2")).isEmpty();
+        assertThat(links.find(conversationId, "https://typed.example.com/x?a=1&amp;b=2")).isEmpty();
+        assertThat(links.find(conversationId, "https://shop.example.com/img/a.png")).isPresent();
+    }
+
+
+    @Test
     @DisplayName("쿼리만 있는 상대 주소는 페이지 경로에 그대로 붙여 푼다")
     void resolvesQueryOnlyLinks() {
         links.record(conversationId, List.of(new FoundPage("https://shop.example.com/a/b?q=1#top", List.of("?page=2"))), List.of());
