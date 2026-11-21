@@ -43,11 +43,11 @@ public final class PushDtos {
     }
 
     /** 등록 요청이다. */
-    public record RegisterPushDeviceRequest(String endpoint, PushKeys keys, String name, String timeZone) {
+    public record RegisterPushDeviceRequest(String endpoint, PushKeys keys, String name, String timeZone, String publicKey) {
 
         public PushRegistration toRegistration() {
             return new PushRegistration(
-                endpoint, keys == null ? null : keys.p256dh(), keys == null ? null : keys.auth(), name, timeZone);
+                endpoint, keys == null ? null : keys.p256dh(), keys == null ? null : keys.auth(), name, timeZone, publicKey);
         }
 
 

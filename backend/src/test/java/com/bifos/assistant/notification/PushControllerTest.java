@@ -21,6 +21,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,7 +89,7 @@ class PushControllerTest {
         assertThat(on.path("enabled").asBoolean()).isTrue();
         assertThat(on.path("publicKey").asString()).isEqualTo(keys.publicKeyBase64Url()).isNotBlank();
 
-        when(keys.enabled()).thenReturn(false);
+        when(keys.current()).thenReturn(Optional.empty());
         JsonNode off = body(mvc.perform(get("/api/v1/push/config")).andReturn().getResponse(), 200);
         assertThat(off.path("enabled").asBoolean()).isFalse();
         assertThat(off.path("publicKey").isNull()).isTrue();
@@ -99,8 +100,8 @@ class PushControllerTest {
     @DisplayName("등록과 목록은 번호, 이름, 등록 시각, 주소 해시만 주고 해제는 204 다")
     void registerListAndUnregister() throws Exception {
         String request = """
-            {"endpoint":"%s","keys":{"p256dh":"%s","auth":"%s"},"name":"Mac Chrome","timeZone":"Asia/Seoul"}
-            """.formatted(ENDPOINT, P256DH, AUTH);
+            {"endpoint":"%s","keys":{"p256dh":"%s","auth":"%s"},"name":"Mac Chrome","timeZone":"Asia/Seoul","publicKey":"%s"}
+            """.formatted(ENDPOINT, P256DH, AUTH, keys.publicKeyBase64Url());
 
         MockHttpServletResponse registered = mvc.perform(put("/api/v1/push/devices")
             .contentType(MediaType.APPLICATION_JSON).content(request)).andReturn().getResponse();
@@ -127,8 +128,8 @@ class PushControllerTest {
     void registerWithoutKeys() throws Exception {
         when(keys.enabled()).thenReturn(false);
         String request = """
-            {"endpoint":"%s","keys":{"p256dh":"%s","auth":"%s"},"name":"PC","timeZone":"Asia/Seoul"}
-            """.formatted(ENDPOINT, P256DH, AUTH);
+            {"endpoint":"%s","keys":{"p256dh":"%s","auth":"%s"},"name":"PC","timeZone":"Asia/Seoul","publicKey":"%s"}
+            """.formatted(ENDPOINT, P256DH, AUTH, keys.publicKeyBase64Url());
 
         MockHttpServletResponse response = mvc.perform(put("/api/v1/push/devices")
             .contentType(MediaType.APPLICATION_JSON).content(request)).andReturn().getResponse();
