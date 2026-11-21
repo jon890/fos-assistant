@@ -1,8 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ConnectionBadge } from "@/components/connector/connection-badge";
+import {
+  ConnectionLoadFailed,
+  ConnectionSummary,
+  ConnectorNotFound,
+} from "@/components/connector/connection-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
@@ -13,9 +16,7 @@ import { ConnectorLimitSections } from "@/components/connector/connector-limit-s
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
 import { useConnectionPoll } from "@/components/connector/use-binding-poll";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { ConnectorFieldInput } from "@/components/connector/connector-field-input";
 import { Notice } from "@/components/ui/notice";
 import {
   CONNECTOR_ID_PATTERN,
@@ -29,7 +30,7 @@ import {
   type ConnectorField,
   type ConnectorOption,
 } from "@/lib/connection";
-import { fetchLoaded, formatChecked, type Loaded } from "@/lib/connection-load";
+import { fetchLoaded, type Loaded } from "@/lib/connection-load";
 
 type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
 
@@ -38,20 +39,6 @@ type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
  * 연결을 막 마쳤거나 사용자가 열었으면 `open` 이고, 붙인 뒤에도 결과를 보이려고 닫을 때까지 둔다.
  */
 type Chooser = "auto" | "open" | "closed";
-
-function NotFound() {
-  return (
-    <div className="mx-auto w-full max-w-2xl" data-testid="connector-not-found">
-      <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
-      <Link
-        href="/connections"
-        className="text-sm text-foreground underline underline-offset-4"
-      >
-        서비스 연결로 돌아가기
-      </Link>
-    </div>
-  );
-}
 
 export function ConnectorConnectionPanel({
   id,
@@ -79,24 +66,16 @@ export function ConnectorConnectionPanel({
 
   useConnectionPoll(id, validId, loaded, busy, setLoaded);
 
-  if (!validId || loaded.kind === "notFound") return <NotFound />;
+  if (!validId || loaded.kind === "notFound") return <ConnectorNotFound />;
   if (loaded.kind === "loading")
     return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
-  if (loaded.kind === "failed") {
+  if (loaded.kind === "failed")
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-3">
-        <Notice variant="error" role="alert">
-          연결 상태를 읽지 못했어요. {loaded.message}
-        </Notice>
-        <Button
-          variant="outline"
-          onClick={() => void fetchLoaded(id).then(setLoaded)}
-        >
-          상태 다시 읽기
-        </Button>
-      </div>
+      <ConnectionLoadFailed
+        message={loaded.message}
+        onRetry={() => void fetchLoaded(id).then(setLoaded)}
+      />
     );
-  }
 
   const { connector, connection } = loaded;
   const available = connector?.available === true;
@@ -256,19 +235,19 @@ export function ConnectorConnectionPanel({
     (chooser === "open" ||
       (chooser === "auto" &&
         (connection.bindings.length === 0 || preferredUnbound)));
-  const shown = fields.flatMap((field) => {
-    if (!field.secret) {
-      const value = connection.values[field.key];
-      return value ? [{ field, value }] : [];
-    }
-    const prefix = connection.secretPrefixes[field.key];
-    if (prefix) return [{ field, value: prefix }];
-    // 짧은 비밀은 앞부분이 없다. 필수 칸은 등록됐다면 반드시 값이 있으므로 입력된 사실만 알린다.
-    // 선택 칸은 입력했는지 응답으로 알 수 없어 보이지 않는다.
-    return status !== "DISCONNECTED" && field.required
-      ? [{ field, value: "입력됨" }]
-      : [];
-  });
+  const renderField = (field: ConnectorField) => (
+    <ConnectorFieldInput
+      key={field.key}
+      field={field}
+      value={values[field.key] ?? ""}
+      options={options[field.key]}
+      busy={busy}
+      loading={pending === `options:${field.key}`}
+      canLoad={secretsFilled}
+      onChange={(value) => setField(field, value)}
+      onLoadOptions={() => void loadOptions(field)}
+    />
+  );
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -292,25 +271,12 @@ export function ConnectorConnectionPanel({
           <ConnectorHeading connector={connector} title={title} />
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
-            <span>
-              상태{" "}
-              <ConnectionBadge
-                status={status}
-                data-testid="connection-status"
-              />
-            </span>
-            {shown.map(({ field, value }) => (
-              <span key={field.key} className="break-all">
-                {field.label}: {value}
-              </span>
-            ))}
-          </div>
-          {connection.checkedAt ? (
-            <p className="text-sm text-muted-foreground">
-              마지막 확인: {formatChecked(connection.checkedAt)}
-            </p>
-          ) : null}
+          <ConnectionSummary
+            fields={fields}
+            connection={connection}
+            hiddenKeys={new Set()}
+            method={null}
+          />
           {!available ? (
             <Notice variant="info" role="status">
               지금은 쓸 수 없어요. 연결을 해제할 수만 있어요.
@@ -327,66 +293,7 @@ export function ConnectorConnectionPanel({
           {available ? (
             <form onSubmit={save} className="space-y-3">
               <LoginNotice url={loginUrl} />
-              {fields.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={`connector-field-${field.key}`}>
-                    {field.label}
-                  </Label>
-                  {field.hasOptions ? (
-                    <div className="flex items-center gap-2">
-                      {options[field.key]?.length ? (
-                        <NativeSelect
-                          id={`connector-field-${field.key}`}
-                          value={values[field.key] ?? ""}
-                          disabled={busy}
-                          onChange={(event) =>
-                            setField(field, event.target.value)
-                          }
-                        >
-                          <option value="">선택</option>
-                          {options[field.key].map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={busy || !secretsFilled}
-                        loading={pending === `options:${field.key}`}
-                        loadingText="불러오는 중…"
-                        onClick={() => void loadOptions(field)}
-                      >
-                        불러오기
-                      </Button>
-                    </div>
-                  ) : (
-                    <Input
-                      id={`connector-field-${field.key}`}
-                      name={field.key}
-                      type={field.secret ? "password" : "text"}
-                      autoComplete="off"
-                      value={values[field.key] ?? ""}
-                      disabled={busy}
-                      onChange={(event) => setField(field, event.target.value)}
-                    />
-                  )}
-                  {field.description ? (
-                    <p className="text-sm text-muted-foreground">
-                      {field.description}
-                    </p>
-                  ) : null}
-                  {field.hasOptions &&
-                  field.autoSelectSingle &&
-                  options[field.key]?.length === 1 ? (
-                    <p className="text-sm text-muted-foreground">
-                      하나뿐이라 자동으로 골랐어요.
-                    </p>
-                  ) : null}
-                </div>
-              ))}
+              {fields.map(renderField)}
               <Button
                 type="submit"
                 disabled={busy || !complete}
