@@ -75,7 +75,7 @@ Control Plane 판정 글은 Control Plane 이 이미 끝 줄을 붙여 보내므
 
 | 자리 | 글 | 꼴과 다음 방법 |
 | --- | --- | --- |
-| `image_source.py` | `IMAGE_SOURCE_LINK_NO_IMAGE`, `IMAGE_SOURCE_LINK_FAILED` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 사진을 올리거나 다른 링크를 보내면 된다는 것을 먼저 알린다(스펙 REQ7). 서버가 이미 페이지 안의 후보를 다 봤기 때문이다(PR2) |
+| `image_source.py` | `IMAGE_SOURCE_LINK_NO_IMAGE`, `IMAGE_SOURCE_LINK_FAILED` | 다음 방법: 결과의 다른 사진으로 link: 를 바꿔 다시 부르고, 쓸 사진이 더 없으면 설명만으로 비슷하게 그려 넣지 말고 사진을 찾지 못한 것과 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다(스펙 REQ7, [agent-found-image](../agent-found-image/spec.md) REQ6). 같은 링크를 다시 부르지 않는다. 서버가 이미 페이지 안의 후보를 다 봤기 때문이다(PR2) |
 | `image_source.py` | `IMAGE_SOURCE_LINK_BLOCKED` | 바로 알림(DECISION9) |
 | `image_source.py` | `IMAGE_SOURCE_LINK_TOO_LARGE` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 더 작은 사진을 올려 달라고 먼저 알린다 |
 | `image_source.py` | `FAILED` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 잠시 뒤 다시 해 달라고 알린다(DECISION10, 스펙 REQ7) |

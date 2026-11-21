@@ -52,9 +52,10 @@ class FailureTextTest(unittest.TestCase):
                 self.assertFalse(text.rstrip().endswith("올려 달라고 한다"), text)
 
     def test_link_without_image_asks_for_a_photo_or_link(self):
-        """링크에서 사진을 찾지 못하면 같은 링크를 다시 부르지 않고 사진이나 링크를 보내 달라고 먼저 알리게 한다."""
+        """링크에서 사진을 찾지 못하면 같은 링크가 아니라 다른 사진으로 다시 부르고, 더 없으면 사진이나 링크를 보내 달라고 먼저 알리게 한다."""
         text = self.module("image_source").LINK_REASONS["IMAGE_SOURCE_LINK_NO_IMAGE"]
-        self.assertTrue(text.endswith("다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 "
+        self.assertIn("다음 방법: 검색·읽기 결과에 나온 다른 사진", text)
+        self.assertTrue(text.endswith("설명만으로 비슷하게 그려 넣지 말고, 사진을 찾지 못한 것과 "
                                       "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"))
 
     def test_reference_photo_failures_do_not_draw_a_lookalike(self):
