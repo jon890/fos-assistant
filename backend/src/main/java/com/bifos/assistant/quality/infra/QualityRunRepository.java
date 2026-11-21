@@ -21,8 +21,8 @@ public interface QualityRunRepository extends JpaRepository<QualityRun, Long> {
         Long groupId, QualityRunKind kind, QualityRunStatus status);
 
 
-    /** 서버가 다시 떴을 때 끝내지 못한 줄이다. */
-    List<QualityRun> findByStatus(QualityRunStatus status);
+    /** 서버가 다시 떴을 때 끝내지 못한 그 종류의 줄이다. */
+    List<QualityRun> findByKindAndStatus(QualityRunKind kind, QualityRunStatus status);
 
 
     /** 그룹의 그 종류 확인을 최근 순으로 읽는다. 첫 쪽이다. */
@@ -33,6 +33,10 @@ public interface QualityRunRepository extends JpaRepository<QualityRun, Long> {
     List<QualityRun> findByGroupIdAndKindAndIdLessThanOrderByIdDesc(Long groupId, QualityRunKind kind, Long id, Pageable page);
 
 
-    /** 그 시각 전에 시작해 그 상태로 끝난 확인이다. 보관 기간이 지난 실패 대화를 찾는다. */
-    List<QualityRun> findByStatusAndStartedAtBefore(QualityRunStatus status, Instant before);
+    /** 그 시각 전에 시작해 그 상태로 끝난 그 종류의 줄이다. 보관 기간이 지난 대화를 찾는다. */
+    List<QualityRun> findByKindAndStatusAndStartedAtBefore(QualityRunKind kind, QualityRunStatus status, Instant before);
+
+
+    /** 그 상태가 아닌 그 종류의 줄이다. 비우기가 끝나지 않은 끝난 평가를 찾는다. */
+    List<QualityRun> findByKindAndStatusNot(QualityRunKind kind, QualityRunStatus status);
 }
