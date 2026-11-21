@@ -7,6 +7,7 @@
   [ADR-003](../../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md) 의 「Hermes 내장 memory 도구를 주지 않는다」 는 그대로다. 쓰는 길은 Control Plane MCP 도구 하나뿐이다.
 - **대체된 부분**: 아래 「바로 저장 조건」 2 의 근거 인용 대조, 5 의 민감도 판정, 「프롬프트 주입을 막는 근거」 의 근거 인용 대조 두 줄, 「감당할 것」 의 민감도 항목과 `execution_question` 이전 실행 항목은 [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) 이 대체한다. `evidence` 는 판정에 쓰지 않고, 부정이 한쪽에만 있는 본문과 민감해 보이는 글과 기능 도입 전 실행이 있는 대화는 제안으로 내린다.
 - **대체된 부분**: 아래 「꺼내는 방식은 `SEARCH` 로 둔다」 의 「다음 실행의 색인에 제목이 실린다」 는 [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 이 개정한다. `retrieval` 은 그대로 `SEARCH` 이고, 본문이 짧은 개인 항목은 예산이 고정된 개인 사실 구역에 본문까지 실린다.
+  2026-11-20 갱신: 지금은 요약 줄이 있는 개인 항목의 요약만 넣는 「요약 구역」 이다. 규칙은 [`docs/features/memory.md`](../features/memory.md) 의 「요약 구역」 이 갖는다.
 
 ### 결정
 

@@ -116,7 +116,7 @@
 | 지금 | 답변 품질: 최신 정보 검색과 출처, 조사 진행 표시, 품질 평가 | [답변 품질](features/answer-quality.md) |
 | 다음 | 실행 중 브라우저 함께 보기와 넘겨받기, 멈춘 단계부터 이어 가기의 남은 PR | [브라우저 함께 보기](features/browser-cowork.md) |
 | 다음 | Agent Runtime 추상화(Hermes 업그레이드 뒤) | |
-| 나중 | 알림을 웹 밖으로 보내는 채널(웹 푸시) | [먼저 알리기](features/attention.md) |
+| 나중 | 웹 푸시의 알림 묶음별 끄기, 조용한 시간, 기기 이름 고치기와 지우기 | [먼저 알리기](features/attention.md) |
 | 나중 | 예약 작업의 실패 다시 하기와 일시 정지 같은 다음 단계 | [예약 작업](features/schedule.md) |
 | 나중 | 코레일 KTX 좌석 확보(보류) | [코레일 KTX](features/korail-ktx.md) |
 
@@ -165,10 +165,6 @@
   그룹이 가족이 아니면 한 사람의 실행이 다른 사람의 한도를 먹는다.
 - **비용을 나눌지.** 지금은 누가 얼마를 썼는지 보이기만 하고 나누지 않는다.
 
-아직 만들지 않은 것은 [`code-architecture.md`](code-architecture.md) 의
-「아직 만들지 않은 것」 절이 갖는다.
-이 문서는 만들 것을 정하고, 그 문서는 지금 어디까지 왔는지를 적는다.
-
 ## 아직 만들지 않은 것
 
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
@@ -187,6 +183,6 @@
 - `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
 - 플러그인 연결에 다시 인증이 필요하다는 알림. 연결 상태에 재인증 상태가 없고, 토큰이 거절된 것을 연결 상태로 옮기는 지점도 없다. 그 상태를 정한 뒤 알림 종류를 더한다([`docs/features/attention.md`](features/attention.md))
 - 예약 작업의 실패 다시 하기와 일시 정지, 도구 미리 허락, 작업 제안. 목록과 넣지 않기로 한 것은 [`docs/features/schedule.md`](features/schedule.md) 의 「다음 단계」 가 갖는다
-- 알림을 웹 밖으로 보내는 채널. 첫 채널은 브라우저 웹 푸시로 정했다. 지금은 웹 안의 「지금 볼 것」 표시와 알림 목록뿐이다
+- 웹 푸시의 알림 묶음별 끄기, 조용한 시간, 기기 이름 고치기와 지우기. 기기 등록과 보내기는 있고 지금은 모든 알림이 등록한 기기로 간다([`docs/features/attention.md`](features/attention.md) 의 「웹 푸시」)
 - 먼저 살펴보기의 목표별 변화 판정. 외부 변화를 Control Plane 이 알지 못해 `NO_CHANGE` 로 모델을 건너뛰지 않는다. 남은 것은 [ADR-080](adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「다음 단계」 가 갖는다
 - 플러그인 plugin 이 일반 에이전트용 `proactive-check` 스킬을 선언하는 manifest 칸. 지금은 그 스킬을 에이전트에 따로 둔다
