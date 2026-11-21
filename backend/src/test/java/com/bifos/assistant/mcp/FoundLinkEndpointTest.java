@@ -116,6 +116,84 @@ class FoundLinkEndpointTest {
 
 
     @Test
+    @DisplayName("상품 페이지가 다시 열리지 않아도 이미 읽은 상품 사진을 받고 그 주소로 다음 장면을 그릴 수 있다")
+    void selectsProductImageFromPreviouslyReadPage() throws Exception {
+        List<Integer> statuses = List.of(301, 403, 202, 500);
+        for (int status : statuses) {
+            String requested = "https://shop.example.com/products/" + status;
+            String finalPage = "https://shop.example.com/products/final-" + status;
+            String photo = "https://cdn.example.com/item/" + status + ".png";
+            web.status(requested, status);
+            web.image(photo, "image/png", png(status));
+            assertThat(report(root, page(null, requested)).statusCode()).isEqualTo(204);
+            reportPhotos(requested, finalPage,
+                new Photo("/common/og.png", "og", 0),
+                new Photo("/item/large.png", "body", 1_000_000),
+                new Photo(photo, "product", 0));
+
+            HttpResponse<byte[]> image = source(root, "link:" + requested);
+            assertThat(image.statusCode()).as(requested).isEqualTo(200);
+            assertThat(image.body()).isEqualTo(png(status));
+            assertThat(image.headers().firstValue("x-image-source-link")).contains(photo);
+            assertThat(image.headers().firstValue("x-image-source-found")).contains("1");
+        }
+        assertThat(web.requested()).containsExactly(
+            "cdn.example.com/item/301.png", "cdn.example.com/item/403.png", "cdn.example.com/item/202.png", "cdn.example.com/item/500.png");
+
+        jdbc.update("UPDATE agent_execution SET status = 'SUCCEEDED' WHERE id = ?", execution.id());
+        String nextRoot = McpCallSigner.newRoot();
+        run(user, conversation, nextRoot);
+        assertThat(source(nextRoot, "link:https://cdn.example.com/item/403.png").body()).isEqualTo(png(403));
+    }
+
+
+    @Test
+    @DisplayName("상품용 Open Graph 사진이 있으면 쓰고 사이트 공통 사진이면 가장 큰 본문 사진을 쓴다")
+    void skipsCommonOpenGraphAndSelectsLargestBodyImage() throws Exception {
+        String first = "https://shop.example.com/goods/1";
+        String second = "https://shop.example.com/goods/2";
+        String third = "https://shop.example.com/goods/3";
+        String unique = "https://cdn.example.com/og/unique.png";
+        String shared = "https://cdn.example.com/og/repeated.png";
+        String largest = "https://cdn.example.com/item/large.png";
+        web.image(unique, "image/png", png(9));
+        web.image(largest, "image/png", png(10));
+        assertThat(report(root, page(null, first, second, third)).statusCode()).isEqualTo(204);
+        reportPhotos(first, first, new Photo(unique, "og", 0), new Photo(largest, "body", 500_000));
+        reportPhotos(second, second,
+            new Photo("/assets/all_og_store.jpg", "og", 0), new Photo(shared, "og", 0),
+            new Photo("/small.jpg", "body", 2_000), new Photo(largest, "body", 500_000));
+        reportPhotos(third, third, new Photo(shared, "og", 0));
+
+        assertThat(source(root, "link:" + first).body()).isEqualTo(png(9));
+        assertThat(source(root, "link:" + second).body()).isEqualTo(png(10));
+        assertFailure("link:" + third, 422, "IMAGE_SOURCE_LINK_NO_IMAGE");
+        assertThat(web.requested()).containsExactly("cdn.example.com/og/unique.png", "cdn.example.com/item/large.png");
+    }
+
+
+    @Test
+    @DisplayName("읽은 주소 자체는 발견 기록이 아니고 선택한 사진도 그 페이지의 후보와 대화 기록에 있어야 한다")
+    void cannotAuthorizePageOrAnUnreportedPhotoByReadingIt() throws Exception {
+        String requested = "https://shop.example.com/goods/1";
+        String photo = "https://cdn.example.com/image.png";
+        reportPhotos(requested, requested, new Photo(photo, "product", 0));
+        assertFailure("link:" + requested, 422, "IMAGE_SOURCE_UNKNOWN");
+        String otherRoot = McpCallSigner.newRoot();
+        run(user, conversation(user), otherRoot);
+        assertThat(report(otherRoot, page(null, requested)).statusCode()).isEqualTo(204);
+        assertThat(code(source(otherRoot, "link:" + photo))).isEqualTo("IMAGE_SOURCE_UNKNOWN");
+
+        ObjectNode read = page(requested);
+        read.putArray("images").addObject().put("url", photo).put("kind", "product").put("size", 0);
+        assertThat(report(root, page(null, requested)).statusCode()).isEqualTo(204);
+        assertThat(report(root, read).statusCode()).isEqualTo(204);
+        assertFailure("link:" + requested, 422, "IMAGE_SOURCE_LINK_NO_IMAGE");
+        assertThat(web.requested()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("읽은 본문의 사진 주소는 받고 읽기 도구에 적어 넣은 페이지 주소 자체는 받지 않는다")
     void acceptsBodyLinksButNotThePageItself() throws Exception {
         web.image("https://shop.example.com/img/a.png", "image/png", png(3));
@@ -336,6 +414,23 @@ class FoundLinkEndpointTest {
 
     private HttpResponse<byte[]> report(String session, ObjectNode page) throws Exception {
         return post(REPORT, body(McpCallSigner.context(token, "found_links", session), page), token);
+    }
+
+
+    private void reportPhotos(String requested, String base, Photo... photos) throws Exception {
+        ObjectNode page = page(base, Arrays.stream(photos).map(Photo::url).toArray(String[]::new));
+        page.put("requested", requested);
+        ArrayNode images = page.putArray("images");
+        for (Photo photo : photos) {
+            images.addObject().put("url", photo.url()).put("kind", photo.kind()).put("size", photo.size());
+        }
+        ObjectNode body = body(McpCallSigner.context(token, "found_links", root), page);
+        body.putArray("typed").add(requested);
+        assertThat(post(REPORT, body, token).statusCode()).isEqualTo(204);
+    }
+
+
+    private record Photo(String url, String kind, long size) {
     }
 
 
