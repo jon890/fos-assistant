@@ -7,6 +7,7 @@ import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
+import { receiveLiveImage } from "./artifact/live-images";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -18,6 +19,7 @@ type Context = Pick<
   | "pending"
   | "setApprovalRefresh"
   | "setLiveDelegations"
+  | "setLiveImages"
   | "panelTarget"
   | "setPanelTarget"
   | "sending"
@@ -36,6 +38,7 @@ export function useConversationEffects({
   pending,
   setApprovalRefresh,
   setLiveDelegations,
+  setLiveImages,
   panelTarget,
   setPanelTarget,
   sending,
@@ -85,6 +88,13 @@ export function useConversationEffects({
               setTurns((previous) => applySteerEvent(previous, event));
               return;
             }
+            // 만든 그림도 보류하지 않는다. 보낸 turn 이 도는 중에 저장되고, 답이 끝나기 전에 보여야 한다.
+            if (event.type === "image") {
+              const path = event.detail;
+              if (path)
+                setLiveImages((previous) => receiveLiveImage(previous, path));
+              return;
+            }
             // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.
             if (event.type === "approval") {
               setApprovalRefresh((count) => count + 1);
@@ -117,6 +127,11 @@ export function useConversationEffects({
       window.clearTimeout(timer);
     };
   }, [conversationId]);
+
+  // turn 이 시작하거나 끝나면 임시 그림을 비운다. 끝날 때는 이력을 다시 읽은 뒤 `sending` 이 풀려 저장된 그림이 이어 보인다.
+  useEffect(() => {
+    setLiveImages([]);
+  }, [sending]);
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
