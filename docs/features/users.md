@@ -59,7 +59,7 @@ sequenceDiagram
 | 모델 | `/admin/models` | 그룹 모델 설정(단계별 모델, 그룹 기본 단계), 모델 숨김 | 대화 입력창 모델 선택기 안의 「그룹 모델 설정」 |
 | 도구 | `/admin/tools` | 그룹의 화면에 보일 도구, 켜진 에이전트 수와 관리 화면 링크 | 없음 |
 | 사용자 | `/admin/people` | 사용자 추가, 사용 중지와 다시 허용, 마지막 로그인과 마지막 대화 시각 | 사이드바 메뉴의 「사용자 관리」 링크 |
-| 외부 서비스 연결 | `/admin/connections` | 반영을 기다리는 바인딩의 「반영 완료」. 재시작 대기 바인딩은 공유 gateway 를 재시작한 뒤 누른다 | `/connections` 아래의 관리자 패널 |
+| 외부 서비스 연결 | `/admin/connections` | 자동 반영이 실패했거나 24시간 넘게 남은 바인딩의 「다시 확인」. 재시작은 운영 정기 작업이 한다([플러그인 연결](connector.md)) | `/connections` 아래의 관리자 패널 |
 | 브라우저 | `/admin/browsers` | 모든 사용자 브라우저의 상태와 오류 코드, 끄기와 지우기 | 없음. `/browser` 는 내 브라우저만 보이고 오류 코드를 그리지 않는다 |
 | 파일 공간 | `/admin/workspaces` | 실행 공간마다 용량과 항목 수 | 없음. `/files` 는 내 공간만 보이고 관리자도 남의 공간을 열지 못한다 |
 | 서버 비밀값 | `/admin/secrets` | 서버 비밀값마다 입력됨 여부, 앞부분, 마지막 변경과 새로 만들기, 지우기. 원문은 보이지 않는다([`secret-store.md`](secret-store.md)) | 없음 |
@@ -183,8 +183,8 @@ profile 을 만드는 경로가 에이전트 만들기와 같아 MCP 등록과 �
 | --- | --- |
 | 설정이 빈 목록이다 | Hermes 를 부르지 않는다 |
 | 기본 도구가 이미 다 켜져 있다 | 쓰지 않는다 |
-| profile 이 실행 공간 정책에 없다 | plugin 이 409 `sandbox_unavailable` 로 거절하면 셸·파일·사진 도구를 빼고 다시 쓴다. 경고 로그를 남긴다. `image_gen` 은 기다리는 목록에 남아 관리자에게 알림이 가고, 운영이 정책에 등록하면 Control Plane 이 5분 안에 스스로 켠다. 나머지 셸·파일 도구는 관리자가 에이전트 도구 화면에서 켠다 |
-| 정책에 없는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. plugin 이 정책 밖 셸 저장을 거절한다. 경고 로그를 남긴다. 그 셸은 Control Plane 의 기동 작업이 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
+| 실행 공간 정책이 profile 에 적용되지 않는다(`default` profile 이거나, 목록에 없고 `isolate_unlisted` 가 꺼져 있다) | plugin 이 409 `sandbox_unavailable` 로 거절하면 셸·파일·사진 도구를 빼고 다시 쓴다. 경고 로그를 남긴다. `image_gen` 은 기다리는 목록에 남아 관리자에게 알림이 가고, 운영이 정책에 등록하거나 `isolate_unlisted` 를 켜면 Control Plane 이 5분 안에 스스로 켠다. 나머지 셸·파일 도구는 관리자가 에이전트 도구 화면에서 켠다 |
+| 정책이 적용되지 않는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. plugin 이 정책 밖 셸 저장을 거절한다. 경고 로그를 남긴다. 그 셸은 Control Plane 의 기동 작업이 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
 | Hermes 가 답하지 않거나 다른 오류로 거절한다 | 경고 로그만 남긴다. 로그인은 그대로 끝난다 |
 | 옛 plugin 이 `require_sandbox` 를 몰라 400 으로 거절한다 | 같다. 아무 도구도 켜지 않는다. plugin 을 먼저 배포한다 |
 

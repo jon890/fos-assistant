@@ -16,7 +16,7 @@
 | 스킬 경로 | manifest 의 `skills`(문자열이나 문자열 목록). 없으면 `./skills` 다. 플러그인 안의 링크 없는 디렉터리여야 한다 |
 | MCP 정의 | manifest 의 `mcpServers` 가 문자열이면 그 상대 경로의 파일, 없으면 root 의 `.mcp.json` 이다. manifest 안에 객체로 적은 정의는 받지 않는다 |
 | MCP 서버 수 | 하나다. 둘 이상이면 카탈로그에서 뺀다 |
-| 서버 정의 | 로컬 실행형(`command`, `args`, `env`, `type` 이 없거나 `stdio`)과 원격(`type: http`, `url`, `headers`)을 받는다. 원격의 규칙은 ADR-20261026 / remote-mcp-plugin 이 갖는다. `sse` 는 받지 않는다 |
+| 서버 정의 | 로컬 실행형(`command`, `args`, `env`, `type` 이 없거나 `stdio`)과 원격(`type: http`, `url`, `headers`)을 받는다. 원격의 규칙은 [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) 이 갖는다. `sse` 는 받지 않는다 |
 | assistant 전용 정보 | 플러그인 root 의 `assistant.json`. 칸과 검증은 지금의 `connector.json` 과 같다. 원격 플러그인만 `headers` 칸을 더 받는다 |
 | 옛 이름 | `assistant.json` 이 없으면 `connector.json` 을 같은 규칙으로 읽는다. 둘 다 있으면 카탈로그에서 뺀다 |
 | manifest 의 나머지 | `hooks`, `commands`, `agents`, Codex 의 `interface` 같은 칸과 디렉터리는 읽지 않고 설치하지 않는다. Hermes 에 옮겨 갈 자리가 없다 |
