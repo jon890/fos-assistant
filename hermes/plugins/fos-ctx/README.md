@@ -290,7 +290,7 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 - 후보 하나는 `MAX_LINK_CHARS`(2,048)자까지, 한 호출은 `MAX_LINKS`(2,000)개까지다. 같은 후보는 한 번만 보낸다
 - `web_extract` 는 비서가 인자 `urls` 에 적어 넣은 주소를 `typed` 로 따로 보낸다(`MAX_TYPED` 50개까지). 읽기 서비스에 따라 결과 항목의 `url` 이 넘어간 뒤의 최종 주소일 수 있어, Control Plane 이 적어 넣은 원래 주소도 찾은 주소에서 빼게 하려는 것이다
 - 뽑기만 한다. 같은 주소인지, 상대 주소를 어떻게 푸는지, 받아도 되는지는 Control Plane 이 정한다
-- **결과 글을 바꾸지 않는다.** hook 은 이 두 도구에서 늘 None 을 돌려준다. 알리지 못해도 도구 결과는 그대로 모델에게 간다. 주소와 결과 글은 로그에 남기지 않는다
+- `web_search`와 `web_extract`의 결과 글은 그대로 둔다. 주소와 결과 글은 로그에 남기지 않는다
 
 `POST <플러그인 정책 주소의 마지막 조각을 found-links 로 바꾼 주소>` 로 보낸다. 인증은 profile 토큰이고 제한 시간은 5초다.
 
@@ -301,6 +301,8 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 ```
 
 `_fos_ctx` 는 도구 이름 `found_links` 로 서명한다. 검색 결과처럼 기준 주소가 없으면 `base` 는 null 이다. `typed` 는 적어 넣은 주소가 있을 때만 붙는다.
+
+1.18.0부터 web toolset의 `product_page_read`로 상품 페이지를 한 번 읽고 사진 후보만 결과에 담는다. 결과 hook은 사진의 출처(`product`, `og`, `body`), 주소, 크기 점수(`size`)를 페이지의 선택 칸 `images`에 보내고, 주소를 `links`에도 담는다. 이동 전 주소인 `requested`는 `typed`로도 보낸다. 원본 HTML은 도구 결과와 Control Plane에 전달하지 않는다. 모델에 가는 결과의 사진 주소는 외부 데이터로 감싼다. 후보 형식과 받기는 [비서가 찾은 사진 기술 설계](../../../docs/features/agent-found-image/design.md)의 「상품 페이지에서 대표 사진 고르기」에 있다.
 
 | 응답 | fos-ctx 가 하는 일 |
 | --- | --- |

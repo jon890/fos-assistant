@@ -27,6 +27,10 @@ const LABELS: Record<string, Label> = {
     running: "웹 페이지를 읽고 있어요",
     done: "웹 페이지를 읽었어요",
   },
+  product_page_read: {
+    running: "상품 페이지를 읽고 있어요",
+    done: "상품 페이지를 읽었어요",
+  },
   artifact_write: {
     running: "결과물을 저장하고 있어요",
     done: "결과물을 저장했어요",

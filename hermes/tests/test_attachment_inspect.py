@@ -64,11 +64,11 @@ class AttachmentInspectTest(unittest.TestCase):
             def register_hook(self, *args):
                 pass
             def register_tool(self, **kwargs):
-                registered.update(kwargs)
+                registered[kwargs["name"]] = kwargs
         self.plugin.register(Context())
-        self.assertEqual(registered["name"], "attachment_inspect")
-        self.assertFalse(registered.get("override", False))
-        schema = registered["schema"]["parameters"]
+        tool = registered["attachment_inspect"]
+        self.assertFalse(tool.get("override", False))
+        schema = tool["schema"]["parameters"]
         self.assertNotIn("additionalProperties", schema)
         for field in ("_fos_ctx", "_fos_inspect"):
             self.assertNotIn(field, schema["properties"])
