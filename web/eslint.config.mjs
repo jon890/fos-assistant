@@ -19,6 +19,7 @@ const NODE_TEST_READ_FILES = [
   "src/lib/dev-docs/read.ts",
   "src/lib/dev-docs/source.ts",
   "src/lib/execution-tree-load.ts",
+  "src/lib/markdown-syntax.ts",
   "src/lib/mermaid.ts",
   "src/lib/push-device.ts",
   "src/lib/push-open.ts",
