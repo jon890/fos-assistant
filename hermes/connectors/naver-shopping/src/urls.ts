@@ -46,9 +46,13 @@ export function classifyUrl(
   return { kind: "external", url: url.href };
 }
 
-/** 검색 주소. 검색어 하나로 첫 페이지만 연다. 다음 페이지를 고르는 인자를 싣지 않는다. */
-export function searchUrl(query: string) {
-  return `https://search.shopping.naver.com/ns/search?query=${encodeURIComponent(query)}`;
+export const SEARCH_SORTS = ["LOW_PRICE", "HIGH_PRICE", "REVIEW"] as const;
+export type SearchSort = (typeof SEARCH_SORTS)[number];
+
+/** 검색 주소. 검색어와 선택한 정렬로 첫 페이지만 연다. */
+export function searchUrl(query: string, sort?: SearchSort) {
+  const url = `https://search.shopping.naver.com/ns/search?query=${encodeURIComponent(query)}`;
+  return sort === undefined ? url : `${url}&sort=${sort}`;
 }
 
 /** 네이버페이 결제 내역(2026-11-16 실측). 주문 확인이 여는 유일한 주소이고 모델이나 인자가 정하지 못한다. 첫 페이지만 연다. */
