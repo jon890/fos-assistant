@@ -7,6 +7,8 @@ export type Question = { id: string; category: string; messages: string[]; check
 /** 링크 하나를 열어 본 결과다. `unknown` 은 자동 요청을 막은 사이트라 열렸는지 모르는 것이다. */
 export type LinkState = "open" | "closed" | "unknown";
 export type ToolCounts = { search: number; searchFailed: number; extract: number; extractFailed: number };
+/** 도구 호출 수와 도구를 부른 차례 수다. 차례 하나는 모델 응답 한 번이 함께 부른 도구 묶음이다. */
+export type ToolRounds = { calls: number; rounds: number };
 export type Verdict = "similar" | "lacking";
 export type Comparison = { id: string; verdict: Verdict; note: string };
 export type QuestionScore = {
@@ -23,6 +25,8 @@ export type QuestionScore = {
   unknownLinks: number;
   latencyMs: number | null;
   tools: ToolCounts;
+  /** 도구 차례 칸이다. 칸이 생기기 전 보고서를 다시 쓴 문항에는 없다. */
+  rounds?: ToolRounds;
   /** 형식 참고 칸이다. 통과 판정에 쓰지 않는다. 칸이 생기기 전 보고서를 다시 쓴 문항에는 없다. */
   format?: FormatCheck;
 };
@@ -46,6 +50,11 @@ export type SetScore = {
   /** 형식 참고 칸을 하나라도 어긴 문항 수와 형식을 본 문항 수다. 통과 판정에 쓰지 않는다. */
   formatViolations: number;
   formatChecked: number;
+  /** 속도 참고 칸이다. 통과 판정에 쓰지 않는다. 걸린 시간을 아는 문항의 평균 초, 도구 호출과 차례의 합, 출처 링크의 합이다. */
+  averageSeconds: number | null;
+  toolCalls: number;
+  toolRounds: number;
+  sourceLinks: number;
   reasons: string[];
 };
 
@@ -226,6 +235,29 @@ export function toolCounts(root: ExecutionNode): ToolCounts {
   return counts;
 }
 
+/**
+ * 실행 트리 전체의 도구 호출 수와 차례 수를 센다. 실행마다 사건 순서대로 읽어, 끝 사건 없이 이어진 시작 사건을 한 차례로 센다.
+ * Hermes 는 한 응답이 함께 부른 도구를 동시에 돌려 시작 사건이 먼저 몰리고, 하나씩 부르면 시작과 끝이 번갈아 온다.
+ * 아주 빨리 끝난 도구가 묶음 중간에 끝 사건을 내면 한 차례가 둘로 세어질 수 있어 참고 값이다.
+ */
+export function toolRounds(root: ExecutionNode): ToolRounds {
+  const result: ToolRounds = { calls: 0, rounds: 0 };
+  const visit = (node: ExecutionNode) => {
+    let previousStarted = false;
+    for (const event of node.events) {
+      const started = event.eventType === "TOOL_STARTED";
+      if (started) {
+        result.calls++;
+        if (!previousStarted) result.rounds++;
+      }
+      if (started || event.eventType === "TOOL_COMPLETED") previousStarted = started;
+    }
+    node.children.forEach(visit);
+  };
+  visit(root);
+  return result;
+}
+
 /** HTTP 상태로 링크를 나눈다. 403 과 429 는 자동 요청을 막은 것이라 틀린 링크로 세지 않는다. 상태가 없으면 연결 실패나 시간 초과다. */
 export function linkState(status: number | null): LinkState {
   if (status === null) return "closed";
@@ -278,6 +310,7 @@ export function scoreQuestion(
     unknownLinks: states.filter((state) => state === "unknown").length,
     latencyMs: root?.latencyMs ?? null,
     tools: root ? toolCounts(root) : { search: 0, searchFailed: 0, extract: 0, extractFailed: 0 },
+    rounds: root ? toolRounds(root) : { calls: 0, rounds: 0 },
     format: formatCheck(answer),
   };
 }
@@ -333,6 +366,11 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
   const formatted = scores.filter((score) => score.format !== undefined);
   const formatViolations = formatted.filter((score) => violatesFormat(score.format!)).length;
   const errors = scores.filter((score) => score.error).length;
+  const timed = scores.filter((score) => score.latencyMs !== null);
+  const averageSeconds = timed.length === 0 ? null : timed.reduce((sum, score) => sum + score.latencyMs!, 0) / timed.length / 1000;
+  const toolCalls = scores.reduce((sum, score) => sum + (score.rounds?.calls ?? 0), 0);
+  const toolRoundCount = scores.reduce((sum, score) => sum + (score.rounds?.rounds ?? 0), 0);
+  const sourceLinkCount = scores.reduce((sum, score) => sum + score.sourceLinks, 0);
   let outcome: SetOutcome;
   if (errors > 0) {
     outcome = "ERROR";
@@ -355,6 +393,10 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
     compareTotal: compareIds.size,
     formatViolations,
     formatChecked: formatted.length,
+    averageSeconds,
+    toolCalls,
+    toolRounds: toolRoundCount,
+    sourceLinks: sourceLinkCount,
     reasons,
   };
 }
@@ -372,6 +414,10 @@ const OUTCOME_TEXT: Record<SetOutcome, string> = {
   FAIL: "기준 미달",
   ERROR: "오류",
 };
+
+function perRound(calls: number, rounds: number): string {
+  return rounds === 0 ? "-" : (calls / rounds).toFixed(2);
+}
 
 function seconds(latencyMs: number | null): string {
   return latencyMs === null ? "-" : `${Math.round(latencyMs / 1000)}초`;
@@ -392,13 +438,14 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     `- 사람 비교: 「비슷하다」 ${set.similar}/${set.compareTotal} (적은 것 ${set.compared}개)`,
     ...set.reasons.map((reason) => `- ${set.outcome === "PARTIAL" ? "참고" : "미달"}: ${reason}`),
     `- 형식 참고(통과 기준 아님): 어긴 문항 ${set.formatViolations}/${set.formatChecked}`,
+    `- 속도 참고(통과 기준 아님): 평균 걸린 시간 ${set.averageSeconds === null ? "-" : `${Math.round(set.averageSeconds)}초`}, 도구 ${set.toolCalls}번을 ${set.toolRounds}차례에 불렀다(차례당 ${perRound(set.toolCalls, set.toolRounds)}개), 출처 링크 합 ${set.sourceLinks}개`,
     "",
-    "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) | 도구 차례(호출) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...scores.map((score) => {
       const result = score.error ? `오류: ${score.error}` : score.passed ? "통과" : "미달";
       const tools = score.tools;
-      return `| ${score.id} | ${score.category} | ${score.check} | ${result} | ${score.sourceLinks} | ${score.openLinks} | ${score.closedLinks} | ${score.unknownLinks} | ${seconds(score.latencyMs)} | ${tools.search}(${tools.searchFailed}) | ${tools.extract}(${tools.extractFailed}) |`;
+      return `| ${score.id} | ${score.category} | ${score.check} | ${result} | ${score.sourceLinks} | ${score.openLinks} | ${score.closedLinks} | ${score.unknownLinks} | ${seconds(score.latencyMs)} | ${tools.search}(${tools.searchFailed}) | ${tools.extract}(${tools.extractFailed}) | ${score.rounds ? `${score.rounds.rounds}(${score.rounds.calls})` : "-"} |`;
     }),
     "",
     "## 형식 참고",
