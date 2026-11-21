@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { describeFailure } from "@/components/error-message";
+import { describeError, describeFailure } from "@/components/error-message";
 import {
   currentSubscription,
   deleteCurrentPushDevice,
@@ -44,6 +44,11 @@ export type PushSettingsView =
 const KEY_CHANGED = "PUSH_KEY_CHANGED";
 /** 등록이 이 코드로 거절되면 서버에 키가 없다 */
 const NOT_CONFIGURED = "PUSH_NOT_CONFIGURED";
+
+const REGISTRATION_FAILED =
+  "이 기기를 등록하지 못했어요. 잠시 뒤 다시 눌러 주세요.";
+const REGISTRATION_REJECTED =
+  "이 기기를 등록하지 못했어요. 다른 브라우저에서 다시 시도하거나 관리자에게 알려 주세요.";
 
 /** 푸시 서비스에 닿지 못해 구독이 끝나지 않을 때의 안내다 */
 export const SUBSCRIBE_TIMEOUT_MESSAGE =
@@ -120,7 +125,7 @@ async function readViewOnce(): Promise<ReadResult> {
 
 async function readErrorCode(response: Response): Promise<string | null> {
   try {
-    const body = (await response.clone().json()) as { code?: unknown };
+    const body = (await response.json()) as { code?: unknown };
     return typeof body.code === "string" ? body.code : null;
   } catch {
     return null;
@@ -176,22 +181,27 @@ export function usePushSettings() {
           await subscription.unsubscribe();
           const refreshed = await fetchPushConfig();
           if (!refreshed.ok) {
-            setActionError(await describeFailure(refreshed));
+            setActionError(
+              describeError(
+                (await readErrorCode(refreshed)) ?? "",
+                REGISTRATION_FAILED,
+              ),
+            );
             return;
           }
           config.current = (await refreshed.json()) as PushConfig;
           continue;
         }
         if (code === NOT_CONFIGURED) return;
-        setActionError(await describeFailure(response));
+        const fallback =
+          response.status === 400 ? REGISTRATION_REJECTED : REGISTRATION_FAILED;
+        setActionError(describeError(code ?? "", fallback));
         return;
       }
     } catch (error) {
       const timedOut = error instanceof PushSubscribeTimeoutError;
       setActionError(
-        timedOut
-          ? SUBSCRIBE_TIMEOUT_MESSAGE
-          : "이 기기를 등록하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
+        timedOut ? SUBSCRIBE_TIMEOUT_MESSAGE : REGISTRATION_FAILED,
       );
       // 시간 초과 뒤 다시 읽기가 멈춰도 단추는 바로 되살린다.
       if (timedOut) setBusy(false);
