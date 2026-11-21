@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -177,7 +178,7 @@ class RecoveredRunRecorderTest {
         row.beginEventObservation();
         executions.save(row);
 
-        assertThat(recorder.settle(row.id(), result("completed", "복구한 답"))).isTrue();
+        assertThat(recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "복구한 답")))).isTrue();
 
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
         assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
@@ -200,7 +201,7 @@ class RecoveredRunRecorderTest {
             .occurredAt(Instant.now())
             .build());
 
-        boolean written = recorder.settle(row.id(), result("completed", "끝난 답"));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "끝난 답")));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
@@ -238,8 +239,8 @@ class RecoveredRunRecorderTest {
         conversations.save(conversation);
         AgentExecution row = chatTurn(conversation, worker);
 
-        assertThat(recorder.settle(row.id(), result("completed", "맡은 답"))).isTrue();
-        assertThat(recorder.settle(chatTurn(conversation, worker).id(), result("cancelled", "멈춘 답"))).isTrue();
+        assertThat(recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "맡은 답")))).isTrue();
+        assertThat(recorder.settle(chatTurn(conversation, worker).id(), TestAgentRuntimes.result(result("cancelled", "멈춘 답")))).isTrue();
 
         assertThat(conversations.findById(conversation.id()).orElseThrow().hermesSessionId())
             .isEqualTo("fos-conversation");
@@ -253,11 +254,11 @@ class RecoveredRunRecorderTest {
     @DisplayName("같은 실행을 한 번 더 적으려 하면 거짓이고 메시지와 사건과 끝난 시각이 그대로다")
     void settlingTwiceWritesOnlyOnce() {
         AgentExecution row = chatTurn(conversation, chief);
-        recorder.settle(row.id(), result("completed", "끝난 답"));
+        recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "끝난 답")));
         Instant finishedAt = executions.findById(row.id()).orElseThrow().finishedAt();
         received.clear();
 
-        boolean again = recorder.settle(row.id(), result("completed", "다른 답"));
+        boolean again = recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "다른 답")));
 
         assertThat(again).as("이미 끝난 줄").isFalse();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
@@ -276,7 +277,7 @@ class RecoveredRunRecorderTest {
     void failedChatTurnKeepsUsageWithoutMessageAndPublishesError() {
         AgentExecution row = chatTurn(conversation, chief);
 
-        boolean written = recorder.settle(row.id(), result("failed", null));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("failed", null)));
 
         assertThat(written).isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
@@ -298,7 +299,7 @@ class RecoveredRunRecorderTest {
     void cancelledChatTurnKeepsPartialAnswerAndPublishesStopped() {
         AgentExecution row = chatTurn(conversation, chief);
 
-        boolean written = recorder.settle(row.id(), result("cancelled", "일부 답"));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("cancelled", "일부 답")));
 
         assertThat(written).isTrue();
         assertThat(executions.findById(row.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
@@ -317,7 +318,7 @@ class RecoveredRunRecorderTest {
     void cancelledChatTurnWithoutAnswerSavesNoMessage() {
         AgentExecution row = chatTurn(conversation, chief);
 
-        boolean written = recorder.settle(row.id(), result("cancelled", ""));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("cancelled", "")));
 
         assertThat(written).isTrue();
         assertThat(executions.findById(row.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
@@ -339,7 +340,7 @@ class RecoveredRunRecorderTest {
         // 커널의 파일 시각이 JVM 시계보다 늦게 갈 수 있어 수정 시각을 못 박는다.
         Files.setLastModifiedTime(file, FileTime.from(Instant.now()));
 
-        recorder.settle(row.id(), result("completed", "만들었어요"));
+        recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "만들었어요")));
 
         ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(artifactRows.findByMessageId(answer.id()))
@@ -357,11 +358,11 @@ class RecoveredRunRecorderTest {
         Files.createDirectories(folder);
         Files.writeString(done, "<!doctype html><p>완성</p>");
         Files.setLastModifiedTime(done, FileTime.from(Instant.now()));
-        recorder.settle(chatTurn(conversation, chief).id(), result("completed", "만들었어요"));
+        recorder.settle(chatTurn(conversation, chief).id(), TestAgentRuntimes.result(result("completed", "만들었어요")));
         Path stopped = folder.resolve("stopped.html");
         Files.writeString(stopped, "<!doctype html><p>멈춤</p>");
         Files.setLastModifiedTime(stopped, FileTime.from(Instant.now().plusSeconds(1)));
-        recorder.settle(chatTurn(conversation, chief).id(), result("cancelled", "일부 답"));
+        recorder.settle(chatTurn(conversation, chief).id(), TestAgentRuntimes.result(result("cancelled", "일부 답")));
         backgroundTasks.awaitIdle(Duration.ofSeconds(20));
 
         List<ChatMessage> answers = messages.findByConversationIdOrderByIdAsc(conversation.id());
@@ -386,7 +387,7 @@ class RecoveredRunRecorderTest {
         ChatMessage previous = messages.save(ChatMessage.fromAssistant(conversation.id(), "앞 답", null, Instant.now()));
         AgentExecution row = chatTurn(conversation, chief);
 
-        recorder.settle(row.id(), result("completed", "새 답"));
+        recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "새 답")));
 
         ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(answer.content()).isEqualTo("새 답");
@@ -400,7 +401,7 @@ class RecoveredRunRecorderTest {
     void completedDelegationRecordsOutputAndPublishesFinished() {
         AgentExecution row = delegated();
 
-        boolean written = recorder.settle(row.id(), result("completed", "조사 결과"));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "조사 결과")));
 
         assertThat(written).isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
@@ -429,8 +430,8 @@ class RecoveredRunRecorderTest {
         AgentExecution exact = delegated();
         AgentExecution longer = delegated();
 
-        recorder.settle(exact.id(), result("completed", atLimit));
-        recorder.settle(longer.id(), result("completed", atLimit + "나"));
+        recorder.settle(exact.id(), TestAgentRuntimes.result(result("completed", atLimit)));
+        recorder.settle(longer.id(), TestAgentRuntimes.result(result("completed", atLimit + "나")));
 
         assertThat(outputs.open(executions.findById(exact.id()).orElseThrow()))
             .as("상한과 같은 길이")
@@ -448,8 +449,8 @@ class RecoveredRunRecorderTest {
         AgentExecution failed = auxiliary();
         assertThat(recorder.kindOf(completed)).isEqualTo(RecoveredRunKind.AUXILIARY);
 
-        recorder.settle(completed.id(), result("completed", "쓰지 않는 답"));
-        recorder.settle(failed.id(), result("failed", null));
+        recorder.settle(completed.id(), TestAgentRuntimes.result(result("completed", "쓰지 않는 답")));
+        recorder.settle(failed.id(), TestAgentRuntimes.result(result("failed", null)));
 
         AgentExecution saved = executions.findById(completed.id()).orElseThrow();
         assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
@@ -503,7 +504,7 @@ class RecoveredRunRecorderTest {
             .timing(Instant.parse("2026-09-30T00:00:00Z"), Instant.parse("2026-09-30T00:01:00Z"))
             .build());
 
-        boolean written = recorder.settle(row.id(), result("failed", null));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("failed", null)));
 
         assertThat(written).isFalse();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
@@ -522,7 +523,7 @@ class RecoveredRunRecorderTest {
         AgentExecution row = chatTurn(conversation, chief);
         agents.deleteById(chief.id());
 
-        boolean written = recorder.settle(row.id(), result("completed", "끝난 답"));
+        boolean written = recorder.settle(row.id(), TestAgentRuntimes.result(result("completed", "끝난 답")));
 
         assertThat(written).isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();

@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.subagent.application;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -98,7 +99,7 @@ class SubagentUsageSchedulingTest {
             invocation.getArgument(1, Runnable.class).run();
             return null;
         }).when(background).start(any(), any());
-        reconciler = new SubagentUsageReconciler(executions, events, jobs, agentService, hermes,
+        reconciler = new SubagentUsageReconciler(executions, events, jobs, agentService, TestAgentRuntimes.hermes(hermes),
             mock(ProfileModelDefaultsClient.class), providers, estimator, manager, clock, background);
         when(hermes.readSubagentUsage(any(), any(), any())).thenReturn(usage(null, "anthropic"));
     }

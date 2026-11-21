@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.turn.application.TurnRunRef;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.RunningDelegationQueries;
 import java.util.Optional;
@@ -31,7 +31,7 @@ public class SteerService {
 
     private final SteerProperties properties;
     private final TurnCancellation turns;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final SteerLedger ledger;
     private final RunningDelegationQueries delegations;
 
@@ -70,7 +70,7 @@ public class SteerService {
             Long executionId = handle.getExecutionId();
             SteerOutcome outcome;
             try {
-                outcome = hermes.steer(run.getApiBaseUrl(), run.getProfileName(), run.getRunId(), text);
+                outcome = runtimes.of(run.getTarget()).steer(run.getTarget(), run.getRunId(), text);
             } catch (RuntimeException ex) {
                 // 보내기 전에 실패했다(profile key 를 읽지 못함 등). 「끼우는 중」 이 남으면 그 대화의 다음 turn 이 막힌다.
                 log.warn("끼우기를 보내지 못해 대기열로 둔다 conversationId={}", conversation.id(), ex);

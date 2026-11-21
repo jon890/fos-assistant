@@ -12,9 +12,9 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunCommand;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
@@ -75,7 +75,7 @@ public class StarterSuggestionService {
     private final AgentService agents;
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ExecutionRecorder executions;
     private final ModelTierService modelTiers;
     private final ObjectMapper objectMapper;
@@ -103,7 +103,7 @@ public class StarterSuggestionService {
         AgentService agents,
         ConversationRepository conversations,
         ChatMessageRepository messages,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ExecutionRecorder executions,
         ModelTierService modelTiers,
         ObjectMapper objectMapper,
@@ -114,7 +114,7 @@ public class StarterSuggestionService {
             agents,
             conversations,
             messages,
-            hermes,
+            runtimes,
             executions,
             modelTiers,
             objectMapper,
@@ -130,7 +130,7 @@ public class StarterSuggestionService {
         AgentService agents,
         ConversationRepository conversations,
         ChatMessageRepository messages,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ExecutionRecorder executions,
         ModelTierService modelTiers,
         ObjectMapper objectMapper,
@@ -141,7 +141,7 @@ public class StarterSuggestionService {
         this.agents = agents;
         this.conversations = conversations;
         this.messages = messages;
-        this.hermes = hermes;
+        this.runtimes = runtimes;
         this.executions = executions;
         this.modelTiers = modelTiers;
         this.objectMapper = objectMapper;
@@ -255,18 +255,17 @@ public class StarterSuggestionService {
             // 실행 줄을 먼저 만들고 숨김을 판정한다. 거절해도 그 오류 코드로 실패한 줄이 남는다.
             modelTiers.requireRunnable(user, agent, choice);
             // 대화가 없는 실행이라 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 모델을 싣지 않아 profile 의 값이다.
-            HermesRunCommand command = new HermesRunCommand(
-                agent.hermesProfile(),
-                agent.apiBaseUrl(),
+            RunCommand command = new RunCommand(
+                agent.runtimeTarget(),
                 input,
                 null,
                 null,
                 choice.provider(),
                 choice.model(),
                 choice.reasoningEffort());
-            runId = hermes.submit(command);
+            runId = runtimes.of(command.target()).submit(command);
             executions.attachRunId(execution, runId);
-            HermesRunResult result = hermes.awaitCompletion(command, runId);
+            RunResult result = runtimes.of(command.target()).awaitCompletion(command, runId);
             awaited = true;
             if (!result.succeeded()) {
                 executions.fail(
@@ -303,7 +302,7 @@ public class StarterSuggestionService {
             if (runId != null && !awaited) {
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                    user.id(), execution.id(), agent.runtimeTarget(), runId, false);
             }
             if (execution != null) {
                 failQuietly(execution, errorCode(ex));
@@ -446,8 +445,8 @@ public class StarterSuggestionService {
     }
 
 
-    private static String statusOf(HermesRunResult result) {
-        return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    private static String statusOf(RunResult result) {
+        return result.statusLabel() == null ? "UNKNOWN" : result.statusLabel().toUpperCase();
     }
 
 

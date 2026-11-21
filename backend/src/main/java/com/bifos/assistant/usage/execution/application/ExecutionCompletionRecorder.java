@@ -2,8 +2,8 @@ package com.bifos.assistant.usage.execution.application;
 
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
@@ -26,7 +26,7 @@ public class ExecutionCompletionRecorder {
     private final Clock clock;
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ExecutionOutputs outputs;
 
 
@@ -40,7 +40,7 @@ public class ExecutionCompletionRecorder {
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution complete(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested) {
         return complete(execution, agent, result, requested, null);
     }
 
@@ -54,7 +54,7 @@ public class ExecutionCompletionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution complete(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String outputText) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
         SessionRuntime served = served(agent, result, requested);
         String provider = served.provider();
@@ -76,7 +76,7 @@ public class ExecutionCompletionRecorder {
 
     /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
     public AgentExecution fail(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String errorCode) {
         if (result == null) {
             return fail(execution, errorCode);
         }
@@ -97,7 +97,7 @@ public class ExecutionCompletionRecorder {
 
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
-    public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+    public AgentExecution cancel(AgentExecution execution, Agent agent, RunResult result, ModelChoice requested) {
         return cancel(execution, agent, result, requested, null);
     }
 
@@ -111,7 +111,7 @@ public class ExecutionCompletionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution cancel(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String outputText) {
         if (result == null) {
             return cancel(execution);
         }
@@ -140,7 +140,7 @@ public class ExecutionCompletionRecorder {
      * <p>v0.21.5 실행 조회의 {@code runtime} 에 둘 다 있으면 그 짝을 통째로 쓴다. 출처가 다른 두 값을 한 짝으로
      * 적으면 금액도 틀린 짝으로 계산된다. 없으면 세션 조회, {@code runtime}, 대화가 고른 값 순서로 칸마다 채운다.
      */
-    private SessionRuntime served(Agent agent, HermesRunResult result, ModelChoice requested) {
+    private SessionRuntime served(Agent agent, RunResult result, ModelChoice requested) {
         SessionRuntime runtime = result.runtime();
         if (runtime != null && !isBlank(runtime.provider()) && !isBlank(runtime.model())) {
             return runtime;
@@ -162,11 +162,11 @@ public class ExecutionCompletionRecorder {
     }
 
 
-    private SessionRuntime readActualRuntime(Agent agent, HermesRunResult result) {
-        SessionRuntime actual = hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
+    private SessionRuntime readActualRuntime(Agent agent, RunResult result) {
+        SessionRuntime actual = runtimes.of(agent.runtimeTarget()).readSessionRuntime(agent.runtimeTarget(), result.sessionId());
         if (actual == null) {
             log.info(
-                "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.hermesProfile(), result.sessionId());
+                "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.runtimeTarget().unit(), result.sessionId());
         }
         return actual;
     }

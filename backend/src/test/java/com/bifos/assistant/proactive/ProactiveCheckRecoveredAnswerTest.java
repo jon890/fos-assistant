@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -126,7 +127,7 @@ class ProactiveCheckRecoveredAnswerTest {
     void leavesOnlyFailedNoticeForRecoveredCheckTurn() {
         AgentExecution root = checkRoot();
 
-        boolean written = recorder.settle(root.id(), ended("completed", CHECK_ANSWER));
+        boolean written = recorder.settle(root.id(), TestAgentRuntimes.result(ended("completed", CHECK_ANSWER)));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
@@ -145,7 +146,7 @@ class ProactiveCheckRecoveredAnswerTest {
     void leavesOnlyStoppedNoticeForCancelledCheckTurn() {
         AgentExecution root = checkRoot();
 
-        boolean written = recorder.settle(root.id(), ended("cancelled", CHECK_ANSWER));
+        boolean written = recorder.settle(root.id(), TestAgentRuntimes.result(ended("cancelled", CHECK_ANSWER)));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
@@ -160,7 +161,7 @@ class ProactiveCheckRecoveredAnswerTest {
     void leavesStoppedNoticeForCancelledCheckTurnWithoutAnswer() {
         AgentExecution root = checkRoot();
 
-        recorder.settle(root.id(), ended("cancelled", ""));
+        recorder.settle(root.id(), TestAgentRuntimes.result(ended("cancelled", "")));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
             .extracting(ChatMessage::role, ChatMessage::content)
@@ -179,7 +180,7 @@ class ProactiveCheckRecoveredAnswerTest {
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), "이 공고를 더 알려 줘", STARTED.plusSeconds(120)));
         AgentExecution ordinary = turn();
 
-        boolean written = recorder.settle(ordinary.id(), ended("completed", "공고의 요구 조건은 이렇다"));
+        boolean written = recorder.settle(ordinary.id(), TestAgentRuntimes.result(ended("completed", "공고의 요구 조건은 이렇다")));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))

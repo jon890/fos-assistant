@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -159,7 +160,7 @@ class ExecutionOutputEncryptionTest {
     private AgentExecution finishedWith(String answer) {
         AgentExecution execution = recorder.start(
             user(owner), conversation.executionConversation(), agent(owner), null, null, 0L);
-        recorder.complete(execution, agent(owner), result(), new ModelChoice("anthropic", "example-model-large", null), answer);
+        recorder.complete(execution, agent(owner), TestAgentRuntimes.result(result()), new ModelChoice("anthropic", "example-model-large", null), answer);
         return execution;
     }
 

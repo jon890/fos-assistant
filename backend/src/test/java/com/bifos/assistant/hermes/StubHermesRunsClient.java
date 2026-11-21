@@ -42,6 +42,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile Runnable beforeAwait = () -> {
     };
     private final List<String> stopped = new CopyOnWriteArrayList<>();
+    /** 중지와 조회가 받은 profile 이다. run 번호로 찾는다. 저장된 profile 로 가는지 볼 때 쓴다. */
+    private final Map<String, String> stoppedProfiles = new ConcurrentHashMap<>();
+    private final Map<String, String> lookupProfiles = new ConcurrentHashMap<>();
     /** {@link #releaseIfLost} 로 받은 run 번호. 잃은 실행 미리 풀기가 무엇을 넘겼는지 본다. */
     private final List<String> released = new CopyOnWriteArrayList<>();
     private RuntimeException releaseFailure;
@@ -224,6 +227,18 @@ public class StubHermesRunsClient implements HermesRunsClient {
     }
 
 
+    /** 그 run 의 중지가 받은 profile 이다. 중지를 받지 않았으면 null 이다. */
+    public String stoppedProfile(String runId) {
+        return stoppedProfiles.get(runId);
+    }
+
+
+    /** 그 run 의 마지막 조회가 받은 profile 이다. 조회를 받지 않았으면 null 이다. */
+    public String lookupProfile(String runId) {
+        return lookupProfiles.get(runId);
+    }
+
+
     public void reset() {
         received.clear();
         nextResult = null;
@@ -242,6 +257,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         deletedSessions.clear();
         sessionDeleteFailure = null;
         stopped.clear();
+        stoppedProfiles.clear();
+        lookupProfiles.clear();
         released.clear();
         releaseFailure = null;
         onStop = runId -> {
@@ -287,6 +304,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
+        stoppedProfiles.put(runId, profileName);
         stopped.add(runId);
         onStop.accept(runId);
     }
@@ -305,6 +323,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
+        lookupProfiles.put(runId, profileName);
         lookups.add(runId);
         LookupFailure failure = lookupFailures.get(runId);
         if (failure != null && failure.remaining().getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {

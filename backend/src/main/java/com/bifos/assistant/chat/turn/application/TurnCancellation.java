@@ -1,9 +1,10 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.chat.turn.application.dto.TurnMark;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -34,7 +35,7 @@ import org.springframework.stereotype.Component;
 public class TurnCancellation {
     private final ConcurrentHashMap<Long, TurnHandle> byConversation = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TurnHandle> byExecution = new ConcurrentHashMap<>();
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
     private final List<Consumer<TurnClosed>> closeListeners = new CopyOnWriteArrayList<>();
@@ -43,11 +44,11 @@ public class TurnCancellation {
 
 
     public TurnCancellation(
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace,
         UserExecutionLimiter limiter,
         BackgroundTasks backgroundTasks) {
-        this.hermes = hermes;
+        this.runtimes = runtimes;
         this.streamGrace = streamGrace;
         this.limiter = limiter;
         this.backgroundTasks = backgroundTasks;
@@ -190,12 +191,12 @@ public class TurnCancellation {
 
 
     /** 이 turn 의 루트 run 을 적는다. 중지 대상으로도 적는다. */
-    public boolean trackRootRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
+    public boolean trackRootRun(Long executionId, RuntimeTarget target, String runId) {
         TurnHandle handle = byExecution.get(executionId);
         if (handle != null) {
-            handle.rootRun = new TurnRunRef(apiBaseUrl, profileName, runId);
+            handle.rootRun = new TurnRunRef(target, runId);
         }
-        return trackRun(executionId, apiBaseUrl, profileName, runId);
+        return trackRun(executionId, target, runId);
     }
 
 
@@ -336,7 +337,7 @@ public class TurnCancellation {
     }
 
 
-    public boolean trackRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
+    public boolean trackRun(Long executionId, RuntimeTarget target, String runId) {
         TurnHandle handle = byExecution.get(executionId);
         if (handle == null) {
             return true;
@@ -348,7 +349,7 @@ public class TurnCancellation {
                 .findFirst()
                 .orElse(null);
             if (run == null) {
-                run = new TurnRunRef(apiBaseUrl, profileName, runId);
+                run = new TurnRunRef(target, runId);
                 handle.runs.add(run);
             }
         }
@@ -386,7 +387,7 @@ public class TurnCancellation {
                 return true;
             }
             try {
-                hermes.stop(run.apiBaseUrl, run.profileName, run.runId);
+                runtimes.of(run.target).stop(run.target, run.runId);
                 run.stopSent.set(true);
                 return true;
             } catch (RuntimeException ex) {

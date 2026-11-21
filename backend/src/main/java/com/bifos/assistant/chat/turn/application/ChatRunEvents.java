@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
@@ -7,11 +8,10 @@ import com.bifos.assistant.chat.turn.application.port.CheckTurn;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.infra.HermesRunEventStream;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.application.dto.RunResult;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -24,8 +24,6 @@ import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
-import java.util.Set;
-import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -39,14 +37,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 class ChatRunEvents {
-    private static final Set<String> TERMINAL_EVENTS = Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
     private final ConnectorToolNames connectorToolNames;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final LostRunRelease lostRunRelease;
-    private final HermesRunEventStream eventStream;
     private final LiveProperties<HermesProperties> hermesProperties;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
@@ -61,13 +57,12 @@ class ChatRunEvents {
             executions.markSubmitted(pending.execution());
             executions.beginEventObservation(pending.execution());
             lostRunRelease.beforeSubmit(pending.command());
-            String runId = hermes.submit(pending.command());
+            String runId = runtimes.of(pending.command().target()).submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
             turns.trackRootRun(
                 pending.execution().id(),
-                pending.command().apiBaseUrl(),
-                pending.command().profileName(),
+                pending.command().target(),
                 runId);
             return runId;
         } catch (ApiException ex) {
@@ -94,14 +89,13 @@ class ChatRunEvents {
                 at -> connectorCalls.calledBefore(pending.execution().treeRootId(), at));
         backgroundTasks.start("turn-event-stream-" + runId, () -> {
             try {
-                eventStream.open(
-                    pending.command().apiBaseUrl(),
-                    pending.command().profileName(),
+                runtimes.of(pending.command().target()).openEvents(
+                    pending.command().target(),
                     runId,
                     event -> {
                         synchronized (pending) {
                             if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
-                                if (TERMINAL_EVENTS.contains(event.type())) {
+                                if (event.kind().terminal()) {
                                     terminalSeen.set(true);
                                 }
                                 countSubagent(handle, event);
@@ -156,16 +150,15 @@ class ChatRunEvents {
     }
 
 
-    HermesRunResult awaitCompletion(PendingTurn pending, String runId) {
+    RunResult awaitCompletion(PendingTurn pending, String runId) {
         try {
-            return hermes.awaitCompletion(pending.command(), runId);
+            return runtimes.of(pending.command().target()).awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
                 pending.user().id(),
                 pending.execution().id(),
-                pending.command().apiBaseUrl(),
-                pending.command().profileName(),
+                pending.command().target(),
                 runId,
                 false);
             executions.fail(pending.execution(), ex.code().name());
@@ -176,11 +169,11 @@ class ChatRunEvents {
 
 
     /** 스트림으로 온 사건을 화면으로 중계하면서 우리 이름으로도 옮겨 적는다. */
-    void forward(PendingTurn pending, HermesRunEvent event, Consumer<ChatEvent> onEvent) {
+    void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
         append(pending, event);
-        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
+        RunEventKind kind = event.kind();
         CheckTurn check = pending.intent() instanceof TurnIntent.ProactiveCheck proactive ? proactive.check() : null;
-        if ("message.delta".equals(type) && event.text() != null) {
+        if (kind == RunEventKind.MESSAGE_DELTA && event.text() != null) {
             executions.markFirstDelta(pending.execution());
             synchronized (pending) {
                 pending.streamed().append(event.text());
@@ -189,7 +182,7 @@ class ChatRunEvents {
                     onEvent.accept(ChatEvent.delta(event.text()));
                 }
             }
-        } else if ("message.interim".equals(type)) {
+        } else if (kind == RunEventKind.MESSAGE_INTERIM) {
             synchronized (pending) {
                 int length = Boolean.TRUE.equals(event.alreadyStreamed()) && event.streamedPrefixLength() != null
                     ? event.streamedPrefixLength() : 0;
@@ -203,17 +196,17 @@ class ChatRunEvents {
                     onEvent.accept(ChatEvent.interim(event.text(), event.alreadyStreamed(), length, event.interimId()));
                 }
             }
-        } else if ("tool.started".equals(type)) {
+        } else if (kind == RunEventKind.TOOL_STARTED) {
             onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null,
                 connectorToolNames.nameOf(event.toolName())));
             if (check != null) {
                 check.toolStarted(pending.execution().id());
             }
-        } else if ("tool.completed".equals(type)) {
+        } else if (kind == RunEventKind.TOOL_COMPLETED) {
             onEvent.accept(ChatEvent.tool(
                 event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed(),
                 connectorToolNames.nameOf(event.toolName())));
-        } else if ("subagent.start".equals(type)) {
+        } else if (kind == RunEventKind.SUBAGENT_STARTED) {
             onEvent.accept(ChatEvent.subagent(
                 event.subagentId(),
                 event.goal() == null ? event.detail() : event.goal(),
@@ -223,7 +216,7 @@ class ChatRunEvents {
                 null,
                 null,
                 null));
-        } else if ("subagent.complete".equals(type)) {
+        } else if (kind == RunEventKind.SUBAGENT_COMPLETED) {
             onEvent.accept(ChatEvent.subagent(
                 event.subagentId(),
                 event.goal() == null ? event.detail() : event.goal(),
@@ -238,11 +231,10 @@ class ChatRunEvents {
 
 
     /** 도는 하위 에이전트의 수를 센다. steer 말풍선이 자식 안내를 붙일지 정하는 데 쓴다(ADR-20261116 / run-steer). */
-    private void countSubagent(TurnHandle handle, HermesRunEvent event) {
-        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
-        if ("subagent.start".equals(type)) {
+    private void countSubagent(TurnHandle handle, RunEvent event) {
+        if (event.kind() == RunEventKind.SUBAGENT_STARTED) {
             turns.subagentStarted(handle);
-        } else if ("subagent.complete".equals(type)) {
+        } else if (event.kind() == RunEventKind.SUBAGENT_COMPLETED) {
             turns.subagentCompleted(handle);
         }
     }
@@ -253,7 +245,7 @@ class ChatRunEvents {
     }
 
 
-    void append(PendingTurn pending, HermesRunEvent event) {
+    void append(PendingTurn pending, RunEvent event) {
         store(pending, sequence -> eventRecorder.record(pending.execution(), event, sequence));
     }
 

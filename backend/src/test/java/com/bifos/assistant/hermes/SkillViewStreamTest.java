@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
@@ -190,7 +191,7 @@ class SkillViewStreamTest {
             .build());
         int sequence = 1;
         for (HermesRunEvent event : events) {
-            ExecutionEvent stored = recorder.record(execution, event, sequence);
+            ExecutionEvent stored = recorder.record(execution, TestAgentRuntimes.event(event), sequence);
             if (stored != null) {
                 executionEvents.save(stored);
                 sequence++;

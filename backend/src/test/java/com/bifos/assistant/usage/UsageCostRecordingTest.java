@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -113,7 +114,7 @@ class UsageCostRecordingTest {
         AgentExecution execution = recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         HermesRunResult result = failedRun(new TokenUsage(1_000L, cached, 500L, 1_500L), provider, model);
 
-        AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
+        AgentExecution failed = recorder.fail(execution, agent, TestAgentRuntimes.result(result), requested(agent), "FAILED");
         AgentExecution stored = executions.findById(failed.id()).orElseThrow();
 
         assertThat(stored.status()).isEqualTo(ExecutionStatus.FAILED);
@@ -142,7 +143,7 @@ class UsageCostRecordingTest {
         AgentExecution failed = recorder.fail(
             execution,
             agent,
-            failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), "openai", UNPRICED_MODEL),
+            TestAgentRuntimes.result(failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), "openai", UNPRICED_MODEL)),
             requested(agent),
             "PROVIDER_BLOCKED");
 
@@ -162,7 +163,7 @@ class UsageCostRecordingTest {
         Agent agent = apiAgent();
         AgentExecution execution = recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
 
-        AgentExecution failed = recorder.fail(execution, agent, failedRun(null, "openai", PRICED_MODEL), requested(agent), "FAILED");
+        AgentExecution failed = recorder.fail(execution, agent, TestAgentRuntimes.result(failedRun(null, "openai", PRICED_MODEL)), requested(agent), "FAILED");
 
         assertThat(failed.inputTokens()).isNull();
         assertThat(failed.cachedInputTokens()).isNull();
@@ -183,7 +184,7 @@ class UsageCostRecordingTest {
         AgentExecution failed = recorder.fail(
             execution,
             agent,
-            failedRun(new TokenUsage(null, null, null, 1_500L), "openai", PRICED_MODEL),
+            TestAgentRuntimes.result(failedRun(new TokenUsage(null, null, null, 1_500L), "openai", PRICED_MODEL)),
             requested(agent),
             "FAILED");
 
@@ -211,7 +212,7 @@ class UsageCostRecordingTest {
             "tool failed",
             new TokenUsage(1_000L, null, 500L, 1_500L));
 
-        AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
+        AgentExecution failed = recorder.fail(execution, agent, TestAgentRuntimes.result(result), requested(agent), "FAILED");
 
         assertThat(hermes.sessionLookups())
             .as("그 에이전트의 주소와 profile 로 실제 모델을 물은 세션")
@@ -232,13 +233,13 @@ class UsageCostRecordingTest {
         recorder.fail(
             recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L),
             agent,
-            failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), PROVIDER, PRICED_MODEL),
+            TestAgentRuntimes.result(failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), PROVIDER, PRICED_MODEL)),
             requested(agent),
             "FAILED");
         recorder.cancel(
             recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L),
             agent,
-            run(1_000L, null, 500L),
+            TestAgentRuntimes.result(run(1_000L, null, 500L)),
             requested(agent));
         fail();
         recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
@@ -338,9 +339,9 @@ class UsageCostRecordingTest {
             "partial-run", "partial-session", "FAILED".equals(route) ? "failed" : "completed",
             "답", PRICED_MODEL, PROVIDER, null, usage, new SessionRuntime(PRICED_MODEL, PROVIDER));
         AgentExecution finished = switch (route) {
-            case "FAILED" -> recorder.fail(started, agent, result, requested(agent), "FAILED");
-            case "CANCELLED" -> recorder.cancel(started, agent, result, requested(agent));
-            default -> recorder.complete(started, agent, result, requested(agent));
+            case "FAILED" -> recorder.fail(started, agent, TestAgentRuntimes.result(result), requested(agent), "FAILED");
+            case "CANCELLED" -> recorder.cancel(started, agent, TestAgentRuntimes.result(result), requested(agent));
+            default -> recorder.complete(started, agent, TestAgentRuntimes.result(result), requested(agent));
         };
         AgentExecution stored = executions.findById(finished.id()).orElseThrow();
 
@@ -392,7 +393,7 @@ class UsageCostRecordingTest {
 
     private AgentExecution complete(HermesRunResult result, Agent agent) {
         AgentExecution execution = recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
-        return recorder.complete(execution, agent, result, requested(agent));
+        return recorder.complete(execution, agent, TestAgentRuntimes.result(result), requested(agent));
     }
 
 

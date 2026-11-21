@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
@@ -43,7 +44,7 @@ class ExecutionEventRecorderTest {
 
 
     private ExecutionEvent record(HermesRunEvent event) {
-        return recorder.record(EXECUTION, event, 1);
+        return recorder.record(EXECUTION, TestAgentRuntimes.event(event), 1);
     }
 
 

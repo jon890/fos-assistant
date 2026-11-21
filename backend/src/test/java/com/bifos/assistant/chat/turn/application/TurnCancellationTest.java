@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.chat.turn.application.dto.TurnMark;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -227,7 +228,7 @@ class TurnCancellationTest {
         UserExecutionLimiter limiter = new UserExecutionLimiter(
             LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1, 0, null)),
             mock(AgentExecutionRepository.class),
-            mock(HermesRunsClient.class),
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
             LiveProperties.fixed(
                 HermesProperties.class,
                 new HermesProperties(null, null, null, null, null, null, null, null)),
@@ -328,7 +329,7 @@ class TurnCancellationTest {
         return new UserExecutionLimiter(
             LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(maxRunning, 0, null)),
             mock(AgentExecutionRepository.class),
-            mock(HermesRunsClient.class),
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
             LiveProperties.fixed(
                 HermesProperties.class, new HermesProperties(null, null, null, null, null, null, null, null)),
             new VirtualThreadBackgroundTasks());
@@ -337,7 +338,7 @@ class TurnCancellationTest {
 
     private static TurnCancellation turnsWith(UserExecutionLimiter limiter) {
         return new TurnCancellation(
-            mock(HermesRunsClient.class), Duration.ofMillis(10), limiter, new VirtualThreadBackgroundTasks());
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)), Duration.ofMillis(10), limiter, new VirtualThreadBackgroundTasks());
     }
 
 

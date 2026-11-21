@@ -1,9 +1,10 @@
 package com.bifos.assistant.usage.execution.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunLookup;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -46,7 +47,7 @@ public class UserExecutionLimiter {
 
     private final LiveProperties<UserExecutionProperties> properties;
     private final AgentExecutionRepository executions;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final LiveProperties<HermesProperties> hermesProperties;
     private final BackgroundTasks backgroundTasks;
 
@@ -201,8 +202,7 @@ public class UserExecutionLimiter {
     public void holdUntilRemoteEnds(
         Long userId,
         Long executionId,
-        String apiBaseUrl,
-        String profileName,
+        RuntimeTarget target,
         String runId,
         boolean stopAlreadySent) {
         if (runId == null || runId.isBlank()) {
@@ -221,7 +221,7 @@ public class UserExecutionLimiter {
         try {
             backgroundTasks.start(
                 "remote-end-" + executionId,
-                () -> followRemoteEnd(userId, executionId, apiBaseUrl, profileName, runId, stopAlreadySent));
+                () -> followRemoteEnd(userId, executionId, target, runId, stopAlreadySent));
         } catch (RuntimeException | Error ex) {
             log.warn("Hermes 에서 끝났는지 확인할 스레드를 띄우지 못해 사용자 자리를 곧바로 돌려준다 executionId={} runId={}", executionId, runId, ex);
             releaseRemoteEnd(userId, executionId);
@@ -248,15 +248,14 @@ public class UserExecutionLimiter {
     private void followRemoteEnd(
         Long userId,
         Long executionId,
-        String apiBaseUrl,
-        String profileName,
+        RuntimeTarget target,
         String runId,
         boolean stopAlreadySent) {
         try {
             if (!stopAlreadySent) {
-                sendStop(executionId, apiBaseUrl, profileName, runId);
+                sendStop(executionId, target, runId);
             }
-            awaitRemoteEnd(executionId, apiBaseUrl, profileName, runId);
+            awaitRemoteEnd(executionId, target, runId);
         } finally {
             releaseRemoteEnd(userId, executionId);
         }
@@ -264,9 +263,9 @@ public class UserExecutionLimiter {
 
 
     /** 보내지 못해도 묻기는 이어 간다. 그 run 이 스스로 끝나면 자리를 돌려줄 수 있다. */
-    private void sendStop(Long executionId, String apiBaseUrl, String profileName, String runId) {
+    private void sendStop(Long executionId, RuntimeTarget target, String runId) {
         try {
-            hermes.stop(apiBaseUrl, profileName, runId);
+            runtimes.of(target).stop(target, runId);
         } catch (RuntimeException ex) {
             log.warn("끝났는지 모르는 run 에 중지를 보내지 못했다 executionId={} runId={}", executionId, runId, ex);
         }
@@ -279,14 +278,14 @@ public class UserExecutionLimiter {
      * <p>아직 돌면 {@code hermes.poll-interval} 뒤 다시 묻고, 닿지 못하면 간격을 두 배씩 {@link #MAX_RETRY_INTERVAL} 까지
      * 늘린다. 끊기면 곧바로 돌아간다.
      */
-    private void awaitRemoteEnd(Long executionId, String apiBaseUrl, String profileName, String runId) {
+    private void awaitRemoteEnd(Long executionId, RuntimeTarget target, String runId) {
         long deadline = System.nanoTime() + remoteEndMaxWait().toNanos();
         Duration pollInterval = hermesProperties.current().pollInterval();
         Duration interval = pollInterval;
         while (true) {
             try {
-                HermesRunLookup lookup = hermes.lookupRun(apiBaseUrl, profileName, runId);
-                if (lookup.state() != HermesRunLookup.State.RUNNING) {
+                RunLookup lookup = runtimes.of(target).lookupRun(target, runId);
+                if (lookup.state() != RunLookup.State.RUNNING) {
                     return;
                 }
                 interval = pollInterval;

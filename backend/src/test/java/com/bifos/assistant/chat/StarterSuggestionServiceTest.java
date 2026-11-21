@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -154,7 +155,7 @@ class StarterSuggestionServiceTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             executions,
             modelTiers,
             objectMapper,
@@ -215,7 +216,7 @@ class StarterSuggestionServiceTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             executions,
             tiers,
             objectMapper,
@@ -278,7 +279,7 @@ class StarterSuggestionServiceTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             executions,
             rejecting,
             objectMapper,
@@ -312,7 +313,7 @@ class StarterSuggestionServiceTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             executions,
             failing,
             objectMapper,
@@ -442,7 +443,7 @@ class StarterSuggestionServiceTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             failingRecorder,
             modelTiers,
             objectMapper,

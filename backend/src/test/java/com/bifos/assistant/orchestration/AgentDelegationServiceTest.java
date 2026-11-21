@@ -353,6 +353,31 @@ class AgentDelegationServiceTest {
 
 
     @Test
+    @DisplayName("끊긴 위임 실행의 profile 이 에이전트의 지금 profile 과 달라도 실행이 돈 profile 로 중지를 보낸다")
+    void stopsCutRunOnStoredProfileWhenAgentProfileDiffers() {
+        // 서버가 다시 떠 이 프로세스에 중지 표시가 없는 도는 위임 실행이다. 실행 기록의 profile 이 에이전트의 지금 값과 다르다.
+        String storedProfile = "moved-" + WORKER;
+        AgentExecution cut = executions.save(AgentExecution.builder()
+            .userId(user.id())
+            .conversationId(conversation.id())
+            .agentId(agents.findByCode(WORKER).orElseThrow().id())
+            .parentExecutionId(origin.id())
+            .rootExecutionId(origin.id())
+            .profileName(storedProfile)
+            .hermesRunId("run-moved-" + UUID.randomUUID())
+            .delegationKey("moved-" + UUID.randomUUID())
+            .costMode(CostMode.API)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.parse("2026-09-30T00:00:00Z"))
+            .build());
+
+        delegations.stop(user, origin, cut.id()).orElseThrow();
+
+        assertThat(stub().stoppedProfile(cut.hermesRunId())).isEqualTo(storedProfile);
+    }
+
+
+    @Test
     @DisplayName("끊긴 위임 실행의 에이전트 행이 없으면 Hermes 에 보내지 않고 중지를 요청하지 않은 상태로 답한다")
     void answersNotStopRequestedWithoutSendingWhenCutRunHasNoAgentRow() {
         // 서버가 다시 떠 이 프로세스에 중지 표시가 없는 도는 위임 실행이다. 가리키는 에이전트 행은 없다.

@@ -1,5 +1,8 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -8,7 +11,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.runtime.application.dto.RunCommand;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -113,8 +116,9 @@ class LostRunReleaseTest {
     }
 
 
-    private HermesRunCommand command() {
-        return new HermesRunCommand(PROFILE, "http://127.0.0.1:1/p/dad", "안녕", null, null, null, null, null);
+    private RunCommand command() {
+        return new RunCommand(
+            new RuntimeTarget(RuntimeKind.HERMES, "http://127.0.0.1:1/p/dad", PROFILE), "안녕", null, null, null, null, null);
     }
 
 

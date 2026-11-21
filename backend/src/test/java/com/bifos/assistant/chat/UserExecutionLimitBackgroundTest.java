@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.application.AgentService;
@@ -152,7 +153,7 @@ class UserExecutionLimitBackgroundTest {
             agentService,
             conversations,
             messages,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             recorder,
             modelTiers,
             objectMapper,

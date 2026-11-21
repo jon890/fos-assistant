@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.subagent.application;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -836,7 +837,7 @@ class SubagentUsageReconcilerTest {
             events,
             jobs,
             agents,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             defaults,
             providers,
             new CostEstimator(prices),

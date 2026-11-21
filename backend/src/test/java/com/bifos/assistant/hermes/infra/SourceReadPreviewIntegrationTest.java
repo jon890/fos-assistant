@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes.infra;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -87,7 +88,7 @@ class SourceReadPreviewIntegrationTest {
         ExecutionEventRecorder recorder = new ExecutionEventRecorder(mock(SkillUseRecorder.class), CLOCK);
         AgentExecution execution = execution();
         return IntStream.range(0, events.length)
-            .mapToObj(index -> recorder.record(execution, events[index], index + 1))
+            .mapToObj(index -> recorder.record(execution, TestAgentRuntimes.event(events[index]), index + 1))
             .toList();
     }
 

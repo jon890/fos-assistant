@@ -9,9 +9,9 @@ import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
-import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.dto.RunCommand;
+import com.bifos.assistant.runtime.application.dto.RunResult;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -75,7 +75,7 @@ public class RoomContext {
     private final ChatMessageRepository messages;
     private final ConversationSessions sessions;
     private final ModelTierService modelTiers;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final LostRunRelease lostRunRelease;
     private final UserExecutionLimiter limiter;
     private final Clock clock;
@@ -159,9 +159,8 @@ public class RoomContext {
             if (resolveFailure != null) {
                 throw resolveFailure;
             }
-            HermesRunCommand command = new HermesRunCommand(
-                agent.hermesProfile(),
-                agent.apiBaseUrl(),
+            RunCommand command = new RunCommand(
+                agent.runtimeTarget(),
                 previous.map(text -> SUMMARY_REQUEST + "\n\n" + PREVIOUS_TITLE + ExternalData.wrap(text)).orElse(SUMMARY_REQUEST),
                 null,
                 conversation.hermesSessionId(),
@@ -169,16 +168,16 @@ public class RoomContext {
                 choice.model(),
                 choice.reasoningEffort());
             lostRunRelease.beforeSubmit(command);
-            runId = hermes.submit(command);
+            runId = runtimes.of(command.target()).submit(command);
             executions.attachRunId(execution, runId);
-            HermesRunResult result = hermes.awaitCompletion(command, runId);
+            RunResult result = runtimes.of(command.target()).awaitCompletion(command, runId);
             awaited = true;
             String output = result.output() == null ? "" : result.output().strip();
             if (!result.succeeded() || output.isEmpty()) {
                 executions.fail(
                     execution, agent, result, choice,
                     result.succeeded() ? SUMMARY_FAILED : statusOf(result));
-                log.warn("대화방을 요약하지 못해 앞 맥락을 잇는다 conversationId={} status={}", conversation.id(), result.status());
+                log.warn("대화방을 요약하지 못해 앞 맥락을 잇는다 conversationId={} status={}", conversation.id(), result.statusLabel());
                 return Optional.empty();
             }
             executions.complete(execution, agent, result, choice);
@@ -187,7 +186,7 @@ public class RoomContext {
             if (runId != null && !awaited) {
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                    user.id(), execution.id(), agent.runtimeTarget(), runId, false);
             }
             if (execution != null) {
                 failQuietly(execution, ex);
@@ -227,8 +226,8 @@ public class RoomContext {
     }
 
 
-    private static String statusOf(HermesRunResult result) {
-        return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    private static String statusOf(RunResult result) {
+        return result.statusLabel() == null ? "UNKNOWN" : result.statusLabel().toUpperCase();
     }
 
 

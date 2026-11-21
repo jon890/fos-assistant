@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
@@ -296,7 +297,7 @@ class ResultDeliveryRecoveryTest {
         AgentExecution parent = chatTurn(ExecutionStatus.RUNNING);
         ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
 
-        boolean written = recovered.settle(parent.id(), result("completed", "다시 붙어 받은 답"));
+        boolean written = recovered.settle(parent.id(), TestAgentRuntimes.result(result("completed", "다시 붙어 받은 답")));
 
         assertThat(written).isTrue();
         assertThat(executions.findById(parent.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);

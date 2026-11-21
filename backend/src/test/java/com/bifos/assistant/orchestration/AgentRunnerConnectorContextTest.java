@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -97,7 +98,7 @@ class AgentRunnerConnectorContextTest {
                 RUN_ID, "sess-1", "completed", ANSWER, "example-model", null, TokenUsage.empty()));
         runner = new AgentRunner(
             contextAssembler,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             mock(LostRunRelease.class),
             executions,
             mock(ExecutionEventRecorder.class),

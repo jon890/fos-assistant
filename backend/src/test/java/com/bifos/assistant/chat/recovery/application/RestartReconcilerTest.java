@@ -228,6 +228,24 @@ class RestartReconcilerTest {
 
 
     @Test
+    @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 실행이 돈 profile 로 묻는다")
+    void looksUpRunOnStoredProfileWhenAgentProfileDiffers() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
+
+        reconciler.claim();
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        assertThat(stub.lookupProfile(row.hermesRunId())).isEqualTo(storedProfile);
+    }
+
+
+    @Test
     @DisplayName("아직 도는 대화 turn 에는 다시 붙어 잠금을 쥐고, 끝나면 답을 적고 잠금을 푼다")
     void reattachesToRunningChatTurnHoldingLockUntilItFinishes() {
         AgentExecution row = chatTurn(conversation, chief);

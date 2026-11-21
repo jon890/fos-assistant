@@ -1,5 +1,7 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -62,6 +64,7 @@ class UserExecutionLimiterTest {
 
     private static final String API_BASE_URL = "http://agent-runtime.test/p/limit";
     private static final String PROFILE = "limit-test";
+    private static final RuntimeTarget TARGET = new RuntimeTarget(RuntimeKind.HERMES, API_BASE_URL, PROFILE);
 
     /** 다른 검사가 남긴 줄과 섞이지 않게 이 검사만 쓰는 큰 번호에서 사용자 번호를 하나씩 받는다. */
     private static final AtomicLong NEXT_USER_ID = new AtomicLong(96_900_000L);
@@ -323,7 +326,7 @@ class UserExecutionLimiterTest {
     void holdsUntilRemoteRunFinishesAndSendsStopOnce() {
         stub.willLookup(runId, HermesRunLookup.running(), HermesRunLookup.running(), finished(runId));
 
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, false);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, false);
 
         assertThat(limiter.used(userId)).as("쥔 직후 자리").isEqualTo(1);
         awaitUntil(() -> limiter.used(userId) == 0, "끝났다는 답을 받고도 자리를 돌려주지 않았다");
@@ -337,7 +340,7 @@ class UserExecutionLimiterTest {
     void doesNotSendStopWhenAlreadySent() {
         stub.willLookup(runId, HermesRunLookup.running(), finished(runId));
 
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, true);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, true);
 
         awaitUntil(() -> limiter.used(userId) == 0, "끝났다는 답을 받고도 자리를 돌려주지 않았다");
         assertThat(stub.stopped()).as("보낸 중지").isEmpty();
@@ -347,7 +350,7 @@ class UserExecutionLimiterTest {
     @Test
     @DisplayName("Hermes 가 그 run 을 모른다고 답하면 한 번 묻고 돌려준다")
     void releasesWhenRemoteRunIsUnknown() {
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, true);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, true);
 
         awaitUntil(() -> limiter.used(userId) == 0, "모른다는 답을 받고도 자리를 돌려주지 않았다");
         assertThat(lookupsOf(runId)).as("물은 수").isEqualTo(1);
@@ -360,7 +363,7 @@ class UserExecutionLimiterTest {
         stub.willFailLookup(runId, new ApiException(ErrorCode.HERMES_UNAVAILABLE, "hermes is down"), 2);
         stub.willLookup(runId, finished(runId));
 
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, true);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, true);
 
         awaitUntil(() -> limiter.used(userId) == 0, "닿은 뒤에도 자리를 돌려주지 않았다");
         assertThat(lookupsOf(runId)).as("닿지 못한 두 번과 끝났다는 답을 받은 한 번").isEqualTo(3);
@@ -373,7 +376,7 @@ class UserExecutionLimiterTest {
         stub.willLookup(runId, HermesRunLookup.running());
         long startedAt = System.nanoTime();
 
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, true);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, true);
         awaitUntil(() -> lookupsOf(runId) >= 3, "도는 동안 다시 묻지 않았다");
 
         assertThat(limiter.used(userId)).as("도는 동안 자리").isEqualTo(1);
@@ -389,8 +392,8 @@ class UserExecutionLimiterTest {
     void holdsSameExecutionOnlyOnce() {
         stub.willLookup(runId, HermesRunLookup.running());
 
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, false);
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, false);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, false);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, false);
 
         assertThat(limiter.used(userId)).isEqualTo(1);
         releaseRemoteRun();
@@ -401,8 +404,8 @@ class UserExecutionLimiterTest {
     @Test
     @DisplayName("run 번호가 비어 있으면 물을 수 없어 쥐지 않는다")
     void doesNotHoldWithoutRunId() {
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, null, false);
-        limiter.holdUntilRemoteEnds(userId, 2L, API_BASE_URL, PROFILE, " ", false);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, null, false);
+        limiter.holdUntilRemoteEnds(userId, 2L, TARGET, " ", false);
 
         assertThat(limiter.used(userId)).isZero();
         assertThat(stub.stopped()).isEmpty();
@@ -413,7 +416,7 @@ class UserExecutionLimiterTest {
     @DisplayName("원격 종료 확인 자리를 쥔 동안에는 같은 사용자의 turn 이 그만큼 덜 열린다")
     void remoteEndHoldTakesTurnRoom() {
         stub.willLookup(runId, HermesRunLookup.running());
-        limiter.holdUntilRemoteEnds(userId, 1L, API_BASE_URL, PROFILE, runId, true);
+        limiter.holdUntilRemoteEnds(userId, 1L, TARGET, runId, true);
 
         limiter.acquireTurn(userId);
         limiter.acquireTurn(userId);

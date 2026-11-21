@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
@@ -385,7 +386,7 @@ class SteerSettleTest {
             conversation.id(), dad.id(), "모르는 글", executionId, SteerState.DELIVERED, null, Instant.now()));
         jdbc.update("UPDATE agent_execution SET status = 'RUNNING', finished_at = NULL WHERE id = ?", executionId);
 
-        recorder.settle(executionId, unknownPending("interrupted"));
+        recorder.settle(executionId, TestAgentRuntimes.result(unknownPending("interrupted")));
 
         assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.UNCONFIRMED);
         assertThat(pendingRows.read(conversation.id()).held()).isTrue();
@@ -467,7 +468,7 @@ class SteerSettleTest {
         // 서버가 그 turn 이 도는 중에 멈춰 실행 줄이 RUNNING 으로 남은 것처럼 만든다.
         jdbc.update("UPDATE agent_execution SET status = 'RUNNING', finished_at = NULL WHERE id = ?", executionId);
 
-        recorder.settle(executionId, result("completed", "돌아올 글"));
+        recorder.settle(executionId, TestAgentRuntimes.result(result("completed", "돌아올 글")));
 
         assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.CARRIED_OVER);
         assertThat(pendingRows.read(conversation.id()).carriedMessageIds()).containsExactly(left.id());
