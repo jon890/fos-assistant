@@ -32,6 +32,10 @@ public enum ErrorCode {
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
     PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
+    /** 답장으로 집은 메시지가 이 대화에 없다. 다른 대화와 남의 메시지도 같은 응답으로 숨긴다(스펙 chat-reference REQ14). */
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 답장으로 집은 사진이나 그림의 파일이 지워졌거나 보관 기간이 지났다(스펙 chat-reference REQ9). */
+    REPLY_SOURCE_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 그 대화의 전달 묶음이 아니거나 없는 묶음이다. 남의 대화의 묶음도 같은 응답으로 숨긴다(ADR-075). */
     DELIVERY_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 묶음이 {@code DELIVERING} 이나 {@code DELIVERED} 이거나, 넘길 결과가 남지 않았거나, 대화에 흐름이 붙었다(ADR-075). */

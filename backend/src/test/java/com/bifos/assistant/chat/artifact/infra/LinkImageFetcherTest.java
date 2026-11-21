@@ -238,6 +238,28 @@ class LinkImageFetcherTest {
 
 
     @Test
+    @DisplayName("이미 고른 사진 주소도 이동을 다시 검사하고 페이지 응답이나 너무 큰 사진을 거절한다")
+    void checksDirectImageRedirectTypeAndSize() {
+        dns.put("inside.example.com", new String[] {"10.0.0.5"});
+        redirect("https://cdn.example.com/redirect", "https://inside.example.com/a.png");
+        html("https://cdn.example.com/page", "<meta property=\"og:image\" content=\"https://cdn.example.com/other.png\">");
+        image("https://cdn.example.com/big", "image/png", big(64));
+        LinkImageFetcher fetcher = new LinkImageFetcher(
+            new LinkImageProperties(null, null, Duration.ofSeconds(2), null, null, 32, null, List.of(), List.of(), true),
+            this::resolve,
+            (address, host, request, c) -> respond(host, request));
+
+        assertThatThrownBy(() -> fetcher.fetchDirect(URI.create("https://cdn.example.com/redirect")))
+            .isInstanceOfSatisfying(LinkImageRejectedException.class, ex -> assertThat(ex.reason()).isEqualTo(Reason.BLOCKED));
+        assertThatThrownBy(() -> fetcher.fetchDirect(URI.create("https://cdn.example.com/page")))
+            .isInstanceOfSatisfying(LinkImageRejectedException.class, ex -> assertThat(ex.reason()).isEqualTo(Reason.NO_IMAGE));
+        assertThatThrownBy(() -> fetcher.fetchDirect(URI.create("https://cdn.example.com/big")))
+            .isInstanceOfSatisfying(LinkImageRejectedException.class, ex -> assertThat(ex.reason()).isEqualTo(Reason.TOO_LARGE));
+        assertThat(requested).containsExactly("cdn.example.com/redirect", "cdn.example.com/page", "cdn.example.com/big");
+    }
+
+
+    @Test
     @DisplayName("사진이 아니거나 형식이 틀리면 NO_IMAGE, 상한을 넘으면 TOO_LARGE 다")
     void rejectsNonImagesAndLargeImages() {
         html("https://shop.example.com/none", "<title>상품</title>");

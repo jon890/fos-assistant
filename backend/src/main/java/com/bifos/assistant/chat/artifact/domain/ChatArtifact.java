@@ -150,6 +150,14 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private Long generationSourceLinksKeyId;
 
+    /**
+     * {@link #generationSourceLinks} 의 링크마다 비서가 찾은 것이면 {@code 1}, 사용자가 보낸 것이면 {@code 0} 을 같은 순서로 이은 글.
+     * 찾은 링크가 없으면 비어 있다(ADR-20261121 / found-link-image-source).
+     */
+    @Column(name = "generation_found_link_flags", length = 16)
+    @Getter
+    private String generationFoundLinkFlags;
+
     /** 같은 올리기가 다시 와도 한 행이 되게 하는 값. 만든 그림 행에만 있다. */
     @Column(name = "generation_call_key", length = 64, columnDefinition = "CHAR(64)")
     @Getter
@@ -237,6 +245,7 @@ public class ChatArtifact extends CreatedAtEntity {
      * @param promptKeyId 지시문을 암호화한 key 번호. 평문이면 null
      * @param sourceLinks 참고한 링크를 저장할 글. 암호화했으면 암호문이다. 링크가 없으면 null
      * @param sourceLinksKeyId 링크를 암호화한 key 번호. 평문이거나 링크가 없으면 null
+     * @param foundLinkFlags 링크마다 비서가 찾았는지 적은 글. 찾은 링크가 없으면 null
      */
     public static ChatArtifact generatedImage(
         Long conversationId,
@@ -246,12 +255,14 @@ public class ChatArtifact extends CreatedAtEntity {
         Long promptKeyId,
         String sourceLinks,
         Long sourceLinksKeyId,
+        String foundLinkFlags,
         String callKey) {
         ChatArtifact image = new ChatArtifact(conversationId, null, path, byteSize);
         image.generationPrompt = prompt;
         image.generationPromptKeyId = promptKeyId;
         image.generationSourceLinks = sourceLinks;
         image.generationSourceLinksKeyId = sourceLinksKeyId;
+        image.generationFoundLinkFlags = foundLinkFlags;
         image.generationCallKey = callKey;
         return image;
     }

@@ -8,10 +8,12 @@ import java.util.List;
  * @param prompt 그림 지시문. 풀지 못하면 null
  * @param vaultItemId 그 그림의 살아 있는 보관본 번호. 없으면 null
  * @param sourceLinks 그림을 만들 때 참고한 링크 주소. 쓴 순서다. 없으면 빈 목록이다
+ * @param foundSourceLinks {@code sourceLinks} 가운데 비서가 찾은 주소. 같은 순서다. 없으면 빈 목록이다
  */
-public record GeneratedImageDetail(String prompt, Long vaultItemId, List<String> sourceLinks) {
+public record GeneratedImageDetail(String prompt, Long vaultItemId, List<String> sourceLinks, List<String> foundSourceLinks) {
 
     public GeneratedImageDetail {
         sourceLinks = sourceLinks == null ? List.of() : List.copyOf(sourceLinks);
+        foundSourceLinks = foundSourceLinks == null ? List.of() : List.copyOf(foundSourceLinks);
     }
 }

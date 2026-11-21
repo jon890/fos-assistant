@@ -23,11 +23,12 @@ from .found_links import TOOLS as FOUND_LINK_TOOLS, report as report_found_links
 from .handoff import report_handoff
 from .generated_image import TOOL as IMAGE_TOOL, _failed as image_upload_failed, publish as publish_image, strip_title
 from .image_source import (
-    FAILED as SOURCE_FAILED, links_for as source_links_for, message as source_message, prepare as prepare_sources,
-    release as release_sources,
+    FAILED as SOURCE_FAILED, found_links_for as source_found_links_for, links_for as source_links_for,
+    message as source_message, prepare as prepare_sources, release as release_sources,
 )
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 from .next_step import alternative, ask_user
+from .product_page import TOOL as PRODUCT_PAGE_TOOL
 
 
 
@@ -126,6 +127,8 @@ def _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id):
         return {"action": "block", "message": SKILL_MANAGE_MESSAGE}
     if not isinstance(tool_name, str):
         return None
+    if tool_name == PRODUCT_PAGE_TOOL and not (session_id and tool_call_id):
+        return _block(GUARD_BLOCK_MESSAGE)
     # Hermes 승인 관문으로 갈 호출은 profile 과 session 에 상관없이 먼저 막는다. 코드 실행 안의 호출도 같다.
     gated = approval_guard(tool_name, args, task_id if isinstance(task_id, str) else "")
     if gated is not None:
@@ -200,11 +203,12 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
     Hermes 는 결과가 문맥에 들어가기 전에 이 hook 을 부르고, 처음 돌려준 글로 결과를 바꾼다.
     판정이 막은 호출은 여기 닿지 않는다. 그래서 여기 닿은 `{"error": ...}` 도 플러그인 서버가 낸 외부 데이터로 감싼다.
     대응 파일의 서버와 맞는 도구의 결과에 화면 넘기기 칸이 있으면 감싸기 전에 Control Plane 에 알린다(`handoff.py`).
-    `web_search` 와 `web_extract` 의 결과는 바꾸지 않고, 결과에 나온 주소만 Control Plane 에 알린다(`found_links.py`).
+    웹 검색과 페이지 읽기 결과의 주소는 Control Plane 에 알린다(`found_links.py`).
     """
     if tool_name == IMAGE_TOOL:
         # 참고한 링크는 사본을 지우면 함께 잊으므로 먼저 읽어 둔다. 그림 올리기에 함께 보낸다.
         links = source_links_for(session_id, tool_call_id)
+        found = source_found_links_for(session_id, tool_call_id)
         # 바탕 사진의 사본은 결과가 어떻든 지운다. 그 뒤 만든 그림을 올린다.
         try:
             release_sources(session_id, tool_call_id)
@@ -212,7 +216,8 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
             logger.warning("fos-ctx: 그림 바탕 사진의 사본을 지우지 못했다: %s", type(exc).__name__)
         # 만든 그림을 Control Plane 에 올리고 경로 없는 결과로 바꾼다. 예외를 던지면 Hermes 가 경로가 든 원래 결과를 모델에게 준다.
         try:
-            return publish_image(args, result, session_id or "", tool_call_id or "", source_links=links)
+            return publish_image(args, result, session_id or "", tool_call_id or "", source_links=links,
+                                 found_links=found)
         except Exception as exc:  # noqa: BLE001 - 경로가 모델에게 가지 않게 정해 둔 글로 바꾼다
             logger.warning("fos-ctx: 만든 그림을 올리지 못했다: %s", type(exc).__name__)
             return image_upload_failed()
@@ -222,7 +227,7 @@ def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id
             report_found_links(tool_name, result, session_id or "", tool_call_id or "", args)
         except Exception as exc:  # noqa: BLE001 - 알리지 못해도 도구 결과는 그대로 모델에게 간다
             logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)
-        return None
+        return wrap_external_data(result) if tool_name == PRODUCT_PAGE_TOOL and isinstance(result, str) else None
     try:
         if not isinstance(tool_name, str) or not tool_name.startswith(MCP_PREFIX) or not isinstance(result, str):
             return None

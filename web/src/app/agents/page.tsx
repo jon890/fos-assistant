@@ -47,9 +47,10 @@ export default async function AgentsPage({
           description="새 에이전트를 만들어 보세요"
         />
       ) : (
-        <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">
+        // 열을 정하지 않은 grid 는 칸이 줄바꿈하지 않는 글자 길이만큼 넓어져 휴대폰에서 틀을 넘는다. 한 열(minmax(0, 1fr))로 묶는다.
+        <ul aria-label="쓸 수 있는 에이전트" className="grid grid-cols-1 gap-3">
           {result.data.map((agent) => (
-            <li key={agent.code}>
+            <li key={agent.code} className="min-w-0">
               <Link
                 prefetch={false}
                 href={`/agents/${agent.code}`}

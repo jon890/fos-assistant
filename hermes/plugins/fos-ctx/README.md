@@ -234,8 +234,8 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | --- | --- |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `generated-image` 로 바꾼 것(`/internal/hermes/generated-image`). http(s) 가 아니거나 없으면 올리지 못한 결과로 바꾼다 |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
-| 본문 | `multipart/form-data`. 조각 `meta` 는 JSON `{"v": 1, "root_session_id", "session_id", "tool_call_id", "title", "prompt", "sig"}` 이고, 그 호출이 링크 사진을 받았으면 `"source_links"`(받은 주소 목록, 쓴 순서)가 더 붙는다(1.15.0 부터). 조각 `image` 는 그림 바이트 그대로다. 그림을 JSON 의 base64 로 보내지 않는다 |
-| 서명할 글 | `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256, 지시문의 SHA-256 을 `\n` 하나로 이은 UTF-8. `source_links` 가 있으면 주소를 `\n` 으로 이은 글의 SHA-256 을 여덟째 줄로 더한다. 없으면 일곱 줄 그대로다. 해시는 소문자 16진수이고 제목이 없으면 빈 글의 해시다. key 는 `_fos_ctx` 와 같다 |
+| 본문 | `multipart/form-data`. 조각 `meta` 는 JSON `{"v": 1, "root_session_id", "session_id", "tool_call_id", "title", "prompt", "sig"}` 이고, 그 호출이 링크 사진을 받았으면 `"source_links"`(받은 주소 목록, 쓴 순서)가 더 붙는다(1.15.0 부터). 그 가운데 Control Plane 이 비서가 찾은 주소라고 알린 것이 있으면 `"found_links"`(그 주소 목록, 같은 순서)가 더 붙는다(1.17.0 부터). 조각 `image` 는 그림 바이트 그대로다. 그림을 JSON 의 base64 로 보내지 않는다 |
+| 서명할 글 | `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256, 지시문의 SHA-256 을 `\n` 하나로 이은 UTF-8. `source_links` 가 있으면 주소를 `\n` 으로 이은 글의 SHA-256 을 여덟째 줄로 더한다. 없으면 일곱 줄 그대로다. `found_links` 가 있으면 같은 방법으로 아홉째 줄을 더한다. 해시는 소문자 16진수이고 제목이 없으면 빈 글의 해시다. key 는 `_fos_ctx` 와 같다 |
 | 보내지 않는 것 | `tool_call_id` 나 session 이 빈 호출, `MAX_BYTES`(20MiB)를 넘는 그림. 올리지 못한 결과로 바꾼다 |
 | 답 | 200 의 `{"title"}` 이면 그 제목으로 성공 결과를 만든다 |
 | 404 | 이 경로가 없는 옛 Control Plane 이다. 결과를 바꾸지 않는다(rule-66). Control Plane 은 이 경로에서 404 를 내지 않는다 |
@@ -243,7 +243,7 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 제한 시간 | `UPLOAD_TIMEOUT`(15초). 한 번만 부른다. Hermes 의 callback 제한(기본 30초)보다 짧다 |
 
 확인 값: 위 「도구 판정」 의 key, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 그림 바이트 `image-bytes`, 제목 `수채화 고양이`, 지시문 `창가에 앉은 고양이` 의 서명은 `d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee` 다. backend 의 `GeneratedImageEndpointTest` 도 같은 값을 쓴다.
-같은 값에 `source_links` `["https://shop.example.com/goods/1", "https://img.example.com/p.png"]` 를 더한 서명은 `83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d` 다.
+같은 값에 `source_links` `["https://shop.example.com/goods/1", "https://img.example.com/p.png"]` 를 더한 서명은 `83a6e8ece6d9e2216497754042c3bd80e85792e7136c95ee91ea4bfa44cefd9d` 다. 거기에 `found_links` `["https://img.example.com/p.png"]` 를 더한 서명은 `17c5d8291617836751c5f1a4491fda52a7e186e9138809060ba56fa802e5f9fd` 다.
 
 ### 그림을 고칠 사진을 받는다
 
@@ -254,7 +254,8 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 - 가리킴을 하나씩 받아 Hermes 홈의 `cache/fos-image-sources/` 에 무작위 이름으로 쓰고, 두 인자를 그 경로로 바꾼 `modify` 를 돌려준다. 제목 줄 떼기와 한 `modify` 로 묶는다. 같은 가리킴은 한 번만 받는다
 - 하나라도 받지 못하면 받은 사본을 지우고, 가리킴마다 까닭을 한 줄씩 적은 글로 막는다. 글은 「그림을 만들지 않았다」 로 시작하고 줄마다 다음 방법이나 바로 알림이 붙는다
 - 링크 가리킴을 받으면 응답 머리 `X-Image-Source-Link` 의 받은 주소를 사본과 같은 호출 키로 기억한다. 머리가 없으면 받지 못한 것으로 본다
-- `transform_tool_result` 는 기억한 링크를 먼저 읽어 그림 올리기의 `source_links` 로 넘기고, 그 호출의 사본과 링크를 지운다. 결과 hook 이 돌지 못한 사본은 다음 받기 때 1시간이 지난 것부터 지운다
+- 응답 머리 `X-Image-Source-Found: 1` 이 함께 있으면 그 주소를 찾은 주소로도 기억한다. 옛 Control Plane 은 이 머리를 내지 않는다
+- `transform_tool_result` 는 기억한 링크를 먼저 읽어 그림 올리기의 `source_links` 와 `found_links` 로 넘기고, 그 호출의 사본과 링크를 지운다. 결과 hook 이 돌지 못한 사본은 다음 받기 때 1시간이 지난 것부터 지운다
 - 두 인자가 모두 비면 묻지 않는다. 가리킴 없는 그림 만들기는 이전과 같다
 
 | 칸 | 값 |
@@ -262,12 +263,12 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `image-source` 로 바꾼 것(`/internal/hermes/image-source`) |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
 | 본문 | JSON `{"_fos_ctx": <도구 이름 image_generate 로 서명한 맥락>, "source": "<가리킴>"}`. 맥락은 MCP 호출의 `_fos_ctx` 와 같다 |
-| 200 | 본문이 원본 바이트이고 `Content-Type` 이 PNG, JPEG, GIF, WebP 가운데 하나다. 20MiB 를 넘으면 받지 못한 것으로 본다. 링크 가리킴이면 `X-Image-Source-Link` 에 Control Plane 이 정해진 꼴로 바꾼 받은 주소가 있다 |
-| 422 `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다. 다음 방법: 맞는 가리킴을 찾아 다시 부르고, 없으면 설명만으로 비슷하게 그려 넣지 말고 사진이나 링크를 보내 달라고 먼저 알린다 |
-| 422 `IMAGE_SOURCE_LINK_BLOCKED` | 열 수 없는 주소다(https 아님, 내부망이나 금지 목록, 넘기기 초과). 비슷하게 그려 넣지 않고 사용자에게 바로 알린다 |
-| 422 `IMAGE_SOURCE_LINK_NO_IMAGE` | 링크에서 쓸 수 있는 사진을 찾지 못했다. 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
-| 422 `IMAGE_SOURCE_LINK_TOO_LARGE` | 사진이 너무 크다. 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 더 작은 사진을 올려 달라고 먼저 알린다 |
-| 502 `IMAGE_SOURCE_LINK_FAILED` | 링크를 열지 못했다. 쇼핑몰이 막았을 수 있다. 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 그 사진을 받지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
+| 200 | 본문이 원본 바이트이고 `Content-Type` 이 PNG, JPEG, GIF, WebP 가운데 하나다. 20MiB 를 넘으면 받지 못한 것으로 본다. 링크 가리킴이면 `X-Image-Source-Link` 에 Control Plane 이 정해진 꼴로 바꾼 받은 주소가 있다. 비서가 찾은 주소로 받았으면 `X-Image-Source-Found: 1` 이 붙는다 |
+| 422 `IMAGE_SOURCE_UNKNOWN` | 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다. 다음 방법: 맞는 가리킴을 찾아 다시 부르고, 스스로 적은 주소나 `execute_code` 안에서 얻은 주소였으면 `web_search` 나 `web_extract` 를 직접 불러 본문의 사진 주소로 다시 부른다. 없으면 설명만으로 비슷하게 그려 넣지 말고 사진이나 링크를 보내 달라고 먼저 알린다 |
+| 422 `IMAGE_SOURCE_LINK_BLOCKED` | 열 수 없는 주소다(https 아님, 내부망이나 금지 목록, 넘기기 초과). 다음 방법: 찾을 수 있는 대상이면 결과의 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 다시 부른다. 실존 인물의 얼굴, 로고, 캐릭터 자체면 찾지 않는다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 찾아 시도한다. 쓸 사진이 더 없으면 설명만으로 비슷하게 그려 넣지 말고, 사진을 찾지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
+| 422 `IMAGE_SOURCE_LINK_NO_IMAGE` | 링크에서 쓸 수 있는 사진을 찾지 못했다. 다음 방법: 찾을 수 있는 대상이면 결과의 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 다시 부른다. 실존 인물의 얼굴, 로고, 캐릭터 자체면 찾지 않는다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 찾아 시도한다. 쓸 사진이 더 없으면 설명만으로 비슷하게 그려 넣지 말고, 사진을 찾지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
+| 422 `IMAGE_SOURCE_LINK_TOO_LARGE` | 사진이 너무 크다. 다음 방법: 찾을 수 있는 대상이면 결과의 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 다시 부른다. 실존 인물의 얼굴, 로고, 캐릭터 자체면 찾지 않는다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 찾아 시도한다. 쓸 사진이 더 없으면 설명만으로 비슷하게 그려 넣지 말고, 사진을 찾지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
+| 502 `IMAGE_SOURCE_LINK_FAILED` | 링크를 열지 못했다. 쇼핑몰이 막았을 수 있다. 다음 방법: 찾을 수 있는 대상이면 결과의 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 다시 부른다. 실존 인물의 얼굴, 로고, 캐릭터 자체면 찾지 않는다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 찾아 시도한다. 쓸 사진이 더 없으면 설명만으로 비슷하게 그려 넣지 말고, 사진을 찾지 못한 것과 사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다 |
 | 410 `IMAGE_SOURCE_GONE` | 지웠거나 보관 기간이 지났다. 사용자에게 바로 알린다. 만든 그림(`generated:`)이면 다음 방법: 다음 장면에서 그 그림을 빼고 인물 줄만으로 다시 부른다 |
 | 404 | 이 경로가 없는 옛 Control Plane 이다. 막는다. 경로를 받던 동작으로 돌아가지 않는다. Control Plane 은 이 경로에서 404 를 내지 않는다 |
 | 그 밖의 답, 제한 시간 | 받지 못했다고 막는다. 다음 방법: 설명만으로 비슷하게 그려 넣지 말고 잠시 뒤 다시 해 달라고 알린다 |
@@ -275,6 +276,7 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 | 맥락이 없다 | `tool_call_id` 나 session 이 빈 호출(코드 실행 안의 호출)은 막는다 |
 
 막는 글은 「그림을 만들지 않았다」 로 시작하고 문제 줄마다 끝 줄이 붙는다. fos-ctx 가 모델에게 직접 쓰는 실패 글은 모두 「다음 방법: …」 이나 「사용자에게 바로 알린다.」 한 줄로 끝나고, 그 줄은 `next_step.py` 가 만든다(fos-assistant [도구 실패 뒤 다른 방법 스펙](../../../docs/features/tool-fallback/spec.md) 의 REQ3). Control Plane 이 보낸 판정 글은 이미 끝 줄이 있어 덧붙이지 않는다.
+링크 사진을 받지 못한 네 까닭(열 수 없음, 사진 없음, 너무 큼, 열지 못함)의 끝 줄은 「결과의 다른 사진으로 바꿔 다시 부르고, 없으면 그리지 않고 알린다」 다(1.17.0 부터, fos-assistant 스펙 agent-found-image REQ6). 대화에 없는 주소의 끝 줄은 그 페이지를 `web_extract` 로 직접 읽고 본문의 사진 주소로 다시 부르게 한다.
 링크(`link:`)를 쓰지 못한 줄에는 끝 줄 앞에 「다음 장면이고 앞 그림은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 다시 부른다」 를 넣는다(스펙 generated-image DECISION52).
 
 ### 찾은 주소를 알린다
@@ -288,7 +290,7 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 - 후보 하나는 `MAX_LINK_CHARS`(2,048)자까지, 한 호출은 `MAX_LINKS`(2,000)개까지다. 같은 후보는 한 번만 보낸다
 - `web_extract` 는 비서가 인자 `urls` 에 적어 넣은 주소를 `typed` 로 따로 보낸다(`MAX_TYPED` 50개까지). 읽기 서비스에 따라 결과 항목의 `url` 이 넘어간 뒤의 최종 주소일 수 있어, Control Plane 이 적어 넣은 원래 주소도 찾은 주소에서 빼게 하려는 것이다
 - 뽑기만 한다. 같은 주소인지, 상대 주소를 어떻게 푸는지, 받아도 되는지는 Control Plane 이 정한다
-- **결과 글을 바꾸지 않는다.** hook 은 이 두 도구에서 늘 None 을 돌려준다. 알리지 못해도 도구 결과는 그대로 모델에게 간다. 주소와 결과 글은 로그에 남기지 않는다
+- `web_search`와 `web_extract`의 결과 글은 그대로 둔다. 주소와 결과 글은 로그에 남기지 않는다
 
 `POST <플러그인 정책 주소의 마지막 조각을 found-links 로 바꾼 주소>` 로 보낸다. 인증은 profile 토큰이고 제한 시간은 5초다.
 
@@ -300,10 +302,12 @@ Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스
 
 `_fos_ctx` 는 도구 이름 `found_links` 로 서명한다. 검색 결과처럼 기준 주소가 없으면 `base` 는 null 이다. `typed` 는 적어 넣은 주소가 있을 때만 붙는다.
 
+1.18.0부터 web toolset의 `product_page_read`로 상품 페이지를 한 번 읽고 사진 후보만 결과에 담는다. 결과 hook은 사진의 출처(`product`, `og`, `body`), 주소, 크기 점수(`size`)를 페이지의 선택 칸 `images`에 보내고, 주소를 `links`에도 담는다. 이동 전 주소인 `requested`는 `typed`로도 보낸다. 원본 HTML은 도구 결과와 Control Plane에 전달하지 않는다. 모델에 가는 결과의 사진 주소는 외부 데이터로 감싼다. 후보 형식과 받기는 [비서가 찾은 사진 기술 설계](../../../docs/features/agent-found-image/design.md)의 「상품 페이지에서 대표 사진 고르기」에 있다.
+
 | 응답 | fos-ctx 가 하는 일 |
 | --- | --- |
 | 204 | 없다 |
-| 그 밖의 응답과 연결 실패 | 로그에 상태 코드나 예외 종류만 남기고 넘어간다. 이 경로를 모르는 옛 Control Plane 은 인증 거절로 답한다 |
+| 그 밖의 응답과 연결 실패 | 경고 로그에 상태 코드나 예외 종류만 남기고 넘어간다. 알릴 주소나 토큰, 맥락이 없을 때도 경고로 남긴다. 이 경로를 모르는 옛 Control Plane 은 인증 거절로 답한다 |
 
 두 도구의 결과 모양은 [`hermes-contract.md`](../../docs/hermes-contract.md) 의 「웹 도구의 결과」 가 갖고, `hermes/tests/test_found_links_contract.py` 가 Hermes 소스와 대조한다.
 

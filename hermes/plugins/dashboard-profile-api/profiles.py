@@ -66,7 +66,7 @@ PROFILE_PLUGIN_DIR = PLUGIN_DIR / "profile-plugins"
 FORBIDDEN_TOOLSETS = frozenset({"memory", "terminal", "file", "code_execution", "browser"})
 # 기존 단일 파일 plugin 을 갱신할 때 하위 모듈을 모두 둔 뒤 진입점을 바꾼다.
 PROFILE_PLUGIN_FILES = (
-    "plugin.yaml", "context.py", "connector_policy.py", "subagent.py", "hooks.py",
+    "plugin.yaml", "context.py", "connector_policy.py", "subagent.py", "product_page.py", "hooks.py",
     "image_headers.py", "image_conversion.py", "image_helper.py", "image_runtime.py", "attachment_inspect.py",
     "tool_guard.py", "approval_guard.py", "handoff.py", "generated_image.py", "image_source.py", "found_links.py", "next_step.py", "__init__.py",
 )

@@ -49,7 +49,7 @@
 | `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「로그와 저장」 이 갖는다 |
 | `/admin/connections` | 자동 반영이 실패했거나 24시간 넘게 남은 바인딩의 「다시 확인」([`docs/features/connector.md`](../../docs/features/connector.md)) |
 | `/admin/browsers` | 모든 사용자 브라우저의 사용자 이름, 상태, 마지막 사용 시각, 오류 코드와 끄기, 지우기 |
-| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md)) |
+| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 단추 연결의 OAuth 앱 줄과 서명 비밀 줄도 둔다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md), [`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md)) |
 | `/admin/workspaces` | 실행 공간마다 주인, 용량, 항목 수와 일부만 셌는지. 주인은 사용자 이름이거나 「에이전트 · <이름>」 이고 이름이 없으면 「알 수 없음」 이다. 일부만 센 공간에 「일부만 셈」 배지. 루트가 없으면 「파일 공간을 쓸 수 없어요」, 공간이 없으면 「아직 실행 공간이 없어요」, 실패는 「불러오지 못했어요」 와 다시 읽기. 관리자 영역이지만 오류 코드와 파일 이름은 그리지 않는다 |
 
 `/admin` 아래는 `ADMIN` 만 연다.
