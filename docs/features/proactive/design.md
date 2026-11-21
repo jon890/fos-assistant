@@ -198,7 +198,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 - **(PR3) 배포 순서는 지금처럼 plugin 먼저다.** 새 `fos-ctx` 가 옛 Control Plane 에 물으면 경로가 없어 404 다. 옛 Control Plane 은 사건 실행을 읽기 경계의 toolset 으로만 열므로 404 는 판정 전과 같게 통과시킨다(rule-66). 그다음 배포에서 이 예외를 뺀다. 그 밖의 실패는 막는다. 옛 대시보드는 `tool_guard` 를 내지 않아 새 Control Plane 이 사건 실행을 열지 않는다. 대시보드를 올린 뒤에는 연결 확인이 각 profile 의 `fos-ctx` 를 새 묶음으로 바꾸고 재시작 대기를 거친 뒤에야 `tool_guard` 가 참이 된다
 - **(PR3) 사건 실행에서 막힌 호출은 도구 오류 결과다.** run 을 실패로 바꾸지 않는다. 모델은 그 결과를 읽고 붙은 플러그인의 읽기 도구로 이어 간다. 도구 호출 상한(`max-tool-calls`)은 막힌 호출도 센다. 메인 에이전트의 성격 글이 셸을 쓰라고 해도 상한을 덜 쓰도록, 사건 실행 규칙(`EVENT_RULES`)이 쓸 수 있는 도구를 적는다
 - **(PR3) 판정 plugin 을 불러오지 못하면 막지 못한다.** 설치 파일이 묶음과 같아도 Hermes 가 plugin 을 import 하지 못하면 hook 없이 나간다. `tool_guard` 는 파일만 본다. 배포 뒤 확인 항목에 hook 로그를 넣는다
-- **(PR3) 옛 Control Plane 의 404 통과는 다음 배포에서 뺀다.** 이 PR 의 Control Plane 이 운영에 올라간 뒤의 다음 fos-ctx 변경에서 `tool_guard.py` 의 404 분기를 지운다. ADR-20261105 / event-watch 의 「다음 단계」 가 이 일을 갖는다
+- **(PR3) 옛 Control Plane 의 404 통과는 다음 배포에서 뺀다.** 이 PR 의 Control Plane 이 운영에 올라간 뒤의 다음 fos-ctx 변경에서 `tool_guard.py` 의 404 분기를 지운다. [ADR-20261105 / event-watch](../../adr/ADR-20261105-event-watch.md) 의 「다음 단계」 가 이 일을 갖는다
 
 ## 검증 전략
 
@@ -242,7 +242,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 | DECISION10 | (PR2) 다시 연결 알림과 조용한 시간 | 조용한 시간에는 내지 않고, 07시 뒤 첫 실패 확인에서 낸다. 아침 묶음에 섞지 않는다 | 작성자 | 스펙 REQ6 이 조용한 시간에 생긴 알림을 미룬다. 실패가 07시 전에 풀리면 다시 연결할 일이 없어 알리지 않는다. 묶음은 「새 메일 N건」 꼴이라 종류가 다른 알림을 섞지 않는다(독립 검토) |
 | DECISION11 | (PR2) 알릴 것 없는 아침 묶음 | 아침 묶음은 알릴 수가 0 이면 만들지 않는다 | 작성자 | 「새 메일 N건 중 0건」 은 할 일이 없는 알림이다. 스펙 REQ5 의 「알릴 것이 없으면 알림이 없다」 와 같다 |
 | DECISION12 | (PR2) 화면의 시간대 입력 | 화면은 시간대를 매일 깨우기처럼 글 칸으로 받고 기본값을 `Asia/Seoul` 로 채운다 | 작성자 | 스펙 DECISION7. 브라우저 시간대를 몰래 쓰지 않아 저장된 값이 화면에 보인다 |
-| DECISION13 | (PR2) 입력 밖 발견 | 사건 실행에서 `topicKey` 가 입력 식별자가 아닌 발견을 `NOT_IN_EVENT` 의 「참고」 로 내린다 | 작성자 | 답의 「새로 알릴 것」 과 알림 수가 갈리지 않게 한다. 입력 밖 식별자는 알릴 항목으로 받지 않는다는 ADR-20261105 / event-watch 의 결정을 답에도 적용한다(독립 검토) |
+| DECISION13 | (PR2) 입력 밖 발견 | 사건 실행에서 `topicKey` 가 입력 식별자가 아닌 발견을 `NOT_IN_EVENT` 의 「참고」 로 내린다 | 작성자 | 답의 「새로 알릴 것」 과 알림 수가 갈리지 않게 한다. 입력 밖 식별자는 알릴 항목으로 받지 않는다는 [ADR-20261105 / event-watch](../../adr/ADR-20261105-event-watch.md) 의 결정을 답에도 적용한다(독립 검토) |
 | DECISION14 | (PR3) 판정 자리 | 사건 실행의 위험 도구는 fos-ctx 의 `pre_tool_call` 이 Control Plane 에 물어 막는다 | 작성자 | 스펙 DECISION26. `subagent_start` hook 은 반환값을 버려 자식 생성을 막지 못하고, 실행마다 toolset 을 줄이는 칸은 Hermes 에 없다. `pre_tool_call` 의 `block` 은 이미 이미지 위임과 `skill_manage` 를 막는다 |
 | DECISION15 | (PR3) 묻는 범위 | 막을 목록이 아니라 안전 목록을 두고 그 밖을 모두 묻는다 | 작성자 | 스펙 DECISION28. 새 Hermes 도구가 판정 없이 열리지 않는다. 보통 대화의 호출마다 Control Plane 왕복이 하나 는다 |
 | DECISION16 | (PR3) session 없는 호출 | Hermes 업그레이드 PR3 에서 대체: 안전 목록 밖 호출은 막는다 | 작성자 | 이전 기준 v0.21.6 의 코드 실행에는 session 이 없어 통과시켰다. 현재 기준은 코드 실행도 session 을 주므로 그 예외를 제거했다 |

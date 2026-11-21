@@ -75,7 +75,7 @@ fos-agents 쪽 디렉터리와 manifest 칸 채우기는 이 저장소 밖이다
 
 ## PR2 의 경계
 
-PR2 는 이 설계를 다시 열지 않고 아래만 정한다. 정확한 칸과 마이그레이션은 PR2 계획이 정한다.
+PR2 는 이 설계를 다시 열지 않고 아래만 정했다. PR2(#823)는 머지됐고, 지금의 칸과 동작은 [`backend/docs/data-schema.md`](../../../backend/docs/data-schema.md) 의 `skipped_skills` 와 [플러그인 연결](../connector.md) 의 「붙이기와 떼기」 가 갖는다.
 
 - Control Plane 의 설치 결과 읽기(`HttpHermesConnectorClient`)가 `skipped_skills` 를 읽고, 성공한 설치 응답만 바인딩 행에 저장한다. 새 테이블은 만들지 않고 `agent_connector_binding` 에 JSON 글 컬럼을 더한다.
 - 에이전트 연결 목록 응답의 바인딩마다 그 값을 내고, 웹의 `agent-connections-section.tsx` 가 spec REQ9 의 문구로 그린다.
@@ -95,7 +95,7 @@ PR2 는 이 설계를 다시 열지 않고 아래만 정한다. 정확한 칸과
 
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
-| DECISION1 | 새 칸 자리 | `assistant.json` 의 `agent_skills`. `plugin.json` 은 건드리지 않는다 | 작성자 | assistant 전용 정보는 `assistant.json` 하나에 둔다(ADR-20261026 / plugin-standard-format). Claude Code 가 이 디렉터리를 스킬로 읽지 않는다 |
+| DECISION1 | 새 칸 자리 | `assistant.json` 의 `agent_skills`. `plugin.json` 은 건드리지 않는다 | 작성자 | assistant 전용 정보는 `assistant.json` 하나에 둔다([ADR-20261026 / plugin-standard-format](../../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md)). Claude Code 가 이 디렉터리를 스킬로 읽지 않는다 |
 | DECISION2 | 빠진 스킬 기록 자리 | 소유 기록에 남기지 않고 판정 함수로 매번 계산해 응답으로 낸다 | 작성자 | 기록에 새 키를 더하면 되돌린 이미지가 그 profile 의 바인딩 쓰기를 모두 거절한다 |
 | DECISION3 | 판정 재료 | profile `config.yaml` 의 API 도구 목록, `terminal` 설정, 스킬 디렉터리. 운영 정책은 읽지 않는다 | 작성자 | spec DECISION17. profile 이름이 인자로 필요 없고, 정책이 없는 개발 환경에서 오류 로그가 늘지 않는다 |
 | DECISION4 | 카탈로그 `skills` 의 뜻 | 에이전트용 스킬까지 합친 이름 | 작성자 | Control Plane 을 고치지 않고 처음 붙이기의 겹침 검사를 넓힌다. 이 목록을 그대로 내거나 쓰는 곳은 「PR2 의 경계」 에 적었다. `agent_list` 의 할 수 있는 일은 올린 스킬만 보므로(`AgentCapabilitiesReader`) 바뀌지 않는다 |

@@ -11,7 +11,7 @@
 | REQ2 | OAuth 앱 값은 `server_secret` 의 이름 `oauth_app:github:<플러그인 id>` 와 `oauth_app:google` 에 둔다. 서버 비밀값 화면은 카탈로그에서 OAuth 를 선언한 플러그인을 읽어 그 줄을 보인다. client ID 와 GitHub App 이름(slug)은 공개 값으로 원문을 보이고 client secret 만 감춘다 |
 | REQ3 | 카탈로그 응답(`ConnectorSummary`)에 `oauth: {provider, ready, fields}` 를 더한다. `ready` 는 그 앱 줄의 값이 모두 있고 토큰 통로 주소를 만들 수 있을 때 참이다. 웹은 `ready` 면 단추 위에 `fields` 밖 칸을, 접힌 「직접 입력」 에 `oauth.fields` 에 든 칸을 그린다. 아니면 입력 칸만 그리고 `ADMIN` 에게만 서버 비밀값 링크를 보인다 |
 | REQ4 | 시작 요청이 단추 밖 칸 값을 함께 받아 대기 보관 파일에 쓴다. 돌아오면 대시보드가 코드를 교환해 대기 OAuth 파일에 쓰고, Control Plane 이 대기 자리로 확인 도구를 부른 뒤 두 대기 파일을 본 자리로 올린다(아래 「흐름」) |
-| REQ5 | 상태 값 검사, 서비스의 `error` 응답, 부분 허락, 확인 도구 실패, 앱 자격 거절을 `OAuthOutcome` 하나로 모아 웹의 돌아오는 경로가 연결 화면에 까닭과 「다시 시도」 를 그린다. 실패하면 대기 파일을 지운다 |
+| REQ5 | 상태 값 검사, 서비스의 `error` 응답, 부분 허락, 확인 도구 실패, 앱 자격 거절을 `ConnectorOAuthCompletion.Outcome` 하나로 모아 웹의 돌아오는 경로가 연결 화면에 까닭과 「다시 시도」 를 그린다. 실패하면 대기 파일을 지운다 |
 | REQ6 | Control Plane 의 토큰 통로가 연결 표식을 받아 지금 유효한 access token 을 준다. 통로 주소는 OAuth 파일에 있고 실행기가 칸처럼 `token_env` 로 넣는다. OAuth 파일은 보관 파일 리비전 밖이라 갱신이 서버 정의를 바꾸지 않는다 |
 | REQ7 | 대시보드가 서비스 응답을 `ok`, `grant_revoked`, `app_rejected`, `unavailable` 로 나눠 답한다. `grant_revoked` 면 연결을 `PENDING` 과 `auth.reconnectRequired` 로 바꾸고 바뀌는 순간에만 사용자 알림을 남긴다. `app_rejected` 는 연결을 두고 관리자 알림을, `unavailable` 은 그 호출만 실패시킨다 |
 | REQ8 | 해제가 바인딩을 모두 뗀 뒤 보관 파일을 지우기 전에 대시보드에 취소를 맡긴다. 실패하거나 건너뛰면 해제를 그대로 잇고 응답의 `oauthRevoke` 에 `status: failed` 와 제공자 설정 주소(`settingsUrl`)를 담는다. GitHub 은 성공해도(`status: revoked`) 앱 설치 화면 주소(`installSettingsUrl`)를 담는다 |
@@ -136,7 +136,7 @@ begin 이 단추 밖 칸을 담은 대기 보관 파일 `<보관 파일 id>.pend
 | 경로 | 하는 일 |
 | --- | --- |
 | `POST /api/v1/connections/{connectorId}/oauth/start` | 웹이 돌아오는 주소와 단추 밖 칸 값을 보낸다. 칸 값을 지금 등록과 같이 검사한다. 앱 값이 없으면 409 `CONNECTOR_OAUTH_NOT_CONFIGURED`. begin 으로 대기 보관 파일을 쓰고, 상태 값과 PKCE 를 만들어 로그인 주소를 답한다 |
-| `POST /api/v1/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `OAuthOutcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
+| `POST /api/v1/connections/oauth/complete` | 웹이 받은 `state`, `code`, `error`, GitHub 의 `setup_action` 을 넘긴다. 결과 `ConnectorOAuthCompletion.Outcome` 과 연결 화면으로 갈 플러그인 id, 다시 보낼 로그인 주소(아래 「흐름」)를 답한다 |
 | `GET /internal/connector-token/{표식}` | 토큰 통로. JWT 없이 받는다(`SecurityConfig` 에 `permitAll`, 브라우저 중계와 같은 자리). `{access_token, expires_at}` |
 
 **상태 값**은 `v1.<사용자 번호>.<플러그인 id>.<만료 epoch 초>.<무작위 16바이트>.<HMAC>` 이다. 서명할 글에 돌아오는 주소와 begin 의 `nonce` 를 넣는다. PKCE verifier 는 `HMAC(서명 비밀, "pkce" + 무작위 값)` 으로 만들어 저장하지 않는다. 시작 때 받은 begin 의 `nonce`, 단추 밖 칸의 비밀 아닌 값과 비밀 칸 앞부분을 그 무작위 값을 key 로 메모리에 10분 둔다(서버 한 대 전제). complete 는 상태 값의 서명을 그 `nonce` 와 함께 검사하고, 서명이 맞으면 그 기억을 지워 한 번만 받은 뒤 exchange·commit·discard 에 넘긴다.
