@@ -33,17 +33,6 @@ export function MessageActions({
         <VersionSwitcher slot={version} onChange={onVersionChange} />
       ) : null}
       <CopyButton text={content} label={copyLabel} />
-      {onReply ? (
-        <TooltipButton
-          variant="outline"
-          size="icon-xs"
-          label="답장"
-          onClick={onReply}
-          className="ml-2 bg-background text-muted-foreground"
-        >
-          <Reply aria-hidden="true" />
-        </TooltipButton>
-      ) : null}
       {canRegenerate && onRegenerate ? (
         <TooltipButton
           variant="outline"
@@ -53,6 +42,18 @@ export function MessageActions({
           className="ml-2 bg-background text-muted-foreground"
         >
           <RotateCcw aria-hidden="true" />
+        </TooltipButton>
+      ) : null}
+      {/* 「답 다시 만들기」 뒤에 둔다. 복사에서 Tab 으로 다시 만들기에 바로 가던 순서를 지킨다. */}
+      {onReply ? (
+        <TooltipButton
+          variant="outline"
+          size="icon-xs"
+          label="답장"
+          onClick={onReply}
+          className="ml-2 bg-background text-muted-foreground"
+        >
+          <Reply aria-hidden="true" />
         </TooltipButton>
       ) : null}
     </div>
