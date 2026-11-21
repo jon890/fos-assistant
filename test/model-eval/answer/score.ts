@@ -50,8 +50,9 @@ export type SetScore = {
   /** 형식 참고 칸을 하나라도 어긴 문항 수와 형식을 본 문항 수다. 통과 판정에 쓰지 않는다. */
   formatViolations: number;
   formatChecked: number;
-  /** 속도 참고 칸이다. 통과 판정에 쓰지 않는다. 걸린 시간을 아는 문항의 평균 초, 도구 호출과 차례의 합, 출처 링크의 합이다. */
+  /** 속도 참고 칸이다. 통과 판정에 쓰지 않는다. 걸린 시간을 아는 문항의 평균 초, 도구 차례를 센 문항 수와 그 문항들의 호출과 차례의 합, 출처 링크의 합이다. */
   averageSeconds: number | null;
+  roundsChecked: number;
   toolCalls: number;
   toolRounds: number;
   sourceLinks: number;
@@ -368,8 +369,10 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
   const errors = scores.filter((score) => score.error).length;
   const timed = scores.filter((score) => score.latencyMs !== null);
   const averageSeconds = timed.length === 0 ? null : timed.reduce((sum, score) => sum + score.latencyMs!, 0) / timed.length / 1000;
-  const toolCalls = scores.reduce((sum, score) => sum + (score.rounds?.calls ?? 0), 0);
-  const toolRoundCount = scores.reduce((sum, score) => sum + (score.rounds?.rounds ?? 0), 0);
+  // 칸이 생기기 전 보고서를 다시 쓴 문항은 도구 차례를 세지 않았으므로 합계에서 뺀다
+  const counted = scores.filter((score) => score.rounds !== undefined);
+  const toolCalls = counted.reduce((sum, score) => sum + score.rounds!.calls, 0);
+  const toolRoundCount = counted.reduce((sum, score) => sum + score.rounds!.rounds, 0);
   const sourceLinkCount = scores.reduce((sum, score) => sum + score.sourceLinks, 0);
   let outcome: SetOutcome;
   if (errors > 0) {
@@ -394,6 +397,7 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
     formatViolations,
     formatChecked: formatted.length,
     averageSeconds,
+    roundsChecked: counted.length,
     toolCalls,
     toolRounds: toolRoundCount,
     sourceLinks: sourceLinkCount,
@@ -419,6 +423,11 @@ function perRound(calls: number, rounds: number): string {
   return rounds === 0 ? "-" : (calls / rounds).toFixed(2);
 }
 
+function toolSummary(set: SetScore): string {
+  if (set.roundsChecked === 0) return "도구 차례 미집계";
+  return `도구 차례를 센 문항 ${set.roundsChecked}개에서 도구 ${set.toolCalls}번을 ${set.toolRounds}차례에 불렀다(차례당 ${perRound(set.toolCalls, set.toolRounds)}개)`;
+}
+
 function seconds(latencyMs: number | null): string {
   return latencyMs === null ? "-" : `${Math.round(latencyMs / 1000)}초`;
 }
@@ -438,7 +447,7 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     `- 사람 비교: 「비슷하다」 ${set.similar}/${set.compareTotal} (적은 것 ${set.compared}개)`,
     ...set.reasons.map((reason) => `- ${set.outcome === "PARTIAL" ? "참고" : "미달"}: ${reason}`),
     `- 형식 참고(통과 기준 아님): 어긴 문항 ${set.formatViolations}/${set.formatChecked}`,
-    `- 속도 참고(통과 기준 아님): 평균 걸린 시간 ${set.averageSeconds === null ? "-" : `${Math.round(set.averageSeconds)}초`}, 도구 ${set.toolCalls}번을 ${set.toolRounds}차례에 불렀다(차례당 ${perRound(set.toolCalls, set.toolRounds)}개), 출처 링크 합 ${set.sourceLinks}개`,
+    `- 속도 참고(통과 기준 아님): 평균 걸린 시간 ${set.averageSeconds === null ? "-" : `${Math.round(set.averageSeconds)}초`}, ${toolSummary(set)}, 출처 링크 합 ${set.sourceLinks}개`,
     "",
     "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) | 도구 차례(호출) |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
