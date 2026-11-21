@@ -17,6 +17,7 @@ import {
   type PushConfig,
   type PushDevice,
 } from "@/lib/push";
+import { PushSubscribeTimeoutError } from "@/lib/with-timeout";
 import {
   deniedHelp,
   deviceName,
@@ -44,6 +45,10 @@ const KEY_CHANGED = "PUSH_KEY_CHANGED";
 /** 등록이 이 코드로 거절되면 서버에 키가 없다 */
 const NOT_CONFIGURED = "PUSH_NOT_CONFIGURED";
 
+/** 푸시 서비스에 닿지 못해 구독이 끝나지 않을 때의 안내다 */
+export const SUBSCRIBE_TIMEOUT_MESSAGE =
+  "이 브라우저에서는 알림 구독이 끝나지 않아요. Chrome·Safari·Edge 같은 브라우저나 휴대폰 홈 화면 앱에서 다시 해 주세요.";
+
 type Loaded = { config: PushConfig; devices: PushDevice[] };
 
 /** 서버 설정과 기기 목록을 읽는다. 푸시 경로가 아직 없는 서버(404)는 꺼진 것으로 본다. */
@@ -64,6 +69,14 @@ type ReadResult = { config: PushConfig | null; view: PushSettingsView };
 
 /** 서버 설정, 기기 목록, 이 브라우저의 구독과 허락 상태를 읽어 화면 상태를 정한다. */
 async function readView(): Promise<ReadResult> {
+  const first = await readViewOnce();
+  if (first.view.phase !== "failed") return first;
+  // 처음 열 때 서버 응답이 한 번 느리거나 실패해도 곧바로 실패로 보이지 않게 한 번 더 읽는다.
+  const second = await readViewOnce();
+  return second.view.phase === "failed" ? first : second;
+}
+
+async function readViewOnce(): Promise<ReadResult> {
   try {
     const loaded = await loadServer();
     if ("failure" in loaded)
@@ -173,8 +186,15 @@ export function usePushSettings() {
         setActionError(await describeFailure(response));
         return;
       }
-    } catch {
-      setActionError("이 기기를 등록하지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+    } catch (error) {
+      const timedOut = error instanceof PushSubscribeTimeoutError;
+      setActionError(
+        timedOut
+          ? SUBSCRIBE_TIMEOUT_MESSAGE
+          : "이 기기를 등록하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
+      );
+      // 시간 초과 뒤 다시 읽기가 멈춰도 단추는 바로 되살린다.
+      if (timedOut) setBusy(false);
     } finally {
       await reload();
       setBusy(false);
