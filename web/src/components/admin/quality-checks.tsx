@@ -47,6 +47,17 @@ async function readFirst(): Promise<Loaded | null> {
 
 type Message = { error: boolean; text: string };
 
+/** 다시 읽은 첫 쪽을 지금 목록에 합친다. 「더 보기」 로 펼친 뒤쪽 기록은 남긴다. */
+function merged(current: Loaded, page: QualityCheckPage): Loaded {
+  const fresh = new Set(page.items.map((check) => check.publicId));
+  const older = current.checks.filter((check) => !fresh.has(check.publicId));
+  return {
+    ...current,
+    checks: [...page.items, ...older],
+    nextCursor: older.length > 0 ? current.nextCursor : page.nextCursor,
+  };
+}
+
 /** 시작이나 「다시 확인」 요청의 결과를 안내 한 줄로 바꾼다. 202 는 새로 시작, 200 은 이미 도는 확인이다. */
 async function startOutcome(request: Promise<Response>): Promise<Message> {
   try {
@@ -104,7 +115,15 @@ export function QualityChecks() {
     loaded?.checks.some((check) => check.status === "RUNNING") ?? false;
   useEffect(() => {
     if (!running) return;
-    const timer = setTimeout(() => setAttempt((value) => value + 1), POLL_MS);
+    const timer = setTimeout(() => {
+      void readJson<QualityCheckPage>(fetchQualityChecks()).then((page) => {
+        // 다시 읽기는 확인 목록만 읽는다. 실패하면 지금 그림을 그대로 두고 다음 차례에 다시 읽는다.
+        if (page !== null)
+          setLoaded((current) =>
+            current === null ? current : merged(current, page),
+          );
+      });
+    }, POLL_MS);
     return () => clearTimeout(timer);
   }, [running, loaded]);
 

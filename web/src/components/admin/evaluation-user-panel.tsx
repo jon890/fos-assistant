@@ -75,6 +75,12 @@ export function EvaluationUserPanel({
               <li key={code}>{MISSING_LABELS[code] ?? code}</li>
             ))}
           </ul>
+          {status.missing.includes("PRIMARY_AGENT") ? (
+            <p className="mt-1">
+              기본 비서는 다시 준비해도 생기지 않아요. 사용자 관리에서 평가
+              사용자를 확인해 주세요.
+            </p>
+          ) : null}
         </Notice>
       )}
       <div className="flex flex-wrap items-end gap-2">
