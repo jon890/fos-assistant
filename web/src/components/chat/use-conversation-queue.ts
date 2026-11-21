@@ -1,6 +1,7 @@
 "use client";
 
 import { describePendingFailure } from "./conversation-session-helpers";
+import type { ReplyTarget } from "@/lib/reply";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationSend } from "./use-conversation-send";
 import type { MessageAttachment } from "./message-types";
@@ -100,9 +101,15 @@ export function useConversationQueue({
     attachmentIds: number[],
     replacementText?: string,
     attachments?: MessageAttachment[],
+    reply?: ReplyTarget,
   ): Promise<boolean> {
     if (!sending && !pending.queue.held)
-      return send(attachmentIds, replacementText, attachments);
+      return send(attachmentIds, replacementText, attachments, reply);
+    if (reply) {
+      // 대기 메시지는 글만 받아 집은 것을 붙일 수 없다(스펙 chat-reference DECISION18).
+      setError("답이 끝나면 답장을 보낼 수 있어요.");
+      return false;
+    }
     if (delegateTo !== null) {
       // 대기 메시지는 대화의 에이전트에게 가고 글만 받는다. 맡김을 그 줄에 넣지 않는다.
       setError("답이 끝나고 대기 메시지를 보낸 뒤에 맡길 수 있어요.");

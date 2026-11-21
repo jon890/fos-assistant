@@ -2,6 +2,7 @@ import type { AgentView } from "@/lib/agent";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { type ModelTierCode } from "@/lib/model-tiers";
 import type { MessageAttachment } from "./message-types";
+import type { ReplyTarget } from "@/lib/reply";
 import type { OutgoingMessage } from "./composer-attachment-utils";
 
 export type Props = {
@@ -13,6 +14,7 @@ export type Props = {
     attachmentIds: number[],
     text?: string,
     attachments?: MessageAttachment[],
+    reply?: ReplyTarget,
   ): Promise<boolean>;
   onOutgoingChange(message: OutgoingMessage | null): void;
   /** 대화가 아직 없으면 null. 사진을 고르면 이 값이 없는 채로 첫 사진을 올릴 수 없다 */
@@ -38,6 +40,8 @@ export type Props = {
    * 고르지 않았으면 주지 않는다.
    */
   delegateTarget?: { agent: AgentView; onClear(): void };
+  /** 답장으로 집은 것이다. 입력창 위에 작게 보이고 닫기를 받는다(스펙 chat-reference REQ4) */
+  reply?: { target: ReplyTarget; onClear(): void };
   /**
    * 입력칸 맨 앞에 `/` 를 치면 이 스킬 이름 목록을 띄운다. 비었으면 스킬이 없다고 알린다.
    * 목록을 아직 읽지 못했으면 주지 않고, 그때는 목록을 띄우지 않는다.

@@ -98,6 +98,16 @@ public class ChatMessage {
     @Getter
     private SteerChild steerChild;
 
+    /** 사용자가 집어 답장한 메시지 줄이다(스펙 chat-reference). 답장이 아니면 null 이다. */
+    @Column(name = "reply_message_id")
+    private Long replyMessageId;
+
+    @Column(name = "reply_attachment_id")
+    private Long replyAttachmentId;
+
+    @Column(name = "reply_artifact_id")
+    private Long replyArtifactId;
+
 
     protected ChatMessage() {}
 
@@ -197,6 +207,23 @@ public class ChatMessage {
         message.steerExecutionId = steerExecutionId;
         message.steerChild = child;
         return message;
+    }
+
+
+    /** 사용자 메시지에 집은 것을 적는다. null 이면 바꾸지 않는다. */
+    public ChatMessage replyTo(ReplyRef reply) {
+        if (reply != null) {
+            this.replyMessageId = reply.messageId();
+            this.replyAttachmentId = reply.attachmentId();
+            this.replyArtifactId = reply.artifactId();
+        }
+        return this;
+    }
+
+
+    /** 집은 것이다. 답장이 아니면 null 이다. */
+    public ReplyRef reply() {
+        return replyMessageId == null ? null : new ReplyRef(replyMessageId, replyAttachmentId, replyArtifactId);
     }
 
 

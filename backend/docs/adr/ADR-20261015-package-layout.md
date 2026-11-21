@@ -34,7 +34,7 @@
 
 | 기능 | 하위 기능(아래에서 위로) |
 | --- | --- |
-| `chat` | `conversation`, `delivery`, `modelchoice`, `attachment`, `artifact`, `contentdraft`, `starter`, `room`, `turn`, `nextturn`, `recovery`, `purge` |
+| `chat` | `conversation`, `delivery`, `modelchoice`, `attachment`, `artifact`, `contentdraft`, `reply`, `starter`, `room`, `turn`, `nextturn`, `recovery`, `purge` |
 | `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval`, `handoff` |
 | `proactive` | `check` |
 | `usage` | `pricing`, `execution`, `subagent`, `tree`, `summary` |
@@ -50,6 +50,7 @@
 | `chat.attachment` | 사진 첨부의 저장과 검사, 원본 조회, 첨부 관찰 |
 | `chat.artifact` | 에이전트가 만든 결과물 파일 |
 | `chat.contentdraft` | 원고 초안과 snapshot |
+| `chat.reply` | 답장으로 집은 메시지와 그림의 검사, 실행 입력의 「사용자가 집은 메시지」 구역(2026-11-21 대화 답장 PR1 에서 더함. `chat.turn.application` 이 클래스 상한에 닿아 있었다) |
 | `chat.starter` | 추천 질문 |
 | `chat.room` | 기본 비서와 이어지는 대화방 찾기와 만들기, 날이 바뀐 첫 메시지의 요약(2026-11-12 에이전트 팀 PR5 에서 더함) |
 | `chat.turn` | 한 번의 대화 turn 의 실행과 중지, 사건 스트림, 대화 API 의 조립 |

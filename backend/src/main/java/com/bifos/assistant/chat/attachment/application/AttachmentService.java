@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.attachment.application;
 import com.bifos.assistant.chat.attachment.application.dto.AgentInput;
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
 import com.bifos.assistant.chat.attachment.application.dto.AttachmentContent;
+import com.bifos.assistant.chat.attachment.application.dto.EmbeddedImages;
+import com.bifos.assistant.chat.attachment.application.dto.ExtraImage;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
@@ -28,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.stereotype.Service;
@@ -280,11 +283,18 @@ public class AttachmentService {
      * 이것을 쓰지 않는다.
      */
     public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text) {
+        return agentInput(conversationId, attached, text, List.of(), List.of());
+    }
+
+
+    /** 답장으로 집은 사진과 그림({@code extras})을 이번 메시지 사진과 한 예산으로 함께 넣는다. 이름표는 {@code labels} 의 같은 자리다. */
+    public AgentInput agentInput(
+        Long conversationId, List<ChatAttachment> attached, String text, List<ExtraImage> extras, List<String> labels) {
         List<ChatAttachment> sent = allOf(conversationId).stream()
             .filter(it -> it.messageId() != null)
             .toList();
         if (sent.isEmpty()) {
-            return new AgentInput(text, List.of());
+            return new AgentInput(text, extras.isEmpty() ? List.of() : images.embed(List.of(), Map.of(), extras).extraImages(labels));
         }
         attached = attached == null ? List.of() : attached;
         Long ownerUserId = sent.getFirst().uploadedByUserId();
@@ -300,7 +310,8 @@ public class AttachmentService {
             .filter(this::inspectable)
             .map(ChatAttachment::id)
             .collect(Collectors.toSet());
-        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(it -> retained.contains(it.id())).toList(), order).stream()
+        EmbeddedImages embedded = images.embed(attached.stream().filter(it -> retained.contains(it.id())).toList(), order, extras);
+        Map<Long, AgentPhoto> prepared = embedded.photos().stream()
             .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
         List<AgentPhoto> photos = attached.stream()
             .map(attachment -> retained.contains(attachment.id()) && prepared.containsKey(attachment.id())
@@ -337,9 +348,11 @@ public class AttachmentService {
             + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
             + "\n"
             + text;
-        List<HermesImage> hermesImages = photos.stream()
-            .filter(AgentPhoto::embedded)
-            .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
+        List<HermesImage> hermesImages = Stream.concat(
+            photos.stream()
+                .filter(AgentPhoto::embedded)
+                .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl())),
+            embedded.extraImages(labels).stream())
             .toList();
         MediaPipelineEvents.referenced(conversationId, pastIds);
         return new AgentInput(input, hermesImages);
@@ -386,7 +399,8 @@ public class AttachmentService {
     }
 
 
-    private boolean inspectable(ChatAttachment attachment) {
+    /** 보낸 사진의 파일이 남아 볼 수 있다. 답장으로 집은 사진을 검사할 때도 쓴다(스펙 chat-reference REQ9). */
+    public boolean inspectable(ChatAttachment attachment) {
         return attachment.isVisible()
             && attachment.expiresAt().isAfter(clock.instant())
             && latest(
@@ -420,7 +434,7 @@ public class AttachmentService {
      * <p>화면은 메시지 순서로 묶고 한 메시지 안에서는 저장한 순서로 보인다. 첨부 번호로만 세면 한 창에서
      * 올려 둔 사진을 다른 창의 사진보다 늦게 보냈을 때 순번이 어긋난다.
      */
-    private Map<Long, Integer> orderInConversation(Long conversationId) {
+    public Map<Long, Integer> orderInConversation(Long conversationId) {
         Map<Long, Integer> order = new HashMap<>();
         attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId).stream()
             .filter(attachment -> attachment.messageId() != null)
