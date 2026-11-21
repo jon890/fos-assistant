@@ -10,6 +10,7 @@ import com.bifos.assistant.quality.domain.type.QualityRunStatus;
 import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -93,5 +94,24 @@ class QualityRunTest {
         assertThat(kept.executionIds()).isEmpty();
         assertThat(kept.status()).isEqualTo(FeatureStatus.FAILED);
         assertThat(kept.reasonCode()).isEqualTo("NO_SOURCES");
+    }
+
+
+    @Test
+    @DisplayName("지우지 못한 대화의 링크는 남기고 지운 대화의 링크만 비운다")
+    void dropLinksKeepsUnremovedConversations() {
+        QualityRun run = running();
+        FeatureResult removed = new FeatureResult(QualityFeature.SEARCH, FeatureStatus.FAILED, "NO_SOURCES", 1, UUID.randomUUID(), List.of(1L));
+        FeatureResult kept = new FeatureResult(QualityFeature.IMAGE, FeatureStatus.FAILED, "NO_IMAGE", 1, UUID.randomUUID(), List.of(2L));
+        run.record(removed, 1);
+        run.record(kept, 1);
+        run.finish(QualityRunStatus.FAILED, START.plusSeconds(1));
+
+        run.dropLinks(Set.of(removed.conversationPublicId()));
+
+        assertThat(run.results().get(0).conversationPublicId()).isNull();
+        assertThat(run.results().get(0).executionIds()).isEmpty();
+        assertThat(run.results().get(1).conversationPublicId()).isEqualTo(kept.conversationPublicId());
+        assertThat(run.results().get(1).executionIds()).containsExactly(2L);
     }
 }

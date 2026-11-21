@@ -19,6 +19,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -129,6 +130,20 @@ public class QualityRun extends CreatedAtEntity {
     /** 30일이 지난 실패 기능의 대화와 실행 링크를 비운다. 결과와 숫자는 남는다. */
     public void dropLinks() {
         results = results().stream().map(FeatureResult::withoutLinks).toList();
+    }
+
+
+    /**
+     * 지운 대화의 링크만 비운다. 지우지 못한 대화의 링크는 남겨 다음 정리가 다시 찾게 한다. 대화 없이 실행 번호만 남은 기능은 비운다.
+     *
+     * @param removed 지웠거나 이미 없는 대화의 공개 식별자
+     */
+    public void dropLinks(Set<UUID> removed) {
+        results = results().stream()
+            .map(result -> result.conversationPublicId() == null || removed.contains(result.conversationPublicId())
+                ? result.withoutLinks()
+                : result)
+            .toList();
     }
 
 

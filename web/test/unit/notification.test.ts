@@ -49,6 +49,13 @@ test("연결 다시 설치 알림은 공개 식별자 없이 관리자 연결 �
   );
 });
 
+test("배포 뒤 확인 실패 알림은 공개 식별자 없이 관리자 품질 화면으로 간다", () => {
+  assert.equal(
+    notificationHref(view({ kind: "QUALITY_CHECK_FAILED", targetType: "ADMIN_QUALITY", targetId: null })),
+    "/admin/quality",
+  );
+});
+
 test("읽지 않은 알림이 없으면 배지를 그리지 않는다", () => {
   assert.equal(unreadBadge(0), null);
   assert.equal(unreadBadge(-1), null);
