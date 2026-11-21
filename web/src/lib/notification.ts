@@ -9,15 +9,18 @@ export type NotificationKind =
   | "EVENT_WATCH_FAILED"
   | "HANDOFF_REQUESTED"
   | "DEFAULT_TOOLS_PENDING"
+  | "CONNECTOR_RECONNECT_REQUIRED"
+  | "CONNECTOR_OAUTH_APP_REJECTED"
   | "PUSH_DEVICES_RESET"
   | "QUALITY_CHECK_FAILED";
 
-/** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다. `ADMIN_CONNECTIONS`, `CONNECTIONS`, `PUSH_SETTINGS`, `ADMIN_QUALITY` 는 목록 화면이라 `targetId` 가 없다 */
+/** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다. `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_SECRETS`, `PUSH_SETTINGS`, `ADMIN_QUALITY` 는 목록 화면이라 `targetId` 가 없다 */
 export type NotificationTargetType =
   | "CONVERSATION"
   | "TASK"
   | "ADMIN_CONNECTIONS"
   | "CONNECTIONS"
+  | "ADMIN_SECRETS"
   | "PUSH_SETTINGS"
   | "ADMIN_QUALITY";
 
@@ -56,6 +59,7 @@ export const TODO_ENTRY_PARAM = "todo";
 export function notificationHref(view: NotificationView): string | null {
   if (view.targetType === "ADMIN_CONNECTIONS") return "/admin/connections";
   if (view.targetType === "CONNECTIONS") return "/connections";
+  if (view.targetType === "ADMIN_SECRETS") return "/admin/secrets";
   if (view.targetType === "PUSH_SETTINGS") return "/settings/notifications";
   if (view.targetType === "ADMIN_QUALITY") return "/admin/quality";
   if (view.targetType === "CONVERSATION" && view.targetId) {
