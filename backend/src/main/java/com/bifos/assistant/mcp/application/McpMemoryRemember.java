@@ -47,10 +47,12 @@ public class McpMemoryRemember {
      * <p>{@code agent_status} 와 {@code agent_stop} 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. 그 답에 바깥 글이 실릴 수 있다.
      * {@code skill_view} 도 넣지 않는다. 같은 toolset 의 {@code skill_manage} 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
      * 할 일 제목을 돌려주는 {@code follow_up_list} 와 {@code follow_up_done} 도 넣지 않는다. 예약 작업의 실행이 바깥 글을 읽고 적은
-     * 제목일 수 있다. {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
+     * 제목일 수 있다. {@code memory_search} 는 {@code memory_read} 와 같은 요청자의 기억만 돌려준다. 빠뜨리면 기억을 찾기만 한 대화도
+     * 바깥 글을 읽은 대화가 되어 바로 저장하지 못하고 제안 카드에 「바깥 글」 표시가 붙는다. {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
      */
     static final Set<String> INTERNAL_TOOLS = Set.of(
         "mcp__fos_assistant__memory_read",
+        "mcp__fos_assistant__memory_search",
         "mcp__fos_assistant__memory_remember",
         "mcp__fos_assistant__follow_up_propose",
         "mcp__fos_assistant__memory_forget",
