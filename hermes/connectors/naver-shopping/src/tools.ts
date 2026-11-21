@@ -5,7 +5,7 @@ import { readStore } from "./product-read.ts";
 import { parseSearch, searchLooksChanged } from "./parse-search.ts";
 import { browserUrl, type Env } from "./session.ts";
 import { readInTab, type Page, type TabOptions } from "./tab.ts";
-import { classifyUrl, searchUrl } from "./urls.ts";
+import { classifyUrl, searchUrl, type SearchSort } from "./urls.ts";
 import { parseJson } from "./values.ts";
 
 export const QUERY_MAX = 100;
@@ -30,13 +30,14 @@ export async function searchProducts(
   env: Env,
   query: string,
   deps: ToolDeps = DEFAULT_DEPS,
+  sort?: SearchSort,
 ) {
   const cdpUrl = browserUrl(env);
   const checked = checkQuery(query);
   // 읽기는 탭 안에서 한다. 칸이 없으면 탭을 남긴 예상 밖 화면 넘기기가 된다.
   const products = await deps.read(
     cdpUrl,
-    searchUrl(checked),
+    searchUrl(checked, sort),
     SEARCH_STATE,
     (raw) => {
       const state = parseJson(raw);

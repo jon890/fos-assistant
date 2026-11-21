@@ -134,11 +134,21 @@ test("옵션 없는 상품은 할인가, 판매처, 유료 배송비와 지역 �
   expect("options_truncated" in parsed).toBe(false);
 });
 
+test("유료 배송의 기본 배송비가 비면 미확인으로 표시한다", () => {
+  for (const baseFee of [undefined, null, "", " 원"]) {
+    const parsed = parseStoreProduct(
+      { ...product, productDeliveryInfo: { deliveryFeeType: "PAID", baseFee } },
+      url,
+    )!;
+    expect(parsed.shipping.fee_krw).toBeNull();
+  }
+});
+
 test("무료 배송이면 배송비 0 이고, 지역 추가 배송비 칸이 없거나 0 이면 없다고 본다", () => {
   const free = parseStoreProduct(
     {
       ...product,
-      productDeliveryInfo: { deliveryFeeType: "FREE", baseFee: 0 },
+      productDeliveryInfo: { deliveryFeeType: "FREE" },
     },
     url,
   )!;

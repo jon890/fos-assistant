@@ -1,8 +1,6 @@
 import { logDiagnostic, ToolError } from "./errors.ts";
 import { PRODUCT_STATE } from "./expressions.ts";
-import { FREE_DELIVERY, PRODUCT } from "./fields.ts";
 import { chooseOption, MissingFields } from "./parse-product.ts";
-import { pick, won } from "./values.ts";
 import { readStore, type StoreRead } from "./product-read.ts";
 import { browserUrl, type Env } from "./session.ts";
 import { workInTab, type Page, type TabOptions } from "./tab.ts";
@@ -75,22 +73,15 @@ export function priceCheckout(
 ): PricedCheckout {
   const { product } = read;
   if (product.store === null) throw new MissingFields(["store"]);
-  // 유료 배송인데 기본 배송비 칸이 비면 0 으로 지어내지 않는다. 카드의 배송비가 틀려진다.
-  const delivery = pick(read.value, PRODUCT.delivery);
-  if (
-    pick(delivery, PRODUCT.feeType) !== FREE_DELIVERY &&
-    won(pick(delivery, PRODUCT.baseFee)) === null
-  )
-    throw new MissingFields(["delivery_fee"]);
+  const { fee_krw: baseFee, free_over_krw: freeOver } = product.shipping;
+  if (baseFee === null) throw new MissingFields(["delivery_fee"]);
   if (!product.naver_pay_buy) throw new ToolError("NAVER_SHOPPING_NOT_BUYABLE");
   const chosen = chooseOption(read.value, product, options);
   if (product.price_krw === null || product.title === null)
     throw new MissingFields(["price"]);
   const unit = product.price_krw + chosen.extra_krw;
   const item = unit * quantity;
-  const freeOver = product.shipping.free_over_krw;
-  const shipping =
-    freeOver !== null && item >= freeOver ? 0 : product.shipping.fee_krw;
+  const shipping = freeOver !== null && item >= freeOver ? 0 : baseFee;
   const total = item + shipping;
   if (!(unit > 0) || !Number.isSafeInteger(total) || total >= AMOUNT_BOUND)
     throw new ToolError("NAVER_SHOPPING_NOT_BUYABLE");
