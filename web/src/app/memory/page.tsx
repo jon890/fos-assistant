@@ -6,9 +6,12 @@ import {
   type MemoryDocument,
 } from "@/components/memory/document-section";
 import { MemoryList, type Memory } from "@/components/memory/memory-list";
+import { PageFrame } from "@/components/ui/page-frame";
+import { LoadFailure } from "@/components/ui/page-state";
 import { callControlPlane } from "@/lib/control-plane";
 import type { MaintenanceCandidate } from "@/lib/memory-maintenance-api";
 import { readMe } from "@/lib/me";
+import { PAGE_HEADS } from "@/lib/page-head";
 
 export default async function MemoryPage({
   searchParams,
@@ -27,7 +30,12 @@ export default async function MemoryPage({
       "/api/v1/memory/maintenance-candidates",
     ),
   ]);
-  if (!result.ok) return <p className="text-sm">{result.message}</p>;
+  if (!result.ok)
+    return (
+      <PageFrame {...PAGE_HEADS.memory}>
+        <LoadFailure message={result.message} />
+      </PageFrame>
+    );
   const readAt = new Date().toISOString();
   // 문서 탭을 읽지 못해도 기억 목록은 그대로 그린다.
   const documentsReady = documents.ok && collections.ok;

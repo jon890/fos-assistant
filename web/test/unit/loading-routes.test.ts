@@ -12,13 +12,14 @@ const SRC_ROOT = join(APP_ROOT, "..");
  *
  * `/agents/{code}` 처럼 대괄호 세그먼트가 있는 경로는 `web/src/app` 아래 디렉터리 이름 그대로 적는다.
  * 틀 파일은 `web/src` 기준이다. 바깥 틀이 `page.tsx` 가 아니라 그 화면의 첫 부품에 있는 경로가 있다.
+ * 화면 머리 틀(`PageFrame`)을 쓰는 화면은 폭을 스스로 갖지 않는다. 뼈대도 같은 부품을 `busy` 로 그리는지 본다.
  */
 const ROUTE_FRAMES: Record<string, string> = {
   agents: "app/agents/page.tsx",
-  "agents/[code]": "components/agent/persona-editor.tsx",
+  "agents/[code]": "components/agent/agent-detail-body.tsx",
   "agents/[code]/skills/[name]": "components/agent/skill-editor.tsx",
   "admin/agents": "components/agent/agent-admin-panel.tsx",
-  "admin/agents/[code]": "components/agent/persona-editor.tsx",
+  "admin/agents/[code]": "components/agent/agent-detail-body.tsx",
   memory: "components/memory/memory-list.tsx",
   now: "app/now/page.tsx",
   "admin/usage": "components/usage/usage-screen.tsx",
@@ -76,9 +77,15 @@ test("callControlPlane 을 부르는 page.tsx 마다 같은 자리에 loading.ts
 
 test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같다", async () => {
   for (const [route, frameFile] of Object.entries(ROUTE_FRAMES)) {
-    const expectedWidth = frameWidth(await readFile(join(SRC_ROOT, frameFile), "utf-8"));
-    assert.ok(expectedWidth, `${frameFile} 에서 mx-auto 와 max-w-* 가 있는 바깥 틀을 찾지 못했다`);
+    const frameSource = await readFile(join(SRC_ROOT, frameFile), "utf-8");
     const content = await readFile(join(APP_ROOT, route, "loading.tsx"), "utf-8");
+    if (content.includes("<PageFrame")) {
+      assert.match(frameSource, /<PageFrame\b/, `${frameFile} 가 화면 머리 틀을 쓰지 않는데 ${route} 의 뼈대만 쓴다`);
+      assert.match(content, /<PageFrame\b[^>]*\bbusy\b/, `${route} 의 loading.tsx 가 화면 머리 틀을 busy 로 그리지 않는다`);
+      continue;
+    }
+    const expectedWidth = frameWidth(frameSource);
+    assert.ok(expectedWidth, `${frameFile} 에서 mx-auto 와 max-w-* 가 있는 바깥 틀을 찾지 못했다`);
     const match = /width="([^"]+)"/.exec(content);
     assert.ok(match, `${route} 의 loading.tsx 에 width 가 없다`);
     assert.equal(match?.[1], expectedWidth, `${route} 의 width 가 ${frameFile} 의 max-w-${expectedWidth} 와 다르다`);
@@ -90,10 +97,12 @@ test("에이전트 목록 뼈대는 일반 화면과 관리자 영역이 각자 
   const admin = await readFile(join(APP_ROOT, "admin/agents/loading.tsx"), "utf-8");
   const memberFrame = await readFile(join(APP_ROOT, "agents/page.tsx"), "utf-8");
   const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
-  assert.equal(frameWidth(memberFrame), "2xl");
+  // 일반 화면은 화면 머리 틀이 폭을 정한다. 관리자 영역은 자기 폭을 그대로 갖는다.
+  assert.match(memberFrame, /<PageFrame\b/);
+  assert.equal(frameWidth(memberFrame), undefined);
   assert.equal(frameWidth(adminFrame), "4xl");
   assert.doesNotMatch(member, /useAdminView|readMe|await/);
-  assert.match(member, /width="2xl" title/);
+  assert.match(member, /<PageFrame\b[^>]*\bbusy\b/);
   assert.match(admin, /width="4xl"\s+title\s+description="agent"\s+form="agent"/);
 });
 

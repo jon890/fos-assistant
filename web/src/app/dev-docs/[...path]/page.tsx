@@ -4,6 +4,9 @@ import { auth } from "@/auth";
 import { DevDocMarkdown } from "@/components/dev-docs/markdown";
 import { DevDocsShell } from "@/components/dev-docs/shell";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
+import { LoadFailure } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { getCatalog } from "@/lib/dev-docs/catalog";
 import { normalizeRepoPath, readDoc } from "@/lib/dev-docs/read";
 import { githubFileUrl, sourceCommit } from "@/lib/dev-docs/source";
@@ -23,7 +26,9 @@ export default async function DevDocPage({
   const catalog = await getCatalog();
   if (!catalog) {
     return (
-      <Notice variant="warning">개발 문서를 담지 않고 띄운 서버예요.</Notice>
+      <PageFrame title={PAGE_HEADS.devDocs.title}>
+        <Notice variant="warning">개발 문서를 담지 않고 띄운 서버예요.</Notice>
+      </PageFrame>
     );
   }
   const repoPath = normalizeRepoPath(path);
@@ -36,9 +41,7 @@ export default async function DevDocPage({
   } catch {
     return (
       <DevDocsShell catalog={catalog} commit={commit} currentPath={repoPath}>
-        <Notice variant="error" role="alert">
-          문서를 불러오지 못했어요.
-        </Notice>
+        <LoadFailure message="문서를 불러오지 못했어요." />
       </DevDocsShell>
     );
   }
