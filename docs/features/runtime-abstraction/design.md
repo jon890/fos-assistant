@@ -32,7 +32,7 @@ ACP 로 구독 로그인, 지침 넣기, Control Plane 도구 붙이기, 웹 검
 | 모듈 | 맡는 것 |
 | --- | --- |
 | `runtime`(새 최상위 패키지) | 중립 실행 port `AgentRuntime`, 그 타입, 대상의 런타임 종류로 구현을 고르는 `AgentRuntimes`. 아무 기능에도 기대지 않는다 |
-| `hermes` | `AgentRuntime` 의 Hermes 구현(`hermes.infra`). Hermes 사건 이름과 상태 문자열을 중립 값으로 옮긴다. 지금의 `HermesRunsClient` 와 `HermesRunEventStream` 은 `hermes` 안의 내부 경계로 남아 이 구현만 부른다(DECISION6). 나머지 Hermes port 는 그대로다(스펙 DECISION8) |
+| `hermes` | `AgentRuntime` 의 Hermes 구현(`hermes.infra`). Hermes 사건 이름과 상태 문자열을 중립 값으로 옮긴다. 지금의 `HermesRunsClient` 와 `HermesRunEventStream` 은 자기 타입(`HermesRunCommand`, `HermesRunResult`, `HermesRunLookup`, `HermesRunEvent`)과 함께 `hermes` 안의 내부 경계로 남아 이 구현만 부르고, 이 구현이 중립 타입과 서로 옮긴다(DECISION6). 나머지 Hermes port 는 그대로다(스펙 DECISION8) |
 | `agent` | `Agent.runtimeTarget()`. 에이전트가 지금 어느 런타임의 어느 격리 단위에서 도는지를 값 하나로 내준다. PR1 에서는 늘 Hermes 다 |
 | `chat`, `orchestration`, `usage` | 실행을 부르는 곳. `AgentRuntimes` 와 `runtime` 의 타입만 쓴다 |
 
@@ -72,6 +72,8 @@ ACP 로 구독 로그인, 지침 넣기, Control Plane 도구 붙이기, 웹 검
 
 ### 타입
 
+`RunCommand`, `RunEvent`, `RunResult`, `RunLookup` 은 새로 만드는 중립 타입이다. `hermes` 의 짝 타입(`HermesRunCommand`, `HermesRunEvent`, `HermesRunResult`, `HermesRunLookup`)은 내부 경계에 남고 `HermesAgentRuntime` 이 둘 사이를 옮긴다. 지금 `hermes.application.dto.RunEvent` 는 단순 이름이 겹치지 않게 `HermesRunEvent` 로 이름을 바꾼다.
+
 | 타입 | 내용 |
 | --- | --- |
 | `RuntimeKind` | PR1 은 `HERMES` 하나. PR2 와 PR3 이 값을 더한다 |
@@ -79,7 +81,8 @@ ACP 로 구독 로그인, 지침 넣기, Control Plane 도구 붙이기, 웹 검
 | `RunCommand` | `target`, `input`, `instructions`, `sessionId`, `provider`, `model`, `reasoningEffort`, `images`(`RunImage`). `provider` 와 `model` 을 함께 채우거나 비우는 규칙은 Hermes 구현이 검사한다 |
 | `RunEvent` | `type` 문자열을 `RunEventKind`(답 조각, 중간 안내, 도구 시작, 도구 끝, 하위 에이전트 시작, 하위 에이전트 끝, 완료, 실패, 취소, 중단, 그 밖)로 바꾼다. 나머지 칸은 그대로다 |
 | `RunResult` | `status` 문자열을 둘로 나눈다. `outcome`(`RunOutcome`: 성공, 실패, 취소)은 부르는 쪽이 분기에 쓰고, `statusLabel` 은 실행 기록의 오류 코드와 로그에 그대로 적는 글자다. 「provider 계정이 막힘」 접두 문자열 검사는 Hermes 구현으로 옮기고 결과에는 불리언으로 남긴다. 나머지 칸은 그대로다 |
-| `RunLookup`, `SessionRuntime`, `SteerOutcome`, `TokenUsage`, `SubagentSessionUsage`, `ToolDetailScope`, `ToolDetailRedactor` | 칸과 동작은 그대로이고 패키지만 바뀐다 |
+| `RunLookup` | 지금 `HermesRunLookup` 과 같은 세 상태(도는 중, 끝남, 모름)이고 끝난 결과를 `RunResult` 로 갖는다 |
+| `RunImage`, `SessionRuntime`, `SteerOutcome`, `TokenUsage`, `SubagentSessionUsage`, `ToolDetailScope`, `ToolDetailRedactor` | 칸과 동작은 그대로이고 `hermes` 에서 패키지만 옮긴다(`HermesImage` 는 이름도 바꾼다). Hermes 의 내부 경계도 옮긴 타입을 쓴다 |
 
 **`status` 는 지금 application 이 읽는다.** 취소인지 보는 곳(`ChatTurnRunner`, `AgentRunner`, `RecoveredRunRecorder`)과, 대문자로 바꿔 실행 기록의 오류 코드로 저장하거나 로그에 남기는 곳(`ChatTurnRunner`, `AgentRunner`, `StarterSuggestionService`, `RoomContext`, `RecoveredRunRecorder`)이 있다.
 Hermes 구현은 `statusLabel` 에 지금 저장되는 것과 같은 글자를 넣어 데이터베이스의 오류 코드 값이 바뀌지 않게 한다. 새 런타임 구현은 Hermes 가 쓰는 이름(`FAILED`, `CANCELLED`, `INTERRUPTED`)에 맞춘다.
@@ -96,7 +99,7 @@ Hermes 구현은 `statusLabel` 에 지금 저장되는 것과 같은 글자를 �
 - 주소와 profile 이름을 들고 다니는 `TurnRunRef`, `RunningDelegation` 은 `RuntimeTarget` 을 들게 바꾼다.
 
 데이터베이스는 PR1 에서 바뀌지 않는다. 런타임 컬럼 둘(에이전트, 실행 기록)은 PR2 가 더한다(스펙 DECISION15).
-실행 기록의 사건 종류(`ExecutionEventType`)와 화면으로 가는 사건(`ChatEvent`)은 지금도 중립 이름이라 바뀌지 않는다. Hermes 사건 이름을 옮기는 표는 `ExecutionEventRecorder` 와 `ChatRunEvents` 에서 Hermes 구현으로 옮긴다.
+실행 기록의 사건 종류(`ExecutionEventType`)와 화면으로 가는 사건(`ChatEvent`)은 지금도 중립 이름이라 바뀌지 않는다. Hermes 사건 이름을 해석하는 일은 `ExecutionEventRecorder` 와 `ChatRunEvents` 에서 Hermes 구현으로 옮긴다.
 
 ### PR2 가 채울 자리
 
@@ -113,7 +116,7 @@ Hermes 구현은 `statusLabel` 에 지금 저장되는 것과 같은 글자를 �
 - **대상의 출처.** 저장된 기록으로 다시 부르는 자리를 `Agent.runtimeTarget()` 으로 바꾸면 에이전트의 profile 이 바뀐 뒤 다른 profile 로 가게 된다. 「대상을 만드는 두 길」 을 지킨다.
 - **런타임을 고르지 못할 때.** `AgentRuntimes` 가 대상의 종류에 맞는 구현을 찾지 못하면 실행을 실패로 기록하는 지금의 오류 길(`ApiException`)을 탄다. PR1 에서는 생기지 않고, PR2 의 「새 런타임 전체를 끈 설정」(스펙 DECISION14)이 이 길을 쓴다.
 - **배포 순서.** PR1 은 스키마와 Hermes 호출을 바꾸지 않아 순서 제약이 없다. 되돌리기는 PR 되돌리기 하나다.
-- **PR 크기.** 옮기는 타입을 쓰는 운영 코드 파일이 `hermes` 밖에 26개이고 테스트 파일이 97개다(2026-11-21). 운영 코드 변경 줄이 상한(`scripts/pr/pr-size.mjs`)을 넘으면 PR1 을 「타입과 port 옮기기」 와 「사건과 상태 해석 옮기기」 로 나눈다. PR 나눔은 사용자가 정한 것(스펙 DECISION7)이라, 나누기 전에 코디네이터를 거쳐 사용자에게 알리고 확인받는다. 나눠도 다섯 단계의 순서는 그대로다.
+- **PR 크기.** 옮기는 타입을 쓰는 운영 코드 파일이 `hermes` 밖에 26개이고 테스트 파일이 97개다(2026-11-21). 중립 port 와 옛 내부 경계가 함께 있을 수 있어 부르는 쪽을 나눠 옮길 수 있다. 운영 코드 변경 줄이 상한(`scripts/pr/pr-size.mjs`)에 닿으면 스스로 끝나는 호출자(추천 질문, 대화방 요약, 하위 에이전트 사용량 정리, 대화 삭제)와 구조 규칙을 다음 PR 로 미루고 코디네이터에게 알린다(사용자 결정 2026-11-21: 다섯 단계 안에서 넘으면 나눈다). 나눠도 다섯 단계의 순서는 그대로다.
 
 ## 검증 전략
 
@@ -121,7 +124,7 @@ Hermes 구현은 `statusLabel` 에 지금 저장되는 것과 같은 글자를 �
 | --- | --- |
 | REQ1 port 에 Hermes 이름이 없다 | 구조 테스트(ArchUnit) 셋. `runtime` 패키지가 `hermes` 를 기대지 않는다. `hermes` 밖의 운영 코드가 `HermesRunsClient`, `HermesRunEventStream`, 옛 실행 타입을 기대지 않는다(금지 대상은 이 타입들로 좁게 정한다. `hermes.infra` 의 다른 클래스를 쓰는 Hermes 전용 기능은 대상이 아니다). 층 순서 테스트에 `runtime` 을 더한다. 사건 이름이 port 에서 빠졌는지는 `RunEventKind` 타입과 이름 표의 단위 테스트가 확인한다 |
 | mcp 가 실행을 직접 부르지 않는다 | rule-11(`MCP_DOES_NOT_CALL_HERMES`)이 막는 타입에 `runtime` 의 `AgentRuntime` 과 `AgentRuntimes` 를 더한다. 지금 규칙은 `hermes` 패키지의 `*Client` 만 막아, 옮기면 빈틈이 생긴다 |
-| REQ1 Hermes 동작이 그대로다 | 통합 테스트의 가짜 구현(`StubHermesRunsClient`, 흉내 낸 `HermesRunEventStream`)은 `hermes` 안의 내부 경계를 그대로 대신하고, Hermes 어댑터는 실제 것을 쓴다. 그래서 지금 테스트가 Hermes 사건 이름으로 준비한 사건이 어댑터의 이름 옮기기를 거쳐 흐르고, 테스트의 사건 준비와 단언을 고치지 않는다. 테스트에서 바뀌는 것은 옮긴 타입의 import 와 결과의 `status` 를 읽던 단언뿐이다 |
+| REQ1 Hermes 동작이 그대로다 | 통합 테스트의 가짜 구현(`StubHermesRunsClient`, 흉내 낸 `HermesRunEventStream`)은 `hermes` 안의 내부 경계를 그대로 대신하고, Hermes 어댑터는 실제 것을 쓴다. 가짜 구현은 Hermes 의 내부 타입(`HermesRunResult` 등)을 그대로 돌려주므로, 지금 테스트가 Hermes 사건 이름과 상태 문자열로 준비한 값이 어댑터의 옮기기를 거쳐 흐르고 「provider 계정이 막힘」 판정도 같은 길로 간다. 테스트에서 바뀌는 것은 옮긴 타입의 import, `RunEvent` 의 새 이름, 부르는 쪽 클래스를 직접 만드는 단위 테스트의 생성자 인자다. 단언하는 값은 고치지 않는다 |
 | 저장되는 오류 코드가 그대로다 | Hermes 가 내는 끝 상태마다 `statusLabel` 과 `outcome` 을 확인하는 단위 테스트. 지금 실행 기록 테스트가 오류 코드 값을 단언하는 것도 그대로 통과한다 |
 | REQ1 왕복 확인 | 배포 뒤 Hermes 대화 한 번(답 흐름, 도구 표시, 중지, 글 끼우기)을 돌린다. 절차는 운영 저장소가 갖는다 |
 | port 계약 | `AgentRuntime` 계약 테스트 하나를 추상 테스트로 두고 Hermes 구현(가짜 HTTP 서버)에 돌린다. 항목은 끝 사건 넷, 「하지 못하는 구현이 내는 값」 열, 「scope 에 따라 가린 사건만 낸다」 다. PR2 의 ACP 구현이 같은 테스트를 상속한다 |
@@ -136,7 +139,7 @@ Hermes 구현은 `statusLabel` 에 지금 저장되는 것과 같은 글자를 �
 | DECISION3 | 사건 스트림 | port 에 넣는다 | 작성자 | 지금 application 이 `hermes.infra` 를 직접 부르는 것이 스펙 REQ1 과 어긋난다. ACP 는 사건이 연결 하나로 와서 「실행마다 스트림 열기」 를 구현이 감춰야 한다 |
 | DECISION4 | 사건 종류와 끝난 상태 | 문자열 대신 enum 으로 두고 구현이 옮긴다. 저장하는 오류 코드 글자는 `statusLabel` 로 따로 넘긴다 | 작성자 | 해석 자리가 여럿이라 런타임마다 여러 곳을 고쳐야 한다. 오류 코드 값이 바뀌면 지난 실행 기록과 섞인다 |
 | DECISION5 | 하지 못하는 동작 | 예외가 아니라 지금 있는 값으로 알린다(`REJECTED`, `NOT_FOUND`, null, 아무것도 하지 않음). 새 enum 값을 더하지 않는다 | 작성자 | 부르는 쪽에 런타임별 분기를 만들지 않는다. `SteerService` 는 새 값을 놓쳐도 컴파일되고, 놓치면 「끼우는 중」 표시가 남아 다음 turn 이 막힌다 |
-| DECISION6 | 옛 port | application 이 보는 port 로는 남기지 않는다. `HermesRunsClient` 와 `HermesRunEventStream` 은 `hermes` 안의 내부 경계로 남고 Hermes 어댑터만 부른다 | 작성자 | 통합 테스트가 이 둘을 가짜로 대신한다. 남겨야 어댑터의 이름 옮기기가 지금 테스트 경로에 들어가고 테스트 준비 코드를 다시 쓰지 않는다. `hermes` 밖에서 부르는 것은 구조 테스트가 막는다 |
+| DECISION6 | 옛 port | application 이 보는 port 로는 남기지 않는다. `HermesRunsClient` 와 `HermesRunEventStream` 은 자기 명령·결과·사건 타입과 함께 `hermes` 안의 내부 경계로 남고 Hermes 어댑터만 부른다 | 작성자 | 통합 테스트가 이 둘을 가짜로 대신한다. 남겨야 어댑터의 이름 옮기기가 지금 테스트 경로에 들어가고 테스트 준비 코드를 다시 쓰지 않는다. `hermes` 밖에서 부르는 것은 구조 테스트가 막는다 |
 | DECISION7 | 하위 에이전트 사용량 보정 | Hermes 전용으로 둔다 | 작성자 | 새 런타임은 하위 에이전트를 끈다(스펙 DECISION17). 중립으로 옮기면 쓰지 않을 추상화다 |
 | DECISION8 | ACP 구현의 상세 설계 시점 | PR2 가 실제로 띄워 확인한 뒤 이 파일을 고친다 | 작성자 | 스펙 DECISION3 이 설계 단계의 확인을 요구한다. 구독 로그인이 필요한 확인이라 운영 절차와 함께 해야 한다 |
 

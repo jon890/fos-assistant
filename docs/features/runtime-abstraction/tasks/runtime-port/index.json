@@ -1,0 +1,37 @@
+{
+  "name": "runtime-port",
+  "description": "실행 port 를 runtime 패키지의 런타임 중립 계약으로 옮기고 Hermes 구현을 어댑터로 감싼다",
+  "pr_scope": "실행 port 와 그 타입을 새 최상위 패키지 runtime 으로 옮기는 일괄 이동이며 Hermes 의 동작과 데이터베이스는 바꾸지 않는다.",
+  "deferred": [
+    {
+      "what": "ACP 구현과 OpenClaw 의 대화 실행, 관리자만 바꾸는 런타임 설정(스펙 PR2)",
+      "why": "구독 로그인, 지침 넣기, Control Plane 도구 붙이기, 웹 검색이 ACP 로 되는지 실제로 띄워 확인한 뒤 설계한다",
+      "after": "이 PR 이 머지되고 실제 확인 결과가 설계에 반영된 뒤"
+    },
+    {
+      "what": "ZeroClaw 와 평가 1차 숫자(PR3), Control Plane 도구와 승인 카드(PR4), 위임과 최종 비교(PR5)",
+      "why": "스펙 DECISION7 이 다섯 단계로 나눴다",
+      "after": "PR2 가 머지된 뒤 차례로"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/runtime-abstraction/spec.md",
+  "design": "docs/features/runtime-abstraction/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2"
+  ],
+  "plan_commit_requirements": {
+    "REQ2": "docs/features/runtime-abstraction.md"
+  },
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ1"] },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ1"] },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ1"] },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard", "requirements": ["REQ1"] }
+  ]
+}
