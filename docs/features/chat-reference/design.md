@@ -14,7 +14,7 @@
 | REQ6 | `chat_message` 에 집은 것을 가리키는 세 칸을 더하고, 이력의 `MessageView` 에 `reply` 를 더해 상자를 그린다. 상자를 누르면 그 메시지 자리로 스크롤하고 잠시 강조한다. 이전 버전이면 버전 넘기기를 그 버전으로 바꾼다(DECISION19) |
 | REQ7 | `ChatTurnRunner` 가 질문 줄의 답장 칸을 읽어 실행 입력 글 앞에 「사용자가 집은 메시지」 구역을 넣고, 집은 그림과 사진을 실행 입력 이미지에 더한다 |
 | REQ8 | 집은 구역에 그 그림의 가리킴(`attachment:<번호>`, `generated:<제목>`)을 적는다. 그림 도구의 받기 경로([ADR-20261120 / image-source](../../adr/ADR-20261120-image-source.md))는 같은 대화의 것을 이미 받으므로 바꾸지 않는다 |
-| REQ9 | 보낼 때 Control Plane 이 집은 것을 검사한다. 그림 파일이 지워졌거나 보관 기간이 지났으면 `REPLY_SOURCE_UNAVAILABLE`(409)로 거절하고 메시지를 저장하지 않는다. 화면은 이 코드와 `MESSAGE_NOT_FOUND` 둘 다 「원래 메시지를 찾을 수 없어요. 다시 집어 주세요」 를 보이고 칩을 비우되 글은 남긴다 |
+| REQ9 | 보낼 때 Control Plane 이 집은 것을 검사한다. 그림 파일이 지워졌거나 보관 기간이 지났으면 `REPLY_SOURCE_UNAVAILABLE`(409)로 거절하고 메시지를 저장하지 않는다. 화면은 이 코드와 `MESSAGE_NOT_FOUND` 둘 다 「원래 메시지를 찾을 수 없어요. 다시 집어 주세요」 를 보이고 글과 칩을 입력창에 남긴다. 사용자가 칩을 닫고 다시 집는다 |
 | REQ13 | 상자의 작은 그림은 그 그림의 지금 상태(지워짐, 보관 기간 지남)를 따라 그림 스펙 REQ9 의 표시를 쓴다. 같은 대화 안에서는 원래 메시지를 하나씩 지우는 길이 없어 글은 늘 있다 |
 | REQ14 | 집은 것의 메시지는 요청 대화(`access.requireOwn` 를 통과한 대화)에 있어야 한다. 다른 대화나 다른 사용자의 번호는 `MESSAGE_NOT_FOUND` 로 같은 응답을 준다 |
 | REQ15 | 다시 만들기는 질문 줄의 답장 칸을 그대로 읽으므로 같은 구역이 다시 들어간다. 이때는 검사로 막지 않고 쓸 수 없는 그림만 빼고 그 사실을 구역에 적는다 |
@@ -26,7 +26,8 @@
 
 | 모듈 | 맡는 것 |
 | --- | --- |
-| `chat.turn` | 보내기 요청의 `reply` 를 받아 검사하고(`ReplyTargets`), 질문 줄에 칸을 적고, 실행 입력 구역을 만든다(`ReplyInput`). 다시 만들기도 같은 길이다 |
+| `chat.reply` | 집은 것의 검사(`ReplyTargets`)와 실행 입력 구역(`ReplyInput`). `chat.turn.application` 이 클래스 상한(rule-75)에 닿아 있어 새 하위 기능으로 둔다([ADR-20261015 / package-layout](../../../backend/docs/adr/ADR-20261015-package-layout.md)) |
+| `chat.turn` | 보내기 요청의 `reply` 를 받아 `chat.reply` 로 검사하고, 질문 줄에 칸을 적고, 실행 입력에 구역을 넣는다. 다시 만들기도 같은 길이다 |
 | `chat.conversation` | `ChatMessage` 의 세 칸과 이력 질의. 새 질의는 없다 |
 | `chat.attachment` | 이번 메시지의 사진, 집은 사진, 집은 그림 바이트를 한 `data:` 예산(`MAX_ENCODED_BYTES`)과 같은 디코딩 제한으로 넣는 메서드를 `AttachmentImages` 에 더한다. 지금의 `photos` 를 두 번 부르면 예산이 두 배가 되고 디코딩 제한을 비켜 간다. 줄이기는 패키지 안의 `AgentImageResizer` 를 쓴다 |
 | `chat.artifact` | 그림 행 번호로 원본 바이트를 읽는 함수 하나를 더한다(`GeneratedImageService.readByTitle` 과 같은 읽기). 줄이지 않는다 |
@@ -98,7 +99,7 @@ Hermes 와 `fos-ctx` 는 바꾸지 않는다. 실행 입력의 글과 이미지 
 
 - 검사는 저장 전에 하고 파일 삭제는 트랜잭션에 묶이지 않는다. 검사 뒤 보관 정리가 파일을 지우면 실행 입력을 만들 때 그 그림만 빼고 「쓸 수 없다」 고 적는다. 메시지는 이미 저장됐으므로 실패시키지 않는다
 - 답을 만드는 중에는 답장을 보내지 않는다. 대기 줄(`PendingMessageRequest`)은 글만 받고 여러 글을 한 turn 으로 합치므로 메시지마다 집은 것을 붙일 수 없다. 사진 올리기도 같은 까닭으로 도는 중에 막혀 있다(`composer.tsx`). 화면은 칩이 있으면 도는 동안 보내기를 끄고 「답이 끝나면 보낼 수 있어요」 를 보인다(스펙 DECISION18). 서버도 도는 중의 보내기와 대기 줄 요청에 `reply` 가 있으면 받지 않는다
-- 화면이 도는 중임을 모른 채 보냈다가 `CONVERSATION_BUSY` 를 받으면 지금은 글만 대기 줄에 넣는다(`use-conversation-send.ts`). 집은 것이 있으면 대기 줄로 옮기지 않고 글과 집은 것을 입력창에 되돌린 뒤 「답이 끝나면 보낼 수 있어요」 를 보인다. 다른 보내기 실패의 복구(`restoreFailedMessage`)도 집은 것을 함께 되돌린다
+- 화면이 도는 중임을 모른 채 보냈다가 `CONVERSATION_BUSY` 를 받으면 지금은 글만 대기 줄에 넣는다(`use-conversation-send.ts`). 집은 것이 있으면 대기 줄로 옮기지 않고 글을 입력창에 되돌린다. 집은 것은 보내기가 받아들여졌을 때만 비우므로 실패하면 그대로 남는다
 - 옛 화면이 `reply` 없이 보내면 지금과 같다. 새 칸은 모두 NULL 을 받아 배포 순서가 없다
 
 ## 검증 전략

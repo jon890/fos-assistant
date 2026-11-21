@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileText, Reply } from "lucide-react";
+import { useReplyMenu } from "./reply-menu";
 import { describeError } from "@/components/error-message";
 import { artifactNames } from "@/lib/artifact-name";
 import { attachmentPlaceholder } from "./variants";
@@ -10,29 +11,24 @@ import type { MessageArtifact, MessageAttachment, Turn } from "./message-types";
 export function AttachmentGallery({
   conversationId,
   attachments,
+  onReply,
 }: {
   conversationId: string | null;
   attachments: MessageAttachment[];
+  /** 사진 한 장을 집는다(스펙 chat-reference REQ1). 넓은 화면은 사진 위 단추, 휴대폰은 길게 누르기다 */
+  onReply?(attachmentId: number): void;
 }) {
   if (attachments.length === 0 || conversationId === null) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       {attachments.map((attachment) =>
         attachment.visible ? (
-          <a
+          <Photo
             key={attachment.id}
-            href={`/api/chat/conversations/${conversationId}/attachments/${attachment.id}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <img
-              data-testid="message-attachment"
-              src={`/api/chat/conversations/${conversationId}/attachments/${attachment.id}`}
-              alt={attachment.originalName}
-              loading="lazy"
-              className="h-24 w-24 rounded-md border border-border object-cover"
-            />
-          </a>
+            conversationId={conversationId}
+            attachment={attachment}
+            onReply={onReply ? () => onReply(attachment.id) : undefined}
+          />
         ) : (
           <div
             key={attachment.id}
@@ -44,6 +40,46 @@ export function AttachmentGallery({
         ),
       )}
     </div>
+  );
+}
+
+function Photo({
+  conversationId,
+  attachment,
+  onReply,
+}: {
+  conversationId: string;
+  attachment: MessageAttachment;
+  onReply?(): void;
+}) {
+  const url = `/api/chat/conversations/${conversationId}/attachments/${attachment.id}`;
+  const menu = useReplyMenu({ onReply, copyText: attachment.originalName });
+  return (
+    <span
+      {...menu.bind}
+      className={`group/photo relative ${menu.bind.className}`}
+    >
+      <a href={url} target="_blank" rel="noreferrer">
+        <img
+          data-testid="message-attachment"
+          src={url}
+          alt={attachment.originalName}
+          loading="lazy"
+          className="h-24 w-24 rounded-md border border-border object-cover"
+        />
+      </a>
+      {onReply ? (
+        <button
+          type="button"
+          aria-label="이 사진으로 답장"
+          onClick={onReply}
+          className="absolute right-1 top-1 hidden rounded bg-background/90 p-1 text-muted-foreground group-hover/photo:block group-focus-within/photo:block [@media(hover:none)]:!hidden"
+        >
+          <Reply aria-hidden="true" className="size-3.5" />
+        </button>
+      ) : null}
+      {menu.menu}
+    </span>
   );
 }
 

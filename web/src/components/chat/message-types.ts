@@ -7,6 +7,7 @@ import type {
   SteerInfo,
 } from "@/lib/chat-event";
 import type { AnswerReveal } from "./answer-reveal";
+import type { ReplyView } from "@/lib/reply";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -94,4 +95,6 @@ export type Turn = {
   delegatedTo?: MentionDelegation | null;
   /** 도는 실행에 끼워 넣은 사용자 글이면 그 말풍선의 상태다. 보통 질문은 없다(ADR-20261116 / run-steer) */
   steer?: SteerInfo | null;
+  /** 답장으로 보낸 내 메시지면 집은 것의 상자다(스펙 chat-reference REQ6). 옛 서버 응답에는 없다 */
+  reply?: ReplyView | null;
 };

@@ -27,6 +27,9 @@ export type {
   Turn,
 } from "./message-types";
 import type { Turn } from "./message-types";
+import { replyTargetOf, type ReplyTarget } from "@/lib/reply";
+import { ReplyPreview } from "./reply-box";
+import { useReplyMenu } from "./reply-menu";
 import type { MemoryUse } from "@/lib/memory-use-api";
 
 export function MessageBubble({
@@ -51,6 +54,8 @@ export function MessageBubble({
   deliveryRetrying = false,
   delegations = [],
   answerAgent,
+  onReply,
+  onJump,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -83,12 +88,25 @@ export function MessageBubble({
   delegations?: DelegationLine[];
   /** 이 답을 쓴 에이전트가 대화의 에이전트가 아니면 그 에이전트다. `@` 로 맡긴 답이 그렇다 */
   answerAgent?: AgentIdentity;
+  /** 메시지나 그 안의 사진, 그림을 집는다. 저장된 사용자 메시지와 답에만 준다(스펙 chat-reference REQ1) */
+  onReply?(target: ReplyTarget): void;
+  /** 보낸 답장 상자를 누르면 원래 메시지로 간다(스펙 chat-reference REQ6) */
+  onJump?(messageId: number): void;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
   // 저장되기 전의 줄은 임시 문자열 id 를 갖는다. 등장 움직임은 그 줄에만 줘서, 대화를 열 때와 답이 저장될 때 다시 움직이지 않게 한다.
   const unsaved = typeof turn.id === "string";
+  const pick = (choice?: { attachmentId?: number; imagePath?: string }) => {
+    const target = replyTargetOf(turn, choice);
+    if (target && onReply) onReply(target);
+  };
+  const canReply = onReply !== undefined && replyTargetOf(turn) !== null;
+  const replyMenu = useReplyMenu({
+    onReply: canReply && !streaming ? () => pick() : undefined,
+    copyText: turn.content,
+  });
 
   if (turn.role === "SYSTEM") {
     return (
@@ -109,18 +127,30 @@ export function MessageBubble({
     return (
       <li
         className={cn(
-          "group flex min-w-0 justify-end focus-visible:outline-none",
+          "group flex min-w-0 justify-end rounded-lg focus-visible:outline-none data-[highlight=true]:bg-muted",
           // 맡김 질문은 말풍선 아래에 맡긴 줄을, steer 말풍선은 상태 글을 둔다. 오른쪽 정렬은 그대로다.
-          (turn.delegatedTo || turn.steer) && "flex-col items-end",
+          (turn.delegatedTo || turn.steer || turn.reply || canReply) &&
+            "flex-col items-end",
         )}
         tabIndex={0}
+        data-message-id={turn.id}
       >
+        {turn.reply ? (
+          <ReplyPreview
+            reply={turn.reply}
+            conversationId={conversationId}
+            onJump={onJump}
+            className="mb-1 max-w-[70%]"
+          />
+        ) : null}
         <div
           data-testid="user-message"
+          {...replyMenu.bind}
           className={cn(
             "relative max-w-[70%] rounded-xl rounded-br-sm bg-primary-soft px-4 py-2.5",
             "group-focus-visible:outline-2 group-focus-visible:outline-ring",
             unsaved && "animate-message-user",
+            replyMenu.bind.className,
           )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
@@ -149,6 +179,9 @@ export function MessageBubble({
           <AttachmentGallery
             conversationId={conversationId}
             attachments={attachments}
+            onReply={
+              canReply ? (attachmentId) => pick({ attachmentId }) : undefined
+            }
           />
           {sentAt ? (
             // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
@@ -165,6 +198,15 @@ export function MessageBubble({
         </div>
         {turn.delegatedTo ? <MentionLine line={turn.delegatedTo} /> : null}
         {turn.steer ? <SteerStatus steer={turn.steer} /> : null}
+        {canReply ? (
+          <MessageActions
+            content={turn.content}
+            latest={false}
+            copyLabel="메시지 복사"
+            onReply={() => pick()}
+          />
+        ) : null}
+        {replyMenu.menu}
       </li>
     );
   }
@@ -172,8 +214,9 @@ export function MessageBubble({
   return (
     <AssistantRow
       data-testid="assistant-message"
+      data-message-id={turn.id}
       agent={answerAgent}
-      className="focus-visible:outline-2 focus-visible:outline-ring"
+      className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring data-[highlight=true]:bg-muted"
       tabIndex={0}
       header={
         sentAt ? (
@@ -204,7 +247,12 @@ export function MessageBubble({
       {/* 기다림 점이 있던 자리에 답이 들어올 때는 흐려짐으로만 바뀐다. */}
       <div
         data-testid="assistant-body"
-        className={cn("leading-7", unsaved && "animate-fade-in")}
+        {...replyMenu.bind}
+        className={cn(
+          "leading-7",
+          unsaved && "animate-fade-in",
+          replyMenu.bind.className,
+        )}
       >
         <AnswerBody
           content={turn.content}
@@ -233,8 +281,10 @@ export function MessageBubble({
           }
           canRegenerate={canRegenerate}
           onRegenerate={onRegenerate}
+          onReply={canReply ? () => pick() : undefined}
         />
       ) : null}
+      {replyMenu.menu}
       <AttachmentGallery
         conversationId={conversationId}
         attachments={attachments}
@@ -245,6 +295,7 @@ export function MessageBubble({
         )}
         conversationId={conversationId}
         messageId={turn.id}
+        onReply={canReply ? (imagePath) => pick({ imagePath }) : undefined}
       />
       <PutFiles
         files={(turn.artifacts ?? []).filter(
