@@ -115,8 +115,8 @@ class PushDispatcherTest {
     void sendsToOwnDevicesOnly() throws Exception {
         Browser aliceBrowser = Browser.create("https://fcm.googleapis.com/fcm/send/alice-1");
         Browser bobBrowser = Browser.create("https://fcm.googleapis.com/fcm/send/bob-1");
-        devices.register(alice, aliceBrowser.registration());
-        devices.register(bob, bobBrowser.registration());
+        devices.register(alice, aliceBrowser.registration(keys.publicKeyBase64Url()));
+        devices.register(bob, bobBrowser.registration(keys.publicKeyBase64Url()));
 
         Notification saved = notify(alice, "「아침 뉴스」 실행을 마쳤어요", "본문 한 줄");
         background.awaitIdle(WAIT);
@@ -137,7 +137,7 @@ class PushDispatcherTest {
     @DisplayName("410 이면 그 기기를 지우고, 로그에 주소와 키를 남기지 않는다")
     void goneRemovesDevice(CapturedOutput output) throws Exception {
         Browser browser = Browser.create("https://fcm.googleapis.com/fcm/send/gone-1");
-        devices.register(alice, browser.registration());
+        devices.register(alice, browser.registration(keys.publicKeyBase64Url()));
         client.respond(410);
 
         notify(alice, "제목", "본문");
@@ -152,7 +152,7 @@ class PushDispatcherTest {
     @DisplayName("500 이면 다시 시도 횟수만큼 더 보내고 버리며 기기는 남는다")
     void transientFailureRetriesThenDrops(CapturedOutput output) throws Exception {
         Browser browser = Browser.create("https://fcm.googleapis.com/fcm/send/busy-1");
-        devices.register(alice, browser.registration());
+        devices.register(alice, browser.registration(keys.publicKeyBase64Url()));
         client.respond(500, 500, 500, 500);
 
         notify(alice, "제목", "본문");
@@ -167,7 +167,7 @@ class PushDispatcherTest {
     @Test
     @DisplayName("429 의 Retry-After 는 상한 안에서 따르고, 500 의 Retry-After 는 따르지 않는다")
     void retryAfterOnlyFor429And503() throws Exception {
-        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/retry-after-1").registration());
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/retry-after-1").registration(keys.publicKeyBase64Url()));
         client.respond(429, Duration.ofMinutes(10));
         client.respond(500, Duration.ofMinutes(10));
 
@@ -202,7 +202,7 @@ class PushDispatcherTest {
     @Test
     @DisplayName("알림 트랜잭션이 되돌아가면 보내지 않는다")
     void rollbackSendsNothing() throws Exception {
-        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/rollback-1").registration());
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/rollback-1").registration(keys.publicKeyBase64Url()));
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             notifications.notify(alice.id(), NotificationKind.TASK_SUCCEEDED, "제목", "본문", null);
@@ -217,7 +217,7 @@ class PushDispatcherTest {
     @Test
     @DisplayName("푸시 서비스가 늦어도 알림을 만든 트랜잭션은 바로 커밋되고 돌아온다")
     void slowPushServiceDoesNotBlockNotification() throws Exception {
-        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/slow-1").registration());
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/slow-1").registration(keys.publicKeyBase64Url()));
         CountDownLatch open = new CountDownLatch(1);
         client.holdUntil(open);
         try {
@@ -238,10 +238,23 @@ class PushDispatcherTest {
     @Test
     @DisplayName("서버에 키가 없으면 아무것도 보내지 않는다")
     void disabledSendsNothing() throws Exception {
-        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/off-1").registration());
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/off-1").registration(keys.publicKeyBase64Url()));
         when(keys.enabled()).thenReturn(false);
 
         notify(alice, "제목", "본문");
+        background.awaitIdle(WAIT);
+
+        assertThat(client.sent()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("기기 해제 알림은 기기가 있어도 푸시로 보내지 않는다")
+    void resetNoticeIsNotPushed() throws Exception {
+        devices.register(alice, Browser.create("https://fcm.googleapis.com/fcm/send/reset-1").registration(keys.publicKeyBase64Url()));
+
+        new TransactionTemplate(transactionManager).execute(status -> notifications.notify(
+            alice.id(), NotificationKind.PUSH_DEVICES_RESET, "알림 받기가 해제됐어요", "본문", null));
         background.awaitIdle(WAIT);
 
         assertThat(client.sent()).isEmpty();
@@ -284,8 +297,8 @@ class PushDispatcherTest {
         }
 
 
-        PushRegistration registration() {
-            return new PushRegistration(endpoint, p256dh(), auth(), "검사 브라우저", "Asia/Seoul");
+        PushRegistration registration(String vapidPublicKey) {
+            return new PushRegistration(endpoint, p256dh(), auth(), "검사 브라우저", "Asia/Seoul", vapidPublicKey);
         }
 
 

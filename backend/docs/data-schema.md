@@ -1028,7 +1028,7 @@ action을 지우면 실행 내용도 지운다.
 알림 하나다([ADR-070](../../docs/adr/ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md)).
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
-`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_SECRETS`(관리자 「서버 비밀값」)만 `target_type` 을 채우고 `target_public_id` 를 비운다.
+`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_SECRETS`(관리자 「서버 비밀값」), `PUSH_SETTINGS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
 `source_public_id` 는 알림을 만든 원인(승인 줄, 화면 넘기기를 적은 판정 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 
@@ -1151,7 +1151,7 @@ action을 지우면 실행 내용도 지운다.
 서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
 결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
 
-- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)와 플러그인 OAuth 의 `oauth_app:*`, `connector_oauth_signing` 이다. OAuth 줄의 이름과 값은 [플러그인 OAuth 연결 설계](../../docs/features/connector-oauth/design.md) 의 「서버 비밀값 줄」 이 갖는다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀), `vapid`(웹 푸시 VAPID 키), 플러그인 OAuth 의 `oauth_app:*`, `connector_oauth_signing` 이다. `vapid` 의 값은 비밀 키와 공개 키, 연락처를 담은 JSON 이고 `meta_json` 에는 공개 키와 연락처만 둔다. OAuth 줄의 이름과 값은 [플러그인 OAuth 연결 설계](../../docs/features/connector-oauth/design.md) 의 「서버 비밀값 줄」 이 갖는다. 뒤 단계의 이름(profile key, provider key)은 그 단계가 더한다
 - 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
 - `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
 - `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)
