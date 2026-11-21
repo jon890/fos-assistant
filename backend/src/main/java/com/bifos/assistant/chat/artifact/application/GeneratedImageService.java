@@ -125,9 +125,20 @@ public class GeneratedImageService {
         } finally {
             lock.unlock();
         }
-        // 잠금을 푼 뒤 알린다. 받는 쪽이 SSE 로 보내는 동안 같은 대화의 다음 그림 저장을 막지 않는다.
+        // 잠금을 푼 뒤 알린다. 받는 쪽이 SSE 로 보내는 동안 같은 대화의 다음 그림 저장을 막지 않는다. 사건의 순서는 뒤바뀔 수 있어
+        // 화면은 사건을 받으면 저장한 순서의 목록({@link #unboundPaths})을 다시 읽는다.
         events.publishEvent(new GeneratedImageStored(conversationId, path));
         return new GeneratedImageSaved(name);
+    }
+
+
+    /**
+     * 그 대화에서 아직 답에 묶이지 않은 그림의 경로를 저장한 순서대로 준다. 답이 끝나면 다음 답에 묶일 그림이다.
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public List<String> unboundPaths(Long conversationId) {
+        return artifacts.findUnboundGeneratedImagePaths(conversationId);
     }
 
 

@@ -47,6 +47,22 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
 
     /**
+     * 그 대화에서 아직 답에 묶이지 않은 그림 행의 경로다. 저장한 순서다. {@link #bindGeneratedImages} 가 다음 답에 묶을 행과 같다.
+     * 화면이 답이 끝나기 전에 그림을 그릴 때 쓴다(generated-image 설계의 「PR7: 나오는 즉시 보이기」).
+     */
+    @Query("""
+            select a.path from ChatArtifact a
+             where a.conversationId = :conversationId
+               and a.messageId is null
+               and a.generationCallKey is not null
+               and a.vaultUserId is null
+               and a.deletedAt is null
+             order by a.id asc
+            """)
+    List<String> findUnboundGeneratedImagePaths(@Param("conversationId") Long conversationId);
+
+
+    /**
      * 그 대화에서 아직 답에 묶이지 않은 그림 행을 이 답에 묶는다(ADR-20261119 / generated-image).
      *
      * <p>turn 시작 시각으로 자르지 않는다. 다른 에이전트에게 맡긴 실행은 부모 turn 이 끝난 뒤에 돌 수 있다. 파일을 지운 행은 묶지 않는다.

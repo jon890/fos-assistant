@@ -163,6 +163,9 @@ class GeneratedImageTurnTest {
         assertThat(received).extracting(ChatEvent::conversationId).containsOnly(conversation.publicId());
         assertThat(rows.findAll().stream().filter(row -> conversation.id().equals(row.conversationId())))
             .allSatisfy(row -> assertThat(row.messageId()).isNull());
+        // 사건의 순서가 뒤바뀌어도 화면이 다시 읽는 목록은 저장한 순서다.
+        assertThat(images.unboundPaths(conversation.id()))
+            .containsExactly("generated/수채화 고양이.png", "generated/수채화 고양이 2.png");
     }
 
 
@@ -198,11 +201,13 @@ class GeneratedImageTurnTest {
         artifactService.recordTurn(conversation.id(), first.id(), NOW.plusSeconds(60));
         // 부모 turn 이 끝난 뒤 맡긴 실행이 올린 그림이다.
         save("call_2", "맡긴 그림", png(2));
+        assertThat(images.unboundPaths(conversation.id())).containsExactly("generated/맡긴 그림.png");
         ChatMessage second = answer("결과를 전하는 답");
         artifactService.recordTurn(conversation.id(), second.id(), NOW.plusSeconds(600));
 
         assertThat(bound(first)).extracting(ChatArtifact::path).containsExactly("generated/남은 그림.png");
         assertThat(bound(second)).extracting(ChatArtifact::path).containsExactly("generated/맡긴 그림.png");
+        assertThat(images.unboundPaths(conversation.id())).isEmpty();
     }
 
 
