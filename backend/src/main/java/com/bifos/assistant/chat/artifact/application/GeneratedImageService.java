@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -191,6 +192,44 @@ public class GeneratedImageService {
             throw gone();
         }
         return image.id();
+    }
+
+
+    /**
+     * 그 답에 묶인 그림 행이다. 만든 순서다(스펙 chat-reference REQ1). 파일이 지워진 행도 낸다.
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public List<ChatArtifact> imagesOfMessage(Long messageId) {
+        return artifacts.findByMessageId(messageId).stream()
+            .filter(ChatArtifact::isGeneratedImage)
+            .sorted(Comparator.comparing(ChatArtifact::id))
+            .toList();
+    }
+
+
+    /**
+     * 그림 행의 원본 바이트다. 파일이 지워졌거나 상한을 넘거나 읽지 못하면 비어 있다(스펙 chat-reference REQ9, REQ15).
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public Optional<byte[]> readLive(ChatArtifact image) {
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(image.conversationId(), image.path());
+        if (file.isEmpty() || !Files.isRegularFile(file.get())) {
+            return Optional.empty();
+        }
+        try {
+            return Files.size(file.get()) > maxBytes ? Optional.empty() : Optional.of(Files.readAllBytes(file.get()));
+        } catch (IOException | ApiException ex) {
+            return Optional.empty();
+        }
+    }
+
+
+    /** 그림 행의 파일이 남아 있다. 바이트는 읽지 않는다. */
+    public boolean isLive(ChatArtifact image) {
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(image.conversationId(), image.path());
+        return file.isPresent() && Files.isRegularFile(file.get());
     }
 
 

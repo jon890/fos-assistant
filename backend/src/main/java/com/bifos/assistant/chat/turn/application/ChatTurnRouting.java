@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.reply.application.dto.ReplyPick;
+import com.bifos.assistant.chat.reply.application.ReplyTargets;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
@@ -14,6 +16,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.ReplyRef;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
@@ -56,6 +59,7 @@ class ChatTurnRouting {
     private final UserExecutionLimiter limiter;
     private final ChatConversationQueries chatConversationQueries;
     private final TurnSteerLedger steerLedger;
+    private final ReplyTargets replyTargets;
 
 
     /**
@@ -72,6 +76,13 @@ class ChatTurnRouting {
      * 저장하지 않는다. 그대로 저장하면 거절된 요청마다 그 글을 제목으로 한 빈 대화가 목록에 남는다.
      */
     Routed route(CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
+        return route(user, conversationId, text, agentCode, attachmentIds, null);
+    }
+
+
+    /** 답장으로 집은 것({@code reply})도 대화를 저장하기 전에 검사한다(스펙 chat-reference REQ9, REQ14). */
+    Routed route(
+        CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds, ReplyPick reply) {
         Instant requestReceivedAt = clock.instant();
         boolean withAttachments = attachmentIds != null && !attachmentIds.isEmpty();
         if (withAttachments && conversationId == null) {
@@ -91,6 +102,7 @@ class ChatTurnRouting {
         }
         requireAttachmentOwner(user, agent, withAttachments);
         SkillCommand command = commandOf(agent, text);
+        ReplyRef replyRef = reply == null || existing == null ? null : replyTargets.resolve(existing, reply);
         if (existing == null && !limiter.hasTurnRoom(user.id())) {
             throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
         }
@@ -98,7 +110,7 @@ class ChatTurnRouting {
             ? existing
             : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
-        return new Routed(conversation, agent, attached, command, requestReceivedAt, existing == null);
+        return new Routed(conversation, agent, attached, command, requestReceivedAt, existing == null, replyRef);
     }
 
 
@@ -109,9 +121,15 @@ class ChatTurnRouting {
         String text,
         String agentCode,
         List<Long> attachmentIds,
-        String delegateTo) {
-        if (delegateTo == null || delegateTo.isBlank()) {
-            return route(user, conversationId, text, agentCode, attachmentIds);
+        String delegateTo,
+        ReplyPick reply) {
+        boolean delegating = delegateTo != null && !delegateTo.isBlank();
+        // 답장은 이어 쓰는 대화에서만 받고 맡김과 함께 받지 않는다. 맡김은 사진을 받지 않는다(설계 chat-reference DECISION8).
+        if (reply != null && (conversationId == null || delegating)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply needs an existing conversation without a delegation");
+        }
+        if (!delegating) {
+            return route(user, conversationId, text, agentCode, attachmentIds, reply);
         }
         return routeMention(user, conversationId, delegateTo, attachmentIds);
     }
@@ -219,6 +237,7 @@ class ChatTurnRouting {
         Conversation conversation,
         List<ChatAttachment> attached,
         String question,
+        ReplyRef reply,
         Instant requestReceivedAt) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
@@ -229,7 +248,7 @@ class ChatTurnRouting {
         }
         requireAttachmentOwner(user, agent, !attached.isEmpty());
         return new Routed(
-            conversation, agent, attached, commandOf(agent, question), requestReceivedAt, false);
+            conversation, agent, attached, commandOf(agent, question), requestReceivedAt, false, reply);
     }
 
 
@@ -248,6 +267,7 @@ class ChatTurnRouting {
     /**
      * 이 turn 의 질문을 남기고, 사람이 보낸 질문이면 그 메시지 번호를 돌려준다.
      *
+     * @param reply 답장으로 집은 것. 새 질문 줄에 적는다. 답장이 아니면 null
      * @return 새 질문이면 방금 저장한 메시지, 다시 생성이면 이미 있는 질문의 번호. 사람 없이 열린 turn 이면 null 이다
      */
     Long saveQuestion(
@@ -255,6 +275,7 @@ class ChatTurnRouting {
         Conversation conversation,
         String text,
         List<Long> attachmentIds,
+        ReplyRef reply,
         TurnIntent intent,
         Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.ProactiveCheck proactive) {
@@ -302,7 +323,8 @@ class ChatTurnRouting {
             ChatMessage saved = null;
             if (newQuestion) {
                 fillBlankTitle(conversation, questionText);
-                saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), questionText, clock.instant()));
+                saved = messages.save(
+                    ChatMessage.fromUser(conversation.id(), user.id(), questionText, clock.instant()).replyTo(reply));
                 attachments.attach(saved.id(), conversation.id(), attachmentIds);
             }
             if (!carriedIds.isEmpty()) {

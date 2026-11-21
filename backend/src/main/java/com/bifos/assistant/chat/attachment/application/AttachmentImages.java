@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.attachment.application;
 
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
+import com.bifos.assistant.chat.attachment.application.dto.EmbeddedImages;
+import com.bifos.assistant.chat.attachment.application.dto.ExtraImage;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import java.awt.Dimension;
@@ -144,6 +146,16 @@ public class AttachmentImages {
      * @param order 첨부 번호마다 그 대화에서 몇 번째 사진인지. 보낸 사진은 모두 들어 있어야 한다
      */
     public List<AgentPhoto> photos(List<ChatAttachment> attached, Map<Long, Integer> order) {
+        return embed(attached, order, List.of()).photos();
+    }
+
+
+    /**
+     * {@link #photos} 와 같이 고르되, 답장으로 집은 사진과 그림({@code extras})을 이번 메시지 사진 뒤에 두고 같은 예산과 디코딩
+     * 제한으로 고른다(스펙 chat-reference REQ7, 설계 DECISION9). 이번 메시지 사진이 먼저 담긴다. 함께 넣을 이미지를 줄이지 못하면 그 자리는
+     * 비어 있고 실패하지 않는다.
+     */
+    public EmbeddedImages embed(List<ChatAttachment> attached, Map<Long, Integer> order, List<ExtraImage> extras) {
         List<Integer> ordinals = new ArrayList<>(attached.size());
         List<Candidate> candidates = new ArrayList<>();
         long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(SEND_DEADLINE_SECONDS);
@@ -152,19 +164,26 @@ public class AttachmentImages {
             if (ordinal == null) {
                 throw new IllegalStateException("attachment " + attachment.id() + " is not bound to a message");
             }
-            boolean small = prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()));
-            if (small) {
-                byte[] copy = readSmallQuietly(attachment);
-                small = copy != null;
-                int index = ordinals.size();
-                if (small) {
-                    AgentImageResizer.dimensions(copy)
-                        .ifPresent(size -> candidates.add(new Candidate(index, attachment.id(), copy, size)));
-                }
+            int index = ordinals.size();
+            byte[] copy = smallCopy(attachment, deadlineNanos);
+            if (copy != null) {
+                AgentImageResizer.dimensions(copy)
+                    .ifPresent(size -> candidates.add(new Candidate(index, attachment.id(), copy, size)));
             }
             ordinals.add(ordinal);
         }
-        String[] dataUrls = new String[attached.size()];
+        for (int k = 0; k < extras.size(); k++) {
+            ExtraImage extra = extras.get(k);
+            int index = attached.size() + k;
+            byte[] copy = extra.attachment() != null
+                ? smallCopy(extra.attachment(), deadlineNanos)
+                : shrinkOriginal(extra.original(), deadlineNanos);
+            if (copy != null) {
+                Long id = extra.attachment() == null ? null : extra.attachment().id();
+                AgentImageResizer.dimensions(copy).ifPresent(size -> candidates.add(new Candidate(index, id, copy, size)));
+            }
+        }
+        String[] dataUrls = new String[attached.size() + extras.size()];
         embedCandidates(candidates, dataUrls, deadlineNanos);
         List<AgentPhoto> photos = new ArrayList<>(attached.size());
         for (int i = 0; i < attached.size(); i++) {
@@ -173,7 +192,35 @@ public class AttachmentImages {
         if (!attached.isEmpty()) {
             MediaPipelineEvents.embedded(attached.getFirst().conversationId(), photos);
         }
-        return photos;
+        List<String> extraUrls = new ArrayList<>(extras.size());
+        for (int k = 0; k < extras.size(); k++) {
+            extraUrls.add(dataUrls[attached.size() + k]);
+        }
+        return new EmbeddedImages(photos, extraUrls);
+    }
+
+
+    /** 사본을 만들고 읽는다. 차례를 얻지 못했거나 읽지 못하면 null 이다. */
+    private byte[] smallCopy(ChatAttachment attachment, long deadlineNanos) {
+        return prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime())) ? readSmallQuietly(attachment) : null;
+    }
+
+
+    /** 원본을 사본 크기로 줄인다. 디코딩 차례를 얻지 못했거나 줄이지 못하면 null 이다. 파일로 남기지 않는다. */
+    private byte[] shrinkOriginal(byte[] original, long deadlineNanos) {
+        try {
+            if (!decoding.tryAcquire(sendWaitNanos(deadlineNanos, System.nanoTime()), TimeUnit.NANOSECONDS)) {
+                return null;
+            }
+            try {
+                return AgentImageResizer.toJpeg(original).orElse(null);
+            } finally {
+                decoding.release();
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
 
