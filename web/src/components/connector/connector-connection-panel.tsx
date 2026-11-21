@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
 import { PageFrame } from "@/components/ui/page-frame";
+import { CONNECTION_BACK, ConnectorNotFound } from "./connector-not-found";
 import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { PAGE_HEADS } from "@/lib/page-head";
 import {
@@ -41,22 +41,6 @@ type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
  * 연결을 막 마쳤거나 사용자가 열었으면 `open` 이고, 붙인 뒤에도 결과를 보이려고 닫을 때까지 둔다.
  */
 type Chooser = "auto" | "open" | "closed";
-
-const BACK = { href: "/connections", label: PAGE_HEADS.connections.title };
-
-function NotFound() {
-  return (
-    <PageFrame title="찾을 수 없는 서비스예요" back={BACK}>
-      <Link
-        href="/connections"
-        data-testid="connector-not-found"
-        className="text-sm text-foreground underline underline-offset-4"
-      >
-        서비스 연결로 돌아가기
-      </Link>
-    </PageFrame>
-  );
-}
 
 export function ConnectorConnectionPanel({
   id,
@@ -84,19 +68,23 @@ export function ConnectorConnectionPanel({
 
   useConnectionPoll(id, validId, loaded, busy, setLoaded);
 
-  if (!validId || loaded.kind === "notFound") return <NotFound />;
+  if (!validId || loaded.kind === "notFound") return <ConnectorNotFound />;
   if (loaded.kind === "loading")
     return (
-      <PageFrame title="" titlePending back={BACK}>
+      <PageFrame title="" titlePending back={CONNECTION_BACK}>
         <ListSkeleton />
       </PageFrame>
     );
   if (loaded.kind === "failed") {
     return (
-      <PageFrame title={PAGE_HEADS.connections.title} back={BACK}>
+      <PageFrame title={PAGE_HEADS.connections.title} back={CONNECTION_BACK}>
         <LoadFailure
           message={`연결 상태를 읽지 못했어요. ${loaded.message}`}
-          onRetry={() => void fetchLoaded(id).then(setLoaded)}
+          onRetry={() => {
+            // 다시 읽는 동안 뼈대를 보여 눌린 것이 보이고 거듭 눌리지 않게 한다.
+            setLoaded({ kind: "loading" });
+            void fetchLoaded(id).then(setLoaded);
+          }}
         />
       </PageFrame>
     );
@@ -275,7 +263,7 @@ export function ConnectorConnectionPanel({
   });
 
   return (
-    <PageFrame title={title} back={BACK}>
+    <PageFrame title={title} back={CONNECTION_BACK}>
       {chooserShown ? (
         <ConnectorOnboarding
           connectorId={id}

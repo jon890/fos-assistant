@@ -45,11 +45,11 @@ export function ListSkeleton({
   return (
     <div
       role="status"
-      aria-label="불러오는 중"
       data-slot="list-skeleton"
       className="flex flex-col gap-2"
       {...props}
     >
+      <span className="sr-only">불러오는 중이에요</span>
       {Array.from({ length: rows }, (_, index) => (
         <Skeleton key={index} className="h-16" />
       ))}

@@ -162,7 +162,7 @@ for (const list of CLIENT_LISTS) {
       const heading = frame(page).getByRole("heading", { level: 1, name: list.title, exact: true });
       // 읽는 중: 머리는 그대로이고 본문에 뼈대가 보인다.
       await expect(heading).toBeVisible();
-      await expect(frame(page).getByRole("status", { name: "불러오는 중" })).toBeVisible();
+      await expect(frame(page).getByRole("status").filter({ hasText: "불러오는 중이에요" })).toBeVisible();
       const body = await boxOf(page, '[data-slot="page-body"]');
 
       mode = "fail";
@@ -171,7 +171,7 @@ for (const list of CLIENT_LISTS) {
       await expect(failure).toBeVisible();
       await expect(failure).toHaveAttribute("role", "alert");
       await expect(heading).toBeVisible();
-      await expect(frame(page).getByRole("status", { name: "불러오는 중" })).toHaveCount(0);
+      await expect(frame(page).getByRole("status").filter({ hasText: "불러오는 중이에요" })).toHaveCount(0);
       const failureBox = await boxOf(page, '[data-slot="load-failure"]');
       expect(Math.abs(failureBox.x - body.x), "실패 안내의 왼쪽 끝").toBeLessThanOrEqual(1);
       expect(Math.abs(failureBox.width - body.width), "실패 안내의 폭").toBeLessThanOrEqual(1);
