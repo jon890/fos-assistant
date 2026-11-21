@@ -41,7 +41,8 @@
 
 ### 3. 화면
 
-- `MessageArtifact.foundSourceLinks` 를 더하고 `PromptDetails` 가 그 링크 옆에 「비서가 찾음」 을 붙인다
+- `MessageArtifact.foundSourceLinks` 를 더하고 `PromptDetails` 가 그 링크 옆에 「비서가 찾음」 을 붙인다. `PromptDetails` 를 부르는 두 곳(목록과 크게 보기)에 모두 넘긴다
+- REQ4, REQ7 의 「묻지 않고 그린다」 와 「지시문에 상품만 따온다는 줄」 은 모델이 하는 일이라 가짜 Hermes 로는 증명하지 못한다. 규칙 글 대조와 운영 왕복(REQ10)으로 본다
 
 ### 4. 테스트
 
@@ -68,9 +69,9 @@
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*FoundLinkEndpointTest' --tests '*ArtifactTest' --tests '*GeneratedImage*'
-cd hermes && python3 -m pytest tests/test_image_source.py tests/test_generated_image.py -q
-cd web && pnpm typecheck && pnpm test:browser generated-image
+(cd backend && ./gradlew test --tests '*FoundLinkEndpointTest' --tests '*ArtifactTest' --tests '*GeneratedImage*')
+python3 -m unittest discover -s hermes/tests -p 'test_*image*.py'
+(cd web && pnpm typecheck && pnpm test:browser generated-image)
 scripts/dev/check-local.sh --fast
 ```
 
