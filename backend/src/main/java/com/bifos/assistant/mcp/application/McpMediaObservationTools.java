@@ -10,7 +10,9 @@ import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,7 +27,6 @@ import tools.jackson.databind.node.ObjectNode;
 public class McpMediaObservationTools {
     public static final String LIST = "list_media_observations";
     public static final String RECORD = "record_media_observation";
-    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
     private final MediaObservationPages pages;
     private final MediaObservationService observations;
     private final MediaObservationInputReader reader;
@@ -91,13 +92,13 @@ public class McpMediaObservationTools {
             guard.requireCurrent(caller);
             JsonNode result = action.get();
             guard.requireCurrent(caller);
-            return McpToolService.result(ExternalData.wrap(json.writeValueAsString(result)), false);
+            return McpToolService.success(ExternalData.wrap(json.writeValueAsString(result)));
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 throw MediaObservationInputReader.invalid();
             }
             if (ex.code() == ErrorCode.MCP_CALL_CONTEXT_INVALID) {
-                return McpToolService.result(INVALID_CONTEXT, true);
+                return McpToolService.failure(McpToolService.INVALID_CONTEXT);
             }
             if (ex.code() == ErrorCode.MEDIA_OBSERVATION_CONFLICT
                 && ex.getMessage() != null
@@ -128,11 +129,22 @@ public class McpMediaObservationTools {
 
 
     private Map<String, Object> failure(ErrorCode code, Long revision) {
-        ObjectNode result = json.createObjectNode().put("code", code.name());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("code", code.name());
         if (revision != null) {
             result.put("currentRevision", revision);
         }
-        return McpToolService.result(json.writeValueAsString(result), true);
+        return McpToolService.jsonFailure(result, nextFor(code));
+    }
+
+
+    /** 사진 관찰 도구의 JSON 실패마다 모델이 해 볼 다음 방법이다(docs/features/tool-fallback/design.md 의 「바꾸는 실패 글」). */
+    static ToolFailureText nextFor(ErrorCode code) {
+        return switch (code) {
+            case MEDIA_OBSERVATION_CONFLICT -> ToolFailureText.alternative(code.name(), "currentRevision 으로 다시 읽고 고쳐 부른다");
+            case INTERNAL_ERROR -> ToolFailureText.alternative(code.name(), McpToolService.SERVER_FAILURE_NEXT);
+            default -> ToolFailureText.askUser(code.name());
+        };
     }
 
 

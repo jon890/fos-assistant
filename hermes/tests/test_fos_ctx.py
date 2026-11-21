@@ -331,8 +331,8 @@ class HookTest(PluginFixture):
         """skill_manage 호출은 막는다."""
         result = self.call("skill_manage", args={"action": "create", "name": "x"})
         self.assertEqual(result["action"], "block")
-        self.assertEqual(result["message"],
-                         "이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다")
+        self.assertEqual(result["message"], self.plugin.SKILL_MANAGE_MESSAGE)
+        self.assertTrue(result["message"].startswith("이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다."))
         # MCP 이름에 같은 글자가 들어가도 스킬 막기로 막지 않는다. 그 호출은 도구 판정으로 간다.
         self.assertEqual(self.call("mcp__other__skill_manage", session=""),
                          {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
@@ -814,7 +814,7 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertIsNone(self.call("mcp__demo__write_note", args={"text": "a" * (limit - 11)}))
         self.assertEqual(len(self.requests[0]["body"]["args_json"].encode("utf-8")), limit)
         self.assertBlocked(self.call("mcp__demo__write_note", args={"text": "a" * (limit - 10)}),
-                           "fos-ctx: 인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.")
+                           self.plugin.ARGS_TOO_LARGE_MESSAGE)
         # 글자 수가 아니라 바이트로 센다. 한글 한 글자는 3바이트다.
         self.assertBlocked(self.call("mcp__demo__write_note", args={"text": "가" * (limit // 3)}),
                            self.plugin.ARGS_TOO_LARGE_MESSAGE)

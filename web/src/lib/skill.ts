@@ -18,8 +18,8 @@ export type SkillUsageView = {
 export type SkillItemView = {
   name: string;
   description: string;
-  /** `UPLOADED` 는 이 화면에서 올린 스킬이고 `HERMES` 는 Hermes 기본 스킬이다. */
-  source: "UPLOADED" | "HERMES";
+  source: "UPLOADED" | "CONNECTOR" | "HERMES";
+  connectorTitle?: string;
   enabled: boolean;
   usage?: SkillUsageView;
 };

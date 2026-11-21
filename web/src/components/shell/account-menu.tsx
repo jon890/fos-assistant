@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { releaseThisDevice } from "@/lib/push";
 import { requestSignOut } from "@/lib/sign-out-client";
 import { useShellAccount } from "./shell-account";
 
@@ -57,6 +58,8 @@ export function AccountMenu({
     if (signingOut.current) return;
     signingOut.current = true;
     setSignOutFailed(false);
+    // 같은 브라우저를 다른 사용자가 쓸 수 있어 이 기기의 푸시를 먼저 끊는다. 2초 안에서만 기다린다.
+    await releaseThisDevice();
     if (await requestSignOut()) {
       // 문서째 새로 열어 클라이언트 라우터 캐시와 화면 상태를 함께 버린다.
       window.location.replace("/signin");

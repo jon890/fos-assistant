@@ -275,7 +275,7 @@ class McpMediaObservationToolTest {
         assertThat(data(call(McpMediaObservationTools.RECORD, args))).isEqualTo(first);
         assertThat(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, id, "다른 본문"))
             .toString())
-                .contains("MEDIA_OBSERVATION_CONFLICT", "currentRevision")
+                .contains("MEDIA_OBSERVATION_CONFLICT", "currentRevision", "next", "다음 방법: currentRevision 으로 다시 읽고 고쳐 부른다")
                 .doesNotContain("첫 관찰");
         jdbc.update("update agent_execution set status='SUCCEEDED' where id=?", origin.id());
         root = McpCallSigner.newRoot();

@@ -10,7 +10,7 @@
 ## 범위
 
 이번 범위는 지금 「재시작 대기」(`restart_required`, `plugin_updated`)가 되는 바인딩이다.
-지금 동작과 남은 수동 단계는 [플러그인 연결](../connector.md) 의 「바인딩의 반영 맞추기」, 「관리자 반영 완료」, 「재시작」 과 [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
+지금 동작과 남은 수동 단계는 [플러그인 연결](../connector.md) 의 「바인딩의 반영 맞추기」, 「관리자 다시 확인」, 「재시작」 과 [ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
 
 | 재시작 대기가 되는 까닭 | 이번 변경 뒤 |
 | --- | --- |

@@ -2,11 +2,14 @@ package com.bifos.assistant.connector.connection.presentation;
 
 import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentColor;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorRestartSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionsView;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPaymentContext;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
@@ -17,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -82,11 +86,13 @@ public final class ConnectionDtos {
      * 연결이 붙은 에이전트 하나다. 상태는 enum 이름 그대로 낸다.
      *
      * @param restartRequired 그 에이전트의 profile 이 공유 gateway 재시작을 기다린다
+     * @param applyFailed 자동 반영이 실패했다
      */
-    public record BoundAgentView(String agentCode, String agentName, String status, boolean restartRequired) {
+    public record BoundAgentView(
+        String agentCode, String agentName, String status, boolean restartRequired, boolean applyFailed) {
         static BoundAgentView from(BoundAgentSummary value) {
             return new BoundAgentView(
-                value.agentCode(), value.agentName(), value.status().name(), value.restartRequired());
+                value.agentCode(), value.agentName(), value.status().name(), value.restartRequired(), value.applyFailed());
         }
     }
 
@@ -115,7 +121,8 @@ public final class ConnectionDtos {
         String linkKind,
         boolean standardPlugin,
         boolean singleBinding,
-        boolean ownerBrowser) {
+        boolean ownerBrowser,
+        ConnectorOAuthSummary oauth) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -133,7 +140,8 @@ public final class ConnectionDtos {
                 value.appearance().linkKind(),
                 value.standardPlugin(),
                 value.singleBinding(),
-                value.ownerBrowser());
+                value.ownerBrowser(),
+                value.oauth());
         }
     }
 
@@ -158,7 +166,9 @@ public final class ConnectionDtos {
         List<BoundAgentView> bindings,
         int undeclaredTools,
         Integer listedTools,
-        Integer readOnlyTools) {
+        Integer readOnlyTools,
+        AuthView auth,
+        OAuthRevokeView oauthRevoke) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -169,8 +179,26 @@ public final class ConnectionDtos {
                 value.bindings().stream().map(BoundAgentView::from).toList(),
                 value.undeclaredTools(),
                 value.listedTools(),
-                value.readOnlyTools());
+                value.readOnlyTools(),
+                new AuthView(
+                    value.auth().usesOAuth() ? "oauth" : "manual", value.auth().provider(), value.auth().reconnectRequired()),
+                OAuthRevokeView.from(value.oauthRevoke()));
         }
+    }
+
+    /**
+     * 단추 연결을 해제할 때 서비스 쪽 허락을 취소한 결과다. {@code status} 는 {@code revoked} 나 {@code failed} 다. {@code failed} 면
+     * 화면이 {@code settingsUrl} 로 직접 거두는 길을 안내한다. {@code installSettingsUrl} 은 앱 설치를 지울 수 있는 화면이다.
+     */
+    public record OAuthRevokeView(String status, String settingsUrl, String installSettingsUrl) {
+        static OAuthRevokeView from(ConnectionOAuthRevoke value) {
+            return value == null ? null
+                : new OAuthRevokeView(value.status().name().toLowerCase(Locale.ROOT), value.settingsUrl(), value.installSettingsUrl());
+        }
+    }
+
+    /** 연결 방식이다. {@code method} 는 {@code oauth} 나 {@code manual} 이고 {@code provider} 는 단추 연결에만 있다. */
+    public record AuthView(String method, String provider, boolean reconnectRequired) {
     }
 
     /**
@@ -227,6 +255,7 @@ public final class ConnectionDtos {
         boolean bound,
         String status,
         boolean restartRequired,
+        boolean applyFailed,
         int toolCount,
         List<String> skills,
         List<SkippedSkillResponse> skippedSkills) {
@@ -238,6 +267,7 @@ public final class ConnectionDtos {
                 value.bound(),
                 value.status() == null ? null : value.status().name(),
                 value.restartRequired(),
+                value.applyFailed(),
                 value.toolCount(),
                 value.skills(),
                 value.skippedSkills().stream()
@@ -304,6 +334,13 @@ public final class ConnectionDtos {
                 value.detachedFrom().stream()
                     .map(agent -> new DetachedAgentResponse(agent.agentCode(), agent.agentName()))
                     .toList());
+        }
+    }
+
+    /** 운영 정기 작업의 재시작 조회 응답이다. 칸의 뜻은 {@link ConnectorRestartSnapshot} 이 갖는다. */
+    public record RestartResponse(long restartWaiting, Instant oldestWaitingSince, int runningExecutions) {
+        static RestartResponse from(ConnectorRestartSnapshot value) {
+            return new RestartResponse(value.restartWaiting(), value.oldestWaitingSince(), value.runningExecutions());
         }
     }
 }

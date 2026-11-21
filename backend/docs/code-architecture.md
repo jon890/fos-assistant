@@ -111,7 +111,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
-| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`) |
+| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`), 도구 실패 글의 끝 줄(`ToolFailureText`) |
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리, 그룹 설정(`group_setting`) 줄을 읽고 쓰는 공통 저장소 |
@@ -314,6 +314,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `connector`는 플러그인 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+OAuth 앱 설정은 `connector.oauth` 가 맡고 아래 하위 기능인 `connector.connection` 의 카탈로그 검사를 재사용한다. Control Plane 은 제공자 이름과 서버 비밀값 줄의 이름 규칙을 안다. 서비스의 로그인·교환·취소 주소는 대시보드가 결정한다([ADR-20261120 / connector-oauth](../../docs/adr/ADR-20261120-connector-oauth.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
 `connector.connection.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
@@ -343,7 +344,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.action.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다. `task` 는 예약 작업 지우기 승인 카드를 띄우려고 `connector.action.application.ControlPlaneApprovals` 를 부르고, 승인한 뒤의 지우기는 `connector.action.application.port.ControlPlaneActionRunner` 를 `task` 가 구현한다. `mcp` 의 예약 작업 도구는 `mcp.application.port.TaskRequests` 를 `task` 가 구현한다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 넣으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `mcp` 의 도구가 커넥터의 값을 읽거나 바꿔야 할 때도 `mcp.application.port` 에 port 를 두고 `connector` 가 구현한다(예: `ConnectorListing`). `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.action.application` 의 읽기 메서드를 부른다. `task` 는 예약 작업 지우기 승인 카드를 띄우려고 `connector.action.application.ControlPlaneApprovals` 를 부르고, 승인한 뒤의 지우기는 `connector.action.application.port.ControlPlaneActionRunner` 를 `task` 가 구현한다. `mcp` 의 예약 작업 도구는 `mcp.application.port.TaskRequests` 를 `task` 가 구현한다. 기억 지우기 승인 카드는 `mcp.application.port.MemoryForgetRequests` 를 `connector.action` 이 구현하고, 승인한 뒤의 지우기도 `connector.action` 의 `MemoryForgetRunner` 가 `memory.application.MemoryForgetting` 을 불러 한다. `memory` 와 `mcp` 는 `connector` 보다 아래 층이라 승인 줄을 직접 만들지 못한다. 연결 붙이기 승인 카드는 `mcp.application.port.ConnectorAttachRequests` 를 `connector.action` 이 구현하고, 승인한 뒤에는 `connector.action` 의 `ConnectorAttachRunner` 가 `connector.connection.application.ConnectorBindingService` 의 붙이기를 승인 트랜잭션 밖에서 부른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길

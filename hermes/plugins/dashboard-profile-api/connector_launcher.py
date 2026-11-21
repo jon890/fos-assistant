@@ -1,7 +1,9 @@
 """플러그인 MCP 서버를 띄우는 실행기다(hermes/plugins/dashboard-profile-api/README.md 의 「실행기(`connector_launcher.py`)」).
 
-Hermes 가 바인딩의 서버 정의대로 `python -I connector_launcher.py <보관 파일 id> <플러그인 id> <칸 key>=<env>... -- <command> <args>...`
+Hermes 가 바인딩의 서버 정의대로 `python -I connector_launcher.py <보관 파일 id> <플러그인 id> <칸 key>=<env>... [@oauth=<env>] -- <command> <args>...`
 로 연다. 보관 파일을 풀어 칸 값을 자식 env 에만 넣고 `execve` 로 실제 서버가 된다. 칸 값은 profile `.env` 와 서버 정의에 없다.
+`@oauth=<env>` 가 있으면 OAuth 파일(`<보관 파일 id>.oauth`)의 토큰 통로 주소를 그 env 에 넣는다. 파일이 없거나 풀지 못하면 빈 값이고
+서버는 그대로 뜬다(docs/features/connector-oauth/design.md 의 「실행기와 직접 실행」).
 
 plugin 패키지의 `__init__.py` 를 실행하지 않는다. 이 디렉터리를 하위 모듈 검색 경로로 둔 빈 패키지를 만들어
 `connector_vault_format.py` 와 `connector_vault_key.py` 만 읽는다. 표준 라이브러리와 `cryptography` 만 쓴다.
@@ -23,6 +25,7 @@ VAULT_DIR_ENV = LAUNCHER_ENV_PREFIX + "DIR"
 # `connector_vault_key.VAULT_KEY_FILE_ENV` 와 같은 이름이다. 실행기는 그 모듈을 읽기 전에 이 이름이 필요하지 않다.
 KEY_FILE_ENV = LAUNCHER_ENV_PREFIX + "KEY_FILE"
 ARGS_SEPARATOR = "--"
+OAUTH_ARG = "@oauth="
 # sysexits 의 설정 오류 코드다.
 EXIT_CONFIG = 78
 # 실행기가 쓰는 빈 패키지 이름이다. Hermes 가 읽는 plugin 패키지 이름과 겹치지 않는다.
@@ -46,7 +49,7 @@ def _modules():
 
 
 def _parse_args(argv: list, schema) -> tuple:
-    """`(보관 파일 id, 플러그인 id, {칸 key: env 이름}, [command, args...])` 다. 틀리면 `LaunchError` 다."""
+    """`(보관 파일 id, 플러그인 id, {칸 key: env 이름}, [command, args...], 통로 주소 env 나 None)` 다. 틀리면 `LaunchError` 다."""
     if ARGS_SEPARATOR not in argv:
         raise LaunchError("arguments")
     cut = argv.index(ARGS_SEPARATOR)
@@ -55,13 +58,22 @@ def _parse_args(argv: list, schema) -> tuple:
         raise LaunchError("arguments")
     vault, connector, pairs = head[0], head[1], head[2:]
     fields = {}
+    oauth_env = None
     for pair in pairs:
+        if pair.startswith(OAUTH_ARG):
+            name = pair[len(OAUTH_ARG):]
+            if (oauth_env is not None or not schema.ENV_NAME_RE.match(name) or name in fields.values()
+                    or name.startswith(LAUNCHER_ENV_PREFIX)):
+                raise LaunchError("arguments")
+            oauth_env = name
+            continue
         key, separator, env_name = pair.partition("=")
         if (not separator or not schema.FIELD_KEY_RE.match(key) or not schema.ENV_NAME_RE.match(env_name)
-                or key in fields or env_name in fields.values() or env_name.startswith(LAUNCHER_ENV_PREFIX)):
+                or key in fields or env_name in fields.values() or env_name.startswith(LAUNCHER_ENV_PREFIX)
+                or env_name == oauth_env):
             raise LaunchError("arguments")
         fields[key] = env_name
-    return vault, connector, fields, command
+    return vault, connector, fields, command, oauth_env
 
 
 def _read_values(vault: str, connector: str, environ: dict, vault_format, vault_key) -> dict:
@@ -86,21 +98,39 @@ def _read_values(vault: str, connector: str, environ: dict, vault_format, vault_
             raise LaunchError("connector_mismatch")
         if stored["v"] == 1:
             return stored["values"]
-        keys = {}
-        key_file = environ.get(KEY_FILE_ENV, "")
-        if key_file:
-            try:
-                keys = vault_key._parse_key_file(pathlib.Path(key_file).read_text(encoding="utf-8"))
-            except (OSError, UnicodeError, ValueError):
-                keys = {}
-        # 읽기는 활성 key id 를 쓰지 않는다. 파일의 `key_id` 의 key 로 푼다.
-        state = vault_key.VaultKeys(vault_key.KEYS_INVALID, False, None, keys)
-        return vault_format._unseal_vault(vault, stored, state)["values"]
+        return vault_format._unseal_vault(vault, stored, _read_keys(environ, vault_key))["values"]
     except LaunchError:
         raise
     except Exception:
         # 예외 본문은 남기지 않는다. 풀기 실패와 모양 오류 모두 같은 단어다.
         raise LaunchError("vault_unreadable") from None
+
+
+def _read_keys(environ: dict, vault_key):
+    """읽기에 쓸 key 들이다. 읽기는 활성 key id 를 쓰지 않고 파일의 `key_id` 의 key 로 푼다."""
+    keys = {}
+    key_file = environ.get(KEY_FILE_ENV, "")
+    if key_file:
+        try:
+            keys = vault_key._parse_key_file(pathlib.Path(key_file).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            keys = {}
+    return vault_key.VaultKeys(vault_key.KEYS_INVALID, False, None, keys)
+
+
+def _read_token_url(vault: str, connector: str, environ: dict, vault_format, vault_key) -> str:
+    """OAuth 파일의 토큰 통로 주소다. 없거나 풀지 못하거나 다른 플러그인의 것이면 빈 값이다. 서버를 막지 않는다."""
+    directory = environ.get(VAULT_DIR_ENV, "")
+    path = pathlib.Path(directory) / ("%s.oauth" % vault)
+    try:
+        if pathlib.Path(directory).is_symlink() or path.is_symlink() or not path.is_file():
+            return ""
+        stored = vault_format._parse_oauth(path.read_bytes())
+        if stored["connector"] != connector:
+            return ""
+        return vault_format._unseal_oauth(vault, stored, _read_keys(environ, vault_key))["oauth"]["token_url"]
+    except Exception:
+        return ""
 
 
 def _child_env(environ: dict, fields: dict, values: dict, command: str) -> dict:
@@ -122,11 +152,13 @@ def launch(argv: list, environ: dict, execve=os.execve) -> int:
     try:
         vault_format, vault_key = _modules()
         schema = sys.modules[PACKAGE + ".connector_schema"]
-        vault, connector, fields, command = _parse_args(argv, schema)
+        vault, connector, fields, command, oauth_env = _parse_args(argv, schema)
         if not schema.CONNECTOR_ID_RE.match(connector):
             raise LaunchError("arguments")
         values = _read_values(vault, connector, environ, vault_format, vault_key)
         env = _child_env(environ, fields, values, command[0])
+        if oauth_env is not None:
+            env[oauth_env] = _read_token_url(vault, connector, environ, vault_format, vault_key)
     except LaunchError as error:
         sys.stderr.write("connector-launcher: %s\n" % error)
         return EXIT_CONFIG

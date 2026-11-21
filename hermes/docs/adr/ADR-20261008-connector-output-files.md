@@ -13,7 +13,7 @@
 | 선언 | `connector.json` 의 `owner_output_env` 에 env 이름 하나. `fields[].env`, `operator_env`, `owner_attachments_env` 와 겹치지 않는다. `.mcp.json` 의 서버 env 는 네 이름의 합과 같다 |
 | 출력 루트 | 실행 공간 정책의 선택 키 `connector_output_root`. Docker 호스트와 Hermes 컨테이너에서 같은 절대 경로다 |
 | 값 | 바인딩 설치가 `<connector_output_root>/users/<SHA-256(sandbox_owner)>/<profile>/<커넥터 id>` 를 만들고 서버 정의에 직접 넣는다. 모델, 요청 본문, manifest 는 경로를 정하지 못한다 |
-| 값이 비는 경우 | 정책이 없거나, 그 키가 없거나, profile 이 정책에 등록되지 않았거나, `sandbox_owner` 가 없거나, 디렉터리를 링크 없이 만들지 못하면 빈 값이다. 붙이기는 막지 않는다. 커넥터는 파일 출력만 거절한다 |
+| 값이 비는 경우 | 정책이 없거나, 그 키가 없거나, [실행 공간 정책](../../README.md#셸-실행-공간)이 profile 에 적용되지 않거나, `sandbox_owner` 가 없거나, 디렉터리를 링크 없이 만들지 못하면 빈 값이다. 붙이기는 막지 않는다. 커넥터는 파일 출력만 거절한다 |
 | 실행 공간 | 그 키가 있으면 셸 저장이 `<connector_output_root>/users/<SHA-256(sandbox_owner)>/<profile>` 을 **같은 경로에 읽기 전용으로** 붙인다. 커넥터가 쓴 경로를 그대로 스크립트가 연다 |
 | 볼 수 있는 범위 | profile 하나. 그 커넥터를 붙인 에이전트의 실행 공간만 본다. 같은 사용자의 다른 에이전트도 보지 못한다 |
 | 승인 실행과 확인 도구 | 빈 값을 준다. 파일 출력은 승인 없이 도는 읽기 도구만 쓴다 |

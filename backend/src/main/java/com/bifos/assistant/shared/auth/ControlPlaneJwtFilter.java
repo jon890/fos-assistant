@@ -41,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
     private static final String BROWSER_GATEWAY_PREFIX = "/internal/browser-gateway/";
+    private static final String CONNECTOR_TOKEN_PREFIX = "/internal/connector-token/";
 
     /**
      * 이 필터가 해석하지 않는 경로다.
@@ -52,7 +53,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
      * {@code app_user} 를 만들고, 그러면 허용되지 않은 주소로도 사용자가 생긴다. 그 경로는 토큰을
      * 스스로 검사한다.
      * {@code /internal/browser-gateway/} 아래는 커넥터가 부르는 브라우저 중계이고, 경로에 든 접근 표식이 인증이다. 하위 경로가 많아
-     * 접두사로 건너뛴다.
+     * 접두사로 건너뛴다. {@code /internal/connector-token/} 아래는 단추로 연결한 플러그인이 부르는 토큰 통로이고 같은 까닭으로 건너뛴다.
      *
      * <p>꺼진 사용자를 401 로 거절하는 판정도 이 경로들에는 걸리지 않는다. 그 밖의 경로는
      * {@code permitAll} 이어도 이 필터가 막는다.
@@ -102,7 +103,9 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/support".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/content-draft-jobs/authorize".equals(uri))
-            || uri.startsWith(BROWSER_GATEWAY_PREFIX);
+            || ("GET".equals(request.getMethod()) && "/internal/ops/connector-restart".equals(uri))
+            || uri.startsWith(BROWSER_GATEWAY_PREFIX)
+            || uri.startsWith(CONNECTOR_TOKEN_PREFIX);
     }
 
 

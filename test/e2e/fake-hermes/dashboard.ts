@@ -1,5 +1,5 @@
 import { type FakeHermesState } from "./state.ts";
-import { createBindings } from "./connectors.ts";
+import { createBindings, DEMO_CONNECTOR } from "./connectors.ts";
 import { createLifecycle, send, readBody } from "./lifecycle.ts";
 import { createConnectorRoutes } from "./connector-routes.ts";
 import { CONNECTOR_SNAPSHOT_PATH } from "./content-snapshot-routes.ts";
@@ -208,7 +208,14 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
       }
       const disabled = state.disabledSkills.get(queryProfile) ?? new Set<string>();
       // 실제 응답의 모양이다. `enabled` 는 전역 `skills.disabled` 만 반영한다.
+      const connectorSkills = state.boundConnectors.get(queryProfile)?.has(DEMO_CONNECTOR.id)
+        ? DEMO_CONNECTOR.skills.map((name) => ({
+            name, description: "메모를 검토해요.", category: "agent", provenance: "agent",
+            connector_id: DEMO_CONNECTOR.id, connector_title: DEMO_CONNECTOR.title,
+          }))
+        : [];
       send(response, 200, [
+        ...connectorSkills,
         ...BUILTIN_SKILLS.map((skill) => ({ ...skill, category: "builtin", provenance: "bundled" })),
         ...readPublishedSkills(state.externalDirs.get(queryProfile) ?? []).map((skill) => ({
           ...skill, category: "agent", provenance: "agent",

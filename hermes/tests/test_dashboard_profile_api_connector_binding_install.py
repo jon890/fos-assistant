@@ -351,6 +351,28 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(self.tree("alice"), before)
         self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
 
+    def test_sandbox_required_connector_binds_on_a_profile_covered_by_default(self):
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=True, profiles={}))
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIs(response.body["changed"], True)
+
+    def test_sandbox_required_connector_is_rejected_when_isolate_unlisted_is_false(self):
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=False, profiles={}))
+        before = self.tree("alice")
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(self.tree("alice"), before)
+
     def test_sandbox_required_connector_binds_on_a_profile_in_the_policy(self):
         """그 profile 이 정책에 있으면 셸이 켜져 있지 않아도 설치가 성공한다."""
         demo, _ = self.bind_fixture()
@@ -629,6 +651,39 @@ class AgentSkillBindingTest(support.ProfileApiRouteTest):
 
     def installed(self):
         return sorted(path.name for path in self.skills.iterdir() if (path / "SKILL.md").is_file())
+
+    def test_skill_list_marks_only_installed_skills_as_owned_by_plugin(self):
+        """설치되지 않은 스킬과 뗀 스킬에는 같은 이름이 색인에 남아도 설치 출처를 붙이지 않는다."""
+        self.set_shell(terminal=False, docker=False)
+        self.assertEqual(self.bind().status_code, 200)
+        skills = [{"name": "demo-report", "enabled": False}, {"name": "demo-runner", "enabled": True}, {"enabled": True}]
+
+        def read():
+            return self.request("/api/skills", "GET", token="valid", query_profiles=("alice",),
+                                full_response=True, skills_payload=skills).body
+
+        installed, skipped, missing_name = read()
+        self.assertEqual(installed["connector_id"], DEMO)
+        self.assertEqual(installed["connector_title"], "검사용 메모")
+        self.assertIs(installed["enabled"], False)
+        self.assertNotIn("connector_id", skipped)
+        self.assertEqual(missing_name, {"enabled": True})
+        self.assertEqual(self.bind(enabled=False).status_code, 200)
+        self.assertEqual(read(), skills)
+
+    def test_skill_list_preserves_response_when_ownership_record_is_unreadable(self):
+        """설치 기록의 값이 잘못돼도 대시보드가 읽은 스킬 목록은 그대로 돌려준다."""
+        self.assertEqual(self.bind().status_code, 200)
+        recorded = self.root / "alice" / ".fos-connectors.json"
+        state = json.loads(recorded.read_text(encoding="utf-8"))
+        state[DEMO]["mcp_server"] = None
+        recorded.write_text(json.dumps(state), encoding="utf-8")
+        skills = [{"name": "demo-report", "enabled": True}]
+
+        response = self.request("/api/skills", "GET", token="valid", query_profiles=("alice",),
+                                full_response=True, skills_payload=skills)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, skills)
 
     def test_shell_off_binds_without_the_runner_and_stays_configured(self):
         """셸 조건이 없으면 요구 env 스킬만 빠지고, 조건이 그대로인 동안 상태 판정은 어긋남으로 보지 않는다(REQ2, REQ3, REQ4)."""

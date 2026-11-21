@@ -113,7 +113,7 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 붙이�
   ).toBeVisible();
   await dialog.getByRole("button", { name: "붙이기" }).click();
   await expect(dialog).toBeHidden();
-  await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
+  await expect(row).toContainText("몇 분 안에 자동으로 반영돼요.");
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
     "붙이는 중",
   );
@@ -134,7 +134,7 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 붙이�
   await expect(
     section(page).getByTestId("agent-connection-state"),
   ).toHaveText("붙지 않음");
-  await expect(section(page)).not.toContainText("몇 분 안에 쓸 수 있어요.");
+  await expect(section(page)).not.toContainText("몇 분 안에 자동으로 반영돼요.");
   await expect(section(page)).not.toContainText("바로 쓸 수 있어요.");
   await expect(section(page)).not.toContainText("관리자가 반영을 확인하면 쓸 수 있어요.");
   await expect(
@@ -200,7 +200,7 @@ test("붙이기가 실패해도 서버에 남은 바인딩을 다시 읽어 보�
     "붙이는 중",
   );
   await expect(row.getByRole("button", { name: "떼기" })).toBeVisible();
-  await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
+  await expect(row).toContainText("몇 분 안에 자동으로 반영돼요.");
 });
 
 for (const restartRequired of [false, true]) {
@@ -219,7 +219,10 @@ for (const restartRequired of [false, true]) {
     const row = section(page).getByTestId("agent-connection");
     await row.getByRole("button", { name: "붙이기" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "붙이기" }).click();
-    await expect(row).toContainText(restartRequired ? "관리자가 반영을 확인하면 쓸 수 있어요." : "바로 쓸 수 있어요.");
+    await expect(row).toContainText(
+      restartRequired ? "자동으로 반영하고 있어요. 대화가 없는 틈에 반영돼서 조금 걸릴 수 있어요." : "바로 쓸 수 있어요.",
+    );
+    await expect(row).not.toContainText("관리자가 반영을 확인하면");
     await expect(row.getByTestId("agent-connection-state")).toHaveText(restartRequired ? "붙이는 중" : "붙음");
     await row.getByRole("button", { name: "떼기" }).focus();
     await row.getByRole("button", { name: "떼기" }).press("Enter");
@@ -227,6 +230,26 @@ for (const restartRequired of [false, true]) {
     await expect(row).not.toContainText("쓸 수 있어요.");
   });
 }
+
+test("자동 반영이 실패한 바인딩은 실패를 알리고 반영 실패로 보인다", async ({ page }) => {
+  const code = await createAgent(page);
+  await page.route(`**/api/agents/${code}/connections/demo-notes`, async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.fallback();
+      return;
+    }
+    const response = await route.fetch();
+    const view = await response.json();
+    await route.fulfill({ response, json: { ...view, status: "PENDING", restartRequired: false, applyFailed: true } });
+  });
+  await page.goto(`/agents/${code}`);
+  const row = section(page).getByTestId("agent-connection");
+  await row.getByRole("button", { name: "붙이기" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "붙이기" }).click();
+  await expect(row).toContainText("반영하지 못했어요. 관리자에게 알렸어요.");
+  await expect(row).not.toContainText("몇 분 안에");
+  await expect(row.getByTestId("agent-connection-state")).toHaveText("반영 실패");
+});
 
 test("설치되지 않은 에이전트용 스킬은 연결 아래에 이름과 고치는 방법이 보이고 떼면 사라진다", async ({
   page,

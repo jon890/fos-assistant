@@ -7,6 +7,7 @@ import com.bifos.assistant.orchestration.application.EventToolGuard;
 import com.bifos.assistant.orchestration.application.dto.ToolGuardAnswer;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +31,8 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class ToolGuardController {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    static final String FAILED_MESSAGE = "이 도구를 지금 쓸 수 있는지 확인하지 못해 막았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
+    static final ToolFailureText FAILED_MESSAGE = ToolFailureText.alternative(
+        "이 도구를 지금 쓸 수 있는지 확인하지 못해 막았다.", "다른 도구가 있으면 그것으로 해 보고, 없으면 잠시 뒤 다시 해 달라고 알린다");
 
     private final EventToolGuard guard;
 
@@ -49,7 +51,7 @@ public class ToolGuardController {
         } catch (RuntimeException ex) {
             // 판정이 던지는 *_NOT_FOUND 가 404 로 나가면 hook 이 통과시킨다. 막는 답으로 바꾼다.
             log.warn("도구 판정이 실패해 막았다 profile={}", mcp.profileName(), ex);
-            return ToolGuardResponse.block(FAILED_MESSAGE);
+            return ToolGuardResponse.block(FAILED_MESSAGE.text());
         }
     }
 

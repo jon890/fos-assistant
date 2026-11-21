@@ -51,7 +51,7 @@ class WebPushClientTest {
             exchange.close();
         });
         server.start();
-        client = new HttpWebPushClient(new PushProperties("", "", "", List.of(),
+        client = new HttpWebPushClient(new PushProperties(List.of(),
             Duration.ofSeconds(2), Duration.ofSeconds(2), List.of(), Duration.ofSeconds(30), 10));
     }
 

@@ -58,6 +58,14 @@ public class ConnectorInstallAttempts {
 
 
     /** 소유자 행을 첫 읽기로 잠그고 현재 로그인 접근 권한을 확인한다. */
+    /** 관리자 다시 확인이 잠근 뒤 본다. 설치 결과를 기다리는 바인딩에 새 시도를 시작하면 진행 중인 설치의 결과가 버려진다. */
+    void requireNotInstalling(ConnectorBinding binding, Instant now) {
+        if (binding.installInFlight(now)) {
+            throw new ApiException(ErrorCode.CONNECTOR_APPLY_SCHEDULED, "an installation is still in flight");
+        }
+    }
+
+
     public AppUser lockOwner(Long ownerId) {
         AppUser owner = users.findByIdForUpdate(ownerId)
             .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
@@ -139,6 +147,8 @@ public class ConnectorInstallAttempts {
         if (cycleStep != CycleStep.NONE && waiting != ResyncOutcome.CATALOG_MISSING) {
             waiting = null;
         }
+        // 사람이 실패한 바인딩을 다시 잇는다. 이 시도도 실패하면 결과 적용이 실패 표시를 다시 남긴다.
+        boolean wasFailed = binding.applyFailedAt() != null;
         if (!automatic && waiting == null) {
             binding.resumeAfterFailure(now);
         }
@@ -157,7 +167,7 @@ public class ConnectorInstallAttempts {
             declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
             binding.restartRequired(), checkInstallation, replaceValues, waiting,
             declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
-            declared != null && ConnectorToolPolicies.partialAsk(declared), automatic, cycleStep);
+            declared != null && ConnectorToolPolicies.partialAsk(declared), automatic, wasFailed, cycleStep);
     }
 
 

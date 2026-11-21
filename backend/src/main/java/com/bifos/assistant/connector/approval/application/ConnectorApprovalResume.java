@@ -31,6 +31,7 @@ import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -57,14 +58,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @RequiredArgsConstructor
 class ConnectorApprovalResume implements ApprovalResumes {
-    static final String NONE = "이 대화에 이어 갈 승인이 없다. 승인이 이미 끝났거나 이어 갈 수 있는 시간이 지났다."
-        + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.";
-    static final String NOT_YET = "사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.";
-    static final String HELD = "사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.";
-    static final String ENDED = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
+    // 이어 가지 못한 글은 승인이나 사람 손이 필요해 바로 알림으로 끝난다(docs/features/tool-fallback/spec.md 의 REQ2, REQ3). RUNNING 은 실패가 아니다.
+    static final String NONE = ToolFailureText.askUser("이 대화에 이어 갈 승인이 없다. 승인이 이미 끝났거나 이어 갈 수 있는 시간이 지났다."
+        + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.").text();
+    static final String NOT_YET = ToolFailureText.askUser("사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.").text();
+    static final String HELD = ToolFailureText.askUser("사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.").text();
+    /** 끝낸 줄의 결과를 뒤에 붙일 때 쓰는 앞글이다. 뒤에 붙는 복구 안내(ADR-092)는 끝 줄 규칙의 대상이 아니다(docs/features/tool-fallback/design.md 의 DECISION2). */
+    static final String ENDED_LEAD = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
+    static final String ENDED = ToolFailureText.askUser(ENDED_LEAD).text();
     static final String RUNNING = "이미 이어 가는 중이다. 새로 준비하지 말고 그 결과를 기다린다.";
-    static final String RETRY = "지금은 플러그인 상태를 확인하지 못해 이어 가지 않았다. 승인은 그대로다. 사용자에게 잠시 뒤 다시 하겠다고 알리고 새로 준비하지 않는다.";
-    static final String SENT = "같은 승인으로 이어 가기를 보냈지만 결과를 읽지 못했다. 새로 준비하지 말고 사용자에게 승인 카드와 「내 브라우저」 를 확인해 달라고 한다.";
+    static final String RETRY = ToolFailureText.askUser("지금은 플러그인 상태를 확인하지 못해 이어 가지 않았다. 승인은 그대로다. 사용자에게 잠시 뒤 다시 하겠다고 알리고 새로 준비하지 않는다.").text();
+    static final String SENT = ToolFailureText.askUser("같은 승인으로 이어 가기를 보냈지만 결과를 읽지 못했다. 새로 준비하지 말고 사용자에게 승인 카드와 「내 브라우저」 를 확인해 달라고 한다.").text();
 
     private final ConnectorFinancialApproval approval;
     private final ConnectorExecutionCurrent current;
@@ -251,7 +255,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
             return fallback;
         }
         String input = rendered.get(0).input();
-        return Objects.equals(fallback, ENDED) ? ENDED + "\n" + input : input;
+        return Objects.equals(fallback, ENDED) ? ENDED_LEAD + "\n" + input : input;
     }
 
 
