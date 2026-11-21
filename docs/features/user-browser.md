@@ -222,7 +222,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 
 표식의 모양, 서명할 글, 만료는 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「결정」 이, 형식 검사와 비교는 `BrowserGatewayTokens` 가 갖는다.
 같은 바인딩은 늘 같은 표식을 받는다. 그래서 다시 설치해도 서버 정의가 바뀌지 않는다.
-서명 비밀을 새로 만들면 옛 표식은 바로 무효다. Control Plane 이 브라우저를 쓰는 플러그인의 바인딩을 모두 다시 설치하고, 그 바인딩은 반영 완료 전까지 재시작 대기다([서버 비밀값 스펙](secret-store/spec.md) 의 REQ18).
+서명 비밀을 새로 만들면 옛 표식은 바로 무효다. Control Plane 이 브라우저를 쓰는 플러그인의 바인딩을 모두 다시 설치한다([서버 비밀값 스펙](secret-store/spec.md) 의 REQ18). 그 바인딩은 대개 그 서버만 껐다 켜서 몇 분 안에 자동 반영된다. 이미 공유 gateway 재시작을 기다리던 바인딩과 플러그인 파일이 바뀐 바인딩은 재시작 대기로 남아 gateway 가 다시 뜬 뒤 스스로 반영된다([ADR-20261120 / connector-auto-apply](../adr/ADR-20261120-connector-auto-apply.md)).
 
 #### 받는 것
 
@@ -262,7 +262,7 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 �
 
 | 호출 | 싣는 주소 |
 | --- | --- |
-| 바인딩 설치(붙이기, 값 교체, 연결 확인, 반영 완료의 다시 설치) | 그 바인딩의 표식 주소(`BrowserGatewayTokens#bindingAddress`) |
+| 바인딩 설치(붙이기, 값 교체, 연결 확인, 관리자 「다시 확인」 의 다시 설치) | 그 바인딩의 표식 주소(`BrowserGatewayTokens#bindingAddress`) |
 | 확인 도구와 선택지 호출 | 요청자의 호출 표식 주소(`BrowserGatewayTokens#callAddress`) |
 | 승인한 실행 | 싣지 않는다. 대시보드가 설치한 서버 정의의 값을 쓴다 |
 

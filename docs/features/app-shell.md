@@ -15,8 +15,8 @@ covers: `web/src/components/shell/sidebar.tsx`, `web/src/components/shell/main-n
 | --- | --- |
 | `/signin`, 로그인하지 않은 `/privacy` | 로그인 전 화면 |
 | `/admin` 아래 | 관리자 틀 |
-| `/settings` 와 설정 묶음의 화면들, `/executions/{id}`, 로그인한 `/privacy` | 설정 틀 |
-| 그 밖의 대화 쪽 화면 | 사이드바 틀 |
+| `/settings` 와 설정 묶음의 화면들, 로그인한 `/privacy` | 설정 틀 |
+| `/executions/{id}` 와 그 밖의 대화 쪽 화면 | 사이드바 틀 |
 
 ```mermaid
 ---

@@ -116,7 +116,7 @@ VAPID 키와 연락처는 설정이 아니라 서버 비밀값 `vapid` 에 있�
 
 | 자리 | 하는 일 | PR |
 | --- | --- | --- |
-| `web/src/app/manifest.ts`, `icon.tsx`, `apple-icon.tsx` | 요청마다 앱 이름으로 manifest(`display: standalone`, `start_url: /`)와 첫 글자 아이콘(192, 512, 180)을 만든다 | PR1 |
+| `web/src/app/manifest.ts`, `app-icon/[size]/route.ts`, `apple-icon.tsx` | 요청마다 앱 이름으로 manifest(`display: standalone`, `start_url: /`)와 첫 글자 아이콘(192, 512, 180)을 만든다 | PR1 |
 | `web/public/sw.js` | `push` 에서 글을 시스템 알림으로 띄우고, `notificationclick` 에서 열린 창이 있으면 앞으로 가져와 `url` 로 옮기고 없으면 새로 연다. 글 해석과 창 고르기는 같은 파일의 작은 함수로 둬 node 테스트가 읽는다 | PR1 |
 | `web/src/app/settings/notifications/page.tsx` 와 부품, `web/src/components/shell/settings-area.ts` | 설정 묶음 「알림」. `SETTINGS_GROUPS` 에 묶음을 더하고, `/settings/...` 아래면 늘 「에이전트」 를 고르던 `selectedSettingsHref` 를 `/settings` 자체만 「에이전트」 로 고치게 바꾼다. [화면 틀 스펙](../app-shell/spec.md) 의 묶음 설명도 함께 고친다. PR1 은 이 기기 상태와 기기 목록, PR2 는 기기 이름 고치기와 지우기, 묶음 스위치, 조용한 시간 | PR1, PR2 |
 | `web/src/lib/push.ts` | 지원과 허락 상태, iOS 판정, 기기 이름, 구독 만들기와 끊기, 주소 해시 | PR1 |
@@ -125,7 +125,7 @@ VAPID 키와 연락처는 설정이 아니라 서버 비밀값 `vapid` 에 있�
 | `web/src/app/signin/page.tsx` | `next` 를 받아 `redirectTo` 로 넘긴다. 디코딩한 값이 `/` 로 시작하고 `//`, `\`, 제어 문자가 없는 같은 사이트 경로만 받고 아니면 `/`. Auth.js 의 `redirectTo` 가 다른 출처를 거르는지도 테스트로 본다 | PR1 |
 | 이름 메뉴의 로그아웃 | 서비스 워커 구독이 있으면 해제 API 와 `unsubscribe()` 를 2초 안에서 기다린 뒤 지금처럼 `/signout` 을 부른다. 실패해도 로그아웃은 막지 않는다 | PR1 |
 
-열기 경로를 `/notifications` 아래에 두지 않는다. [화면 틀 PR4](../app-shell/spec.md) 가 `/notifications` 를 「지금 볼 것」 의 알림 탭으로 넘기는데, 넘기는 방식이 아직 정해지지 않아 하위 경로까지 넘기면 열기가 깨진다. `/n/<id>` 는 그 넘김과 상관없다.
+옛 `/notifications` 주소는 [화면 틀 PR4](../app-shell/spec.md) 대로 「지금 볼 것」 의 알림 탭(`/now?tab=notifications`)으로 넘긴다. 푸시가 여는 주소는 `/n/<id>` 다.
 
 ## 실패와 일관성
 

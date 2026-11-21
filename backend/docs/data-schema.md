@@ -266,7 +266,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
-사용자 물리 삭제는 사용자 정리(ADR-20261101 / user-purge)가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
+사용자 물리 삭제는 사용자 정리([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md))가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
 접근 해제만으로는 사용자와 개인 데이터를 지우지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
@@ -1153,7 +1153,7 @@ action을 지우면 실행 내용도 지운다.
 서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
 결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
 
-- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)와 `vapid`(웹 푸시 VAPID 키)다. `vapid` 의 값은 비밀 키와 공개 키, 연락처를 담은 JSON 이고 `meta_json` 에는 공개 키와 연락처만 둔다. 뒤 단계의 이름(profile key, provider key)은 그 단계가 더한다
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀), `vapid`(웹 푸시 VAPID 키), 플러그인 OAuth 의 `oauth_app:*`, `connector_oauth_signing` 이다. `vapid` 의 값은 비밀 키와 공개 키, 연락처를 담은 JSON 이고 `meta_json` 에는 공개 키와 연락처만 둔다. OAuth 줄의 이름과 값은 [플러그인 OAuth 연결 설계](../../docs/features/connector-oauth/design.md) 의 「서버 비밀값 줄」 이 갖는다. 뒤 단계의 이름(profile key, provider key)은 그 단계가 더한다
 - 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
 - `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
 - `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)

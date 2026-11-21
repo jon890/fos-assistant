@@ -20,7 +20,7 @@
 | 배포 뒤 확인 | 사람이 배포 뒤 실제 실행을 직접 왕복시킨다. 2026-11-20 운영 버그 셋(Hermes v0.23.2 뒤 위임이 막힘, 실행 공간 비서의 내 파일 넣기 경로, backend MCP 도구가 바뀌어도 gateway 를 다시 띄우지 않음)은 가짜 Hermes 테스트를 모두 통과했고 사람이 직접 확인해 찾았다 | 루트 `AGENTS.md` 의 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」 |
 | 답변 품질 평가 | 20문항을 운영에서 사람이 돌리고 규칙으로 센다(출처 링크 수, 링크 열림, 날짜). 8문항은 사용자가 ChatGPT 와 나란히 본다 | [`answer-quality.md`](../answer-quality.md), `test/model-eval/answer/` |
 | 블로그 사진 평가 | 합성 사진에 심은 글자로 규칙 판정한다. 사람이 돌린다 | [ADR-20261020 / blog-photo-eval](../../adr/ADR-20261020-blog-photo-eval.md), `test/model-eval/blog/` |
-| 모델 채점 | 두 평가 모두 쓰지 않기로 했다. 판정이 흔들린다는 까닭이다 | [`answer-quality/spec.md`](../answer-quality/spec.md) DECISION8, ADR-20261020 결정 2 |
+| 모델 채점 | 두 평가 모두 쓰지 않기로 했다. 판정이 흔들린다는 까닭이다 | [`answer-quality/spec.md`](../answer-quality/spec.md) DECISION8, [ADR-20261020 / blog-photo-eval](../../adr/ADR-20261020-blog-photo-eval.md) 결정 2 |
 | 답에 대한 반응 | 답 자체에 좋다·나쁘다 단추가 없다. 「다시 생성」 은 동작하지만 사건으로 따로 남지 않는다 | `TurnIntent.Regenerate`, `FeedbackEventType` |
 | 이미 쌓이는 피드백 사건 | 「참고한 기억」 의 틀림·관련 없음, 승인 줄 승인·거절, 제안 받아들임·숨김·미룸. 기본 365일 보관 | `decision_feedback_event`, `DecisionFeedbackProperties` |
 | 외부 알림 | 앱에는 외부 메신저로 보내는 경로가 없고 앱 안 알림만 있다 | `notification` 모듈 |

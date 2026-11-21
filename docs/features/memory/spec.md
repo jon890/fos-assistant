@@ -60,7 +60,7 @@ PR1a 만 배포돼도 비서는 요약으로 동작하고, 사용자는 대화�
 
 ## 설계
 
-기술 설계는 technical-design 단계에서 [`design.md`](design.md) 를 이번 변경으로 새로 쓴다. 지금 그 파일은 직전 변경(기억 암호화)의 설계다.
+기술 설계는 [`design.md`](design.md) 가 갖는다.
 스펙이 정한 제약만 적는다.
 
 - 테이블을 늘리지 않는다. 요약 줄은 `memory` 와 `memory_revision` 의 칸, 예산과 상한, 하루 제안 수와 모델 단계는 `group_setting` 의 새 키, 요약 제안은 `decision_feedback_event` 의 정비 사건이다
