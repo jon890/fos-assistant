@@ -57,7 +57,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
         self.assertEqual(self.status_of()["connectors"], [
             {"plugin": DEMO, "enabled": False, "configured": False, "mode": "bind"},
-            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
 
         # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 빈 `tools` 로 싣고 남는다. 목록은 붙이기 전으로 돌아간다.
         last = self.bind(OTHER, enabled=False)

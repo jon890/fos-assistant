@@ -1074,6 +1074,29 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("설치 목록 항목의 skipped_skills 는 있으면 읽고 칸이 없으면 모름(null)으로 둔다")
+    @Test
+    void readsSkippedSkillsOfInstalledConnector() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        server.expect(requestTo(url))
+            .andRespond(withSuccess(
+                "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,"
+                    + "\"configured\":true,\"mode\":\"bind\","
+                    + "\"skipped_skills\":[{\"name\":\"demo-runner\",\"reasons\":[\"name_taken\"]}]}]}",
+                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+            .andRespond(withSuccess(
+                "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,"
+                    + "\"configured\":true,\"mode\":\"bind\"}]}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client.readConnector(PROFILE, DEMO).skippedSkills())
+            .containsExactly(new HermesConnectorClient.SkippedSkill("demo-runner", List.of("name_taken")));
+        assertThat(client.readConnector(PROFILE, DEMO).skippedSkills()).isNull();
+        server.verify();
+    }
+
+
     @DisplayName("모양이 맞는 목록에 받은 커넥터가 없으면 설치되지 않은 것으로 읽는다")
     @Test
     void readsConnectorMissingFromWellFormedListAsNotInstalled() {

@@ -1,42 +1,42 @@
 "use client";
 
-import Link from "next/link";
 import { ConnectionBadge } from "@/components/connector/connection-badge";
-import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
+import { CONNECTION_BACK } from "@/components/connector/connector-not-found";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 import type { ConnectorConnection, ConnectorField } from "@/lib/connection";
-import { formatChecked } from "@/lib/connection-load";
+import { fetchLoaded, formatChecked, type Loaded } from "@/lib/connection-load";
 
-export function ConnectorNotFound() {
+/** 연결 하나의 화면을 읽는 동안 보이는 뼈대다. */
+export function ConnectionLoading() {
   return (
-    <div className="mx-auto w-full max-w-2xl" data-testid="connector-not-found">
-      <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
-      <Link
-        href="/connections"
-        className="text-sm text-foreground underline underline-offset-4"
-      >
-        서비스 연결로 돌아가기
-      </Link>
-    </div>
+    <PageFrame title="" titlePending back={CONNECTION_BACK}>
+      <ListSkeleton />
+    </PageFrame>
   );
 }
 
+/** 연결 상태를 읽지 못했을 때의 화면이다. 다시 읽는 동안 뼈대를 보여 눌린 것이 보이고 거듭 눌리지 않게 한다. */
 export function ConnectionLoadFailed({
-  message,
-  onRetry,
+  id,
+  failed,
+  onLoaded,
 }: {
-  message: string;
-  onRetry(): void;
+  id: string;
+  failed: { message: string };
+  onLoaded(next: Loaded): void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-3">
-      <Notice variant="error" role="alert">
-        연결 상태를 읽지 못했어요. {message}
-      </Notice>
-      <Button variant="outline" onClick={onRetry}>
-        상태 다시 읽기
-      </Button>
-    </div>
+    <PageFrame title={PAGE_HEADS.connections.title} back={CONNECTION_BACK}>
+      <LoadFailure
+        message={`연결 상태를 읽지 못했어요. ${failed.message}`}
+        onRetry={() => {
+          onLoaded({ kind: "loading" });
+          void fetchLoaded(id).then(onLoaded);
+        }}
+      />
+    </PageFrame>
   );
 }
 

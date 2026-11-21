@@ -163,6 +163,7 @@ Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그�
 fos-ctx 는 안전 목록 밖의 도구 호출마다 `POST /internal/hermes/tool-guard` 로 그 session 이 사건 살펴보기 트리인지 묻는다([ADR-20261105 / event-watch](../adr/ADR-20261105-event-watch.md)). 인증은 위와 같은 profile 토큰이고, 본문과 서명은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「도구 판정」 이 갖는다.
 fos-ctx 는 Hermes 의 `image_generate` 가 만든 그림을 `POST /internal/hermes/generated-image` 로 올린다([ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md)). 인증은 같은 profile 토큰이고, 본문과 서명은 같은 README 의 「만든 그림을 올린다」, 저장과 답에 묶는 규칙은 [`generated-image.md`](generated-image.md) 가 갖는다.
 그림을 고칠 바탕 사진은 `POST /internal/hermes/image-source` 로 하나씩 받는다([ADR-20261120 / image-source](../adr/ADR-20261120-image-source.md)). 인증은 같은 profile 토큰이고 본문은 같은 README 의 「그림을 고칠 사진을 받는다」 가 갖는다.
+비서가 웹 검색과 페이지 읽기로 찾은 주소는 `POST /internal/hermes/found-links` 로 알린다([ADR-20261121 / found-link-image-source](../adr/ADR-20261121-found-link-image-source.md)). 인증은 같은 profile 토큰이고 본문은 같은 README 의 「찾은 주소를 알린다」 가 갖는다.
 `EventToolGuard` 는 위 요청자 판정과 같은 자료(자식 등록, 루트 session 에서 도는 실행)로 트리를 풀되, 풀지 못한 session 을 늘 거절하지 않는다. 점검 대화의 session 이거나 그 profile 에서 사건 살펴보기가 도는 동안만 막는다. 보통 대화와 Hermes 의 다른 플랫폼 대화를 깨지 않으려는 것이다. 순서는 [사건 감지 설계](proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
 판정 중 예외는 200 의 `block` 이고 서명이 틀리면 `403 TOOL_GUARD_REJECTED` 다. 이 경로는 404 를 내지 않는다. fos-ctx 가 404 를 이 경로가 없는 옛 Control Plane 으로 읽고 통과시키기 때문이다.
 

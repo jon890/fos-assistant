@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   ConnectionLoadFailed,
+  ConnectionLoading,
   ConnectionSummary,
-  ConnectorNotFound,
 } from "@/components/connector/connection-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -24,6 +24,8 @@ import {
   oauthMethodLabel,
 } from "@/components/connector/connector-oauth";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
+import { CONNECTION_BACK, ConnectorNotFound } from "./connector-not-found";
 import {
   CONNECTOR_ID_PATTERN,
   checkConnection,
@@ -89,14 +91,10 @@ export function ConnectorConnectionPanel({
   useConnectionPoll(id, validId, loaded, busy, setLoaded);
 
   if (!validId || loaded.kind === "notFound") return <ConnectorNotFound />;
-  if (loaded.kind === "loading")
-    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
+  if (loaded.kind === "loading") return <ConnectionLoading />;
   if (loaded.kind === "failed")
     return (
-      <ConnectionLoadFailed
-        message={loaded.message}
-        onRetry={() => void fetchLoaded(id).then(setLoaded)}
-      />
+      <ConnectionLoadFailed id={id} failed={loaded} onLoaded={setLoaded} />
     );
 
   const { connector, connection } = loaded;
@@ -320,7 +318,7 @@ export function ConnectorConnectionPanel({
   );
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <PageFrame title={title} back={CONNECTION_BACK}>
       {chooserShown ? (
         <ConnectorOnboarding
           connectorId={id}
@@ -431,6 +429,6 @@ export function ConnectorConnectionPanel({
           <ErrorNotice error={error} loginUrl={loginUrl} />
         </CardContent>
       </Card>
-    </div>
+    </PageFrame>
   );
 }
