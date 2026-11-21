@@ -131,6 +131,12 @@ export function AgentDetailBody({
     setPersona(await readPersona(code));
   }
 
+  const adminNotice =
+    persona !== null && adminError ? (
+      <Notice variant="error" role="alert" className="mb-8">
+        관리 정보를 불러오지 못했어요. {adminError}
+      </Notice>
+    ) : null;
   // 절 부품은 폭을 갖지 않는다. 폭과 제목은 아래에서 영역에 맞게 감싼다.
   const sections = (
     <>
@@ -140,11 +146,7 @@ export function AgentDetailBody({
         </Notice>
       ) : (
         <>
-          {adminError ? (
-            <Notice variant="error" role="alert" className="mb-8">
-              관리 정보를 불러오지 못했어요. {adminError}
-            </Notice>
-          ) : null}
+          {admin ? null : adminNotice}
           {persona.ok ? (
             <PersonaEditor
               code={code}
@@ -257,6 +259,8 @@ export function AgentDetailBody({
   if (admin)
     return (
       <div className="mx-auto w-full max-w-2xl">
+        {/* 관리자 영역은 전처럼 관리 정보 오류가 제목 위다. */}
+        {adminNotice}
         <h1
           className={`text-xl font-semibold ${persona?.ok ? "mb-2" : "mb-4"}`}
         >

@@ -20,7 +20,7 @@ const ROUTE_FRAMES: Record<string, string> = {
   "agents/[code]/skills/[name]": "components/agent/skill-editor.tsx",
   "admin/agents": "components/agent/agent-admin-panel.tsx",
   "admin/agents/[code]": "components/agent/agent-detail-body.tsx",
-  memory: "app/memory/page.tsx",
+  memory: "components/memory/memory-list.tsx",
   now: "app/now/page.tsx",
   "admin/usage": "components/usage/usage-screen.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",

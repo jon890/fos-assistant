@@ -206,6 +206,13 @@ export function ConnectorCatalog({
 
   useEffect(load, [load]);
 
+  /** 다시 읽는 동안 뼈대를 보여 눌린 것이 보이게 한다. */
+  function retry() {
+    setError(null);
+    setConnectors(null);
+    load();
+  }
+
   return (
     <PageFrame
       {...PAGE_HEADS.connections}
@@ -228,7 +235,7 @@ export function ConnectorCatalog({
       {error ? (
         <LoadFailure
           message={`서비스 목록을 읽지 못했어요. ${error}`}
-          onRetry={load}
+          onRetry={retry}
         />
       ) : connectors === null ? (
         <ListSkeleton />

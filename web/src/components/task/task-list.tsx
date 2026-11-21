@@ -51,6 +51,13 @@ export function TaskList() {
 
   useEffect(load, [load]);
 
+  /** 다시 읽는 동안 뼈대를 보여 눌린 것이 보이게 한다. */
+  function retry() {
+    setError(null);
+    setTasks(null);
+    load();
+  }
+
   return (
     <PageFrame
       {...PAGE_HEADS.tasks}
@@ -61,7 +68,7 @@ export function TaskList() {
       }
     >
       {error ? (
-        <LoadFailure message={error} onRetry={load} />
+        <LoadFailure message={error} onRetry={retry} />
       ) : tasks === null ? (
         <ListSkeleton />
       ) : tasks.length === 0 ? (
