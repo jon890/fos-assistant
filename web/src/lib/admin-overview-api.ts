@@ -24,6 +24,8 @@ export type OverviewMonthly = {
   actualCostMicros: number;
   /** 금액을 확인하지 못한 실행이나 도우미가 있어 금액이 실제보다 적을 수 있다 */
   incomplete: boolean;
+  /** 평가 전용 사용자의 합계다. 위 칸에서 빠진다. 평가 사용자가 없으면 null 이다 */
+  evaluation: { executions: number; actualCostMicros: number } | null;
 };
 
 /** 읽는다. 읽지 못하면 `null` 이다. 실패 본문은 화면에 그리지 않으므로 읽지 않는다. */

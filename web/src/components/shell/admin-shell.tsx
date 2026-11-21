@@ -14,6 +14,7 @@ import {
   Menu,
   Plug,
   Receipt,
+  ShieldCheck,
   Users,
   Wrench,
 } from "lucide-react";
@@ -28,7 +29,7 @@ import { ScreenTransition } from "./screen-transition";
 /**
  * 관리자 메뉴의 묶음과 줄이다. 순서는 `docs/features/admin-area/spec.md` 의 REQ1 이 정한다.
  *
- * <p>품질과 기억 줄은 그 화면을 만드는 PR 이 「살펴보기」 의 두 번째와 「비서 설정」 의 마지막에 더한다.
+ * <p>기억 줄은 그 화면을 만드는 PR 이 「비서 설정」 의 마지막에 더한다.
  */
 const GROUPS = [
   {
@@ -36,6 +37,7 @@ const GROUPS = [
     label: "살펴보기",
     links: [
       { href: "/admin", label: "요약", icon: LayoutDashboard },
+      { href: "/admin/quality", label: "품질", icon: ShieldCheck },
       { href: "/admin/usage", label: "사용량과 비용", icon: Receipt },
     ],
   },
