@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { FRAME_SANDBOX } from "@/components/chat/artifact/artifact-panel";
 import { CsvTable } from "@/components/workspace/csv-table";
 import {
@@ -112,81 +117,66 @@ function PreviewBody({ item, name }: { item: VaultItem; name: string }) {
 }
 
 /**
- * 「내 파일」 의 파일 하나를 미리 본다(스펙 workspace REQ14). 넓은 화면은 목록 옆 패널, 좁은 화면은 전체 폭 시트다.
+ * 「내 파일」 의 파일 하나를 미리 본다(스펙 workspace REQ14). 화면 폭과 상관없이 목록 위를 덮는 시트다.
+ * 휴대폰은 전체 폭이고, 넓은 화면은 바깥을 눌러 닫을 수 있게 왼쪽에 목록이 조금 남는다(app-shell spec DECISION26).
+ * 포커스가 HTML 미리보기 iframe 안에 있으면 Esc 가 이 창까지 오지 않아 「닫기」 단추로 닫는다.
  *
  * <p>그림은 그대로, HTML 은 스크립트 없이, CSV·TSV 는 표로, MD·TXT·CSS 는 원문 그대로 보인다. 나머지는 내려받기만 된다.
  */
 export function MyFilePreview({
   item,
-  wide,
+  opener,
   onClose,
   onDelete,
 }: {
   item: VaultItem;
-  /** 넓은 화면이면 목록 옆 패널, 좁으면 전체 폭 시트다. 폭을 아직 모르면(null) 옆 패널로 그린다. */
-  wide: boolean | null;
+  /** 시트를 연 단추다. 시트에 trigger 가 없어 Radix 가 포커스를 돌려줄 곳을 모르므로 닫은 뒤 여기로 돌려준다. 대화의 링크로 열었으면 null 이다. */
+  opener: HTMLElement | null;
   onClose(): void;
   onDelete(): void;
 }) {
   const name = displayName(item.path, item.title);
-  const titleClass = "min-w-0 flex-1 truncate text-sm font-semibold";
-  const header = (title: React.ReactNode) => (
-    <header className="flex min-w-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-      {title}
-      <div className="flex shrink-0 items-center gap-1">
-        <Button variant="outline" size="sm" asChild>
-          <a href={downloadUrl(item)}>
-            {item.fileCount > 1 ? "묶음 내려받기" : "내려받기"}
-          </a>
-        </Button>
-        <Button variant="outline" size="sm" onClick={onDelete}>
-          지우기
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          닫기
-        </Button>
-      </div>
-    </header>
-  );
-  const body = <PreviewBody item={item} name={name} />;
-
-  if (wide !== false)
-    return (
-      <aside
-        data-testid="my-file-preview"
-        aria-label="미리보기"
-        className="sticky top-4 flex h-[75vh] w-1/2 min-w-0 shrink-0 flex-col rounded-md border border-border bg-card"
-      >
-        {header(
-          <h2 className={titleClass} title={item.path}>
-            {name}
-          </h2>,
-        )}
-        {body}
-      </aside>
-    );
-
+  const [open, setOpen] = useState(true);
   return (
-    <Sheet
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
+    <Sheet open={open} onOpenChange={setOpen}>
       {/* 닫기 단추는 머리의 「닫기」 하나만 둔다. */}
       <SheetContent
         side="right"
         data-testid="my-file-preview"
         showCloseButton={false}
         aria-describedby={undefined}
-        className="min-w-0 gap-0 border-border bg-card data-[side=right]:w-full data-[side=right]:sm:max-w-none"
+        // 닫는 움직임이 끝난 뒤 연 줄로 포커스를 돌려주고 부모에 알린다.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          opener?.focus();
+          onClose();
+        }}
+        className="min-w-0 gap-0 border-border bg-card data-[side=right]:w-full data-[side=right]:sm:max-w-none data-[side=right]:lg:w-[min(72rem,calc(100%-4rem))]"
       >
-        {header(
-          <SheetTitle className={titleClass} title={item.path}>
+        <header className="flex min-w-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <SheetTitle
+            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            title={item.path}
+          >
             {name}
-          </SheetTitle>,
-        )}
-        {body}
+          </SheetTitle>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button variant="outline" size="sm" asChild>
+              <a href={downloadUrl(item)}>
+                {item.fileCount > 1 ? "묶음 내려받기" : "내려받기"}
+              </a>
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDelete}>
+              지우기
+            </Button>
+            <SheetClose asChild>
+              <Button variant="ghost" size="sm">
+                닫기
+              </Button>
+            </SheetClose>
+          </div>
+        </header>
+        <PreviewBody item={item} name={name} />
       </SheetContent>
     </Sheet>
   );
