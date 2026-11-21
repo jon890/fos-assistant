@@ -1,5 +1,6 @@
 {
   "name": "naver-shopping",
+  "version": "1.1.0",
   "description": "로그인해 둔 내 브라우저로 네이버 쇼핑 상품을 찾고 상품 정보를 읽는 플러그인 plugin",
   "skills": "./skills"
 }

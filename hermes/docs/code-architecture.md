@@ -79,6 +79,7 @@ hermes/
   connectors/
     <플러그인 이름>/            범용 플러그인 하나. assistant.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
   runtime/                   관리 bootstrap이 설치하는 일반 addon. plugin 등록과 별개
+  skill-packages/            화면의 스킬 묶음 올리기로 넣는 스킬 원본. Hermes 에 설치하지 않는다
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
   bundle.sh                  설치 묶음을 만든다
