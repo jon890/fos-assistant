@@ -5,7 +5,6 @@ import com.bifos.assistant.quality.application.dto.EvalVerdict;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -175,7 +174,8 @@ class EvalRunner {
         List<String> failures = List.of();
         try {
             if (tier != null) {
-                chat.chooseModelTier(evaluation, conversationId, ModelSelectionMode.TIER, tier);
+                // 대화의 단계만 바꾼다. 사람 화면의 단계 고르기는 사용자 기본 단계까지 바꿔, 다음 평가와 배포 뒤 확인의 단계가 움직인다.
+                chat.chooseTierForTask(conversationId, tier);
             }
             Attempt attempt = converse(evaluation, conversationId, question, deadline);
             driver.settle(evaluation, conversationId);
@@ -212,15 +212,42 @@ class EvalRunner {
             reason = RUN_FAILED;
         }
         long elapsedMs = Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
-        List<Long> executionIds = observer.roots(conversationId).stream().map(AgentExecution::id).toList();
-        int modelCalls = observer.modelCalls(conversationId);
-        // 남긴 카드는 대화를 지우기 전에 거절로 닫는다. 판정 직후에 비워 실행 도중 예약 작업이 발화하지 않게 한다.
-        boolean cleaned = cleaner.rejectPending(evaluation, conversationId)
-            && cleaner.cleanQuestion(evaluation, conversationId, startedAt);
-        boolean dropped = status == EvalItemStatus.PASSED && !question.keepConversation() && conversations.dropConversation(evaluation, conversationId);
+        boolean cleaned = false;
+        boolean dropped = false;
+        List<Long> executionIds = List.of();
+        int modelCalls = 0;
+        try {
+            executionIds = observer.roots(conversationId).stream().map(AgentExecution::id).toList();
+            modelCalls = observer.modelCalls(conversationId);
+            cleaned = settleAndClean(evaluation, conversationId, startedAt);
+            dropped = status == EvalItemStatus.PASSED && !question.keepConversation() && conversations.dropConversation(evaluation, conversationId);
+        } catch (RuntimeException ex) {
+            // 결과를 적지 못하고 RUNNING 으로 남지 않게 실패로 적는다. 남은 것은 다음 시작과 하루 정리가 다시 비운다.
+            log.warn("평가 문항을 마무리하지 못했다 bundle={} question={}", bundleId, question.id(), ex);
+            status = EvalItemStatus.FAILED;
+            reason = RUN_FAILED;
+        }
         runs.record(runId, new ItemResult(bundleId, question.id(), status, reason, failures, elapsedMs, startedAt, conversationId,
             dropped ? null : conversation.publicId(), dropped ? List.of() : executionIds, question.keepConversation()), modelCalls);
         return cleaned;
+    }
+
+
+    /**
+     * 남긴 카드를 먼저 거절로 닫고, 그 거절로 에이전트가 다시 도는 turn 과 위임 결과 전달이 끝나기를 기다린 뒤 문항 대화가 만든 것을 비운다. 기다리지 않으면
+     * 그 뒤에 돈 turn 이 만든 예약 작업이나 기억이 「비우기 끝남」 뒤에 남는다.
+     */
+    private boolean settleAndClean(CurrentUser evaluation, Long conversationId, Instant startedAt) {
+        int rootsBefore = observer.roots(conversationId).size();
+        boolean rejected = cleaner.rejectPending(evaluation, conversationId);
+        driver.waitUntil(clock.instant().plus(CARD_FOLLOW_UP_GRACE), () -> observer.roots(conversationId).size() > rootsBefore);
+        boolean settled = driver.waitUntil(clock.instant().plus(TurnDriver.STOP_GRACE),
+            () -> !driver.running(conversationId) && observer.delegationSettled(conversationId));
+        if (!settled) {
+            driver.stopConversation(evaluation, conversationId);
+        }
+        boolean cleaned = cleaner.cleanQuestion(evaluation, conversationId, startedAt, null);
+        return rejected & cleaned;
     }
 
 

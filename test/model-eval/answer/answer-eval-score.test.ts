@@ -16,6 +16,7 @@ import {
   sourceLinks,
   toolCounts,
   toolRounds,
+  userTurnExecutionIds,
   type Comparison,
   type LinkState,
   type Question,
@@ -390,4 +391,18 @@ test("사진을 찾아 그려 달라는 문항은 그림을 만들었거나 사�
   const set = scoreSet(scores, comparisons(6));
   assert.equal(set.outcome, "FAIL");
   assert.ok(set.reasons.some((reason) => reason.includes("사진이나 링크를 보내 달라고 하지도 않았다")), set.reasons.join(", "));
+});
+
+test("사용자 turn 이 연 실행만 고르고 위임 결과를 전하는 자동 turn 은 뺀다", () => {
+  const message = (role: string, executionId: number | null) => ({ role, content: "답", executionId, status: null, artifacts: [] });
+  const messages = [
+    message("USER", null),
+    message("ASSISTANT", 11),
+    message("SYSTEM", null),
+    message("ASSISTANT", 12),
+    message("USER", null),
+    message("ASSISTANT", 21),
+  ];
+
+  assert.deepEqual(userTurnExecutionIds(messages), [11, 21]);
 });

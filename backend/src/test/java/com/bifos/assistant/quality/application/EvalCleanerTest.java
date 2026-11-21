@@ -18,6 +18,13 @@ import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.quality.domain.EvalResult;
+import com.bifos.assistant.quality.domain.EvalResult.ItemResult;
+import com.bifos.assistant.quality.domain.QualityRun;
+import com.bifos.assistant.quality.domain.type.EvalItemStatus;
+import com.bifos.assistant.quality.domain.type.QualityRunStatus;
+import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
+import com.bifos.assistant.quality.infra.QualityRunRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.application.TaskService;
@@ -35,12 +42,14 @@ import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 평가 문항 하나의 대화가 만든 것만 지우고, 다른 대화와 배포 뒤 확인, 다른 사용자의 것은 남기는지 본다. */
 @BackendIntegrationTest
@@ -84,6 +93,15 @@ class EvalCleanerTest {
     @Autowired
     MemoryCaptureRepository captures;
 
+    @Autowired
+    EvalRuns evalRuns;
+
+    @Autowired
+    QualityRunRepository runs;
+
+    @Autowired
+    TransactionTemplate transactions;
+
 
     @BeforeEach
     void setUp() {
@@ -120,7 +138,7 @@ class EvalCleanerTest {
         Memory remembered = memoryService.create(evaluation, MemoryScope.USER, "강아지 이름", "초코", false);
         captures.save(MemoryCapture.of(remembered.id(), evaluation.id(), question, 501L, MemoryCaptureKind.CREATED, remembered.revision(), null, false));
 
-        boolean all = cleaner.cleanQuestion(evaluation, question, questionStartedAt);
+        boolean all = cleaner.cleanQuestion(evaluation, question, questionStartedAt, null);
 
         assertThat(all).isTrue();
         assertThat(tasks.findById(own.id()).orElseThrow().archived()).isTrue();
@@ -141,9 +159,51 @@ class EvalCleanerTest {
         Long question = conversationOf(evaluation, agent);
         Task earlier = taskService.create(evaluation, input("앞 작업", agent, "알려 줘", ConversationMode.NEW_PER_RUN), null).task();
 
-        cleaner.cleanQuestion(evaluation, question, NOW.plusSeconds(1));
+        cleaner.cleanQuestion(evaluation, question, NOW.plusSeconds(1), null);
 
         assertThat(tasks.findById(earlier.id()).orElseThrow().archived()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("다시 비울 때는 그 문항이 끝난 뒤 생긴 대화 칸 빈 작업을 고르지 않는다")
+    void recleanStopsAtTheQuestionEnd() {
+        CurrentUser evaluation = user();
+        Agent agent = agentOf(evaluation);
+        Long question = conversationOf(evaluation, agent);
+        Task later = taskService.create(evaluation, input("뒤 문항 작업", agent, "알려 줘", ConversationMode.NEW_PER_RUN), null).task();
+
+        cleaner.cleanQuestion(evaluation, question, NOW.minusSeconds(60), NOW.minusSeconds(1));
+
+        assertThat(tasks.findById(later.id()).orElseThrow().archived()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("재기동 처리는 도는 평가를 끊김으로 끝내고, 다시 비우기가 그 문항이 만든 것을 지운 뒤 비우기 끝남을 적는다")
+    void interruptedEvalIsRecleaned() {
+        AppUser saved = users.save(AppUser.of("evaluation@quality.invalid", "평가 사용자", 1L, UserRole.MEMBER));
+        transactions.executeWithoutResult(status -> users.markEvaluation(saved.id(), NOW));
+        CurrentUser evaluation = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
+        Agent agent = agentOf(evaluation);
+        Long question = conversationOf(evaluation, agent);
+        Task own = taskService.create(evaluation, input("문항 작업", agent, "매일 알려 줘", ConversationMode.SINGLE), question).task();
+        QualityRun run = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, null, 1, EvalResult.started("MEDIUM", List.of("b")), NOW);
+        run.recordEval(run.evalResult().withItem(new ItemResult("b", "q", EvalItemStatus.RUNNING, null, List.of(), 0, NOW.minusSeconds(5),
+            question, null, List.of(), false)), 0);
+        Long runId = runs.save(run).id();
+
+        evalRuns.interruptRunning();
+        cleaner.recleanFinished();
+
+        QualityRun ended = runs.findById(runId).orElseThrow();
+        assertThat(ended.status()).isEqualTo(QualityRunStatus.FAILED);
+        assertThat(ended.evalResult().items()).singleElement().satisfies(item -> {
+            assertThat(item.status()).isEqualTo(EvalItemStatus.FAILED);
+            assertThat(item.reasonCode()).isEqualTo("INTERRUPTED");
+        });
+        assertThat(ended.evalResult().cleaned()).isTrue();
+        assertThat(tasks.findById(own.id()).orElseThrow().archived()).isTrue();
     }
 
 
@@ -173,6 +233,7 @@ class EvalCleanerTest {
 
 
     private void clean() {
+        runs.deleteAll();
         captures.deleteAll();
         memories.deleteAll();
         followUps.deleteAll();

@@ -55,6 +55,7 @@ export const evalRunScenario: Scenario = {
     const memoriesBefore = await count(context, "/memories");
     const tasksBefore = await count(context, "/tasks");
     const conversationsBefore = await count(context, "/chat/conversations");
+    const followUpsBefore = await count(context, "/follow-ups");
 
     step("MEMBER 는 평가를 시작하지 못한다");
     expectStatus(await call(context, "/admin/quality/evals", { method: "POST", token: context.tokens.kid, body: {} }), 403, "MEMBER 의 평가 시작");
@@ -89,9 +90,10 @@ export const evalRunScenario: Scenario = {
     expect(messages.some((message) => message.role === "USER"), "실패 대화에 질문이 없다");
     expectStatus(await call(context, messagesPath, { token: context.tokens.kid }), 403, "MEMBER 의 실패 대화 읽기");
 
-    step("다른 사용자의 기억, 예약 작업, 대화는 바뀌지 않는다");
+    step("다른 사용자의 기억, 예약 작업, 대화, 할 일은 바뀌지 않는다");
     expect(await count(context, "/memories") === memoriesBefore, "평가가 관리자의 기억 수를 바꿨다");
     expect(await count(context, "/tasks") === tasksBefore, "평가가 관리자의 예약 작업 수를 바꿨다");
     expect(await count(context, "/chat/conversations") === conversationsBefore, "평가가 관리자의 대화 수를 바꿨다");
+    expect(await count(context, "/follow-ups") === followUpsBefore, "평가가 관리자의 할 일 수를 바꿨다");
   },
 };

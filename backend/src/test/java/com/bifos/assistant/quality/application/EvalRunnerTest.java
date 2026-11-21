@@ -17,7 +17,6 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -105,7 +104,7 @@ class EvalRunnerTest {
         when(observer.delegationSettled(CONVERSATION)).thenReturn(true);
         when(observer.roots(CONVERSATION)).thenReturn(List.of());
         when(cleaner.rejectPending(any(), eq(CONVERSATION))).thenReturn(true);
-        when(cleaner.cleanQuestion(any(), eq(CONVERSATION), any())).thenReturn(true);
+        when(cleaner.cleanQuestion(any(), eq(CONVERSATION), any(), any())).thenReturn(true);
         when(conversations.dropConversation(any(CurrentUser.class), eq(CONVERSATION))).thenReturn(true);
         when(contentDrafts.select(any(), any())).thenReturn(Optional.empty());
         card = mock(ConnectorAction.class);
@@ -129,6 +128,18 @@ class EvalRunnerTest {
         assertThat(result.conversationPublicId()).isNull();
         verify(conversations).dropConversation(any(CurrentUser.class), eq(CONVERSATION));
         verify(runs).markCleaned(RUN);
+    }
+
+
+    @Test
+    @DisplayName("남긴 카드의 거절이 실패해도 나머지 비우기는 돈다")
+    void cleansEvenWhenRejectFails() {
+        when(cleaner.rejectPending(any(), eq(CONVERSATION))).thenReturn(false);
+
+        runner.run(RUN, 7L, List.of(bundle(null, null)), null);
+
+        verify(cleaner).cleanQuestion(any(), eq(CONVERSATION), any(), any());
+        verify(runs, never()).markCleaned(RUN);
     }
 
 
@@ -207,11 +218,13 @@ class EvalRunnerTest {
 
 
     @Test
-    @DisplayName("단계를 고르면 문항 대화의 단계를 그 값으로 바꾼다")
+    @DisplayName("단계를 고르면 문항 대화의 단계만 바꾸고 평가 사용자의 기본 단계는 건드리지 않는다")
     void choosesTier() {
         runner.run(RUN, 7L, List.of(bundle(null, null)), ModelTier.HIGH);
 
-        verify(chat).chooseModelTier(any(), eq(CONVERSATION), eq(ModelSelectionMode.TIER), eq(ModelTier.HIGH));
+        verify(chat).chooseTierForTask(CONVERSATION, ModelTier.HIGH);
+        // 사람 화면의 단계 고르기는 사용자 기본 단계까지 바꾼다. 평가는 그 길을 쓰지 않는다.
+        verify(chat, never()).chooseModelTier(any(), any(), any(), any());
     }
 
 

@@ -15,6 +15,7 @@ import {
   scoreQuestion,
   scoreSet,
   sourceLinks,
+  userTurnExecutionIds,
   type Comparison,
   type LinkState,
   type Question,
@@ -227,9 +228,10 @@ async function scoreEval(values: Record<string, unknown>): Promise<number> {
     let result: QuestionScore;
     try {
       if (item.status !== "PASSED") throw new Error(`평가 문항이 ${item.status}${item.reasonCode ? ` ${item.reasonCode}` : ""} 로 끝났다`);
-      const executionId = item.executionIds.at(-1);
-      if (!item.conversationPublicId || executionId == null) throw new Error("남긴 대화나 실행 번호가 없다");
+      if (!item.conversationPublicId || item.executionIds.length === 0) throw new Error("남긴 대화나 실행 번호가 없다");
       const messages = await api.evalMessages(item.conversationPublicId);
+      // 도구 수와 시간은 옛 score 처럼 마지막 사용자 turn 의 실행 트리로 본다. 위임 결과를 전하는 자동 turn 은 고르지 않는다
+      const executionId = userTurnExecutionIds(messages).at(-1) ?? item.executionIds.at(-1)!;
       const answer = collectAnswers(messages, item.executionIds);
       if (answer.length === 0) throw new Error("그 실행의 답을 찾지 못했다");
       for (const url of sourceLinks(answer)) if (!links.has(url)) links.set(url, await checkLink(url));

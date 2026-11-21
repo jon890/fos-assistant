@@ -1,8 +1,10 @@
 package com.bifos.assistant.quality.application;
 
 import com.bifos.assistant.quality.application.dto.OpenedEval;
+import com.bifos.assistant.chat.artifact.domain.MediaPathMask;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.quality.application.dto.EvalBundleView;
@@ -109,7 +111,9 @@ public class EvalService {
         Conversation conversation = chat.conversationOf(user, conversationPublicId);
         List<EvalMessageView> views = new ArrayList<>();
         for (ChatMessage message : chat.history(user, conversation.id())) {
-            views.add(new EvalMessageView(message.role().name(), message.content(), message.executionId(), message.createdAt()));
+            // 사용자 화면과 같이 답 본문의 Hermes 그림 경로를 가린다(ADR-20261119).
+            String content = message.role() == MessageRole.ASSISTANT ? MediaPathMask.strip(message.content()) : message.content();
+            views.add(new EvalMessageView(message.role().name(), content, message.executionId(), message.createdAt()));
         }
         return views;
     }

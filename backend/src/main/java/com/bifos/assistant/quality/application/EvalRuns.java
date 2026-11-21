@@ -75,7 +75,12 @@ class EvalRuns {
         if (!run.running()) {
             return run;
         }
-        run.recordEval(run.evalResult().withBundles(bundles), 0);
+        // 마무리하지 못해 RUNNING 으로 남은 문항은 실패로 닫는다. 끝난 줄에 도는 문항이 남지 않게 한다.
+        EvalResult closed = run.evalResult().withItems(item -> item.status() == EvalItemStatus.RUNNING
+            ? new ItemResult(item.bundle(), item.question(), EvalItemStatus.FAILED, EvalRunner.RUN_FAILED, List.of(), item.elapsedMs(),
+                item.startedAt(), item.conversationId(), item.conversationPublicId(), item.executionIds(), item.keep())
+            : item);
+        run.recordEval(closed.withBundles(bundles), 0);
         // 밖의 채점기가 판정하는 묶음은 평가 전체의 통과·실패에 넣지 않는다. 그 묶음은 답을 모두 받았으면 통과로 본다.
         boolean passed = !bundles.isEmpty() && bundles.stream().allMatch(bundle -> "PASSED".equals(bundle.status())
             || (EvalJudge.EXTERNAL.equals(bundle.status()) && bundle.errors() == 0 && bundle.passed() == bundle.ran()));

@@ -64,10 +64,11 @@ class EvalCleaner {
      * 문항 대화가 만든 예약 작업, 기억, 할 일, 보관본을 지우고 기다리는 승인 줄을 거절로 닫는다. 대화 자체는 지우지 않는다.
      *
      * @param questionStartedAt 문항을 시작한 시각. 위임 자식이 만들어 대화 칸이 빈 예약 작업을 이 시각 뒤로 찾는다
+     * @param questionEndedAt 다시 비울 때 그 문항이 끝난 뒤의 시각(다음 문항의 시작이나 줄이 끝난 시각). 지금 도는 문항의 것을 고르지 않게 한다. 없으면 null
      * @return 모두 지웠으면 참
      */
-    boolean cleanQuestion(CurrentUser evaluation, Long conversationId, Instant questionStartedAt) {
-        boolean all = archiveTasks(evaluation, conversationId, questionStartedAt);
+    boolean cleanQuestion(CurrentUser evaluation, Long conversationId, Instant questionStartedAt, Instant questionEndedAt) {
+        boolean all = archiveTasks(evaluation, conversationId, questionStartedAt, questionEndedAt);
         all &= rejectPending(evaluation, conversationId);
         all &= deployCheckCleaner.forgetCaptured(evaluation, conversationId);
         all &= deleteFollowUps(evaluation, conversationId);
@@ -96,7 +97,7 @@ class EvalCleaner {
      * 그 대화의 예약 작업을 보관 처리한다. 루트 실행이 만든 작업은 대화 칸이 그 대화다. 위임 자식이 만든 작업은 대화 칸이 비므로, 문항 시작 뒤 생긴 대화 칸 빈 작업
      * 가운데 배포 뒤 확인의 고정 지시문이 아닌 것을 함께 보관 처리한다.
      */
-    private boolean archiveTasks(CurrentUser evaluation, Long conversationId, Instant questionStartedAt) {
+    private boolean archiveTasks(CurrentUser evaluation, Long conversationId, Instant questionStartedAt, Instant questionEndedAt) {
         boolean all = true;
         for (TaskDetail detail : tasks.list(evaluation)) {
             Task task = detail.task();
@@ -105,6 +106,7 @@ class EvalCleaner {
                 && questionStartedAt != null
                 && task.createdAt() != null
                 && !task.createdAt().isBefore(questionStartedAt)
+                && (questionEndedAt == null || task.createdAt().isBefore(questionEndedAt))
                 && !DeployCheckItems.TASK_INSTRUCTION.equals(task.instruction());
             if (!ownConversation && !detachedChild) {
                 continue;
@@ -160,10 +162,16 @@ class EvalCleaner {
                 }
                 CurrentUser user = EvaluationUserService.asCurrentUser(evaluation.get());
                 boolean all = true;
-                for (ItemResult item : run.evalResult().items()) {
-                    if (item.conversationId() != null) {
-                        all &= cleanQuestion(user, item.conversationId(), item.startedAt());
+                List<ItemResult> items = run.evalResult().items();
+                for (int index = 0; index < items.size(); index++) {
+                    ItemResult item = items.get(index);
+                    if (item.conversationId() == null) {
+                        continue;
                     }
+                    Instant ended = index + 1 < items.size() && items.get(index + 1).startedAt() != null
+                        ? items.get(index + 1).startedAt()
+                        : run.finishedAt();
+                    all &= cleanQuestion(user, item.conversationId(), item.startedAt(), ended);
                 }
                 if (all) {
                     evalRuns.markCleaned(runId);
