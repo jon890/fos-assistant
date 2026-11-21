@@ -10,7 +10,14 @@ import { interimKey } from "../turn-stream-text.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "interim";
 export type ActivityItemState =
-  "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
+  | "running"
+  | "done"
+  | "failed"
+  | "stopped"
+  | "unfinished"
+  | "result-missing"
+  /** 답이 끝날 때 아직 도는 맡긴 실행이다. 결과는 다음 답으로 온다 */
+  | "handed-off";
 
 export type ActivityItem = {
   key: string;
@@ -25,6 +32,10 @@ export type ActivityItem = {
   durationMs: number | null;
   state: ActivityItemState;
   pairKey: string | null;
+  /** 다른 에이전트에게 맡긴 실행의 도우미 줄과 그 도구 줄이다. 답이 끝나도 실패로 세지 않는다 */
+  delegated?: boolean;
+  /** 맡긴 실행의 도구 줄이면 그 도우미 줄의 `pairKey`(맡은 실행 번호)다 */
+  parent?: string;
 };
 
 export type ActivityState = {
@@ -82,7 +93,11 @@ export function failActivity(
         item.state === "running"
           ? {
               ...item,
-              state: item.kind === "subagent" ? "result-missing" : "unfinished",
+              state: item.delegated
+                ? "handed-off"
+                : item.kind === "subagent"
+                  ? "result-missing"
+                  : "unfinished",
             }
           : item,
       ),
@@ -251,6 +266,9 @@ export function fromTree(
   const visit = (node: ExecutionTreeNode, isRoot: boolean) => {
     const firstItem = state.items.length;
     const nodeCancelled = turnCancelled || cancelled(node);
+    // 답이 끝난 뒤에도 도는 맡긴 실행은 실패가 아니라 결과를 다음 답으로 넘긴 것이다
+    const handedOff =
+      !isRoot && node.delegated === true && node.status === "RUNNING";
     if (!isRoot && node.events.length > 0)
       state = {
         ...state,
@@ -320,9 +338,11 @@ export function fromTree(
               ...item,
               state: nodeCancelled
                 ? "stopped"
-                : item.kind === "subagent"
-                  ? "result-missing"
-                  : "unfinished",
+                : handedOff
+                  ? "handed-off"
+                  : item.kind === "subagent"
+                    ? "result-missing"
+                    : "unfinished",
             },
       ),
     };

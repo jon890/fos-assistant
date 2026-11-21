@@ -42,7 +42,7 @@
 ### 3. `web/src/components/chat/use-conversation-effects.ts` 와 `web/src/components/chat/conversation-session.tsx`
 
 - 대화 SSE 처리(`use-conversation-effects.ts` 의 `delegation`, `steer` 분기 자리)에서 `delegation_activity` 를 보류하지 않고 `setActivity((previous) => previous && applyDelegationActivity(previous, event))` 로 도는 답의 작업 과정에 넣는다. 도는 답이 없으면(`previous` 가 null) 버린다.
-- effects 의 Context 타입(Pick 목록)에 `setActivity` 를 더하고, `conversation-session.tsx` 의 `useConversationEffects({...})` 호출에 같은 `setActivity` 를 넘긴다. `use-conversation-events.ts` 가 이미 같은 `setActivity` 를 받는 방식을 따른다.
+- effects 의 Context 타입(Pick 목록)에 `setActivity` 를 더한다. `conversation-session.tsx` 가 상태 전체를 펼쳐 넘기므로 호출부는 바뀌지 않는다.
 
 ### 4. `web/src/components/chat/activity/activity-timeline.tsx`, `activity-icon.tsx`
 
@@ -73,8 +73,9 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 |---|---|
 | `web/src/lib/chat-event.ts` | 수정 |
 | `web/src/components/chat/activity/activity-state.ts` | 수정 |
+| `web/src/components/chat/activity/activity-delegation.ts` | 신규 (`activity-state.ts` 가 파일 길이 상한 400줄에 가까워 따로 둔다) |
+| `web/eslint.config.mjs` | 수정 (Node 테스트가 읽는 파일 목록) |
 | `web/src/components/chat/use-conversation-effects.ts` | 수정 |
-| `web/src/components/chat/conversation-session.tsx` | 수정 |
 | `web/src/components/execution/execution-tree.tsx` | 수정 |
 | `web/src/components/chat/activity/activity-timeline.tsx` | 수정 |
 | `web/src/components/chat/activity/activity-icon.tsx` | 수정 |

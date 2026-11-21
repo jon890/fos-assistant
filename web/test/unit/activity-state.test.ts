@@ -4,6 +4,8 @@ import {
   activityLabel, activityOutcome, activityUses, applyChatEvent, emptyActivity, failActivity, fromTree,
 } from "../../src/components/chat/activity/activity-state.ts";
 import { formatSeconds } from "../../src/lib/format.ts";
+import { applyDelegationActivity } from "../../src/components/chat/activity/activity-delegation.ts";
+import type { ChatEvent } from "../../src/lib/chat-event.ts";
 import type {
   ExecutionEventView,
   ExecutionTreeNode,
@@ -221,4 +223,70 @@ test("끝 사건의 빈 detail 은 시작 사건의 검색어를 지우지 않�
   let state = applyChatEvent(emptyActivity(0), { type: "tool", toolName: "web_search", detail: "서울 날씨", phase: "started" });
   state = applyChatEvent(state, { type: "tool", toolName: "web_search", detail: "", phase: "completed" });
   assert.equal(state.items[0]!.detail, "서울 날씨");
+});
+
+
+const SHOPPER = { code: "shopper", name: "쇼핑 담당", icon: "🛍️", color: "ROSE" };
+
+function delegatedTool(phase: "started" | "completed", toolName: string, detail: string | null): ChatEvent {
+  return {
+    type: "delegation_activity", executionId: 91, toolName, detail, phase, durationMs: phase === "completed" ? 300 : null,
+    failed: phase === "completed" ? false : null,
+    delegation: { executionId: 91, parentExecutionId: 90, status: "RUNNING", agent: SHOPPER },
+  };
+}
+
+test("맡긴 실행의 도구 사건은 맡은 에이전트 도우미 줄 아래에 차례로 들어간다", () => {
+  let state = applyChatEvent(emptyActivity(0), { type: "tool", phase: "started", toolName: "agent_delegate" });
+  state = applyDelegationActivity(state, delegatedTool("started", "web_search", "운동화"));
+  state = applyChatEvent(state, { type: "tool", phase: "started", toolName: "memory_search" });
+  state = applyDelegationActivity(state, delegatedTool("completed", "web_search", null));
+  state = applyDelegationActivity(state, delegatedTool("started", "web_extract", "https://example.com"));
+
+  assert.deepEqual(
+    state.items.map((item) => [item.kind, item.name, item.state, item.parent ?? null]),
+    [
+      ["tool", "agent_delegate", "running", null],
+      ["subagent", "쇼핑 담당", "running", null],
+      ["tool", "web_search", "done", "91"],
+      ["tool", "web_extract", "running", "91"],
+      ["tool", "memory_search", "running", null],
+    ],
+  );
+  assert.equal(state.items[2].detail, "운동화");
+});
+
+test("답이 끝날 때 아직 도는 맡긴 실행은 맡겨 둠이고 답은 실패로 보이지 않는다", () => {
+  let state = applyDelegationActivity(emptyActivity(0), delegatedTool("started", "web_search", "운동화"));
+  state = applyChatEvent(state, { type: "done" });
+
+  assert.deepEqual(state.items.map((item) => item.state), ["handed-off", "handed-off"]);
+  assert.equal(activityOutcome(state.items), "done");
+});
+
+test("Hermes 내장 도우미는 지금처럼 결과를 받지 못함이다", () => {
+  let state = applyChatEvent(emptyActivity(0), { type: "subagent", phase: "started", subagentId: "s1", goal: "조사" });
+  state = failActivity(state, 1);
+
+  assert.equal(state.items[0].state, "result-missing");
+  assert.equal(activityOutcome(state.items), "failed");
+});
+
+test("끝난 답을 트리로 그리면 도는 맡긴 자식은 맡겨 둠, 끝난 맡긴 자식은 그 도구 줄과 함께 끝남이다", () => {
+  const running = { ...node(2, "RUNNING", [toolStarted(2, "web_search")]), delegated: true };
+  const ended = { ...node(3, "SUCCEEDED", [toolStarted(3, "web_extract")]), delegated: true };
+  const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [], [running, ended]) });
+
+  assert.deepEqual(items.map((item) => [item.kind, item.state]), [
+    ["subagent", "handed-off"],
+    ["tool", "handed-off"],
+    ["subagent", "done"],
+    ["tool", "unfinished"],
+  ]);
+  assert.equal(activityOutcome(items.slice(0, 2)), "done");
+});
+
+test("답이 끝난 뒤에 온 맡긴 도구 사건은 버린다", () => {
+  const ended = applyChatEvent(emptyActivity(0), { type: "done" });
+  assert.equal(applyDelegationActivity(ended, delegatedTool("started", "web_search", "운동화")), ended);
 });

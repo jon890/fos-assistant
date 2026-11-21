@@ -6,6 +6,7 @@ import nextTs from "eslint-config-next/typescript";
 
 // rule-59: Node 테스트의 런타임 의존이 늘면 아래 목록도 함께 늘린다.
 const NODE_TEST_READ_FILES = [
+  "src/components/chat/activity/activity-delegation.ts",
   "src/components/chat/activity/activity-state.ts",
   "src/components/chat/markdown-plugins.ts",
   "src/components/chat/skill-command.ts",

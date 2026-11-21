@@ -7,6 +7,7 @@ import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
+import { applyDelegationActivity } from "./activity/activity-delegation";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -24,6 +25,7 @@ type Context = Pick<
   | "currentExecutionId"
   | "stopRequested"
   | "setTurns"
+  | "setActivity"
 > &
   Pick<ConversationSessionProps, "conversationId"> &
   Pick<
@@ -42,6 +44,7 @@ export function useConversationEffects({
   currentExecutionId,
   stopRequested,
   setTurns,
+  setActivity,
   conversationId,
   runConversationTask,
   resumeAfterReconnect,
@@ -88,6 +91,14 @@ export function useConversationEffects({
             // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.
             if (event.type === "approval") {
               setApprovalRefresh((count) => count + 1);
+              return;
+            }
+            // 맡긴 실행의 도구 사건은 도는 답의 작업 과정에 바로 넣는다. 도는 답이 없으면 버리고 끝난 뒤에는 트리가 그린다.
+            if (event.type === "delegation_activity") {
+              setActivity(
+                (previous) =>
+                  previous && applyDelegationActivity(previous, event),
+              );
               return;
             }
             // 맡긴 줄도 보류하지 않는다. 위임은 보낸 turn 이 도는 중에 시작하고, 끝난 줄은 이력이 아직 모른다.

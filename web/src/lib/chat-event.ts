@@ -35,6 +35,7 @@ export type ChatEvent = {
     | "pending"
     | "approval"
     | "delegation"
+    | "delegation_activity"
     | "steer";
   text?: string | null;
   alreadyStreamed?: boolean | null;
@@ -57,7 +58,7 @@ export type ChatEvent = {
   model?: string | null;
   inputTokens?: number | null;
   outputTokens?: number | null;
-  /** `delegation` 사건의 맡긴 줄이다 */
+  /** `delegation` 사건의 맡긴 줄이다. `delegation_activity`(맡긴 실행의 도구 사건 하나)는 맡은 에이전트의 이름표를 여기 넣고 `executionId` 가 맡은 실행이다 */
   delegation?: DelegationLine | null;
   /** 위임 결과 알림 줄의 `system` 사건이 싣는 그 줄이 전한 결과다 */
   deliveredResults?: DelegationLine[] | null;
