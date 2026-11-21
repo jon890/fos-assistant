@@ -64,6 +64,7 @@ from .connector_status import (
     _policy_hook_active,
     _policy_hook_failure,
     _policy_plugin_enabled,
+    _status_skipped_skills,
     _tool_map_drift,
 )
 
@@ -189,7 +190,8 @@ async def _connector_request(request):
                 if support["state"] == "verified" and (not configured or _policy_hook_failure(profile_dir, config, state, drift) is not None):
                     support["state"] = "pending"
                 connectors.append({"plugin": plugin, "enabled": entry is not None, "configured": configured,
-                                   "mode": mode, **({"execution_guard": support} if manifest is not None
+                                   "mode": mode, **_status_skipped_skills(profile_dir, config, manifest, entry),
+                                   **({"execution_guard": support} if manifest is not None
                                    and manifest.get("execution_guard") is not None else {})})
             # 운영 목록에서 빠진 플러그인의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": BIND_MODE}

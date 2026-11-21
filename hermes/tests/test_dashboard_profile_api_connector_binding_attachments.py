@@ -25,7 +25,7 @@ class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
         self.assertEqual(record[DEMO]["server"], server)
         self.assertNotIn("DEMO_ATTACHMENT_DIR", self.env_text())
         status = self.status_of()
-        self.assertEqual(status["connectors"][0], {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
+        self.assertEqual(status["connectors"][0], {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []})
         self.assertNotIn(expected, json.dumps(response.body))
 
     def test_rebinding_with_another_owner_rewrites_the_owner_directory(self):
