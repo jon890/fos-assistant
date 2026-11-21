@@ -39,10 +39,10 @@ function hermesToolsets(): Record<string, string[]> {
 /**
  * 켤 수 있지만 내장 도구가 없는 toolset 이다. 도구 이름은 다른 곳이 갖는다.
  * - `fos-assistant`: Control Plane MCP 서버. 도구는 `McpToolCatalog` 에서 읽는다
- * - `fos-attachments`: fos-ctx 가 등록하는 도구. `register_tool` 에서 읽는다
+ * - `fos-attachments`, `fos-product-page`: fos-ctx 가 등록하는 도구. `register_tool` 에서 읽는다
  * - `homeassistant`, `spotify`: 고정 버전 Hermes 의 `toolsets.py` 에 없고 따로 설치하는 plugin 이 도구를 가져온다
  */
-const NON_BUILTIN_TOOLSETS = new Set(["fos-assistant", "fos-attachments", "homeassistant", "spotify"]);
+const NON_BUILTIN_TOOLSETS = new Set(["fos-assistant", "fos-attachments", "fos-product-page", "homeassistant", "spotify"]);
 
 
 /** Python 의 `NAME = frozenset({...})` 안의 글자들이다. */
