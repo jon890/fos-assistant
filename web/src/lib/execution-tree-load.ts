@@ -12,12 +12,20 @@ const RETRY_DELAY_MS = 1_000;
  */
 export class ExecutionTreeLoadError extends Error {
   readonly reason: string;
+  /** 다시 읽어 볼 만한 실패인가. 세션 만료(401)나 없는 실행(404) 같은 4xx 는 다시 읽어도 같다 */
+  readonly retryable: boolean;
 
-  constructor(reason: string) {
+  constructor(reason: string, retryable = true) {
     super(`실행 트리를 읽지 못했다 reason=${reason}`);
     this.name = "ExecutionTreeLoadError";
     this.reason = reason;
+    this.retryable = retryable;
   }
+}
+
+/** 4xx 가운데 기다리면 풀릴 수 있는 요청 시간 초과(408)와 요청 제한(429)만 다시 읽는다. */
+function retryableStatus(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429;
 }
 
 type Options = {
@@ -54,6 +62,7 @@ async function readOnce(
     const code = await errorCode(response);
     throw new ExecutionTreeLoadError(
       `http ${response.status}${code ? ` ${code}` : ""}`,
+      retryableStatus(response.status),
     );
   }
   let tree: ExecutionTreeResponse;
@@ -72,7 +81,8 @@ async function readOnce(
  * 끝난 답의 작업 과정에 쓸 실행 트리를 읽는다. 처음 읽기가 실패하면 한 번만 다시 읽는다.
  *
  * <p>운영에서 오래 쉰 뒤 첫 조회가 느리거나 일시적으로 실패해, 펼친 작업 과정이 「읽지 못했어요」 로 끝난 일이
- * 있었다. 같은 조회를 곧바로 다시 하면 읽힌다. 두 번 모두 실패하면 마지막 까닭을 콘솔에 남기고 던진다.
+ * 있었다. 같은 조회를 곧바로 다시 하면 읽힌다. 다시 읽어도 같은 4xx(세션 만료, 없는 실행)는 곧바로 던진다. 두 번 모두
+ * 실패하면 마지막 까닭을 콘솔에 남기고 던진다.
  */
 export async function loadExecutionTree(
   executionId: number,
@@ -89,6 +99,8 @@ export async function loadExecutionTree(
       `작업 과정 첫 읽기 실패 executionId=${executionId}`,
       first instanceof ExecutionTreeLoadError ? first.reason : first,
     );
+    if (first instanceof ExecutionTreeLoadError && !first.retryable)
+      throw first;
     await wait(RETRY_DELAY_MS);
     if (options.stopped?.()) throw first;
   }

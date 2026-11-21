@@ -118,3 +118,24 @@ test("loadExecutionTree 는 기다리는 사이 화면이 사라졌으면 다시
   );
   assert.equal(server.calls, 1);
 });
+
+for (const status of [401, 404]) {
+  test(`loadExecutionTree 는 ${status} 이면 기다리지 않고 한 번만 읽고 던진다`, async (t) => {
+    t.mock.method(console, "warn", () => {});
+    const server = sequence(() => json(status, { code: "X" }), () => json(200, TREE));
+    let waited = false;
+
+    await assert.rejects(
+      loadExecutionTree(7, {
+        fetchTree: server.fetchTree,
+        wait: async () => {
+          waited = true;
+        },
+      }),
+      (error: unknown) =>
+        error instanceof ExecutionTreeLoadError && error.reason === `http ${status} X`,
+    );
+    assert.equal(server.calls, 1);
+    assert.equal(waited, false);
+  });
+}
