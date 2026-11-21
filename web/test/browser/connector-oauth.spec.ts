@@ -224,3 +224,30 @@ test("다시 연결은 저장된 저장소 칸을 다시 넣지 않아도 저장
   await page.waitForURL(AUTHORIZE);
   expect(started).toEqual({ values: { repo: "me/site" } });
 });
+
+test("처음 연결을 거절하고 돌아오면 넣었던 저장소 칸이 되살아나 다시 시도가 같은 값으로 시작한다", async ({ page }) => {
+  await serve(page, OAUTH, disconnected);
+  const starts: unknown[] = [];
+  await page.route(`**/api/connections/${ID}/oauth/start`, (route) => {
+    starts.push(route.request().postDataJSON());
+    return route.fulfill({ json: { authorizeUrl: AUTHORIZE } });
+  });
+  await page.route("https://github.com/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<p>GitHub 대역</p>" }),
+  );
+  await page.route("**/api/connections/oauth/complete", (route) =>
+    route.fulfill({ json: { outcome: "DENIED", connectorId: ID, authorizeUrl: null, reason: null } }),
+  );
+  await page.goto(`/connections/${ID}?agent=browserswitch`);
+  await page.getByLabel("저장소", { exact: true }).fill("me/site");
+  await page.getByRole("button", { name: "GitHub 으로 연결" }).click();
+  await page.waitForURL(AUTHORIZE);
+
+  await page.goto("/connections/oauth/callback?error=access_denied&state=s");
+  await expect(page.getByTestId("oauth-result")).toContainText("연결하지 않았어요");
+  await expect(page).toHaveURL(new RegExp(`/connections/${ID}\\?agent=browserswitch$`));
+  await expect(page.getByLabel("저장소", { exact: true })).toHaveValue("me/site");
+  await page.getByTestId("oauth-result").getByRole("button", { name: "다시 시도" }).click();
+  await page.waitForURL(AUTHORIZE);
+  expect(starts).toEqual([{ values: { repo: "me/site" } }, { values: { repo: "me/site" } }]);
+});

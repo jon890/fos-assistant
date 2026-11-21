@@ -70,16 +70,15 @@ export function ConnectorConnectionPanel({
   oauthResult: { outcome: OAuthOutcome; reason: string | null } | null;
 }) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
-  const [values, setValues] = useState<Record<string, string>>({});
+  const notices = useOAuthNotices(id, oauthResult, preferredAgent);
+  const [values, setValues] = useState(notices.restored);
   const [options, setOptions] = useState<Record<string, ConnectorOption[]>>({});
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | ConnectionFailure | null>(null);
-  const connectedBack = oauthResult?.outcome === "CONNECTED";
-  const [chooser, setChooser] = useState<Chooser>(
-    connectedBack ? "open" : "auto",
-  );
-  const [justConnected, setJustConnected] = useState(connectedBack);
-  const notices = useOAuthNotices(id, oauthResult);
+  // 단추 연결을 마치고 돌아왔으면 바로 쓸 에이전트를 고르게 한다.
+  const back = oauthResult?.outcome === "CONNECTED";
+  const [chooser, setChooser] = useState<Chooser>(back ? "open" : "auto");
+  const [justConnected, setJustConnected] = useState(back);
   const busy = pending !== null;
 
   const validId = CONNECTOR_ID_PATTERN.test(id);
@@ -129,6 +128,7 @@ export function ConnectorConnectionPanel({
     setError(null);
     notices.setReturned(null);
     notices.setRevoke(null);
+    notices.remember(buttonFields, startValues);
     const started = await startOAuth(id, startValues);
     if (!started.ok) {
       setPending(null);

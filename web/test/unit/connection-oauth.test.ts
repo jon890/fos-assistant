@@ -5,6 +5,8 @@ import {
   isOAuthReason,
   oauthOutcomeMessage,
   providerName,
+  recallOAuthStart,
+  rememberOAuthStart,
   safeAuth,
   safeCompletion,
   safeRevoke,
@@ -79,4 +81,28 @@ test("실패한 결과마다 까닭을 보이고 성공은 까닭이 없다", ()
     oauthOutcomeMessage("VERIFY_FAILED", "CONNECTOR_UNAVAILABLE"),
     "연결을 확인하지 못했어요. 서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요.",
   );
+});
+
+test("시작 기억은 같은 플러그인의 15분 안 값만 되살리고 틀린 칸과 에이전트 번호는 버린다", () => {
+  const store = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+  };
+  const globals = globalThis as { window?: unknown };
+  globals.window = { sessionStorage: storage };
+  try {
+    rememberOAuthStart("career", { repo: "me/site" }, "browserswitch");
+    assert.deepEqual(recallOAuthStart("career"), { values: { repo: "me/site" }, agent: "browserswitch" });
+    assert.equal(recallOAuthStart("gmail"), null);
+    store.set(
+      "connector-oauth-start",
+      JSON.stringify({ id: "career", values: { "BAD KEY": "x", repo: 1 }, agent: "../x", at: Date.now() }),
+    );
+    assert.deepEqual(recallOAuthStart("career"), { values: {}, agent: null });
+    store.set("connector-oauth-start", JSON.stringify({ id: "career", values: {}, agent: null, at: Date.now() - 16 * 60 * 1000 }));
+    assert.equal(recallOAuthStart("career"), null);
+  } finally {
+    delete globals.window;
+  }
 });

@@ -134,6 +134,64 @@ export const completeOAuth = (query: {
     body: query,
   });
 
+const START_KEY = "connector-oauth-start";
+/** 서비스 화면에 다녀오는 시간보다 길게 잡는다. Control Plane 의 상태 값은 10분 뒤 만료된다. */
+const START_TTL_MS = 15 * 60 * 1000;
+const AGENT_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+type StartMemo = {
+  id: string;
+  values: Record<string, string>;
+  agent: string | null;
+  at: number;
+};
+
+/**
+ * 단추로 서비스 화면에 가기 전에 이 탭에만 비밀 아닌 입력값과 시작한 에이전트 번호를 둔다.
+ * 돌아온 화면이 「다시 시도」 할 칸 값과 에이전트 번호를 되살린다. 비밀 칸은 두지 않는다.
+ */
+export function rememberOAuthStart(
+  id: string,
+  values: Record<string, string>,
+  agent: string | null,
+): void {
+  try {
+    const memo: StartMemo = { id, values, agent, at: Date.now() };
+    window.sessionStorage.setItem(START_KEY, JSON.stringify(memo));
+  } catch {
+    // 저장소를 쓸 수 없는 브라우저는 되살리지 않을 뿐이다.
+  }
+}
+
+/** 같은 플러그인으로 시작한 지 15분 안의 기억이다. 모양이 틀리면 null 이다. */
+export function recallOAuthStart(
+  id: string,
+): { values: Record<string, string>; agent: string | null } | null {
+  try {
+    const memo = object(
+      JSON.parse(window.sessionStorage.getItem(START_KEY) ?? "null"),
+    );
+    if (
+      !memo ||
+      memo.id !== id ||
+      typeof memo.at !== "number" ||
+      Date.now() - memo.at > START_TTL_MS
+    )
+      return null;
+    const values: Record<string, string> = {};
+    for (const [key, value] of Object.entries(object(memo.values) ?? {}))
+      if (FIELD_KEY_PATTERN.test(key) && typeof value === "string")
+        values[key] = value;
+    const agent =
+      typeof memo.agent === "string" && AGENT_PATTERN.test(memo.agent)
+        ? memo.agent
+        : null;
+    return { values, agent };
+  } catch {
+    return null;
+  }
+}
+
 // 아래는 서버 라우트가 Control Plane 응답에서 계약의 칸만 옮길 때 쓴다.
 
 function object(value: unknown): Record<string, unknown> | null {

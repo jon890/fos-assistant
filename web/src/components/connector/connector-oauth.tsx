@@ -12,6 +12,8 @@ import type {
 import {
   oauthOutcomeMessage,
   providerName,
+  recallOAuthStart,
+  rememberOAuthStart,
   type ConnectionAuth,
   type ConnectionOAuthRevoke,
   type ConnectorOAuth,
@@ -216,6 +218,12 @@ export function OAuthNotices({
   );
 }
 
+/** 돌아온 화면이면 단추를 누를 때 넣었던 비밀 아닌 칸 값을 되살린다. 그 밖에는 빈 값이다. */
+function restoredValues(id: string, returned: boolean): Record<string, string> {
+  if (!returned || typeof window === "undefined") return {};
+  return recallOAuthStart(id)?.values ?? {};
+}
+
 /**
  * 돌아온 결과와 해제 결과의 상태다. 돌아온 결과는 다시 읽어도 또 보이지 않게 주소의 검색어를 지운다.
  * 주소만 바꾸고 화면은 다시 그리지 않는다.
@@ -223,14 +231,25 @@ export function OAuthNotices({
 export function useOAuthNotices(
   id: string,
   oauthResult: { outcome: OAuthOutcome; reason: string | null } | null,
+  agent: string | null,
 ) {
   const [returned, setReturned] = useState(oauthResult);
+  // 돌아온 화면이면 단추를 누를 때 넣었던 비밀 아닌 칸 값을 되살린다.
+  const [restored] = useState(() => restoredValues(id, oauthResult !== null));
   const [revoke, setRevoke] = useState<ConnectionOAuthRevoke | null>(null);
   useEffect(() => {
+    // 결과 검색어만 지우고 에이전트 번호는 남긴다.
     if (oauthResult)
-      window.history.replaceState(null, "", `/connections/${id}`);
-  }, [id, oauthResult]);
-  return { returned, setReturned, revoke, setRevoke };
+      window.history.replaceState(
+        null,
+        "",
+        `/connections/${id}${agent ? `?agent=${agent}` : ""}`,
+      );
+  }, [id, oauthResult, agent]);
+  /** 서비스 화면에 가기 전에 비밀 아닌 칸 값과 시작한 에이전트를 이 탭에 둔다. */
+  const remember = (fields: ConnectorField[], values: Record<string, string>) =>
+    rememberOAuthStart(id, nonSecret(fields, values), agent);
+  return { returned, setReturned, revoke, setRevoke, restored, remember };
 }
 
 /**
@@ -249,5 +268,17 @@ export function oauthStartValues(
       (field.secret ? "" : (connection.values[field.key] ?? ""));
     if (value) result[field.key] = value;
   }
+  return result;
+}
+
+/** 비밀 아닌 칸의 값만 남긴다. 탭에 잠시 둘 값이다. */
+function nonSecret(
+  fields: ConnectorField[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const field of fields)
+    if (!field.secret && values[field.key])
+      result[field.key] = values[field.key];
   return result;
 }

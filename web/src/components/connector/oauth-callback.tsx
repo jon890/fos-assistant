@@ -9,6 +9,7 @@ import {
   OAUTH_RESULT_PARAM,
   completeOAuth,
   oauthOutcomeMessage,
+  recallOAuthStart,
 } from "@/lib/connection-oauth";
 
 type Query = Parameters<typeof completeOAuth>[0];
@@ -40,6 +41,9 @@ export function OAuthCallback({ query }: { query: Query }) {
       }
       const params = new URLSearchParams({ [OAUTH_RESULT_PARAM]: outcome });
       if (reason) params.set(OAUTH_REASON_PARAM, reason);
+      // 에이전트 화면에서 시작했으면 그 에이전트를 연결 화면에 다시 넘긴다.
+      const agent = recallOAuthStart(connectorId)?.agent;
+      if (agent) params.set("agent", agent);
       router.replace(`/connections/${connectorId}?${params.toString()}`);
     });
   }, [query, router]);
