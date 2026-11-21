@@ -140,6 +140,7 @@ export function parseStoreProduct(product: Json, url: string) {
   if (missing.length) throw new MissingFields(missing);
   const { options: groups, truncated, unknown } = options(product);
   const free = pick(delivery, PRODUCT.feeType) === FREE_DELIVERY;
+  // 유료 배송의 기본 배송비가 비면 미확인으로 둔다. 0 으로 바꾸면 비교 가격을 실제보다 낮게 보인다.
   return {
     kind: "store" as const,
     url,
