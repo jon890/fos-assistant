@@ -49,7 +49,9 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+# public 은 checkout 의 권한을 그대로 가져온다. 배포 checkout 은 파일 600 이라 nextjs 가 sw.js 를 읽지 못해 500 이 난다.
+# 그래서 아래 문서와 같이 `--chmod=755` 로 읽기를 연다.
+COPY --from=builder --chmod=755 /app/public ./public
 
 # 「개발 문서」 화면이 읽는 문서다(web/docs/adr/ADR-20261117-dev-docs-image.md).
 # 소유자는 root 로 두고 `--chmod=755` 로 모두에게 읽기와 디렉터리 진입을 열어(8진수는 구버전 Docker 도 받는다. 파일에 실행 비트가 붙지만 문서라 무해하다), 좁은 권한의 checkout(디렉터리 700, 파일 600)이어도 화면 서버 사용자(nextjs)가 읽는다. 쓰기는 열지 않는다.
