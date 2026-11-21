@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
+import com.bifos.assistant.chat.reply.application.dto.ReplyPick;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
@@ -101,7 +102,7 @@ public class ChatService {
     /** {@code delegateTo} 가 있으면 그 에이전트에게 바로 맡긴다(ADR-20261112 / mention-delegation). */
     public ChatTurn send(
         CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds, String delegateTo) {
-        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo);
+        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo, null);
         return chatTurnRunner.runTurn(user, routed, text, TurnIntent.forSend(delegateTo), event -> {
         }, false, null);
     }
@@ -109,20 +110,19 @@ public class ChatService {
 
     public void stream(
         CurrentUser user, Long conversationId, String text, String agentCode, Consumer<ChatEvent> onEvent) {
-        stream(user, conversationId, text, agentCode, List.of(), null, onEvent);
+        stream(user, conversationId, text, agentCode, List.of(), null, null, onEvent);
     }
 
 
-    /** {@link #send(CurrentUser, Long, String, String, List, String)} 의 흐르는 경로다. */
+    /** {@link #send(CurrentUser, Long, String, String, List, String)} 의 흐르는 경로다. {@code reply} 는 답장으로 집은 것이고 이 경로만 받는다(스펙 chat-reference). */
     public void stream(
         CurrentUser user,
         Long conversationId,
         String text,
         String agentCode,
-        List<Long> attachmentIds,
-        String delegateTo,
+        List<Long> attachmentIds, String delegateTo, ReplyPick reply,
         Consumer<ChatEvent> onEvent) {
-        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo);
+        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo, reply);
         TurnIntent intent = TurnIntent.forSend(delegateTo);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
@@ -305,7 +305,7 @@ public class ChatService {
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
                 .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                 .toList();
-            Routed routed = chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
+            Routed routed = chatTurnRouting.routeExisting(user, conversation, attached, question.content(), question.reply(), requestReceivedAt);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, question.content(), intent, onEvent, true, handle);
             onEvent.accept(ChatTurnCompletion.eventOf(turn));

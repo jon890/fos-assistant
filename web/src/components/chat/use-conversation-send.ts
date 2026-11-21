@@ -22,6 +22,7 @@ import type { ConversationHistory } from "./use-conversation-history";
 import type { ConversationQueue } from "./use-conversation-queue";
 import type { ConversationEvents } from "./use-conversation-events";
 import type { MessageAttachment } from "./message-types";
+import { replyRequestOf, type ReplyTarget } from "@/lib/reply";
 
 type Context = Pick<
   ConversationSessionState,
@@ -98,6 +99,7 @@ export function useConversationSend({
     attachmentIds: number[],
     replacementText?: string,
     attachments?: MessageAttachment[],
+    reply?: ReplyTarget,
   ): Promise<boolean> {
     const text = (replacementText ?? draft).trim();
     if (
@@ -149,6 +151,7 @@ export function useConversationSend({
         content: text,
         senderName: null,
         attachments,
+        reply,
         delegatedTo: target ? pendingMention(target) : null,
       },
     ]);
@@ -259,6 +262,7 @@ export function useConversationSend({
         code === "CONVERSATION_BUSY" &&
         target === null &&
         attachmentIds.length === 0 &&
+        !reply &&
         conversationIdRef.current !== null
       ) {
         setTurns((previous) =>
@@ -299,6 +303,7 @@ export function useConversationSend({
           agentCode,
           attachmentIds,
           delegateTo: target?.code ?? null,
+          reply: reply ? replyRequestOf(reply) : null,
         });
       } catch {
         // fetch 예외로는 수락 전 실패와 수락 뒤 응답 유실을 구분하지 못한다. 별도 POST를 보내지 않는다.
@@ -389,5 +394,6 @@ export type ConversationSend = {
     attachmentIds: number[],
     replacementText?: string,
     attachments?: MessageAttachment[],
+    reply?: ReplyTarget,
   ): Promise<boolean>;
 };

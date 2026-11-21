@@ -2,16 +2,51 @@ package com.bifos.assistant.chat.attachment.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.attachment.application.dto.EmbeddedImages;
+import com.bifos.assistant.chat.attachment.application.dto.ExtraImage;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
+import com.bifos.assistant.hermes.application.dto.HermesImage;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /** 한 턴에 사진을 어느 단계로 싣고 더 실을 수 있는지의 판정을 본다. */
 class AttachmentImagesTest {
 
     private static final long MB = 1024L * 1024;
+
+
+    @Test
+    @DisplayName("답장으로 집은 그림 원본은 줄인 사본으로 받은 순서대로 넣고, 읽지 못하는 바이트의 자리는 비운다")
+    void embedsPickedImagesInOrder() throws IOException {
+        AttachmentImages images = new AttachmentImages(Mockito.mock(AttachmentStore.class));
+        byte[] picture = png(2000, 1000);
+
+        EmbeddedImages embedded = images.embed(List.of(), Map.of(), List.of(
+            ExtraImage.ofBytes(picture), ExtraImage.ofBytes(new byte[] {1, 2, 3})));
+
+        assertThat(embedded.photos()).isEmpty();
+        assertThat(embedded.extraDataUrls()).hasSize(2);
+        assertThat(embedded.extraDataUrls().get(0)).startsWith("data:image/jpeg;base64,");
+        assertThat(embedded.extraDataUrls().get(1)).isNull();
+        assertThat(embedded.extraImages(List.of("집은 그림 1", "집은 그림 2"))).extracting(HermesImage::label)
+            .containsExactly("집은 그림 1");
+    }
+
+
+    private static byte[] png(int width, int height) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB), "png", out);
+        return out.toByteArray();
+    }
 
 
     @Test

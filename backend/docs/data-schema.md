@@ -455,6 +455,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `content_key_id` 가 비어 있으면 `content` 는 평문이다. 외래 키를 두지 않는다
 - `sender_user_id` 는 `ASSISTANT` 와 `SYSTEM` 에서, `execution_id` 는 `USER` 와 `SYSTEM` 에서 비어 있다
 - `steer_state`, `steer_execution_id`, `steer_child` 는 답이 도는 중 도는 실행에 끼워 넣은 사용자 글(steer 말풍선)에만 찬다. 상태는 `DELIVERED`(받아 둠), `CARRIED_OVER`(돌아와 다음 turn 으로 감), `UNCONFIRMED`(들어갔는지 모름), `NOT_DELIVERED`(중지한 결과가 돌려줘 들어가지 않음)이고 `steer_execution_id` 는 끼워 넣은 turn 의 루트 실행이다. `execution_id` 가 `USER` 행에서 비어 있다는 규칙을 지키려고 칸을 따로 둔다. 답 줄로 읽는 질의가 `execution_id` 로 답을 고르기 때문이다. 흐름과 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다
+- `reply_message_id`, `reply_attachment_id`, `reply_artifact_id` 는 사용자가 메시지나 그림을 집어 보낸 답장의 사용자 줄에만 찬다. 집은 메시지 줄과, 사진이나 그림 한 장을 집었으면 그 첨부나 그림 행이다. 둘 다 비면 메시지 전체를 집은 것이다. 외래 키를 두지 않는다. 다시 만들기는 질문 줄의 이 칸을 다시 읽는다. 흐름은 [`docs/features/chat-reference.md`](../../docs/features/chat-reference.md) 가 갖는다. 칸은 `V20261105074442__chat_message_reply.sql` 이 갖는다
 - `content` 를 `LONGTEXT` 로 못 박는다. 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다
 
 **본문은 저장할 때 암호화한다.** KEK 설정이 있으면 새 메시지를 빈 글로 넣고 같은 트랜잭션에서 암호문으로 고친다.
