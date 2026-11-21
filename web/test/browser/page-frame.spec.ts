@@ -216,3 +216,31 @@ test("할 것이 없는 사용자의 지금 볼 것은 다른 화면과 같은 �
   await expect(frame(page).getByText("지금 확인할 것이 없어요")).toBeVisible();
   await expect(frame(page).locator('[data-slot="load-failure"]')).toHaveCount(0);
 });
+
+test("에이전트 목록은 이름과 소개가 길어도 360, 390, 1440 폭에서 가로로 넘치지 않는다", async ({ page, context }, testInfo) => {
+  // 열을 정하지 않은 grid 는 칸이 말줄임 글자의 전체 길이만큼 넓어져 휴대폰에서 main 이 넘쳤다.
+  await setSession(context, { email: `frame-long-agent-${testInfo.project.name}@example.com`, name: "긴 이름 사용자" });
+  const created = await page.request.post("/api/agents", { data: { name: "긴 이름 에이전트" } });
+  expect(created.status()).toBe(201);
+  const { code } = (await created.json()) as { code: string };
+  try {
+    const renamed = await page.request.patch(`/api/agents/${code}/introduction`, {
+      data: { name: "가".repeat(100), description: "나".repeat(60), icon: null, color: null },
+    });
+    expect(renamed.ok()).toBeTruthy();
+    for (const width of [360, 390, 1440]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/agents");
+      const card = page.getByRole("list", { name: "쓸 수 있는 에이전트" }).getByRole("link").filter({ hasText: "나".repeat(60) });
+      await expect(card).toBeVisible();
+      const box = (await card.boundingBox())!;
+      expect(box.x + box.width, `${width}px 에서 카드가 화면 밖으로 나간다`).toBeLessThanOrEqual(width);
+      const overflow = await page.evaluate(() =>
+        [document.documentElement, document.querySelector("main")!].map((node) => node.scrollWidth - node.clientWidth),
+      );
+      expect(overflow, `${width}px 에서 화면이 가로로 넘친다`).toEqual([0, 0]);
+    }
+  } finally {
+    expect((await page.request.delete(`/api/agents/${code}`)).status()).toBe(204);
+  }
+});
