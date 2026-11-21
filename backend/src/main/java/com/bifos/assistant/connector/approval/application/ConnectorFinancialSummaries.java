@@ -3,7 +3,6 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.financial.application.FinancialOrderLimits;
-import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.approval.application.dto.CheckoutActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialActionSummary.Normalization;
@@ -47,7 +46,6 @@ public class ConnectorFinancialSummaries {
     private final TextCipher cipher;
     private final FinancialDigest digest;
     private final FinancialOrderLimits limits;
-    private final PurchaseLimits purchases;
     private final Clock clock;
 
 
@@ -75,20 +73,13 @@ public class ConnectorFinancialSummaries {
     @Transactional(readOnly = true)
     public Map<UUID, CheckoutActionSummary> checkouts(CurrentUser user, List<UUID> actionIds) {
         var found = new LinkedHashMap<UUID, CheckoutActionSummary>();
-        Long remaining = null;
-        boolean read = false;
         for (UUID actionId : actionIds) {
             var action = actions.findByPublicId(actionId)
                 .filter(row -> user.id().equals(row.userId()) && row.risk() == ToolRisk.PURCHASE).orElse(null);
             if (action == null) {
                 continue;
             }
-            // 오늘 남은 한도는 사용자마다 한 번만 읽는다. 읽지 못하면 그 칸만 비운다. 판정은 승인할 때 서버가 다시 한다.
-            if (!read) {
-                read = true;
-                remaining = remainingToday(user.id());
-            }
-            found.put(actionId, checkout(action, remaining));
+            found.put(actionId, checkout(action));
         }
         return found;
     }
@@ -109,23 +100,12 @@ public class ConnectorFinancialSummaries {
         if (action.risk() != ToolRisk.PURCHASE) {
             return Optional.empty();
         }
-        var summary = checkout(action, null);
+        var summary = checkout(action);
         return summary.available() ? Optional.ofNullable(summary.url()) : Optional.empty();
     }
 
 
-    private Long remainingToday(Long userId) {
-        try {
-            long daily = purchases.limitOf(userId).dailyKrw();
-            return Math.max(0, daily - purchases.spentToday(userId, null, clock.instant()));
-        } catch (RuntimeException ex) {
-            log.warn("주문서 카드의 남은 한도를 읽지 못했다 kind={}", ex.getClass().getSimpleName());
-            return null;
-        }
-    }
-
-
-    private CheckoutActionSummary checkout(ConnectorAction action, Long remaining) {
+    private CheckoutActionSummary checkout(ConnectorAction action) {
         try {
             var row = action.bodyErasedAt() == null ? contents.findById(action.id()).orElse(null) : null;
             if (row == null) {
@@ -140,7 +120,7 @@ public class ConnectorFinancialSummaries {
             shown.get("options").forEach(option -> options.add(new CheckoutActionSummary.Option(text(option, "name"), text(option, "value"))));
             return new CheckoutActionSummary(true, text(shown, "title"), text(shown, "store"), options, shown.get("quantity").intValue(),
                 shown.get("itemAmountKrw").longValue(), shown.get("shippingFeeKrw").longValue(), shown.get("expectedTotalKrw").longValue(),
-                shown.get("regionalExtraFee").booleanValue(), text(shown, "url"), remaining);
+                shown.get("regionalExtraFee").booleanValue(), text(shown, "url"));
         } catch (RuntimeException ex) {
             log.warn("주문서 카드 요약을 열지 못했다 actionId={} kind={}", action.publicId(), ex.getClass().getSimpleName());
             return CheckoutActionSummary.unavailable();

@@ -317,18 +317,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 전용 금융 UPDATE는 `limit_updated_at`과 일반 감사 `updated_at`을 함께 적는다. 두 칸의 의미를 합치지 않는다.
 
-#### 구매 상한 컬럼
-
-`purchase_limit_` 로 시작하는 컬럼은 사용자가 정한 구매 상한이다. 근거는 [ADR-20261113 / purchase-checkout](../../docs/adr/ADR-20261113-purchase-checkout.md)가 갖는다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `purchase_limit_order_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 한 건 상한. 상품 금액과 기본 배송비를 더한 예상 합계와 견준다 |
-| `purchase_limit_daily_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 KST 하루 상한. 그날 승인한 `PURCHASE` 승인 줄의 예상 합계 합과 견준다 |
-
-운영 최대치가 없어 이 값이 곧 적용 상한이다. 0 이면 주문서 준비를 받지 않으며, 칸을 더할 때 모든 사용자가 0 으로 채워져 닫힌 채 시작한다. 화면 API 는 0 이상 1조 미만의 정수만 받는다.
-주문 상한 컬럼처럼 엔티티의 넣기와 고치기에서 빼고 `PurchaseLimitRepository` 의 전용 쿼리로만 읽고 쓴다. 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
-
 #### 결과물 자동 보관 컬럼
 
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다.
@@ -895,9 +883,8 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `dedupe_key` 는 `v1-connector`, profile, 루트 session, session, `tool_call_id` 를 줄바꿈으로 이어 SHA-256 한 값이고 유일하다. 같은 호출이 다시 와도 줄이 하나다
 - `result_text` 의 `FAILED` 줄은 플러그인이 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
 - `result_text` 의 `UNKNOWN` 줄은 플러그인이 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
-- 위험도 `PURCHASE` 줄(주문서 채우기)은 결과 판정이 끝낸다. 결제 화면을 넘긴 `SUCCEEDED` 줄의 `result_text` 는 Control Plane 이 정한 `{"status": "PAYMENT_HANDOFF", "message", "finalAmountKrw", "expectedTotalKrw"}` 이고 플러그인 글을 싣지 않는다. 넘기지 못한 `FAILED` 줄의 `error_code` 는 `purchase_limit`(승인 순간이나 결제 직전의 구매 상한), `purchase_amount_changed`(최종 금액이 예상 합계보다 큼), `human_action_required`(구매하기 전에 사람이 해야 하는 화면) 가운데 하나이고, `result_text` 는 위 오류 계약 꼴로 금액과 상한을 정수 세부로 싣는다. 판정 표는 `docs/features/naver-shopping/design.md` 의 「결과 판정」 이 갖는다
-- 하루 구매 합계는 그 사용자가 KST 그날(`decided_at`) 승인한 `PURCHASE` 줄 가운데 `EXECUTING`, `SUCCEEDED`, `UNKNOWN`, `WAITING` 인 줄의 실행 원문 `expectedTotalKrw` 합이다. `FAILED` 는 세지 않는다
-- `status` 가 `WAITING` 이면 승인한 주문서 채우기가 「구매하기」 전에 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고, 이어 가면 `EXECUTING`, 표식이 끝나면 `FAILED`(`resume_ended` 나 `purchase_limit`)다. `waiting_since` 는 처음 멈춘 시각이고 다시 멈춰도 바꾸지 않는다. `resume_step` 은 플러그인이 낸 이어 갈 단계이고 Control Plane 은 뜻을 모른다. `resumed_at` 은 마지막으로 이어 간 시각이고, 오래 남은 `EXECUTING` 줄의 정리는 이 칸이 있으면 `decided_at` 대신 이 칸으로 본다. `WAITING` 동안 `expires_at` 은 `waiting_since` 뒤 30분, 표식이 끝나는 시각이고 이어 갈 탭은 `handoff_tab` 이다. 멈춘 적 없는 줄은 세 칸이 비어 있다([browser-cowork 설계](../../docs/features/browser-cowork/design.md) 「PR4 이어 가기」)
+- 위험도 `PURCHASE` 줄(주문서 채우기)은 결과 판정이 끝낸다. 결제 화면을 넘긴 `SUCCEEDED` 줄의 `result_text` 는 Control Plane 이 정한 `{"status": "PAYMENT_HANDOFF", "message", "finalAmountKrw", "expectedTotalKrw"}` 이고 Control Plane 이 고정한 값만 담는다. 넘기지 못한 `FAILED` 줄의 `error_code` 는 `purchase_amount_changed`(최종 금액이 예상 합계보다 큼), `human_action_required`(구매하기 전에 사람이 해야 하는 화면) 가운데 하나이고, `result_text` 는 위 오류 계약 꼴로 금액을 정수 세부에 넣는다. 판정 표는 `docs/features/naver-shopping/design.md` 의 「결과 판정」 이 갖는다
+- `status` 가 `WAITING` 이면 승인한 주문서 채우기가 「구매하기」 전에 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고, 이어 가면 `EXECUTING`, 표식이 끝나면 `FAILED`(`resume_ended`)다. `waiting_since` 는 처음 멈춘 시각이고 다시 멈춰도 바꾸지 않는다. `resume_step` 은 플러그인이 낸 이어 갈 단계이고 Control Plane 은 뜻을 모른다. `resumed_at` 은 마지막으로 이어 간 시각이고, 오래 남은 `EXECUTING` 줄의 정리는 이 칸이 있으면 `decided_at` 대신 이 칸으로 본다. `WAITING` 동안 `expires_at` 은 `waiting_since` 뒤 30분, 표식이 끝나는 시각이고 이어 갈 탭은 `handoff_tab` 이다. 멈춘 적 없는 줄은 세 칸이 비어 있다([browser-cowork 설계](../../docs/features/browser-cowork/design.md) 「PR4 이어 가기」)
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다

@@ -250,7 +250,7 @@ export function verifyApproval(
     endpoint.pathname !== CLAIM_PATH
   )
     reject();
-  /** claim 으로 ticket 을 한 번 소비한다. 200 과 정확한 응답이 아니면 거절이다. 채우기 직전 상한도 Control Plane 이 이때 본다. */
+  /** claim 으로 ticket 을 한 번 소비한다. 200 과 정확한 응답이 아니면 거절이다. */
   return async function claim() {
     if (now() >= expires) reject();
     let response: Response;
