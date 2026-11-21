@@ -128,7 +128,7 @@ sequenceDiagram
 1. 문항은 별도 작업(`BackgroundTasks`)에서 `send` 로 보낸다. 실행기 스레드는 그 기능의 끝남 조건을 1초 남짓 간격으로 본다.
 2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, `ChatService.deliveryStates` 의 그 대화 전달이 `DELIVERED` 이고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다.
 3. 10분이 지나면 도는 turn 의 실행 번호를 `TurnCancellation.markOf(conversationId)` 로 읽어 `ChatService.stop` 을 부르고, 도는 위임 자식은 `AgentDelegationService` 의 중지로 멈춘다. 그 기능을 `TIMED_OUT` 으로 적는다.
-4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 실행을 `ChatService.stop` 으로 멈추고 `TIMED_OUT` 으로 적는다.
+4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 기능을 `TIMED_OUT`(까닭 `HERMES_TIMEOUT`)으로 적는다. turn 잠금은 이미 풀려 `ChatService.stop` 으로 멈출 수 없고, 남은 원격 run 은 기존 잃은 run 정리(`LostRunRelease`)가 다음 제출 때 푼다.
 5. 대화에 도는 turn 이 없어진 뒤에 다음 기능으로 간다. 사용자 실행 자리를 겹쳐 쓰지 않게 한다.
 
 **확인 하나는 서버 하나에서 돈다.** 시작은 `BackgroundTasks` 로 띄운다. 서버가 도중에 다시 뜨면 기동 때 `RUNNING` 인 줄을 `FAILED`, 까닭 `INTERRUPTED` 로 끝낸다. 다시 돌리지 않는다.
@@ -187,7 +187,8 @@ sequenceDiagram
 | 확인을 두 번 시작 | 도는 `DEPLOY_CHECK` 를 그대로 돌려준다. 시작은 평가 사용자 행 잠금(`AppUserRepository.findByIdForUpdate`) 안에서 `RUNNING` 인 `DEPLOY_CHECK` 를 찾아 하나만 만든다(「실행기 구현 메모」) |
 | `USER_BUSY`, `CONVERSATION_BUSY` | 평가 전용 사용자는 실행기만 쓰므로 정상이면 일어나지 않는다. 일어나면 그 기능을 `FAILED`, 까닭 `BUSY` 로 적는다 |
 | Hermes 연결 실패, 시간 초과, 실행 실패 | 그 기능 `FAILED`, 까닭은 실행 줄의 오류 종류를 고정 코드로 옮긴다 |
-| 정리 실패 | 결과는 바꾸지 않는다. 경고 로그를 남기고 하루 정리 작업이 다시 지운다 |
+| 정리 실패 | 결과는 바꾸지 않고 경고 로그를 남긴다. 실패한 기능의 대화는 하루 정리 작업이 30일 뒤 다시 지운다. 통과한 기능의 대화와 확인 중 생긴 기억은 결과에 번호가 없어 다시 지우지 않는다. 평가 전용 사용자에게만 남는다 |
+| 재기동으로 끊긴 기능 | 대화 번호 없이 `INTERRUPTED` 로 적어 그 대화는 정리되지 않는다. 예약 작업 발화 도중이면 보관 처리하지 못한 작업이 재기동 뒤 한 번 발화한다. 둘 다 평가 전용 사용자에게만 남는다 |
 | 서버 재기동 | 「확인 하나는 서버 하나에서 돈다」 대로 `INTERRUPTED` |
 | 배포 순서 | 마이그레이션(칸과 표)과 코드가 한 PR 이다. 파이프라인 요청은 이 PR 이 배포되고 평가 사용자를 준비한 뒤에 켠다 |
 
