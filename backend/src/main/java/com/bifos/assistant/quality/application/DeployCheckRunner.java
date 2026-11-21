@@ -102,9 +102,10 @@ class DeployCheckRunner {
     /** 기능을 차례로 돌리고 줄을 끝낸다. 도중의 예외는 남은 기능을 {@code RUN_FAILED} 로 적고 끝낸다. */
     void run(Long runId, Long evaluationUserId) {
         Instant startedAt = clock.instant();
-        CurrentUser evaluation = EvaluationUserService.asCurrentUser(users.findById(evaluationUserId).orElseThrow());
-        QualityFeature current = null;
+        CurrentUser evaluation = null;
+        QualityFeature current = QualityFeature.values()[0];
         try {
+            evaluation = EvaluationUserService.asCurrentUser(users.findById(evaluationUserId).orElseThrow());
             for (QualityFeature feature : QualityFeature.values()) {
                 current = feature;
                 Outcome outcome = runFeature(feature, evaluation);
@@ -115,8 +116,13 @@ class DeployCheckRunner {
             log.error("배포 뒤 확인이 도중에 멈췄다 runId={} feature={}", runId, current, ex);
             recordRest(runId, current);
         } finally {
-            cleaner.forgetNewMemories(evaluation, startedAt);
-            runs.finish(runId);
+            try {
+                if (evaluation != null) {
+                    cleaner.forgetNewMemories(evaluation, startedAt);
+                }
+            } finally {
+                runs.finish(runId);
+            }
         }
     }
 
