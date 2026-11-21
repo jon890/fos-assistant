@@ -127,7 +127,7 @@ export function MessageBubble({
     return (
       <li
         className={cn(
-          "group flex min-w-0 justify-end rounded-lg focus-visible:outline-none data-[highlight=true]:bg-muted",
+          "group relative flex min-w-0 justify-end rounded-lg focus-visible:outline-none data-[highlight=true]:bg-muted",
           // 맡김 질문은 말풍선 아래에 맡긴 줄을, steer 말풍선은 상태 글을 둔다. 오른쪽 정렬은 그대로다.
           (turn.delegatedTo || turn.steer || turn.reply || canReply) &&
             "flex-col items-end",
@@ -200,12 +200,16 @@ export function MessageBubble({
         {turn.delegatedTo ? <MentionLine line={turn.delegatedTo} /> : null}
         {turn.steer ? <SteerStatus steer={turn.steer} /> : null}
         {canReply ? (
-          <MessageActions
-            content={turn.content}
-            latest={false}
-            copyLabel="메시지 복사"
-            onReply={() => pick()}
-          />
+          // 자리를 차지하지 않게 말풍선 아래 틈에 띄운다. 질문이 저장될 때 아래 답이 밀리지 않는다.
+          // 휴대폰은 길게 누르기 메뉴를 쓴다(스펙 chat-reference REQ3).
+          <div className="absolute right-0 top-full -mt-1.5 hidden md:block">
+            <MessageActions
+              content={turn.content}
+              latest={false}
+              copyLabel="메시지 복사"
+              onReply={() => pick()}
+            />
+          </div>
         ) : null}
         {replyMenu.menu}
       </li>
