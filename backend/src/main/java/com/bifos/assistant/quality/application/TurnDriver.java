@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 평가 대화에 문항 하나를 보내고 끝나기를 기다린다. 배포 뒤 확인과 묶음 평가가 함께 쓴다(docs/features/agent-quality/design.md 의 「기능마다 10분 마감」).
+ * 평가 대화에 문항 하나를 보내고 끝나기를 기다린다. 배포 뒤 확인과 묶음 평가가 함께 쓴다(docs/features/agent-quality/design.md 의 「확인 한 번의 흐름」).
  *
  * <p>{@link ChatService#send} 는 끝날 때까지 막히고, turn 취소 표시는 Hermes run 을 멈추지 않는다. 그래서 문항은 별도 작업에서 보내고 부른 스레드는
  * 끝남 조건을 {@code poll-interval} 마다 본다. 마감이 지나면 도는 turn 과 위임 자식을 멈춘다.
