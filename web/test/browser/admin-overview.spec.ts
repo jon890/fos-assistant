@@ -113,7 +113,7 @@ test("요약은 그룹 전체의 7일 실패를 세고 남의 실행은 열지 �
     await expect(lines.nth(0).getByRole("link")).toHaveCount(0);
     await expect(lines.nth(2)).toContainText("MINE_LATEST");
     await expect(failures).not.toContainText("TOO_OLD");
-    await expect(failures.getByText("아직 품질 확인 결과가 없어요")).toBeVisible();
+    await expect(failures.getByRole("link", { name: "배포 뒤 확인 기록은 품질 화면에서 봐요" })).toHaveAttribute("href", "/admin/quality");
 
     // 이번 달 실행 수는 두 사람의 합이다. 서버처럼 서울 달력으로 세어 지난달에 든 실행은 뺀다.
     const seoulMonth = (date: Date) =>
@@ -155,7 +155,7 @@ test("실패가 없는 그룹은 안내를 보이고 가격 없는 실행이 있
     await page.goto("/admin");
     const failures = page.getByRole("region", { name: "품질과 실패" });
     await expect(failures.getByText("최근 7일 동안 실패한 실행이 없어요")).toBeVisible();
-    await expect(failures.getByText("아직 품질 확인 결과가 없어요")).toBeVisible();
+    await expect(failures.getByRole("link", { name: "배포 뒤 확인 기록은 품질 화면에서 봐요" })).toHaveAttribute("href", "/admin/quality");
     const monthly = page.getByRole("region", { name: "이번 달 사용량" });
     await expect(monthly.getByText("금액을 확인하지 못한 실행이 있어 실제보다 적을 수 있어요")).toBeVisible();
   } finally {

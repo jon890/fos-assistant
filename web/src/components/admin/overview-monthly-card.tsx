@@ -10,6 +10,8 @@ import { useOverviewRead } from "./use-overview-read";
  * 「이번 달 사용량」 카드다. 그룹 전체의 이번 달 실행 수, 구독 경로 실행 수, 예상 추가 사용 요금을 보인다.
  *
  * <p>링크가 여는 「사용량과 비용」 은 관리자 자신의 실행만 세므로 링크 글자에 「내」 를 붙인다.
+ *
+ * <p>평가 전용 사용자의 실행은 위 합계에서 빠지고 「평가」 한 줄로 따로 보인다(docs/features/agent-quality/spec.md 의 REQ2).
  */
 export function OverviewMonthlyCard() {
   const [read, retry] = useOverviewRead(readOverviewMonthly);
@@ -41,6 +43,20 @@ export function OverviewMonthlyCard() {
               {formatAmount(monthly.actualCostMicros, monthly.currency)}
             </span>
           </p>
+          {monthly.evaluation ? (
+            <p
+              data-testid="overview-monthly-evaluation"
+              className="flex items-baseline justify-between gap-2 text-muted-foreground"
+            >
+              <span>평가</span>
+              <span className="tabular-nums">
+                {`${monthly.evaluation.executions.toLocaleString("ko-KR")}건 · ${formatAmount(
+                  monthly.evaluation.actualCostMicros,
+                  monthly.currency,
+                )}${monthly.evaluation.incomplete ? " 이상" : ""}`}
+              </span>
+            </p>
+          ) : null}
           {monthly.incomplete ? (
             <Notice variant="warning">
               금액을 확인하지 못한 실행이 있어 실제보다 적을 수 있어요
