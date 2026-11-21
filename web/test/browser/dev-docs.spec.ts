@@ -141,11 +141,15 @@ test("mermaid 그림을 누르면 화면을 덮는 창에서 원래 크기로 �
   const dialogBox = (await dialog.boundingBox())!;
   expect(dialogBox.width).toBeGreaterThan(1440 * 0.9);
   // 창 안의 그림은 viewBox 폭 그대로 그린다. 본문 폭에 맞춰 줄이지 않는다.
-  const sizes = await dialog.getByTestId("mermaid-dialog-diagram").locator("svg").evaluate((svg) => ({
-    natural: (svg as SVGSVGElement).viewBox.baseVal.width,
-    drawn: svg.getBoundingClientRect().width,
-  }));
-  expect(Math.abs(sizes.drawn - sizes.natural)).toBeLessThanOrEqual(1);
+  // 창이 0.96 배에서 커지며 열리므로 움직임이 끝날 때까지 다시 잰다.
+  const diagram = dialog.getByTestId("mermaid-dialog-diagram").locator("svg");
+  await expect
+    .poll(() =>
+      diagram.evaluate((svg) =>
+        Math.abs(svg.getBoundingClientRect().width - (svg as SVGSVGElement).viewBox.baseVal.width),
+      ),
+    )
+    .toBeLessThanOrEqual(1);
 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
