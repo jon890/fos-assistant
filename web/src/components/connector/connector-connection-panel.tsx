@@ -17,6 +17,12 @@ import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
 import { useConnectionPoll } from "@/components/connector/use-binding-poll";
 import { ConnectorFieldInput } from "@/components/connector/connector-field-input";
+import {
+  OAuthConnect,
+  OAuthNotices,
+  useOAuthNotices,
+  oauthMethodLabel,
+} from "@/components/connector/connector-oauth";
 import { Notice } from "@/components/ui/notice";
 import {
   CONNECTOR_ID_PATTERN,
@@ -30,9 +36,15 @@ import {
   type ConnectorField,
   type ConnectorOption,
 } from "@/lib/connection";
+import {
+  safeAuth,
+  startOAuth,
+  type OAuthOutcome,
+} from "@/lib/connection-oauth";
 import { fetchLoaded, type Loaded } from "@/lib/connection-load";
 
-type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
+type Pending =
+  "save" | "check" | "disconnect" | "oauth" | `options:${string}` | null;
 
 /**
  * 에이전트 고르기 영역의 상태다. `auto` 는 연결됐고 아직 쓰는 에이전트가 없을 때만 보인다.
@@ -43,18 +55,28 @@ type Chooser = "auto" | "open" | "closed";
 export function ConnectorConnectionPanel({
   id,
   preferredAgent,
+  admin,
+  oauthResult,
 }: {
   id: string;
   /** 에이전트 화면에서 이 연결을 하러 왔으면 그 에이전트 번호다. 고르기 영역이 맨 앞에 둔다. */
   preferredAgent: string | null;
+  /** 관리자에게만 단추 연결 설정 안내를 보인다. */
+  admin: boolean;
+  /** 서비스 화면에서 돌아온 결과다. 돌아오는 화면이 주소 검색어로 넘긴다. */
+  oauthResult: { outcome: OAuthOutcome; reason: string | null } | null;
 }) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const [values, setValues] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, ConnectorOption[]>>({});
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | ConnectionFailure | null>(null);
-  const [chooser, setChooser] = useState<Chooser>("auto");
-  const [justConnected, setJustConnected] = useState(false);
+  const connectedBack = oauthResult?.outcome === "CONNECTED";
+  const [chooser, setChooser] = useState<Chooser>(
+    connectedBack ? "open" : "auto",
+  );
+  const [justConnected, setJustConnected] = useState(connectedBack);
+  const notices = useOAuthNotices(id, oauthResult);
   const busy = pending !== null;
 
   const validId = CONNECTOR_ID_PATTERN.test(id);
@@ -80,6 +102,13 @@ export function ConnectorConnectionPanel({
   const { connector, connection } = loaded;
   const available = connector?.available === true;
   const fields = available ? connector.fields : [];
+  const oauth = available ? (connector.oauth ?? null) : null;
+  const auth = safeAuth(connection.auth);
+  // 단추를 쓸 수 있으면 단추가 대신하는 칸을 「직접 입력」 아래 접는다.
+  const folded = new Set(oauth?.ready ? oauth.fields : []);
+  const oauthKeys = new Set(
+    auth.method === "oauth" ? (oauth?.fields ?? []) : [],
+  );
   const title = connector?.title ?? id;
   const loginUrl = connector?.ownerBrowserLoginUrl;
   const secretsFilled = fields
@@ -88,6 +117,36 @@ export function ConnectorConnectionPanel({
   const complete = fields.every(
     (field) => !field.required || values[field.key]?.trim(),
   );
+  const buttonFields = fields.filter((field) => !folded.has(field.key));
+  const canStart = buttonFields.every(
+    (field) => !field.required || values[field.key]?.trim(),
+  );
+
+  /** 채운 칸의 값만 앞뒤 공백을 지워 모은다. */
+  function filled(list: ConnectorField[]): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const field of list) {
+      const value = values[field.key]?.trim();
+      if (value) result[field.key] = value;
+    }
+    return result;
+  }
+
+  /** 단추 밖 칸 값만 보내고 받은 로그인 주소로 이 창을 보낸다. */
+  async function connectWithOAuth() {
+    if (busy || !canStart) return;
+    const submitted = filled(buttonFields);
+    setPending("oauth");
+    setError(null);
+    notices.setReturned(null);
+    notices.setRevoke(null);
+    const started = await startOAuth(id, submitted);
+    if (!started.ok) {
+      setPending(null);
+      return setError(started);
+    }
+    window.location.assign(started.data.authorizeUrl);
+  }
 
   function setField(field: ConnectorField, value: string) {
     setValues((current) => {
@@ -143,11 +202,7 @@ export function ConnectorConnectionPanel({
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !complete) return;
-    const submitted: Record<string, string> = {};
-    for (const field of fields) {
-      const value = values[field.key]?.trim();
-      if (value) submitted[field.key] = value;
-    }
+    const submitted = filled(fields);
     // 비밀 원문은 보낸 직후 화면에서 비운다.
     setValues((current) => {
       const next = { ...current };
@@ -185,6 +240,8 @@ export function ConnectorConnectionPanel({
     if (busy) return;
     setPending(kind);
     setError(null);
+    notices.setReturned(null);
+    notices.setRevoke(null);
     const result = await (kind === "check"
       ? checkConnection(id)
       : disconnectConnection(id));
@@ -220,7 +277,10 @@ export function ConnectorConnectionPanel({
     setPending(null);
     if (!result.ok) return setError(result.message);
     if (kind === "check") showConnected(result.data);
-    else setLoaded({ kind: "ready", connector, connection: result.data });
+    else {
+      notices.setRevoke(result.data.oauthRevoke ?? null);
+      setLoaded({ kind: "ready", connector, connection: result.data });
+    }
   }
 
   const status = connection.status;
@@ -248,6 +308,16 @@ export function ConnectorConnectionPanel({
       onLoadOptions={() => void loadOptions(field)}
     />
   );
+  const manualSubmit = (
+    <Button
+      type="submit"
+      disabled={busy || !complete}
+      loading={pending === "save"}
+      loadingText="연결하는 중…"
+    >
+      {status === "DISCONNECTED" ? "연결하기" : "값 바꾸기"}
+    </Button>
+  );
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -274,8 +344,16 @@ export function ConnectorConnectionPanel({
           <ConnectionSummary
             fields={fields}
             connection={connection}
-            hiddenKeys={new Set()}
-            method={null}
+            hiddenKeys={oauthKeys}
+            method={oauth ? oauthMethodLabel(auth) : null}
+          />
+          <OAuthNotices
+            returned={notices.returned}
+            revoke={notices.revoke}
+            provider={oauth?.provider ?? auth.provider}
+            canRetry={oauth?.ready === true}
+            busy={busy || !canStart}
+            onRetry={() => void connectWithOAuth()}
           />
           {!available ? (
             <Notice variant="info" role="status">
@@ -293,15 +371,32 @@ export function ConnectorConnectionPanel({
           {available ? (
             <form onSubmit={save} className="space-y-3">
               <LoginNotice url={loginUrl} />
-              {fields.map(renderField)}
-              <Button
-                type="submit"
-                disabled={busy || !complete}
-                loading={pending === "save"}
-                loadingText="연결하는 중…"
-              >
-                {status === "DISCONNECTED" ? "연결하기" : "값 바꾸기"}
-              </Button>
+              {buttonFields.map(renderField)}
+              {oauth ? (
+                <OAuthConnect
+                  oauth={oauth}
+                  auth={auth}
+                  status={status}
+                  admin={admin}
+                  busy={busy}
+                  starting={pending === "oauth"}
+                  canStart={canStart}
+                  onStart={() => void connectWithOAuth()}
+                />
+              ) : null}
+              {folded.size > 0 ? (
+                <details className="space-y-3" data-testid="manual-entry">
+                  <summary className="cursor-pointer text-sm text-muted-foreground">
+                    직접 입력
+                  </summary>
+                  {fields
+                    .filter((field) => folded.has(field.key))
+                    .map(renderField)}
+                  {manualSubmit}
+                </details>
+              ) : (
+                manualSubmit
+              )}
             </form>
           ) : null}
           {available && status !== "DISCONNECTED" ? (

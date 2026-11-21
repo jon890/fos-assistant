@@ -16,6 +16,7 @@ import {
 } from "@/lib/connection";
 import { readJsonBody } from "@/lib/json-body";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
+import { safeAuth, safeOAuth, safeRevoke } from "@/lib/connection-oauth";
 
 /** Control Plane 의 오류 본문을 브라우저에 그대로 전달하지 않는다. 표에 없는 코드는 연결 실패로 바꾼다. */
 export function connectionResponse<T>(result: ControlPlaneResult<T>) {
@@ -220,6 +221,7 @@ function safeSummary(value: unknown) {
     standardPlugin: item.standardPlugin === true,
     singleBinding: item.singleBinding === true,
     ownerBrowser: item.ownerBrowser === true,
+    oauth: safeOAuth(item.oauth),
   };
 }
 
@@ -268,9 +270,7 @@ function listedCount(value: unknown): number | null {
 }
 
 function undeclaredCount(value: unknown): number {
-  return Number.isSafeInteger(value) && (value as number) >= 0
-    ? (value as number)
-    : 0;
+  return listedCount(value) ?? 0;
 }
 
 function safeField(value: unknown) {
@@ -312,6 +312,8 @@ function safeConnection(value: unknown) {
     undeclaredTools: undeclaredCount(item.undeclaredTools),
     listedTools: listedCount(item.listedTools),
     readOnlyTools: listedCount(item.readOnlyTools),
+    auth: safeAuth(item.auth),
+    oauthRevoke: safeRevoke(item.oauthRevoke),
   };
 }
 
