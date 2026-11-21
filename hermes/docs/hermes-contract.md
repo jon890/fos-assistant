@@ -2699,6 +2699,10 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | 결과 hook 이 받는 글 | `transform_tool_result` 는 자르지 않은 결과 글 전체와 `tool_call_id` 를 받는다. Control Plane 이 받는 `tool.completed` 의 `preview` 는 500자로 잘려 있어 주소를 뽑는 데 쓸 수 없다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
 | OpenAI 내장 검색 | 검색이 Hermes 의 도구로 돌지 않아 결과 hook 이 불리지 않는다. 위 「웹 검색 서비스」 를 본다 | `agent/codex_responses_adapter.py` |
 
+상품 사진을 위한 `product_page_read`는 fos-ctx가 `PluginContext.register_tool`로 web toolset에 추가하는 비동기 도구다. Hermes는 web toolset의 내장 도구 목록에 registry에서 같은 toolset으로 등록한 도구도 합친다. 기본 `web_extract`의 등록부는 마크다운으로 읽고, `_trim_results`가 제공자 메타데이터를 빼므로 상품 사진용 원본 HTML은 별도로 받는다.
+
+플러그인은 Hermes의 무료 Firecrawl 클라이언트와 같은 API에 `rawHtml`을 요청한다. `_validate_extract_urls`, `async_is_safe_url`, `check_website_access`로 읽기 시작 주소를 확인하고, 응답의 `_final_url`에도 공개 네트워크·웹사이트 정책을 적용한다. 사용하는 내부 함수와 등록부는 `hermes/tests/test_found_links_contract.py`가 대조한다. 원본 HTML은 상품 사진 후보를 뽑은 뒤 버린다.
+
 `_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
 없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.
 허용 목록의 잘못된 이름은 목록 전체가 무효일 때만 마지막 검사에서 알린다.
