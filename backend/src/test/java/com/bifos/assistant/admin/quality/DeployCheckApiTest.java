@@ -8,6 +8,7 @@ import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.quality.application.DeployCheckRuns;
 import com.bifos.assistant.quality.application.dto.OpenedDeployCheck;
+import com.bifos.assistant.quality.domain.EvalResult;
 import com.bifos.assistant.quality.domain.FeatureResult;
 import com.bifos.assistant.quality.domain.QualityRun;
 import com.bifos.assistant.quality.domain.type.FeatureStatus;
@@ -179,6 +180,22 @@ class DeployCheckApiTest {
         assertThat(ended.results()).hasSize(QualityFeature.values().length);
         assertThat(ended.results().getLast().reasonCode()).isEqualTo("INTERRUPTED");
         assertThat(notifications.findAll()).extracting(Notification::kind).containsExactly(NotificationKind.QUALITY_CHECK_FAILED);
+    }
+
+
+    @Test
+    @DisplayName("서버가 다시 떠도 도는 평가 줄은 배포 뒤 확인 처리가 바꾸지 않고 알림도 남기지 않는다")
+    void restartLeavesEvalRunsAlone() {
+        QualityRun eval = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, admin.id(), 1, EvalResult.started("MEDIUM", List.of("service-concepts")),
+            Instant.now());
+        Long id = runs.save(eval).id();
+
+        runWrites.interruptRunning();
+
+        QualityRun kept = runs.findById(id).orElseThrow();
+        assertThat(kept.status()).isEqualTo(QualityRunStatus.RUNNING);
+        assertThat(kept.evalResult().items()).isEmpty();
+        assertThat(notifications.findAll()).isEmpty();
     }
 
 

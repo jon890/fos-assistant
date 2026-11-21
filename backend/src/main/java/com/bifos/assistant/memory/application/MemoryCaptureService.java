@@ -215,6 +215,46 @@ public class MemoryCaptureService {
     }
 
 
+    /**
+     * 한 기억을 고친 기록 여럿을 한 번에 되돌린다. 가장 먼저 고치기 전의 판으로 돌리고 그 기록들을 모두 되돌린 것으로 적는다. 평가 전용 사용자의 평가 대화가 고친
+     * 것을 비울 때 쓴다(docs/features/agent-quality/design.md 의 「비우기」). 하나씩 되돌리면 앞 기록을 되돌릴 때 판이 맞지 않아 막힌다.
+     *
+     * @param captureIds 같은 기억을 고친({@code UPDATED}) 요청자의 기록
+     * @throws ApiException 남의 기록이거나 없거나 다른 기억의 기록이면 MEMORY_NOT_FOUND, 돌아갈 판이 없거나 읽을 수 없으면 MEMORY_REVISION_CONFLICT
+     */
+    @Transactional
+    public void undoUpdates(CurrentUser user, Long memoryId, List<Long> captureIds) {
+        List<MemoryCapture> rows = captures.findAllById(captureIds).stream()
+            .filter(row -> !row.undone())
+            .toList();
+        if (rows.isEmpty()) {
+            return;
+        }
+        for (MemoryCapture row : rows) {
+            if (!row.userId().equals(user.id()) || !row.memoryId().equals(memoryId) || row.kind() != MemoryCaptureKind.UPDATED) {
+                throw notFound();
+            }
+        }
+        Memory memory = memories.findByIdForUpdate(memoryId).orElseThrow(MemoryCaptureService::notFound);
+        if (!Objects.equals(memory.ownerUserId(), user.id()) || memory.scope() != MemoryScope.USER) {
+            throw notFound();
+        }
+        int first = rows.stream().mapToInt(MemoryCapture::baseRevision).min().orElseThrow();
+        MemoryRevision before = revisions
+            .findById(new MemoryRevisionId(memoryId, first))
+            .orElseThrow(() -> conflict("the previous revision is missing"));
+        if (!before.readable()) {
+            throw conflict("an unreadable revision is not restored here");
+        }
+        memoryService.revise(user, memory, before.content(), before.summary(), before.retrieval());
+        for (MemoryCapture row : rows) {
+            row.undo(clock.instant());
+            captures.save(row);
+        }
+        log.info("memory updates undone userId={} memoryId={} count={}", user.id(), memoryId, rows.size());
+    }
+
+
     /** 바로 저장을 되돌린다. 새 항목은 지우고 기존 제안은 복원한다. 그 뒤에 고쳤으면 막고, 이미 없으면 기록만 되돌린다. */
     private void removeCreated(CurrentUser user, MemoryCapture capture) {
         Optional<Memory> found = memories.findByIdForUpdate(capture.memoryId());

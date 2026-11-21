@@ -124,7 +124,7 @@ public class DeployCheckRuns {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void interruptRunning() {
-        for (QualityRun run : runs.findByStatus(QualityRunStatus.RUNNING)) {
+        for (QualityRun run : runs.findByKindAndStatus(QualityRunKind.DEPLOY_CHECK, QualityRunStatus.RUNNING)) {
             Set<QualityFeature> done = run.results().stream().map(FeatureResult::feature).collect(Collectors.toSet());
             EnumSet<QualityFeature> left = EnumSet.allOf(QualityFeature.class);
             left.removeAll(done);

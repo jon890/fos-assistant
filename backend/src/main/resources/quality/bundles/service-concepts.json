@@ -1,0 +1,25 @@
+{
+  "id": "service-concepts",
+  "title": "서비스 개념",
+  "timeoutMinutes": 10,
+  "pass": {"type": "ratio", "ratio": 0.85},
+  "questions": [
+    {"id":"files-put","tag":"file_space","turns":[{"text":"방금 만든 표를 내 파일공간에 넣어 두려면 어떻게 해?"}],"expect":{"includes":["파일 공간","내 파일","/files"],"absent":["어느 서비스"]}},
+    {"id":"files-where","tag":"file_space","turns":[{"text":"내 파일 공간은 어디서 봐?"}],"expect":{"linkPrefixes":["/files"]}},
+    {"id":"schedule-weather","tag":"schedule","turns":[{"text":"매일 아침 7시에 날씨 알려 줘"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"]}},
+    {"id":"schedule-watch","tag":"schedule","turns":[{"text":"애플 공식 온라인 스토어에서 에어팟 프로 가격이 30만 원 밑으로 내려가는지 매시간 확인해서 알려 줘"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"],"instructionIncludes":["30만|300,000|300000","확인|검증","알리|알려","없으면|없을 때|없는 경우"]}},
+    {"id":"schedule-briefing","tag":"schedule","turns":[{"text":"평일 아침 8시마다 AI 관련 새 뉴스를 세 개만 골라서 요약해 줘. 이미 알려 준 건 빼고"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"],"instructionIncludes":["뉴스","세 개|3개|3 개","이미|중복|되풀이|반복","없으면|없을 때|없는 경우"]}},
+    {"id":"schedule-vague","tag":"schedule","turns":[{"text":"가끔 운동하라고 알려 줘"}],"expect":{"noLinkPrefixes":["/tasks/0","/tasks/1","/tasks/2","/tasks/3","/tasks/4","/tasks/5","/tasks/6","/tasks/7","/tasks/8","/tasks/9","/tasks/a","/tasks/b","/tasks/c","/tasks/d","/tasks/e","/tasks/f"],"absent":["만들었어요","만들었습니다","등록했어요","등록했습니다"]}},
+    {"id":"memory-where","tag":"memory","turns":[{"text":"네가 나에 대해 기억하는 거 어디서 볼 수 있어?"}],"expect":{"linkPrefixes":["/memory"]}},
+    {"id":"memory-forget","tag":"memory","turns":[{"text":"내가 전에 말한 회사 이야기 기억에서 지워 줘"}],"expect":{"linkPrefixes":["/memory"],"absent":["지웠어요","지웠습니다"]}},
+    {"id":"memory-forget-card","tag":"memory","turns":[{"text":"우리 집 강아지 이름은 초코야. 기억해 둬"},{"text":"방금 말한 강아지 이름 기억은 지워 줘"}],"expect":{"tools":["memory_forget"],"includes":["승인"],"absent":["지웠어요","지웠습니다"]}},
+    {"id":"followup-add","tag":"follow_up","turns":[{"text":"다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬"}],"expect":{"tools":["follow_up_propose"],"linkPrefixes":["/now"],"absent":["어느 앱"]}},
+    {"id":"followup-done","tag":"follow_up","turns":[{"text":"다음 주 화요일까지 병원 예약하기를 할 일로 적어 둬"},{"text":"병원 예약하기 그거 끝냈어"}],"expect":{"tools":["follow_up_done"],"linkPrefixes":["/now"]}},
+    {"id":"followup-self","tag":"follow_up","turns":[{"text":"내 할 일 목록은 어디서 봐?"}],"expect":{"linkPrefixes":["/now"]}},
+    {"id":"connection-known","tag":"connection","turns":[{"text":"{connectorTitle} 연결해 줘"}],"expect":{"tools":["connector_list"],"linkPrefixes":["/connections/{connectorId}"],"absent":["연결했어요","연결했습니다"]}},
+    {"id":"connection-attach","tag":"connection","turns":[{"text":"{connectorTitle} 연결 마쳤어. 이 에이전트에서 쓰게 해 줘"}],"expect":{"linkPrefixes":["/connections/{connectorId}"],"absent":["연결했어요","연결했습니다","붙였어요","붙였습니다"]}},
+    {"id":"connection-unknown","tag":"connection","turns":[{"text":"싸이월드 연결해 줘"}],"expect":{"links":["/connections"],"includes":["없"],"absent":["연결했어요","연결했습니다"]}},
+    {"id":"agent-switch","tag":"agent_pick","turns":[{"text":"{otherAgentName}로 바꿔 줘"}],"expect":{"links":["/new?agent={otherAgentCode}"],"absent":["바꿨어요","바꿨습니다"]}},
+    {"id":"agent-unknown","tag":"agent_pick","turns":[{"text":"우주여행 비서로 바꿔 줘"}],"expect":{"noLinkPrefixes":["/new?agent="],"absent":["바꿨어요","바꿨습니다"]}}
+  ]
+}

@@ -6,8 +6,6 @@ import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
-import com.bifos.assistant.chat.turn.application.dto.TurnMark;
-import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.FeatureVerdict;
 import com.bifos.assistant.quality.config.QualityProperties;
@@ -19,7 +17,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.TaskService;
 import com.bifos.assistant.task.application.dto.ScheduleInput;
 import com.bifos.assistant.task.application.dto.TaskDetail;
@@ -43,8 +40,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BooleanSupplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -66,14 +61,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class DeployCheckRunner {
 
-    /** 마감 뒤 멈춘 turn 이 닫히기를 기다리는 상한이다. 넘으면 다음 기능으로 넘어간다. */
-    static final Duration STOP_GRACE = Duration.ofMinutes(2);
-
     /** 예약 작업 발화가 끝난 상태다. */
     private static final Set<TaskRunStatus> TASK_RUN_ENDED = Set.of(
         TaskRunStatus.SUCCEEDED, TaskRunStatus.FAILED, TaskRunStatus.CANCELLED, TaskRunStatus.SKIPPED);
-
-    private static final Set<ErrorCode> BUSY = Set.of(ErrorCode.USER_BUSY, ErrorCode.CONVERSATION_BUSY);
 
     private static final ZoneId TASK_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -87,7 +77,7 @@ class DeployCheckRunner {
     private final AttachmentService attachments;
     private final TaskService tasks;
     private final TurnCancellation turns;
-    private final AgentDelegationService delegations;
+    private final TurnDriver driver;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -101,7 +91,6 @@ class DeployCheckRunner {
 
     /** 기능을 차례로 돌리고 줄을 끝낸다. 도중의 예외는 남은 기능을 {@code RUN_FAILED} 로 적고 끝낸다. */
     void run(Long runId, Long evaluationUserId) {
-        Instant startedAt = clock.instant();
         CurrentUser evaluation = null;
         QualityFeature current = QualityFeature.values()[0];
         try {
@@ -116,13 +105,7 @@ class DeployCheckRunner {
             log.error("배포 뒤 확인이 도중에 멈췄다 runId={} feature={}", runId, current, ex);
             recordRest(runId, current);
         } finally {
-            try {
-                if (evaluation != null) {
-                    cleaner.forgetNewMemories(evaluation, startedAt);
-                }
-            } finally {
-                runs.finish(runId);
-            }
+            runs.finish(runId);
         }
     }
 
@@ -161,6 +144,11 @@ class DeployCheckRunner {
         } catch (RuntimeException ex) {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
+        }
+        if (attempt.conversationId != null) {
+            // 문항이 돌다 기억 도구로 남긴 것은 통과와 상관없이 되돌린다. 대화 번호로 찾아 함께 도는 평가의 기억은 건드리지 않는다.
+            // 아래 조회가 실패해도 건너뛰지 않게 먼저 부른다.
+            cleaner.forgetCaptured(evaluation, attempt.conversationId);
         }
         long elapsedMs = Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
         List<Long> executionIds = attempt.conversationId == null
@@ -213,7 +201,7 @@ class DeployCheckRunner {
             }
             case TASK_FIRE -> throw new IllegalArgumentException("task fire does not converse");
         }
-        settle(evaluation, attempt.conversationId);
+        driver.settle(evaluation, attempt.conversationId);
         return observer.observe(evaluation, attempt.conversationId, attempt.timedOut);
     }
 
@@ -227,57 +215,27 @@ class DeployCheckRunner {
             return;
         }
         Long conversationId = attempt.conversationId;
-        boolean settled = waitUntil(deadline,
+        boolean settled = driver.waitUntil(deadline,
             () -> observer.delegationSettled(conversationId) && !turns.markOf(conversationId).running());
         if (!settled) {
             attempt.timedOut = true;
-            stopConversation(evaluation, conversationId);
+            driver.stopConversation(evaluation, conversationId);
         }
     }
 
 
-    /**
-     * 문항 하나를 보내고 끝나기를 기다린다. 마감이 지나면 도는 turn 을 멈추고 시간 초과로 적는다. 앞 문항이 시간 초과나 거절로
-     * 끝났으면 보내지 않는다.
-     */
+    /** 문항 하나를 보내고 끝나기를 기다린다. 앞 문항이 시간 초과나 거절로 끝났으면 보내지 않는다. */
     private void send(CurrentUser evaluation, Attempt attempt, String text, List<Long> attachmentIds, Instant deadline) {
         if (attempt.timedOut || attempt.busy || attempt.rejected) {
             return;
         }
-        Long conversationId = attempt.conversationId;
-        int rootsBefore = observer.roots(conversationId).size();
-        CompletableFuture<Void> sent = new CompletableFuture<>();
-        background.start("deploy-check-send-" + conversationId, () -> {
-            try {
-                chat.send(evaluation, conversationId, text, null, attachmentIds);
-                sent.complete(null);
-            } catch (RuntimeException ex) {
-                sent.completeExceptionally(ex);
+        switch (driver.send(evaluation, attempt.conversationId, text, attachmentIds, deadline)) {
+            case TIMED_OUT -> attempt.timedOut = true;
+            case BUSY -> attempt.busy = true;
+            case REJECTED -> attempt.rejected = true;
+            case DONE -> {
+                // 실행 실패는 실행 줄에 남아 판정이 읽는다.
             }
-        });
-        if (!waitUntil(deadline, sent::isDone)) {
-            attempt.timedOut = true;
-            // 마감 때 아직 turn 을 열지 않았거나 실행 번호가 붙기 전일 수 있다. 끝날 때까지 되풀이해 멈춰, 늦게 열린 turn 도 제출 즉시 멈춘다.
-            waitUntil(clock.instant().plus(STOP_GRACE), () -> {
-                if (sent.isDone()) {
-                    return true;
-                }
-                stopConversation(evaluation, conversationId);
-                return false;
-            });
-            return;
-        }
-        try {
-            sent.join();
-        } catch (RuntimeException ex) {
-            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
-            if (cause instanceof ApiException api && BUSY.contains(api.code())) {
-                attempt.busy = true;
-            } else if (observer.roots(conversationId).size() == rootsBefore) {
-                attempt.rejected = true;
-            }
-            // 실행 실패는 실행 줄에 남아 판정이 그 줄의 오류 코드로 읽는다. 실행 줄이 생기기 전의 거절은 BUSY 가 아니면 RUN_FAILED 다.
-            log.info("배포 뒤 확인 문항이 예외로 끝났다 conversationId={} cause={}", conversationId, cause.toString());
         }
     }
 
@@ -303,7 +261,7 @@ class DeployCheckRunner {
         UUID taskId = created.task().publicId();
         Optional<TaskRunDetail> ended = Optional.empty();
         try {
-            boolean done = waitUntil(deadline, () -> latestRun(evaluation, taskId)
+            boolean done = driver.waitUntil(deadline, () -> latestRun(evaluation, taskId)
                 .filter(run -> TASK_RUN_ENDED.contains(run.run().status()))
                 .isPresent());
             Optional<TaskRunDetail> last = latestRun(evaluation, taskId);
@@ -311,7 +269,7 @@ class DeployCheckRunner {
             if (!done) {
                 attempt.timedOut = true;
                 if (attempt.conversationId != null) {
-                    stopConversation(evaluation, attempt.conversationId);
+                    driver.stopConversation(evaluation, attempt.conversationId);
                 }
             }
             ended = last;
@@ -323,7 +281,7 @@ class DeployCheckRunner {
             }
         }
         if (attempt.conversationId != null) {
-            settle(evaluation, attempt.conversationId);
+            driver.settle(evaluation, attempt.conversationId);
         }
         String status = ended.map(run -> run.run().status().name()).orElse(null);
         Long executionId = ended.map(run -> run.run().executionId()).orElse(null);
@@ -355,61 +313,5 @@ class DeployCheckRunner {
         }
         return attachments.upload(
             evaluation, conversationId, "deploy-check-photo.png", "image/png", bytes.length, new ByteArrayResource(bytes));
-    }
-
-
-    /**
-     * 도는 turn 을 멈추고, 대화의 루트마다 도는 위임 자식을 멈춘다. 이미 끝났으면 아무것도 하지 않는다.
-     *
-     * <p>turn 을 열었지만 실행 번호가 붙기 전이면 취소 표시만 켠다. Hermes run 이 제출되는 즉시 그 표시를 보고 멈춘다.
-     */
-    private void stopConversation(CurrentUser evaluation, Long conversationId) {
-        TurnMark mark = turns.markOf(conversationId);
-        if (mark.running() && mark.executionId() == null) {
-            turns.findByConversation(conversationId).ifPresent(turns::cancel);
-        }
-        if (mark.executionId() != null) {
-            try {
-                chat.stop(evaluation, mark.executionId());
-            } catch (ApiException ignored) {
-                // 그 사이 끝났다.
-            }
-        }
-        for (AgentExecution root : observer.roots(conversationId)) {
-            try {
-                delegations.stopRunningChildrenOf(root.id());
-            } catch (RuntimeException ex) {
-                log.warn("배포 뒤 확인의 위임 자식을 멈추지 못했다 rootExecutionId={}", root.id(), ex);
-            }
-        }
-    }
-
-
-    /** 대화에 도는 turn 이 없어질 때까지 기다린다. 사용자 실행 자리를 다음 기능과 겹쳐 쓰지 않게 한다. */
-    private void settle(CurrentUser evaluation, Long conversationId) {
-        if (!waitUntil(clock.instant().plus(STOP_GRACE), () -> !turns.markOf(conversationId).running())) {
-            log.warn("배포 뒤 확인의 평가 대화에 turn 이 아직 돈다 conversationId={}", conversationId);
-            stopConversation(evaluation, conversationId);
-        }
-    }
-
-
-    /** 조건이 참이 되면 참, 마감까지 참이 되지 않으면 거짓이다. */
-    private boolean waitUntil(Instant deadline, BooleanSupplier condition) {
-        Duration interval = properties.current().pollInterval();
-        while (true) {
-            if (condition.getAsBoolean()) {
-                return true;
-            }
-            if (!clock.instant().isBefore(deadline)) {
-                return false;
-            }
-            try {
-                Thread.sleep(interval);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
     }
 }
