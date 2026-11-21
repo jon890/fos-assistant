@@ -37,14 +37,17 @@ type State =
 
 /**
  * 크게 보기 창의 그림을 원래 크기로 맞춘다. mermaid 는 `width="100%"` 와 `max-width` 로 그려 좁은 본문에서 줄어든다.
- * 창에서는 viewBox 의 폭으로 그리고 넘치면 창 안에서 스크롤한다.
+ * 창에서는 viewBox 의 폭과 높이 그대로 그리고 넘치면 창 안에서 스크롤한다. 감싸는 요소가 flex 면 줄어들므로 블록으로 둔다.
  */
 function naturalSize(node: HTMLDivElement | null) {
   const svg = node?.querySelector("svg");
   if (!svg) return;
-  const width = svg.viewBox.baseVal?.width;
+  const box = svg.viewBox.baseVal;
   svg.style.maxWidth = "none";
-  if (width) svg.style.width = `${width}px`;
+  if (box?.width && box.height) {
+    svg.style.width = `${box.width}px`;
+    svg.style.height = `${box.height}px`;
+  }
 }
 
 /**
@@ -71,11 +74,11 @@ function ExpandableDiagram({ id, svg }: { id: string; svg: string }) {
         className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-2 sm:max-w-none"
       >
         <DialogTitle className="pr-10">그림 크게 보기</DialogTitle>
-        <div className="flex min-h-0 flex-1 overflow-auto rounded-md border border-border bg-white p-3">
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-white p-3">
           <div
             ref={naturalSize}
             data-testid="mermaid-dialog-diagram"
-            className="m-auto"
+            className="mx-auto w-fit"
             // mermaid 가 strict 로 정리한 SVG 다.
             dangerouslySetInnerHTML={{
               __html: svg.replaceAll(id, `${id}-large`),
