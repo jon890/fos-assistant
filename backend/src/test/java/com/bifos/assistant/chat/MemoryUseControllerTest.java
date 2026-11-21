@@ -112,7 +112,7 @@ class MemoryUseControllerTest {
             "fos-" + UUID.randomUUID());
         messages.save(ChatMessage.fromAssistant(conversation.id(), "답", run.id(), Instant.now()));
         contextSources.save(ExecutionContextSource.of(
-            run.id(), 0, "MEMORY_FACTS", "memory:" + memory.id(), "INLINE", "FRESH"));
+            run.id(), 0, "MEMORY_READ", "memory:" + memory.id(), "INLINE", "FRESH"));
         when(currentUser.require()).thenReturn(dad);
     }
 
@@ -137,7 +137,7 @@ class MemoryUseControllerTest {
             .andExpect(jsonPath("$[0].memoryId").value(memory.id()))
             .andExpect(jsonPath("$[0].title").value("딸 이름"))
             .andExpect(jsonPath("$[0].scope").value("USER"))
-            .andExpect(jsonPath("$[0].via").value("FACTS"))
+            .andExpect(jsonPath("$[0].via").doesNotExist())
             .andExpect(jsonPath("$[0].content").doesNotExist())
             .andExpect(content().string(not(containsString(SECRET_BODY))));
     }

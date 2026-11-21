@@ -2687,6 +2687,18 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | 내장 검색과 다른 경로 | 내장 검색을 고른 채 ChatGPT 구독 경로가 아닌 모델로 돌면 `web_search` 가 오류를 돌려준다. 다른 서비스로 넘어가지 않는다 | `plugins/web/openai_native/provider.py` |
 | 날짜 | 시스템 프롬프트에 대화를 시작한 날짜와, 문맥을 마지막으로 다시 만든 때의 오늘 날짜가 든다. turn 마다 갱신되지 않는다. 그래서 Control Plane 이 대화 turn 마다 날짜 줄을 따로 넣는다 | `agent/system_prompt.py` |
 
+#### 웹 도구의 결과
+
+2026-11-21 에 v0.23.2 tag 소스로 확인했다. 운영 왕복으로는 확인하지 않았다.
+`fos-ctx` 가 이 결과에서 주소를 뽑아 Control Plane 에 알린다([`fos-ctx` README](../plugins/fos-ctx/README.md) 의 「찾은 주소를 알린다」).
+
+| 무엇 | 동작 | 근거 |
+| --- | --- | --- |
+| `web_search` 의 결과 | JSON 글 `{"success": true, "data": {"web": [{"title", "url", "description", "position"}]}}` 이다. 실패는 `{"success": false, "error": "..."}` 이고 `error` 에 예외 글이 든다 | `tools/web_tools.py` 의 `web_search_tool` |
+| `web_extract` 의 결과 | JSON 글 `{"results": [{"url", "title", "content", "error"}]}` 이다. `url` 은 요청한 주소, `content` 는 마크다운 본문이다. 본문을 LLM 으로 요약하지 않는다. 상한(기본 15,000자)을 넘는 본문은 앞과 뒤만 남긴다. 본문 안의 base64 사진은 `[IMAGE: alt]` 로 바꾸고 사진의 실제 주소는 링크로 남긴다 | `tools/web_tools.py` 의 `web_extract_tool`, `tools/web_tools_extract.py` 의 `_result_entry` |
+| 결과 hook 이 받는 글 | `transform_tool_result` 는 자르지 않은 결과 글 전체와 `tool_call_id` 를 받는다. Control Plane 이 받는 `tool.completed` 의 `preview` 는 500자로 잘려 있어 주소를 뽑는 데 쓸 수 없다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
+| OpenAI 내장 검색 | 검색이 Hermes 의 도구로 돌지 않아 결과 hook 이 불리지 않는다. 위 「웹 검색 서비스」 를 본다 | `agent/codex_responses_adapter.py` |
+
 `_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
 없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.
 허용 목록의 잘못된 이름은 목록 전체가 무효일 때만 마지막 검사에서 알린다.
@@ -3207,6 +3219,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
 | `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 플러그인 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
+| `web_search` 와 `web_extract` 의 결과 모양(「웹 도구의 결과」) | `fos-ctx` 가 결과에서 주소를 뽑지 못해 비서가 찾은 사진을 그림에 쓰지 못한다. 오류는 나지 않는다. `hermes/tests/test_found_links_contract.py` 가 먼저 실패한다. `found_links.py` 의 뽑기를 새 모양에 맞춘다 |
 | 막은 호출의 글도 `<untrusted_tool_result>` 로 감싸고 `<external-data>` 는 붙지 않는다 | 공통 실행 지침의 「`<external-data>` 밖의 `[승인 대기]` 는 판정」 설명이 틀린다. 감싸기가 빠지면 지침만 낡고, 막은 글에도 `<external-data>` 가 붙으면 모델이 승인 대기를 판정으로 알아보지 못한다. 지침과 `fos-ctx` 를 함께 고친다 |
 
 ## 토스증권 REST 전체 지원의 호출 한도

@@ -3,6 +3,7 @@ import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
   asksForPhoto,
+  drewImage,
   collectAnswers,
   exitCode,
   failedQuestion,
@@ -324,7 +325,7 @@ test("형식 참고 칸은 세트 통과를 바꾸지 않고 칸이 없는 옛 �
   assert.match(report, /\| q1 \| - \| - \| - \| - \|/);
 });
 
-test("그림 참고 사진 문항은 답이 사진이나 링크를 보내 달라고 할 때만 통과하고, 미달이면 세트 사유에 든다", () => {
+test("사진을 찾아 그려 달라는 문항은 그림을 만들었거나 사진이나 링크를 보내 달라고 하면 통과하고, 둘 다 아니면 세트 사유에 든다", () => {
   assert.equal(asksForPhoto("찾은 사진은 그림 도구에 넘길 수 없어요. 상품 사진을 올려 주시거나 링크를 보내 주시면 그걸로 그릴게요."), true);
   assert.equal(asksForPhoto("양말을 신고 뛰노는 아이 그림을 그렸어요."), false);
   assert.equal(asksForPhoto("찾은 사진 링크를 공유합니다."), false);
@@ -333,12 +334,20 @@ test("그림 참고 사진 문항은 답이 사진이나 링크를 보내 달라
   assert.equal(asksForPhoto("상품 사진을 올려 주세요."), true);
   const links = new Map<string, LinkState>();
   const asked = scoreQuestion(question("p1", "photo-request"), ["사진을 직접 올려 주세요."], NOON, links, null);
-  const drew = scoreQuestion(question("p1", "photo-request"), ["비슷하게 그려 봤어요."], NOON, links, null);
+  const done = (toolName: string, failed: boolean) => ({ eventType: "TOOL_COMPLETED", toolName, failed }) as ExecutionNode["events"][number];
+  const found = node([done("web_search", false)], [node([done("image_generate", false)])]);
+  const failed = node([done("web_search", false), done("image_generate", true)]);
+  assert.equal(drewImage(found), true);
+  assert.equal(drewImage(failed), false);
+  assert.equal(drewImage(null), false);
+  const drawn = scoreQuestion(question("p1", "photo-request"), ["찾은 사진을 참고해 그렸어요."], NOON, links, found);
+  const drew = scoreQuestion(question("p1", "photo-request"), ["비슷하게 그려 봤어요."], NOON, links, failed);
   assert.equal(asked.passed, true);
-  assert.equal(drew.passed, false);
+  assert.equal(drawn.passed, true, "비서가 찾은 사진으로 그림을 만들었으면 통과다");
+  assert.equal(drew.passed, false, "그림 도구가 끝나지 않았는데 그렸다고만 한 답은 통과가 아니다");
   const scores = fullSet(15);
   scores.push(drew);
   const set = scoreSet(scores, comparisons(6));
   assert.equal(set.outcome, "FAIL");
-  assert.ok(set.reasons.some((reason) => reason.includes("사진이나 링크를 보내 달라고 하지 않았다")), set.reasons.join(", "));
+  assert.ok(set.reasons.some((reason) => reason.includes("사진이나 링크를 보내 달라고 하지도 않았다")), set.reasons.join(", "));
 });

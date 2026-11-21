@@ -2,14 +2,6 @@ import Link from "next/link";
 import type { MemoryUse } from "@/lib/memory-use-api";
 import type { SourceReadSummary } from "@/components/chat/message-types";
 
-const VIA_LABELS: Record<MemoryUse["via"], string> = {
-  ALWAYS: "항상",
-  FACTS: "기억한 사실",
-  SEARCH: "질문으로 찾은 기억",
-  LINK: "연결된 기억",
-  READ: "찾아 읽음",
-};
-
 /** 결과에서 확인한 주소와 요청 주소를 한 목록으로 합친다. 같은 주소는 한 번만 둔다. */
 function sourceUrls(sourceReads: SourceReadSummary | null | undefined) {
   if (!sourceReads) return [];
@@ -19,7 +11,7 @@ function sourceUrls(sourceReads: SourceReadSummary | null | undefined) {
 }
 
 /**
- * 끝난 답의 작업 과정 맨 끝에 그 답이 연 원문과 본문을 받은 기억을 작게 둔다. 둘 다 없으면 아무것도 그리지 않는다.
+ * 끝난 답의 작업 과정 맨 끝에 그 답이 연 원문과 `memory_read` 로 깊게 읽은 기억을 작게 둔다. 둘 다 없으면 아무것도 그리지 않는다.
  *
  * <p>사용자가 확인할 내용이 아니라 작업 과정의 일부라 접힌 줄에는 개수를 더하지 않는다.
  * 기억 제목은 사용자나 모델이 쓴 글이라 평문으로만 그린다(ADR-009).
@@ -64,14 +56,13 @@ export function ActivityReferences({
           <ul className="flex flex-col gap-1">
             {uses.map((use) => (
               <li
-                key={`${use.via}:${use.memoryId}`}
+                key={use.memoryId}
                 data-testid="activity-memory-use"
                 className="flex flex-wrap items-baseline gap-x-2"
               >
                 <span className="min-w-0 break-words text-foreground-soft">
                   {use.title}
                 </span>
-                <span>{VIA_LABELS[use.via]}</span>
                 {use.scope === "GROUP" ? <span>그룹</span> : null}
                 {memoryUseActions?.(use)}
               </li>

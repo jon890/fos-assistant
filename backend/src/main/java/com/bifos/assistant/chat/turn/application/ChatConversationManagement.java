@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
+import com.bifos.assistant.chat.conversation.application.FoundLinks;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -31,6 +32,7 @@ class ChatConversationManagement {
     private final ModelTierService modelTiers;
     private final Clock clock;
     private final PendingMessageStore pendingMessages;
+    private final FoundLinks foundLinks;
     private final DecisionFeedbackRecorder feedback;
 
 
@@ -91,6 +93,8 @@ class ChatConversationManagement {
         }
         // 지운 대화에는 더 보낼 수 없다. 남기면 기동 확인이 보낼 수 없는 행을 계속 만난다.
         pendingMessages.clear(conversationId);
+        // 비서가 찾은 주소의 기록도 대화와 함께 지운다(스펙 agent-found-image DECISION16).
+        foundLinks.clear(conversationId);
         // 판단 피드백은 사용자의 기록이다. 대화를 지우면 그 대화에서 나온 제안의 사건도 함께 지운다.
         feedback.forgetConversation(user.id(), conversationId);
     }

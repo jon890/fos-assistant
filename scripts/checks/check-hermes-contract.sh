@@ -64,6 +64,9 @@ HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
 # 만든 그림 올리기가 기대는 그림 결과의 모양과 캐시 폴더, hook 의 인자 처리다(ADR-20261119 / generated-image).
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_generated_image_contract.py' -v
+# 찾은 주소 알리기가 기대는 두 웹 도구의 결과 모양과 결과 hook 이 받는 글이다(ADR-20261121 / found-link-image-source).
+HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
+  python3 -I -m unittest discover -s hermes/tests -p 'test_found_links_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_bodyless_request_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
