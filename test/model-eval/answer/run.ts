@@ -33,11 +33,16 @@ type RunsFile = { version: 1; startedAt: string; label: string; tier: string; ru
 const DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TURN_TIMEOUT_MS = 900000;
 const LINK_TIMEOUT_MS = 15000;
+/** 평가 전용 사용자로 도는 답변 품질 묶음의 id 다(backend/src/main/resources/quality/bundles/answer-quality.json). */
+const ANSWER_BUNDLE = "answer-quality";
 const USAGE = `사용법:
   node test/model-eval/answer/run.ts send --out <결과 디렉터리> [--question <id>]... [--tier <칸>] [--label <이름표>]
   node test/model-eval/answer/run.ts score --out <결과 디렉터리> [--compare <사람 비교 파일>] [--keep]
+  node test/model-eval/answer/run.ts score-eval --eval <평가 publicId> --out <결과 디렉터리> [--compare <사람 비교 파일>]
 
 환경 변수: FOS_EVAL_BASE_URL, FOS_EVAL_TOKEN, FOS_EVAL_AGENT_CODE (send 는 셋 모두, score 는 앞의 둘)
+score-eval 은 평가 전용 사용자로 돈 묶음 평가(answer-quality 묶음)의 대화를 관리자 API 로 읽어 같은 기준으로 채점한다.
+  FOS_EVAL_BASE_URL 과 관리자의 FOS_EVAL_TOKEN 이 필요하다. 대화는 지우지 않는다(30일 뒤 Control Plane 이 지운다)
 선택: FOS_EVAL_TIER (--tier 가 없을 때), FOS_EVAL_TURN_TIMEOUT_MS
 score 는 통과한 대화를 지운다(사람 비교 문항과 통과하지 못한 문항은 남긴다). --keep 은 모두 남긴다.
 사람 비교를 적어 score 를 다시 돌리면 지운 대화의 문항은 앞 보고서(report.json)의 결과를 쓴다.
@@ -201,6 +206,51 @@ async function score(values: Record<string, unknown>): Promise<number> {
   return exitCode(set.outcome);
 }
 
+/** 평가 전용 사용자로 돈 답변 품질 묶음을 채점한다. 보내기는 Control Plane 이 했고, 여기서는 남긴 대화를 읽어 판정만 한다. */
+async function scoreEval(values: Record<string, unknown>): Promise<number> {
+  const env = requireEnv(["FOS_EVAL_BASE_URL", "FOS_EVAL_TOKEN"]);
+  if (!values.eval) throw new UsageError("--eval 이 필요하다");
+  const out = resolve(values.out as string);
+  mkdirSync(out, { recursive: true });
+  const comparisons = loadComparisons(values.compare as string | undefined);
+  const questions = new Map(loadQuestions([]).map((question) => [question.id, question]));
+  const api = new ControlPlane(env.FOS_EVAL_BASE_URL, env.FOS_EVAL_TOKEN, turnTimeout());
+  const run = await api.evalRun(values.eval as string);
+  if (run.status === "RUNNING") throw new UsageError("평가가 아직 돈다. 끝난 뒤 다시 부른다");
+  const items = run.items.filter((item) => item.bundle === ANSWER_BUNDLE);
+  if (items.length === 0) throw new UsageError(`그 평가에 ${ANSWER_BUNDLE} 묶음 문항이 없다`);
+  const links = new Map<string, LinkState>();
+  const scores: QuestionScore[] = [];
+  for (const item of items) {
+    const question = questions.get(item.question);
+    if (!question) throw new UsageError(`평가의 문항이 질문 세트에 없다: ${item.question}`);
+    let result: QuestionScore;
+    try {
+      if (item.status !== "PASSED") throw new Error(`평가 문항이 ${item.status}${item.reasonCode ? ` ${item.reasonCode}` : ""} 로 끝났다`);
+      const executionId = item.executionIds.at(-1);
+      if (!item.conversationPublicId || executionId == null) throw new Error("남긴 대화나 실행 번호가 없다");
+      const messages = await api.evalMessages(item.conversationPublicId);
+      const answer = collectAnswers(messages, item.executionIds);
+      if (answer.length === 0) throw new Error("그 실행의 답을 찾지 못했다");
+      for (const url of sourceLinks(answer)) if (!links.has(url)) links.set(url, await checkLink(url));
+      const tree = await api.evalTree(executionId);
+      result = scoreQuestion(question, answer, new Date(item.startedAt ?? Date.now()), links, tree.root);
+    } catch (error) {
+      if (error instanceof UsageError) throw error;
+      result = failedQuestion(question, errorText(error));
+    }
+    scores.push(result);
+    console.log(`${question.id} ${result.error ? `오류 ${result.error}` : result.passed ? "통과" : "미달"}`);
+  }
+  const label = `eval-${run.publicId}`;
+  const tier = run.tier ?? "";
+  const set = scoreSet(scores, comparisons, questions.size);
+  writeFileSync(join(out, "report.json"), `${JSON.stringify({ label, tier, set, scores, comparisons }, null, 2)}\n`);
+  writeFileSync(join(out, "report.md"), markdown(label, tier, scores, set, comparisons));
+  console.log(`세트 결과: ${set.outcome}${set.reasons.length > 0 ? ` (${set.reasons.join("; ")})` : ""}`);
+  return exitCode(set.outcome);
+}
+
 async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -212,6 +262,7 @@ async function main(): Promise<number> {
       label: { type: "string" },
       compare: { type: "string" },
       keep: { type: "boolean" },
+      eval: { type: "string" },
     },
   });
   if (values.help) {
@@ -219,8 +270,9 @@ async function main(): Promise<number> {
     return 0;
   }
   const command = positionals[0];
-  if (command !== "send" && command !== "score") throw new UsageError(`명령은 send 나 score 다\n\n${USAGE}`);
+  if (command !== "send" && command !== "score" && command !== "score-eval") throw new UsageError(`명령은 send, score, score-eval 이다\n\n${USAGE}`);
   if (!values.out) throw new UsageError("--out 이 필요하다");
+  if (command === "score-eval") return scoreEval(values);
   return command === "send" ? send(values) : score(values);
 }
 

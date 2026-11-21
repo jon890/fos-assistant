@@ -76,7 +76,9 @@ class EvalRuns {
             return run;
         }
         run.recordEval(run.evalResult().withBundles(bundles), 0);
-        boolean passed = !bundles.isEmpty() && bundles.stream().allMatch(bundle -> "PASSED".equals(bundle.status()));
+        // 밖의 채점기가 판정하는 묶음은 평가 전체의 통과·실패에 넣지 않는다. 그 묶음은 답을 모두 받았으면 통과로 본다.
+        boolean passed = !bundles.isEmpty() && bundles.stream().allMatch(bundle -> "PASSED".equals(bundle.status())
+            || (EvalJudge.EXTERNAL.equals(bundle.status()) && bundle.errors() == 0 && bundle.passed() == bundle.ran()));
         run.finish(passed ? QualityRunStatus.PASSED : QualityRunStatus.FAILED, clock.instant());
         return run;
     }

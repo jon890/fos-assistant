@@ -130,11 +130,15 @@ class EvalApiTest {
         assertThat(started.statusCode()).isEqualTo(202);
         JsonNode body = json.readTree(started.body());
         assertThat(body.path("tier").asString()).isEqualTo("HIGH");
-        assertThat(body.path("bundles").get(0).path("id").asString()).isEqualTo("service-concepts");
+        assertThat(body.path("bundles").toString()).contains("service-concepts", "answer-quality");
         String publicId = body.path("publicId").asString();
         JsonNode read = json.readTree(api("GET", EVALS + "/" + publicId, admin, null).body());
         assertThat(read.path("status").asString()).isEqualTo("FAILED");
-        assertThat(read.path("bundles").get(0).path("status").asString()).isEqualTo("FAILED");
+        for (JsonNode bundle : read.path("bundles")) {
+            // 답변 품질 묶음은 밖에서 채점해 EXTERNAL, 서비스 개념 묶음은 에이전트가 없어 FAILED 다.
+            String expected = "answer-quality".equals(bundle.path("id").asString()) ? "EXTERNAL" : "FAILED";
+            assertThat(bundle.path("status").asString()).as(bundle.path("id").asString()).isEqualTo(expected);
+        }
         assertThat(read.path("items").toString()).doesNotContain("conversationId\"");
         JsonNode listed = json.readTree(api("GET", EVALS, admin, null).body());
         assertThat(listed.path("items").get(0).path("publicId").asString()).isEqualTo(publicId);

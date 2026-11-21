@@ -71,6 +71,7 @@ public record EvalView(
      *
      * @param status {@code RUNNING}, {@code PASSED}, {@code FAILED}, {@code TIMED_OUT}, {@code SKIPPED}
      * @param failures 규칙 미달의 고정 코드와 대상 이름
+     * @param startedAt 문항을 시작한 시각. 날짜 문항의 판정이 쓴다
      * @param conversationPublicId 남겨 둔 평가 대화. 통과해 지웠거나 보관 기간이 지나면 null
      */
     public record ItemView(
@@ -80,13 +81,14 @@ public record EvalView(
         String reasonCode,
         List<String> failures,
         long elapsedMs,
+        Instant startedAt,
         UUID conversationPublicId,
         List<Long> executionIds,
         boolean keep) {
 
         static ItemView of(EvalResult.ItemResult item) {
             return new ItemView(item.bundle(), item.question(), item.status().name(), item.reasonCode(), item.failures(), item.elapsedMs(),
-                item.conversationPublicId(), item.executionIds(), item.keep());
+                item.startedAt(), item.conversationPublicId(), item.executionIds(), item.keep());
         }
     }
 }

@@ -215,6 +215,21 @@ class EvalRunnerTest {
     }
 
 
+    @Test
+    @DisplayName("밖에서 채점하는 묶음은 규칙 판정 없이 답을 받으면 통과로 적고 대화를 남긴다")
+    void externalBundleKeepsAnsweredConversation() {
+        EvalQuestion question = new EvalQuestion("shop-vacuum", "쇼핑", List.of(new EvalTurn("청소기 추천해 줘", null, null)), EvalExpect.NONE, true);
+
+        runner.run(RUN, 7L, List.of(new EvalBundle("answer-quality", "답변 품질", 15, new PassRule(PassRule.EXTERNAL, null), List.of(question))),
+            null);
+
+        ItemResult result = lastItem();
+        assertThat(result.status()).isEqualTo(EvalItemStatus.PASSED);
+        assertThat(result.conversationPublicId()).isNotNull();
+        verify(conversations, never()).dropConversation(any(CurrentUser.class), eq(CONVERSATION));
+    }
+
+
     private EvalBundle bundle(CardAction secondTurnCard, String cardStatus) {
         EvalQuestion question = new EvalQuestion("task-delete-card", "schedule",
             List.of(new EvalTurn("매일 아침 7시에 날씨 알려 줘", null, null), new EvalTurn("그 예약 지워 줘", null, secondTurnCard)),

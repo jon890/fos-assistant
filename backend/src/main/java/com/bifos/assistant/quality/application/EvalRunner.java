@@ -114,7 +114,7 @@ class EvalRunner {
                 Duration timeout = Optional.ofNullable(properties.current().evalTimeoutOverride())
                     .orElse(Duration.ofMinutes(bundle.timeoutMinutes()));
                 for (EvalQuestion question : bundle.questions()) {
-                    cleanedAll &= runQuestion(runId, bundle.id(), question, evaluation, primary, tier, slots, timeout);
+                    cleanedAll &= runQuestion(runId, bundle, question, evaluation, primary, tier, slots, timeout);
                 }
             }
         } catch (RuntimeException ex) {
@@ -153,8 +153,9 @@ class EvalRunner {
      *
      * @return 그 문항이 만든 것을 모두 지웠으면 참
      */
-    private boolean runQuestion(Long runId, String bundleId, EvalQuestion original, CurrentUser evaluation, Agent primary, ModelTier tier,
+    private boolean runQuestion(Long runId, EvalBundle bundle, EvalQuestion original, CurrentUser evaluation, Agent primary, ModelTier tier,
         Map<String, String> slots, Duration timeout) {
+        String bundleId = bundle.id();
         Optional<EvalQuestion> filled = EvalBundles.fill(original, slots);
         if (filled.isEmpty()) {
             runs.record(runId, new ItemResult(bundleId, original.id(), EvalItemStatus.SKIPPED, null, List.of(), 0, null, null, null, List.of(),
@@ -191,10 +192,18 @@ class EvalRunner {
                 status = EvalItemStatus.FAILED;
                 reason = CARD_FAILED;
             } else {
-                EvalVerdict verdict = EvalJudge.judge(question.expect(), observe(evaluation, conversationId, attempt.lastCard));
-                status = verdict.passed() ? EvalItemStatus.PASSED : EvalItemStatus.FAILED;
-                reason = verdict.passed() ? null : RULES;
-                failures = verdict.failures();
+                EvalObservation observation = observe(evaluation, conversationId, attempt.lastCard);
+                if (bundle.pass().external()) {
+                    // 판정은 밖의 채점기가 남긴 대화를 읽어 한다. 여기서는 답을 받았는지만 본다.
+                    boolean answered = !observation.answer().isBlank();
+                    status = answered ? EvalItemStatus.PASSED : EvalItemStatus.FAILED;
+                    reason = answered ? null : EvalJudge.NO_ANSWER;
+                } else {
+                    EvalVerdict verdict = EvalJudge.judge(question.expect(), observation);
+                    status = verdict.passed() ? EvalItemStatus.PASSED : EvalItemStatus.FAILED;
+                    reason = verdict.passed() ? null : RULES;
+                    failures = verdict.failures();
+                }
             }
         } catch (RuntimeException ex) {
             log.warn("평가 문항이 예외로 끝났다 bundle={} question={}", bundleId, question.id(), ex);
