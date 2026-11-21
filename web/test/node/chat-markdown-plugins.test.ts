@@ -4,13 +4,13 @@ import test from "node:test";
 import { createElement } from "../../node_modules/react/index.js";
 import { renderToStaticMarkup } from "../../node_modules/react-dom/server.js";
 import ReactMarkdown from "../../node_modules/react-markdown/index.js";
-import remarkGfm from "../../node_modules/remark-gfm/index.js";
 import {
   isOpenFence,
   rehypeSoftBreaks,
   rehypeSourceSection,
   remarkOpenFence,
 } from "../../src/components/chat/markdown-plugins.ts";
+import { MARKDOWN_SYNTAX_PLUGINS } from "../../src/lib/markdown-syntax.ts";
 import { rehypeRevealFade } from "../../src/components/chat/reveal-fade.ts";
 
 function render(text: string, streaming = false): string {
@@ -18,7 +18,7 @@ function render(text: string, streaming = false): string {
     createElement(
       ReactMarkdown,
       {
-        remarkPlugins: [remarkGfm, [remarkOpenFence, { streaming }]],
+        remarkPlugins: [...MARKDOWN_SYNTAX_PLUGINS, [remarkOpenFence, { streaming }]],
         rehypePlugins: [rehypeSourceSection, rehypeSoftBreaks],
       },
       text,
