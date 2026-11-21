@@ -2750,8 +2750,8 @@ plugin 이 `register_tool(toolset=...)` 에 준 이름은 plugin toolset 이 된
 | 무엇 | 어디 |
 | --- | --- |
 | 새 profile 의 `known_plugin_toolsets.api_server` 에 `fos-product-page` 를 적는다 | profile 틀 |
-| API 허용 목록을 쓸 때 같은 기록을 적고, `web` 없이 `fos-product-page` 만 켜는 목록은 거절한다 | `dashboard-profile-api` 의 `product_page_toolset.py` |
-| 기동 때 이미 있는 profile 의 기록을 채우고 허용 목록의 `fos-product-page` 를 `web` 에 맞춘다 | 같은 파일의 기동 이관 |
+| API 허용 목록을 쓸 때 같은 기록을 적고, 목록의 `fos-product-page` 를 `web` 에 맞춘다. 새 이름을 모르는 이전 Control Plane 이 `web` 만 보내도 함께 켠다 | `dashboard-profile-api` 의 `product_page_toolset.py` |
+| 기동 때 이미 있는 profile 의 기록을 채우고 허용 목록의 `fos-product-page` 를 Hermes 가 최종 계산한 웹 검색 권한에 맞춘다. 문자열로 저장된 옛 목록과 `agent.disabled_toolsets` 도 Hermes 처럼 해석한다 | 같은 파일의 기동 이관 |
 | Hermes 에 쓰는 목록에 `web` 이 있을 때만 `fos-product-page` 를 둔다 | Control Plane `HttpHermesToolsetClient` |
 
 `fos-attachments` 는 기록에 적지 않아 모든 profile 에서 켜진다. 현재 실행의 대화 사진만 읽어 그대로 둔다.

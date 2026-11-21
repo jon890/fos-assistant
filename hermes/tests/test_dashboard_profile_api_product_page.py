@@ -17,8 +17,14 @@ PLUGIN_TOOLSETS = {"fos-attachments", PRODUCT_PAGE}
 
 
 def hermes_platform_tools(config, platform):
-    """허용 목록 계산 뒤 알려지지 않은 plugin toolset 을 켜고, 마지막에 disabled_toolsets 를 뺀다."""
+    """허용 목록 계산 뒤 알려지지 않은 plugin toolset 을 켜고, 마지막에 disabled_toolsets 를 뺀다.
+
+    문자열로 저장된 옛 목록도 Hermes 처럼 목록으로 푼다.
+    """
     listed = (config.get("platform_toolsets") or {}).get(platform)
+    if isinstance(listed, str):
+        listed = yaml.safe_load(listed)
+        config = {**config, "platform_toolsets": {**config["platform_toolsets"], platform: listed}}
     enabled = fake_platform_tools(config, platform)
     if isinstance(listed, list):
         enabled |= set(listed) & PLUGIN_TOOLSETS
@@ -74,13 +80,24 @@ class ProductPageToolsetTest(support.ProfileApiRouteTest):
         self.assertIn("web", enabled)
         self.assertIn(PRODUCT_PAGE, enabled)
 
-    def test_product_page_without_web_is_rejected(self):
-        """웹 검색 없이 상품 페이지만 켜는 목록은 받지 않는다."""
-        path = self.root / "owner/config.yaml"
-        original = path.read_bytes()
+    def test_product_page_without_web_is_dropped(self):
+        """웹 검색 없이 상품 페이지만 든 목록은 상품 페이지를 빼고 저장한다."""
         self.assertEqual(self.request("/api/config", "PUT", token="valid",
-                                      body=self.body(["delegation", "fos-assistant", PRODUCT_PAGE])), 400)
-        self.assertEqual(path.read_bytes(), original)
+                                      body=self.body(["delegation", "fos-assistant", PRODUCT_PAGE])), 200)
+        saved = self.saved_config()
+        self.assertNotIn(PRODUCT_PAGE, saved["platform_toolsets"]["api_server"])
+        self.assertNotIn(PRODUCT_PAGE, hermes_platform_tools(saved, "api_server"))
+
+    def test_old_control_plane_web_request_keeps_product_page(self):
+        """새 이름을 모르는 이전 Control Plane 이 web 만 보내도 상품 페이지가 함께 켜지고, 다시 저장해도 남는다."""
+        for _ in range(2):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid",
+                                          body=self.body(["delegation", "web", "fos-assistant"])), 200)
+            saved = self.saved_config()
+            self.assertIn(PRODUCT_PAGE, saved["platform_toolsets"]["api_server"])
+            enabled = hermes_platform_tools(saved, "api_server")
+            self.assertIn("web", enabled)
+            self.assertIn(PRODUCT_PAGE, enabled)
 
     def test_save_keeps_other_known_plugin_toolsets(self):
         """다른 platform 과 다른 이름의 기록은 그대로 두고 상품 페이지만 더한다."""
@@ -101,13 +118,24 @@ class ProductPageToolsetTest(support.ProfileApiRouteTest):
                 yaml.safe_dump({"platform_toolsets": {"api_server": allowed}}), encoding="utf-8")
         (self.root / "wide").mkdir()
         (self.root / "wide/config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+        # 옛 버전이 문자열로 저장한 목록과, 목록에는 web 이 있어도 disabled_toolsets 가 끈 profile 이다.
+        for name, config in (
+                ("legacy", {"platform_toolsets": {"api_server": "[delegation, fos-assistant]"}}),
+                ("disabled", {"platform_toolsets": {"api_server": ["web", "fos-assistant", PRODUCT_PAGE]},
+                              "agent": {"disabled_toolsets": ["web"]}}),
+                ("narrow", {"agent": {"disabled_toolsets": ["web"]}})):
+            (self.root / name).mkdir()
+            (self.root / name / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+        for name in ("legacy", "disabled", "narrow"):
+            self.assertIn(PRODUCT_PAGE, hermes_platform_tools(
+                yaml.safe_load((self.root / name / "config.yaml").read_text(encoding="utf-8")), "api_server"))
 
-        self.assertEqual(self.plugin._migrate_product_page_toolset(), {"changed": 3, "kept": 1, "unreadable": 0})
+        self.assertEqual(self.plugin._migrate_product_page_toolset(), {"changed": 6, "kept": 1, "unreadable": 0})
 
         def load(name):
             return yaml.safe_load((self.root / name / "config.yaml").read_text(encoding="utf-8"))
 
-        for name in ("owner", "guest"):
+        for name in ("owner", "guest", "legacy", "disabled", "narrow"):
             enabled = hermes_platform_tools(load(name), "api_server")
             self.assertNotIn("web", enabled)
             self.assertNotIn(PRODUCT_PAGE, enabled)
@@ -117,6 +145,7 @@ class ProductPageToolsetTest(support.ProfileApiRouteTest):
         # 허용 목록이 없는 profile 은 Hermes 기본 묶음으로 웹 검색이 켜지므로 그대로 둔다.
         self.assertEqual(load("wide"), {"model": {"default": "m"}})
 
-        before = {name: (self.root / name / "config.yaml").read_bytes() for name in ("owner", "guest", "reader")}
-        self.assertEqual(self.plugin._migrate_product_page_toolset(), {"changed": 0, "kept": 4, "unreadable": 0})
+        before = {name: (self.root / name / "config.yaml").read_bytes()
+                  for name in ("owner", "guest", "reader", "legacy", "disabled", "narrow")}
+        self.assertEqual(self.plugin._migrate_product_page_toolset(), {"changed": 0, "kept": 7, "unreadable": 0})
         self.assertEqual({name: (self.root / name / "config.yaml").read_bytes() for name in before}, before)

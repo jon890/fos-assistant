@@ -40,7 +40,7 @@ from .sandbox import (
 )
 from .sandbox_approvals import _with_sandbox_approvals
 from .image_service import IMAGE_TOOLSET, _with_image_service
-from .product_page_toolset import PRODUCT_PAGE_TOOLSET, _product_page_rejection, _with_product_page_known
+from .product_page_toolset import PRODUCT_PAGE_TOOLSET, _with_product_page, _with_product_page_known
 
 
 # 올린 스킬의 버전 디렉터리 이름이다. `.` 과 `..` 은 첫 글자 규칙에서 걸린다.
@@ -198,6 +198,9 @@ async def _check_config_update(request):
         rejected = _toolset_rejection(platform["api_server"])
         if rejected is not None:
             return rejected
+        # 상품 페이지 toolset 을 web 에 맞춘 목록으로 검사하고 저장한다. 처리기가 본문 목록을 쓴 뒤 경로가 이 목록으로 바꾼다.
+        sent = platform["api_server"]
+        platform = {"api_server": _with_product_page(sent)}
     if ensure_image_service and (platform is None or IMAGE_TOOLSET not in platform["api_server"]):
         return _rejected("ensure_image_service 는 image_gen 을 켜는 도구 저장에만 쓴다")
     sandbox = None
@@ -261,9 +264,6 @@ async def _check_config_update(request):
                 known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP, PRODUCT_PAGE_TOOLSET}
             if set(allowed) - known:
                 return _rejected("모르는 도구 이름이 있다")
-            product_page = _product_page_rejection(allowed)
-            if product_page is not None:
-                return _rejected(product_page)
             if set(_bound_servers(get_profile_dir(profile))) - set(allowed):
                 return _rejected("연결된 플러그인의 도구 이름이 빠졌다", 409)
             if CONTROL_PLANE_MCP not in mcp_names and not (set(allowed) & builtins):
@@ -317,6 +317,8 @@ async def _check_config_update(request):
                 or updated.get("image_gen") != saved.get("image_gen")
                 or updated.get("known_plugin_toolsets") != saved.get("known_plugin_toolsets")):
             request.state.fos_checked_config = (config_path, original, updated)
+        if platform is not None and platform["api_server"] != sent:
+            request.state.fos_api_toolsets = (config_path, sent, platform["api_server"])
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")
         return _rejected("profile 설정을 검증하지 못했다", 500)
