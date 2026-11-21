@@ -21,15 +21,12 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
-import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
-import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
-import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Instant;
@@ -69,8 +66,7 @@ public class AgentRunner {
     private final HermesRunsClient hermes;
     private final LostRunRelease lostRunRelease;
     private final ExecutionRecorder executions;
-    private final ExecutionEventRecorder eventRecorder;
-    private final ExecutionEventRepository executionEvents;
+    private final ChildRunEvents childRunEvents;
     private final DelegationOutput delegationOutput;
     private final ModelTierService modelTiers;
     private final Clock clock;
@@ -133,7 +129,7 @@ public class AgentRunner {
                 null,
                 requestReceivedAt);
             onStarted.accept(execution);
-            return fail(execution, ex, 1);
+            return fail(childRunEvents.unobserved(execution), execution, ex);
         }
         ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
@@ -151,8 +147,8 @@ public class AgentRunner {
             requestReceivedAt);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
-            AgentExecution cancelledExecution = executions.cancel(execution);
-            append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 1);
+            AgentExecution cancelledExecution = childRunEvents.end(
+                childRunEvents.unobserved(execution), () -> executions.cancel(execution), ExecutionEventType.RUN_CANCELLED, null);
             return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
         }
         HermesRunCommand command = new HermesRunCommand(
@@ -166,13 +162,16 @@ public class AgentRunner {
             choice.reasoningEffort());
 
         String runId = null;
+        executions.markSubmitted(execution);
+        ChildRunRecording recording = childRunEvents.start(execution);
         try {
-            executions.markSubmitted(execution);
             lostRunRelease.beforeSubmit(command);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             onSubmitted.accept(execution, runId);
-            append(execution, ExecutionEventType.RUN_STARTED, null, 1);
+            childRunEvents.append(recording, ExecutionEventType.RUN_STARTED, null);
+            // 도구 사건을 그 실행 줄에 남기고 대화 화면에 알린다. 끝은 아래 결과 조회가 정한다(스펙 assistant-hub REQ3)
+            childRunEvents.relay(recording, agent, runId, conversation);
         } catch (RuntimeException ex) {
             if (runId != null) {
                 // 제출은 됐다. 실행 줄을 FAILED 로 적은 뒤에도 Hermes 에서 돌지 않게 멈춘다.
@@ -181,7 +180,7 @@ public class AgentRunner {
                 limiter.holdUntilRemoteEnds(
                     user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, true);
             }
-            return fail(execution, ex, 1);
+            return fail(recording, execution, ex);
         }
 
         HermesRunResult result;
@@ -192,18 +191,21 @@ public class AgentRunner {
             limiter.holdUntilRemoteEnds(
                 user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
             if (cancelled.getAsBoolean()) {
-                AgentExecution cancelledExecution = executions.cancel(execution);
-                append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
+                AgentExecution cancelledExecution = childRunEvents.end(
+                    recording, () -> executions.cancel(execution), ExecutionEventType.RUN_CANCELLED, null);
                 return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
             }
-            return fail(execution, ex, 2);
+            return fail(recording, execution, ex);
         }
 
         if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
-            AgentExecution cancelledExecution = delegationKey == null
-                ? executions.cancel(execution, agent, result, choice)
-                : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output()));
-            append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
+            AgentExecution cancelledExecution = childRunEvents.end(
+                recording,
+                () -> delegationKey == null
+                    ? executions.cancel(execution, agent, result, choice)
+                    : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output())),
+                ExecutionEventType.RUN_CANCELLED,
+                null);
             return new AgentRun(
                 cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
         }
@@ -213,23 +215,26 @@ public class AgentRunner {
             String code = result.providerBlocked()
                 ? ErrorCode.PROVIDER_BLOCKED.name()
                 : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
-            AgentExecution failed = executions.fail(execution, agent, result, choice, code);
-            append(failed, ExecutionEventType.RUN_FAILED, code, 2);
+            AgentExecution failed = childRunEvents.end(
+                recording, () -> executions.fail(execution, agent, result, choice, code), ExecutionEventType.RUN_FAILED, code);
             return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
         }
 
-        AgentExecution completed = delegationKey == null
-            ? executions.complete(execution, agent, result, choice)
-            : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output()));
-        append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
+        AgentExecution completed = childRunEvents.end(
+            recording,
+            () -> delegationKey == null
+                ? executions.complete(execution, agent, result, choice)
+                : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output())),
+            ExecutionEventType.RUN_COMPLETED,
+            null);
         return new AgentRun(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }
 
 
-    private AgentRun fail(AgentExecution execution, RuntimeException ex, int sequence) {
+    private AgentRun fail(ChildRunRecording recording, AgentExecution execution, RuntimeException ex) {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
-        AgentExecution failed = executions.fail(execution, code);
-        append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
+        AgentExecution failed = childRunEvents.end(
+            recording, () -> executions.fail(execution, code), ExecutionEventType.RUN_FAILED, code);
         log.warn("하위 에이전트 실행이 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
     }
@@ -270,23 +275,5 @@ public class AgentRunner {
             return instructions;
         }
         return instructions == null || instructions.isBlank() ? addition : instructions + "\n\n" + addition;
-    }
-
-
-    /**
-     * 사건 하나를 저장한다.
-     *
-     * <p>저장이 실패해도 실행은 그대로 이어진다. 사건은 관측용이고 그것 때문에 답이 끊기면 안 된다.
-     * {@code ChatService} 가 같은 이유로 같은 판단을 한다.
-     */
-    private void append(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
-        try {
-            ExecutionEvent event = eventRecorder.record(execution, type, detail, sequence);
-            if (event != null) {
-                executionEvents.save(event);
-            }
-        } catch (RuntimeException ex) {
-            log.warn("실행 사건을 남기지 못했다 executionId={}", execution.id(), ex);
-        }
     }
 }

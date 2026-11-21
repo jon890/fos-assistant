@@ -12,6 +12,7 @@ import java.util.List;
  * @param truncated <b>이 노드 아래</b>를 잘랐다. 화면이 그 자리에 한 줄을 적는다. 트리 전체를 어딘가
  * 잘랐는지는 {@link ExecutionTree#truncated()} 가 따로 알린다
  * @param contextSources 이 실행의 문맥에 실은 항목의 참조. 내부 값이라 관리자에게만 싣고 그 밖에는 null 이다
+ * @param delegated 다른 에이전트에게 맡긴 실행({@code delegation_key} 가 있다). 화면이 답이 끝난 뒤에도 도는 이 실행을 「맡겨 둠」 으로 그린다
  */
 public record ExecutionNode(
     boolean truncated,
@@ -37,5 +38,6 @@ public record ExecutionNode(
     Instant finishedAt,
     List<ContextSourceRef> contextSources,
     List<ExecutionEventView> events,
-    List<ExecutionNode> children) {
+    List<ExecutionNode> children,
+    boolean delegated) {
 }

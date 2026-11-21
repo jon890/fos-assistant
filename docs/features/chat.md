@@ -376,6 +376,8 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 
 **`delegation` 은 대화 단위 SSE 로만 간다.** turn 이 바로 맡긴 위임의 실행 줄이 생길 때와 끝날 때 한 번씩 낸다. 보낸 turn 이 도는 동안에도 `approval` 처럼 미루지 않는다. 그리는 규칙은 [에이전트 팀](agent-team.md) 의 「대화 안의 협업」 이 갖는다.
 
+**`delegation_activity` 도 대화 단위 SSE 로만 간다.** turn 이 바로 맡긴 실행의 도구 사건 하나이고 칸은 `tool` 사건과 같다. 맡은 실행 번호와 맡은 에이전트의 이름표(`delegation`)를 함께 넣는다. 가리기도 `tool` 과 같다(`DelegationActivityNotifier`, 스펙 [비서 중심 대화](assistant-hub/spec.md) REQ3).
+
 **`started` 는 대화 turn 의 루트 실행 번호를 싣는다.**
 중지는 루트 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다. 화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 

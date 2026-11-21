@@ -300,7 +300,8 @@ public class ExecutionTreeService {
                 .toList(),
             branch.children().stream()
                 .map(child -> node(child, byExecution, usageStatuses, sources, toolNames, viewer))
-                .toList());
+                .toList(),
+            execution.delegationKey() != null);
     }
 
 

@@ -153,7 +153,7 @@ public record ChatEvent(
      * <p>그 밖에는 이 사건을 그대로 돌려준다.
      */
     public Optional<ChatEvent> forViewer(CurrentUser viewer) {
-        if ("tool".equals(type) && !ToolDetailPolicy.visibleTo(viewer, toolName)) {
+        if (("tool".equals(type) || "delegation_activity".equals(type)) && !ToolDetailPolicy.visibleTo(viewer, toolName)) {
             return Optional.of(redacted(null, model, inputTokens, outputTokens));
         }
         if (InternalValuePolicy.visibleTo(viewer)) {

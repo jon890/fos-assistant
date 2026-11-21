@@ -75,14 +75,14 @@
 
 - 새 `backend/src/test/java/com/bifos/assistant/orchestration/application/ChildRunEventsTest.java`(대역): 시작, 도구 사건 둘, 끝이 1-4 로 빈틈없이 적힌다. `end` 뒤에 온 사건은 적히지 않고 알림도 없다. 스트림 열기에 넘긴 `ToolDetailScope` 가 그 에이전트의 연결 도구 접두사를 가린다(`ToolDetailScope` 의 판정 메서드로 단언한다. 실제 가리기는 `HermesRunEventStream` 이 하므로 대역 스트림으로 보지 않는다). 스트림이 예외로 끝나도 끝 사건이 적힌다. 도구 사건마다 `DelegatedRunActivity` 가 나간다.
 - `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java`, `AgentRunnerConnectorContextTest.java`: 새 의존을 넣어 지금처럼 통과한다. 실패 경로의 번호가 counter 로 적힌다.
-- `backend/src/test/java/com/bifos/assistant/chat/ToolDetailStreamTest.java` 또는 같은 폴더의 가리기 테스트: `delegation_activity` 의 `detail` 이 `MEMBER` 에게 비고 `ADMIN` 에게 보인다.
+- 가리기: `DelegationActivityNotifierTest` 에서 `delegation_activity` 의 `detail` 이 `MEMBER` 에게 비고 `ADMIN` 에게 보인다.
 - 새 `backend/src/test/java/com/bifos/assistant/chat/nextturn/application/DelegationActivityNotifierTest.java`: 직접 위임의 사건만 publish 하고 손자 위임은 보내지 않는다.
 - `backend/src/test/java/com/bifos/assistant/usage/ExecutionTreeServiceTest.java`: 위임 키가 있는 자식의 `delegated` 가 참이고 루트는 거짓이다.
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ChildRunEventsTest' --tests '*AgentRunnerSubmitFailureTest' --tests '*AgentRunnerConnectorContextTest' --tests '*ToolDetailStreamTest' --tests '*DelegationActivityNotifierTest' --tests '*AgentDelegationServiceTest' --tests '*ArchitectureRules*' --tests '*ExecutionTreeServiceTest'
+cd backend && ./gradlew test --tests '*ChildRunEventsTest' --tests '*AgentRunnerSubmitFailureTest' --tests '*AgentRunnerConnectorContextTest' --tests '*DelegationActivityNotifierTest' --tests '*AgentDelegationServiceTest' --tests '*ArchitectureRules*' --tests '*ExecutionTreeServiceTest'
 cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 node scripts/checks/check-file-length.mjs
 node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
@@ -93,6 +93,7 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/ChildRunEvents.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/ChildRunRecording.java` | 신규 (구조 규칙이 서비스의 공개 중첩 타입을 막아 기록 상태를 따로 둔다) |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/dto/DelegatedRunActivity.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationActivityNotifier.java` | 신규 |
@@ -104,7 +105,6 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 | `backend/src/test/java/com/bifos/assistant/orchestration/application/ChildRunEventsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerConnectorContextTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ToolDetailStreamTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/nextturn/application/DelegationActivityNotifierTest.java` | 신규 |
 | `docs/features/execution.md` | 수정 |
 | `docs/features/chat.md` | 수정 |
