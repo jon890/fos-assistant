@@ -12,6 +12,8 @@ export type Person = {
   enabled: boolean;
   /** 일반 요청으로 app_user와 기본 에이전트가 만들어졌는지 나타낸다. */
   joined: boolean;
+  /** 배포 뒤 확인에 쓰는 평가 전용 사용자다. */
+  evaluation: boolean;
   /** 마지막으로 로그인 완료를 기록한 시각이다. */
   lastLoginAt: string | null;
   /** 마지막으로 사용자가 보낸 대화 메시지의 시각이다. */
