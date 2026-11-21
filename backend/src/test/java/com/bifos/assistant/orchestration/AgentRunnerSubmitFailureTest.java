@@ -104,7 +104,7 @@ class AgentRunnerSubmitFailureTest {
             mock(ExecutionEventRepository.class),
             new DelegationOutput(LiveProperties.fixed(
                 DelegationProperties.class,
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20), Duration.ZERO))),
             modelTiers,
             Clock.systemUTC(),
             limiter,

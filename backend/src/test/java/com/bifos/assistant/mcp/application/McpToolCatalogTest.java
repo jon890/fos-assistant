@@ -68,24 +68,27 @@ class McpToolCatalogTest {
 
 
     @Test
+    @DisplayName("맡김 대기 상한이 0 이면 기다리지 않는다는 설명이고, 아니면 그 초까지 기다려 결과를 함께 준다는 설명이다")
+    @SuppressWarnings("unchecked")
+    void describesDelegateWaitFromCurrentSetting() {
+        LiveProperties<DelegationProperties> properties = mock(LiveProperties.class);
+        when(properties.current()).thenReturn(settings(20), settings(20, Duration.ofMinutes(2)));
+        var catalog = catalog(properties);
+
+        assertThat(description(catalog.tools(), "agent_delegate")).contains("끝날 때까지 기다리지 않는다.");
+        assertThat(description(catalog.tools(), "agent_delegate"))
+            .contains("최대 120초까지 결과를 기다려 output 으로 함께 돌려주므로")
+            .contains("status 가 RUNNING 이면 note 를 따른다.");
+    }
+
+
+    @Test
     @DisplayName("모든 도구는 모델에게 서명 인자를 노출하지 않고 실행 맥락을 허용한다")
     @SuppressWarnings("unchecked")
     void allowsRuntimeContextForEveryTool() {
         LiveProperties<DelegationProperties> properties = mock(LiveProperties.class);
         when(properties.current()).thenReturn(settings(20));
-        var catalog = new McpToolCatalog(properties,
-            new McpMemoryRemember(null, null, null, null),
-            new McpMediaObservationTools(null, null, null, null, null),
-            new McpContentDraftTools(null, null, null, null, null),
-            new McpContentDraftSnapshots(null, null, null, null),
-            new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
-            new McpApprovalResumeTool(mock(ApprovalResumes.class)),
-            new McpFileSpaceTools(null, null, null),
-            new McpConnectorListTool(mock(ConnectorListing.class)),
-            new McpTaskTools(mock(TaskRequests.class)),
-            new McpFollowUpTools(null, null, null, null, null, null, null),
-            new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
-            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
+        var catalog = catalog(properties);
 
         assertThat(catalog.tools()).allSatisfy(tool -> {
             assertThat(tool.get("inputSchema")).isInstanceOf(Map.class);
@@ -98,13 +101,40 @@ class McpToolCatalogTest {
     }
 
 
+    private static McpToolCatalog catalog(LiveProperties<DelegationProperties> properties) {
+        return new McpToolCatalog(properties,
+            new McpMemoryRemember(null, null, null, null),
+            new McpMediaObservationTools(null, null, null, null, null),
+            new McpContentDraftTools(null, null, null, null, null),
+            new McpContentDraftSnapshots(null, null, null, null),
+            new McpFinancialLimitTools(mock(FinancialLimitRequests.class)),
+            new McpApprovalResumeTool(mock(ApprovalResumes.class)),
+            new McpFileSpaceTools(null, null, null),
+            new McpConnectorListTool(mock(ConnectorListing.class)),
+            new McpTaskTools(mock(TaskRequests.class)),
+            new McpFollowUpTools(null, null, null, null, null, null, null),
+            new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
+            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
+    }
+
+
     private static String description(List<Map<String, Object>> definitions) {
-        return definitions.stream().filter(tool -> "agent_status".equals(tool.get("name")))
+        return description(definitions, "agent_status");
+    }
+
+
+    private static String description(List<Map<String, Object>> definitions, String name) {
+        return definitions.stream().filter(tool -> name.equals(tool.get("name")))
             .map(tool -> (String)tool.get("description")).findFirst().orElseThrow();
     }
 
 
     private static DelegationProperties settings(int waitSeconds) {
-        return new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(waitSeconds));
+        return settings(waitSeconds, Duration.ZERO);
+    }
+
+
+    private static DelegationProperties settings(int waitSeconds, Duration delegateWait) {
+        return new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(waitSeconds), delegateWait);
     }
 }

@@ -383,7 +383,7 @@ class AgentDelegationServiceRaceTest {
 
     /** 서버 전체 한도만 다른 위임 설정이다. 나머지는 {@link #service} 의 기본값과 같다. */
     private static DelegationProperties withMaxActive(int maxActive) {
-        return new DelegationProperties(2, 4, maxActive, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20));
+        return new DelegationProperties(2, 4, maxActive, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20), Duration.ZERO);
     }
 
 

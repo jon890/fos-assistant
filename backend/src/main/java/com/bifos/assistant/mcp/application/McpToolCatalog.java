@@ -30,6 +30,7 @@ public class McpToolCatalog {
 
 
     public List<Map<String, Object>> tools() {
+        DelegationProperties delegation = delegationProperties.current();
         return Stream.of(List.<Map<String, Object>>of(
             Map.of(
                 "name",
@@ -85,7 +86,7 @@ public class McpToolCatalog {
                 "name",
                 "agent_delegate",
                 "description",
-                "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
+                delegateDescription(delegation),
                 "inputSchema",
                 Map.of(
                     "type",
@@ -103,7 +104,7 @@ public class McpToolCatalog {
                 "agent_status",
                 "description",
                 "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다. 먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 "
-                    + delegationProperties.current().statusWaitMax().toSeconds() + "초).",
+                    + delegation.statusWaitMax().toSeconds() + "초).",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -215,5 +216,19 @@ public class McpToolCatalog {
         var definition = new LinkedHashMap<>(tool);
         definition.put("inputSchema", inputSchema);
         return definition;
+    }
+
+
+    /** 기다림 상한이 0 이면 지금 설명, 아니면 그 초까지 기다려 결과를 함께 돌려준다는 설명이다(ADR-20261121 / delegate-wait). */
+    private static String delegateDescription(DelegationProperties delegation) {
+        String target = "agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. ";
+        long waitSeconds = delegation.delegateWaitMax().toSeconds();
+        if (waitSeconds <= 0) {
+            return "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. " + target
+                + "맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.";
+        }
+        return "다른 에이전트에게 일을 맡긴다. 대화에서는 최대 " + waitSeconds + "초까지 결과를 기다려 output 으로 함께 돌려주므로, 결과가 오면 그것으로 답한다. "
+            + "status 가 RUNNING 이면 note 를 따른다. " + target
+            + "맡긴 일이 그때까지 끝나지 않으면 그 결과는 이 대화의 다음 차례에 자동으로 전달된다.";
     }
 }

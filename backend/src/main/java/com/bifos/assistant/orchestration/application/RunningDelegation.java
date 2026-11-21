@@ -79,12 +79,13 @@ final class RunningDelegation {
     }
 
 
-    /** 실행이 끝나기를 기다린다. 끊기면 기다리기를 그만두고 끊긴 표시는 되살린다. */
-    void awaitEnded(Duration limit) {
+    /** 실행이 끝나기를 기다린다. 끝났으면 참이다. 끊기면 기다리기를 그만두고 끊긴 표시는 되살린다. */
+    boolean awaitEnded(Duration limit) {
         try {
-            ended.await(limit.toMillis(), TimeUnit.MILLISECONDS);
+            return ended.await(limit.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

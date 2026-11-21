@@ -79,13 +79,13 @@
 
 - 새 `backend/src/test/java/com/bifos/assistant/orchestration/application/DelegationWaiterTest.java`(대역): 가짜 시계로 첫 호출이 상한 전체, 30초 뒤 같은 루트가 남은 시간, 상한을 지나면 0, `max` 0 이면 기다리지 않음, 오래된 항목이 지워진다. 중지 표시가 서면 1초 안에 풀리고 `deliverable` 이 거짓이다. 먼저 살펴보기 트리와 부모가 있는 origin 은 기다리지 않는다.
 - `backend/src/test/java/com/bifos/assistant/orchestration/DelegationPropertiesTest.java`: 0 은 받고 음수는 기동 실패다.
-- `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java`: `OverridableLiveProperties`(`backend/src/test/java/com/bifos/assistant/testsupport/`)로 `delegateWaitMax` 를 몇 초로 바꾼 사례를 더한다. 가짜 Hermes 자식이 곧 끝나면 결과에 `output` 이 있고 그 실행의 `result_delivered_at` 이 적혔다. 그 대화의 turn 이 닫힌 뒤 결과 알림 줄(`SYSTEM`)이 생기지 않는다(깨우기는 전한 결과를 열지 않는다, `DelegationWakeServiceTest` 가 이미 보는 규칙). 자식이 상한을 넘기면 `RUNNING` 과 `note` 이고 `result_delivered_at` 이 비었다. 먼저 살펴보기 트리와 손자 위임은 기다리지 않는다. 루트 turn 의 중지가 확정되면 기다림이 곧 풀리고 `result_delivered_at` 이 비었다. 기존 사례는 `0s` 로 지금처럼 통과한다.
+- 새 `backend/src/test/java/com/bifos/assistant/mcp/McpDelegateWaitTest.java`(`@OverrideProperties("assistant.delegation.delegate-wait-max=3s")`, `McpAgentToolsTest` 와 같은 준비): `McpAgentToolsTest` 는 1700줄이 넘어 사례를 새 파일에 둔다. 가짜 Hermes 자식이 곧 끝나면 결과에 `output` 이 있고 그 실행의 `result_delivered_at` 이 적혔다. 그 대화의 turn 이 닫힌 뒤 결과 알림 줄(`SYSTEM`)이 생기지 않는다(깨우기는 전한 결과를 열지 않는다, `DelegationWakeServiceTest` 가 이미 보는 규칙). 자식이 상한을 넘기면 `RUNNING` 과 `note` 이고 `result_delivered_at` 이 비었다. 같은 답의 두 번째 맡김은 남은 시간만 기다린다. 손자 위임은 기다리지 않는다. 중지와 먼저 살펴보기는 `DelegationWaiterTest` 가 본다. `McpAgentToolsTest` 의 기존 사례는 `0s` 로 지금처럼 통과한다.
 - `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolCatalogTest.java`: 상한이 0 이 아니면 설명에 초 값이 들고, 0 이면 지금 설명이다.
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*DelegationWaiterTest' --tests '*DelegationPropertiesTest' --tests '*McpAgentToolsTest' --tests '*McpToolCatalogTest' --tests '*AgentDelegationServiceTest' --tests '*AgentDelegationServiceRaceTest' --tests '*AgentRunnerSubmitFailureTest' --tests '*AgentRunnerConnectorContextTest' --tests '*DelegationOutputTest'
+cd backend && ./gradlew test --tests '*DelegationWaiterTest' --tests '*DelegationPropertiesTest' --tests '*McpAgentToolsTest' --tests '*McpDelegateWaitTest' --tests '*McpToolCatalogTest' --tests '*AgentDelegationServiceTest' --tests '*AgentDelegationServiceRaceTest' --tests '*AgentRunnerSubmitFailureTest' --tests '*AgentRunnerConnectorContextTest' --tests '*DelegationOutputTest'
 cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 node scripts/checks/check-file-length.mjs
 node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
@@ -106,10 +106,13 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolCatalog.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/application/DelegationWaiterTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/DelegationPropertiesTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpDelegateWaitTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/RunningDelegation.java` | 수정 (`awaitEnded` 가 끝났는지 돌려준다) |
 | `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolCatalogTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java` | 수정 (설정 인자) |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java` | 수정 (설정 인자) |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerConnectorContextTest.java` | 수정 (설정 인자) |
 | `backend/src/test/java/com/bifos/assistant/orchestration/DelegationOutputTest.java` | 수정 (설정 인자) |
+| `backend/src/test/java/com/bifos/assistant/chat/ArtifactMcpValidationTest.java` | 수정 (생성자 인자) |
+| `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolServiceTest.java` | 수정 (생성자 인자) |
 | `docs/features/agent-skill.md` | 수정 |
