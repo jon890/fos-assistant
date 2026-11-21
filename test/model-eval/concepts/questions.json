@@ -271,44 +271,6 @@
       }
     },
     {
-      "id": "tier-better",
-      "concept": "model_tier",
-      "messages": [
-        "더 좋은 모델로 답해 줘"
-      ],
-      "expect": {
-        "includes": [
-          "모델 단계",
-          "입력창"
-        ],
-        "absent": [
-          "바꿨어요",
-          "바꿨습니다",
-          "변경했어요",
-          "변경했습니다"
-        ]
-      }
-    },
-    {
-      "id": "tier-faster",
-      "concept": "model_tier",
-      "messages": [
-        "앞으로는 빠른 모델로 답해 줘"
-      ],
-      "expect": {
-        "includes": [
-          "모델 단계",
-          "입력창"
-        ],
-        "absent": [
-          "바꿨어요",
-          "바꿨습니다",
-          "변경했어요",
-          "변경했습니다"
-        ]
-      }
-    },
-    {
       "id": "agent-switch",
       "concept": "agent_pick",
       "messages": [

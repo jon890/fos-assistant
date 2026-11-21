@@ -78,6 +78,7 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
 | 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별·그룹별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 그룹 key 는 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)). 푼 key 는 Control Plane 메모리에만 있다 |
+| 웹 푸시 VAPID 키와 연락처 | 서버 비밀값 `server_secret` 의 `vapid`. 비밀 키를 KEK 로 감싼 채로 두고 관리자 화면 「서버 비밀값」 에서 서버가 새로 만든다. 바꾸면 등록 기기를 모두 비운다 |
 | 브라우저 중계 서명 비밀 | 서버 비밀값 `server_secret` 의 `browser_gateway`. KEK 로 감싼 채로 두고 관리자 화면 「서버 비밀값」 에서 서버가 새로 만든다 |
 
 데이터베이스에는 어떤 비밀값도 원문으로 넣지 않는다.

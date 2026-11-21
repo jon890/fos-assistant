@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import { SecretConfirmDialog } from "@/components/admin/secret-confirm-dialog";
+import { VapidSecretRow } from "@/components/admin/vapid-secret-row";
 import { formatWhen } from "@/lib/format";
 import {
   deleteGatewaySecret,
+  deleteVapid,
+  regenerateVapid,
   fetchServerSecrets,
   regenerateConfirmText,
   regenerateGatewaySecret,
@@ -161,6 +164,20 @@ export function AdminSecretList() {
     setConfirming(null);
   }
 
+  async function changeVapid(call: () => Promise<Response>) {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const response = await call();
+      if (!response.ok) setError(await failureOf(response));
+    } catch {
+      setError("요청을 보내지 못했어요. 잠시 뒤 다시 해 주세요.");
+    }
+    apply(await readOverview());
+    setBusy(false);
+  }
+
   async function remove() {
     setBusy(true);
     setError(null);
@@ -203,6 +220,17 @@ export function AdminSecretList() {
               gateway.set ? setConfirming("regenerate") : void regenerate()
             }
             onDelete={() => setConfirming("delete")}
+          />
+          <VapidSecretRow
+            vapid={overview.vapid}
+            storeAvailable={overview.storeAvailable}
+            busy={busy}
+            onRegenerate={(subject) =>
+              changeVapid(() =>
+                regenerateVapid(subject, overview.vapid.publicKey),
+              )
+            }
+            onDelete={() => changeVapid(deleteVapid)}
           />
         </div>
       )}
