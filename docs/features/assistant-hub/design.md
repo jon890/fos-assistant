@@ -6,7 +6,7 @@
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `McpToolService.delegate` 가 실행 번호를 받은 뒤, 대화 turn 의 루트가 바로 맡긴 위임이면 `AgentDelegationService` 의 새 기다리기로 남은 예산만큼 `RunningDelegation.awaitEnded` 를 기다린다. 끝났으면 `agent_status` 와 같은 모양(`statusOf`)으로 결과를 넣고 `markResultDelivered` 를 적어 자동 답이 열리지 않게 한다 |
+| REQ1 | `McpToolService.delegate` 가 실행 번호를 받은 뒤, 대화 turn 의 루트가 바로 맡긴 위임이면 새 `DelegationWaiter` 가 남은 예산만큼 `RunningDelegation.awaitEnded` 를 기다린다. 끝났으면 `agent_status` 와 같은 모양(`statusOf`)으로 결과를 넣고 `markResultDelivered` 를 적어 자동 답이 열리지 않게 한다 |
 | REQ2 | 예산 안에 끝나지 않으면 `RUNNING` 과 「짧게 답을 끝내고 결과를 짐작하지 않는다」 지시 한 줄을 넣는다. 결과는 지금 깨우기(ADR-040)가 그대로 전한다. 상한은 `assistant.delegation.delegate-wait-max`(기본 2분, 0 이면 기다리지 않음) |
 | REQ3 | `AgentRunner` 가 맡긴 실행도 Hermes 사건 스트림을 열어 도구 사건을 그 자식 실행 줄에 적는다(ADR-090 과 같은 경로). 트리와 `uses` 는 `root_execution_id` 로 자식을 이미 읽어 그대로 보인다. 도는 동안의 줄은 자식 사건을 Spring 사건으로 내고 `chat` 이 대화 단위 SSE 의 새 사건 `delegation_activity` 로 보낸다 |
 | REQ4 | (PR2) 새 대화 만들기와 보내기가 대화의 에이전트를 요청자의 기본 비서로 정한다(`PrimaryAgents`). 웹은 `/new` 의 이름표 목록, `?agent=`, 「대화하기」 단추를 지운다 |
@@ -34,7 +34,7 @@
 ### PR1 `agent_delegate` 의 기다리기
 
 - 대상(스펙 DECISION11): origin 이 대화 turn 의 루트 실행(`parentExecutionId == null`)이고 먼저 살펴보기 트리가 아니다. 사용자 질문, 대기 줄, 자동 turn, 예약 turn 이 모두 루트다. 손자 위임은 지금처럼 바로 돌려준다.
-- 예산(스펙 DECISION13, DECISION20): 루트 실행마다 첫 기다림을 시작한 시각을 `AgentDelegationService` 의 메모리 맵에 둔다. 마감은 그 시각 더하기 상한이다. Hermes 는 우리 MCP 도구를 한 번에 하나씩 부르므로 같은 답의 맡김은 차례로 같은 마감까지 기다린다. 항목은 마감에서 상한만큼 더 지나면 다음 접근 때 지운다. 서버 하나 전제는 루트 잠금과 같다.
+- 예산(스펙 DECISION13, DECISION20): 루트 실행마다 첫 기다림을 시작한 시각을 `DelegationWaiter` 의 메모리 맵에 둔다. 마감은 그 시각 더하기 상한이다. Hermes 는 우리 MCP 도구를 한 번에 하나씩 부르므로 같은 답의 맡김은 차례로 같은 마감까지 기다린다. 항목은 마감에서 상한만큼 더 지나면 다음 접근 때 지운다. 서버 하나 전제는 루트 잠금과 같다.
 - 중지: 기다리는 동안 루트 turn 의 중지 표시(`TurnCancellation`)가 서면 기다림을 곧바로 푼다. 전달 표시는 루트 turn 이 아직 돌고 중지가 확정되지 않았을 때만 적는다. 아니면 적지 않고 `RUNNING` 이나 끝난 상태만 돌려주어 결과를 지금 깨우기(ADR-040)와 중지 뒤 규칙에 맡긴다. 기다림은 중지 표시와 자식의 끝 가운데 먼저 오는 것으로 풀리도록 짧은 간격으로 나눠 기다린다.
 - 결과 모양: 끝났으면 `agent_status` 와 같은 `execution_id`, `status`, `output`(연결이 붙은 에이전트면 `<external-data>` 로 감쌈), `error_code` 다. `FAILED`, `CANCELLED` 도 끝난 결과다(스펙 DECISION19). `RUNNING` 이면 `execution_id`, `status` 와 `note` 한 줄 「아직 끝나지 않았다. 결과는 끝나면 다음 답으로 자동 전달된다. 이번 답은 누구에게 무엇을 맡겼는지 한 줄로 끝내고 결과를 짐작해 쓰지 않는다」 를 넣는다.
 - 전달 표시: 끝난 결과를 돌려줄 때 `markResultDelivered` 를 적는다. `agent_status` 가 이미 쓰는 규칙이다(`McpToolService.markDeliveredIfFinished`).

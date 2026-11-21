@@ -1,0 +1,66 @@
+{
+  "name": "delegate-wait",
+  "description": "대화 turn 이 맡긴 일을 정한 시간까지 기다려 한 답으로 내고, 맡긴 실행의 도구 기록을 남겨 실행 트리와 작업 과정에 보인다(스펙의 PR1)",
+  "pr_scope": "agent_delegate 의 기다리기와 예산, 맡긴 실행의 사건 스트림 기록과 대화 SSE 중계, 도는 답과 끝난 답의 작업 과정에 맡은 에이전트의 도구 줄과 「맡겨 둠」 상태를 만든다.",
+  "deferred": [
+    {
+      "what": "입구를 비서로 모으기: 새 대화의 에이전트 고르기와 「대화하기」 없애기, 지난 대화 읽기 전용, @ 맡기기 없애기, 예약 작업의 에이전트, 에이전트 바꾸기 부탁(스펙 REQ4-REQ8, PR2)",
+      "why": "스펙 DECISION12 가 맡기기 먼저로 PR 순서를 정했다",
+      "after": "이 PR 이 main 에 머지된 뒤"
+    },
+    {
+      "what": "연결은 전문 에이전트에만, 전문 에이전트의 스킬을 비서 대화의 / 로 맡기기(스펙 REQ9-REQ10, PR3)",
+      "why": "스펙 DECISION12",
+      "after": "PR2 가 main 에 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/assistant-hub/spec.md",
+  "design": "docs/features/assistant-hub/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3"
+  ],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ1",
+        "REQ2"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ3"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ3"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ3"
+      ]
+    }
+  ]
+}
