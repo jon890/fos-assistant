@@ -2,6 +2,8 @@
 
 사용자가 대화에 보낸 링크는 `link:<주소>` 로 가리키고, Control Plane 이 대화에 있는 주소인지 확인한 뒤 받는다
 (fos-assistant `docs/adr/ADR-20261120-link-image-source.md`). 받은 주소는 그림 올리기의 `source_links` 로 남긴다.
+비서가 웹 검색과 페이지 읽기로 찾은 주소도 같은 `link:` 로 가리킨다. Control Plane 이 `found_links.py` 가 알린 주소인지 확인한다
+(fos-assistant `docs/adr/ADR-20261121-found-link-image-source.md`).
 
 계약의 정본은 fos-assistant `docs/adr/ADR-20261120-image-source.md` 와 `hermes/plugins/fos-ctx/README.md` 의
 「그림을 고칠 사진을 받는다」 다. 모델은 `image_url` 과 `reference_image_urls` 에 `attachment:<첨부 번호>` 나
@@ -53,14 +55,16 @@ EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "i
 # 참고 사진을 쓰지 못하면 설명만으로 비슷하게 그려 넣지 않고 먼저 알린다(fos-assistant 스펙 tool-fallback REQ7).
 NO_DRAW = "설명만으로 비슷하게 그려 넣지 말고, "
 ASK_PHOTO = "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"
-NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
+NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, "
+                            "link:<사용자가 보낸 주소나 검색·읽기 결과에 나온 주소> 만 쓴다. "
                             "파일 경로와 맨 주소는 쓰지 않는다",
-                            "사용자가 이 대화에 보낸 주소면 link: 로 고쳐 다시 부른다. 비서가 찾은 주소처럼 넘길 수 없으면 " + NO_DRAW
+                            "사용자가 이 대화에 보낸 주소나 검색·읽기 결과에 나온 주소면 link: 로 고쳐 다시 부른다. 넘길 수 없으면 " + NO_DRAW
                             + "그 사진을 넘길 수 없다는 것과 " + ASK_PHOTO)
 # 어느 사진을 뺄지는 사용자가 정한다(fos-assistant 스펙 generated-image DECISION25, DECISION32).
 TOO_MANY = ask_user("한 번에 쓸 수 있는 사진은 %d장까지다. 어느 사진을 뺄지 사용자에게 묻는다" % MAX_SOURCES)
-UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다",
-                      "이 대화의 첨부, 사용자가 보낸 링크, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다. 없으면 " + NO_DRAW
+UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다. 링크라면 검색이나 페이지 읽기 결과에 나온 주소도 아니다",
+                      "이 대화의 첨부, 사용자가 보낸 링크, 검색·읽기 결과에 글자 그대로 나온 주소, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다. "
+                      "없으면 " + NO_DRAW
                       + "그 사진을 쓸 수 없다는 것과 " + ASK_PHOTO)
 GONE = ask_user("지웠거나 보관 기간이 지나 쓸 수 없다")
 # 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
