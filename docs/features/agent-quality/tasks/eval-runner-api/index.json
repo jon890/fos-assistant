@@ -1,0 +1,64 @@
+{
+  "name": "eval-runner-api",
+  "description": "평가 실행기와 카드 처리, 평가 문항 비우기, 관리자 평가 API, 답변 품질 묶음의 밖 채점",
+  "pr_scope": "평가 실행기가 서비스 개념과 답변 품질 묶음을 평가 전용 사용자로 돌리고, 문항마다 비우며, 관리자 API 로 시작하고 결과와 남긴 대화를 읽게 한다.",
+  "deferred": [
+    {
+      "what": "답변 품질 판정(형식 검사, 사진 요청, 출처 링크 열기)을 Java 로 옮겨 answer-quality 묶음을 external 에서 answer-quality 규칙으로 바꾸고, 공개 주소 읽기를 shared 로 꺼낸다",
+      "why": "운영 코드 상한 안에 두려고 이 PR 은 답변 품질 채점을 test/model-eval/answer/run.ts score-eval 에 맡긴다",
+      "after": "이 PR 이 머지되고 배포 뒤 score-eval 결과로 옛 결과와 비교한 뒤"
+    },
+    {
+      "what": "화면과 정리: 품질 화면 둘째 칸과 「지금 돌리기」, 옛 TypeScript 평가 스크립트 지우기, AGENTS.md 와 서비스 개념·답변 품질 문서 고치기",
+      "why": "design.md 「PR2a 나눔」 의 마지막 PR 이다",
+      "after": "답변 품질 판정을 옮기는 PR 이 머지된 뒤"
+    }
+  ],
+  "status": "in_progress",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/agent-quality/spec.md",
+  "design": "docs/features/agent-quality/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ6",
+    "REQ9",
+    "REQ15",
+    "REQ16",
+    "REQ17"
+  ],
+  "total_phases": 3,
+  "current_phase": 3,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ17"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ6",
+        "REQ9",
+        "REQ15",
+        "REQ16",
+        "REQ17"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ9",
+        "REQ15",
+        "REQ16",
+        "REQ17"
+      ]
+    }
+  ]
+}
