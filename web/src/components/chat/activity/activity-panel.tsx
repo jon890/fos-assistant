@@ -11,7 +11,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/components/ui/use-media-query";
-import { fetchExecutionTree } from "@/lib/usage-api";
+import { loadExecutionTree } from "@/lib/execution-tree-load";
 import {
   ExecutionTree,
   type ExecutionTreeResponse,
@@ -37,11 +37,7 @@ export function ActivityPanel({ target, onClose }: Props) {
   useEffect(() => {
     if (executionId === null) return;
     let active = true;
-    fetchExecutionTree(executionId)
-      .then((response) => {
-        if (!response.ok) throw new Error("작업 과정을 불러오지 못했어요");
-        return response.json() as Promise<ExecutionTreeResponse>;
-      })
+    loadExecutionTree(executionId, { stopped: () => !active })
       .then((value) => {
         if (active) {
           setLoaded({ executionId, tree: value });

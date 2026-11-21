@@ -103,7 +103,7 @@ class ProfileApiConnectorInstallSecurityTest(support.ProfileApiRouteTest):
         self.binding_install()
         response = self.connector_status()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"}])
+        self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind", "skipped_skills": []}])
         self.assertNotIn(DEMO_BASE, json.dumps(response.body))
         self.assertEqual(self.connector_probe(), 204)
         # 설치한 플러그인의 서버가 아니면 등록된 MCP 서버여도 넘기지 않는다.

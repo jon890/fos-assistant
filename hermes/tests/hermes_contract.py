@@ -618,6 +618,11 @@ PLUGIN_DEPENDENCY_HELPERS = ("missing_python_dependencies", "_declared_requireme
 
 # 만든 그림 올리기가 기대는 지점이다(fos-assistant ADR-20261119 / generated-image). plugin 은 이 이름들을 import 하지 않고 동작에만 기댄다.
 # `test_generated_image_contract.py` 가 Hermes 소스에서 본다.
+# fos-ctx 가 결과에서 주소를 뽑아 Control Plane 에 알리는 두 웹 도구다(fos-assistant ADR-20261121 / found-link-image-source).
+# 결과 모양은 `test_found_links_contract.py` 가 Hermes 소스와 대조한다.
+WEB_RESULT_TOOLS = ("web_search", "web_extract")
+# `web_search` 결과 항목에서 주소를 찾는 칸이다.
+WEB_SEARCH_ITEM_FIELDS = ("url", "title", "description")
 GENERATED_IMAGE_TOOL = "image_generate"
 # `$HERMES_HOME` 아래에서 그림을 쓰는 폴더다. plugin 은 이 폴더 아래의 파일만 읽고 지운다.
 GENERATED_IMAGE_CACHE_PARTS = ("cache", "generated", "images")

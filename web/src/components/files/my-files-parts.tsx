@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import type { VaultItem, VaultKind, VaultList } from "@/lib/artifact-vault-api";
@@ -188,15 +189,13 @@ export function ListState({
 }) {
   if (failure)
     return (
-      <Notice variant="error" role="alert" data-testid="my-files-failure">
-        <p>{failure}</p>
-        <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-          다시 읽기
-        </Button>
-      </Notice>
+      <LoadFailure
+        message={failure}
+        onRetry={onRetry}
+        data-testid="my-files-failure"
+      />
     );
-  if (items === null)
-    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
+  if (items === null) return <ListSkeleton />;
   if (items.length > 0) return null;
   return filtered ? (
     <EmptyState

@@ -74,9 +74,9 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 | [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |
 | [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. 세 단계 모두 구현했다. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 바꿨다 |
-| [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. ADR-20261010 / media-observation-storage 의 요청 alias 테이블과 ADR-20261011 / media-observation-cache 를 대체한다 |
+| [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) 의 요청 alias 테이블과 [ADR-20261011 / media-observation-cache](archive/ADR-20261011-media-observation-cache.md) 를 대체한다 |
 | [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
-| [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, ADR-20261008 / data-encryption 에 그룹 데이터 key 를 더한다. 남긴 평문 해시는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 HMAC 으로 바꾼다 |
+| [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) 에 그룹 데이터 key 를 더한다. 남긴 평문 해시는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 HMAC 으로 바꾼다 |
 | [ADR-20261120 / agent-service-writes](ADR-20261120-agent-service-writes.md) | 에이전트는 되돌릴 수 있는 서비스 쓰기를 바로 하고 지우기는 승인 카드로 미루며, 사람이 없는 실행에도 같게 연다 | Accepted. ADR-082 의 살펴보기 쓰기 스위치를 서비스 쓰기 도구에도 쓴다 |
 
 ## 보관

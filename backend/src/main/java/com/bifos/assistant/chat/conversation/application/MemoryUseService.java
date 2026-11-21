@@ -16,7 +16,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionMemoryRef;
 import com.bifos.assistant.usage.execution.application.ExecutionMemoryRefs;
-import com.bifos.assistant.usage.execution.application.dto.MemoryUseVia;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,9 +28,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 대화의 답마다 그 실행이 본문을 받은 기억을 지금 볼 수 있는 것만 제목과 함께 낸다(ADR-20261008 / memory-facts).
+ * 대화의 답마다 그 실행이 {@code memory_read} 로 본문을 읽은 기억을 지금 볼 수 있는 것만 제목과 함께 낸다(ADR-20261008 /
+ * memory-facts). 조립이 넣은 기억은 내지 않는다(사용자 결정 2026-11-21).
  *
- * <p>실행 당시의 권한이 아니라 지금 권한으로 거른다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 빠진다. 본문은 싣지
+ * <p>실행 당시의 권한이 아니라 지금 권한으로 거른다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 빠진다. 본문은 내지
  * 않는다.
  */
 @Service
@@ -46,11 +46,11 @@ public class MemoryUseService {
     private final Clock clock;
 
 
-    /** 답 실행 번호 오름차순으로, 한 실행 안에서는 실은 순서 뒤에 읽은 순서로 낸다. */
+    /** 답 실행 번호 오름차순으로, 한 실행 안에서는 읽은 순서로 낸다. */
     @Transactional(readOnly = true)
     public List<MemoryUse> usesOf(CurrentUser user, Long conversationId) {
         List<Long> executionIds = messages.findAssistantExecutionIds(conversationId);
-        List<ExecutionMemoryRef> found = refs.of(executionIds);
+        List<ExecutionMemoryRef> found = refs.readOf(executionIds);
         if (found.isEmpty()) {
             return List.of();
         }
@@ -60,8 +60,8 @@ public class MemoryUseService {
         List<MemoryUse> uses = new ArrayList<>();
         for (ExecutionMemoryRef ref : found) {
             Memory memory = visible.get(ref.memoryId());
-            if (memory != null && (ref.via() != MemoryUseVia.READ || readable(accesses, ref, memory))) {
-                uses.add(new MemoryUse(ref.executionId(), memory.id(), memory.title(), memory.scope(), ref.via()));
+            if (memory != null && readable(accesses, ref, memory)) {
+                uses.add(new MemoryUse(ref.executionId(), memory.id(), memory.title(), memory.scope()));
             }
         }
         return uses;
@@ -91,7 +91,7 @@ public class MemoryUseService {
     }
 
 
-    /** {@code memory_read} 로 읽은 항목은 그 실행의 에이전트가 지금 읽을 수 있을 때만 낸다. 에이전트마다 접근 범위를 한 번만 읽는다. */
+    /** 읽은 항목은 그 실행의 에이전트가 지금 읽을 수 있을 때만 낸다. 에이전트마다 접근 범위를 한 번만 읽는다. */
     private boolean readable(Map<Long, MemoryAccess> accesses, ExecutionMemoryRef ref, Memory memory) {
         if (ref.agentId() == null) {
             return false;

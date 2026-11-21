@@ -198,7 +198,7 @@ class ArtifactVaultListTest {
 
     private ArtifactVaultFinder finder(long quotaBytes, long maxFileBytes) {
         return new ArtifactVaultFinder(
-            rows, metas, conversations, new ArtifactVaultProperties(quotaBytes, maxFileBytes, null, null, null));
+            rows, metas, conversations, new ArtifactVaultProperties(quotaBytes, maxFileBytes, null, null, null), null);
     }
 
 

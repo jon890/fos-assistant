@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { LoadFailure } from "@/components/ui/page-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { allCardsEmpty, type AttentionView } from "@/lib/attention";
 import { AddFollowUpButton } from "./add-follow-up-button";
@@ -11,7 +12,7 @@ import { NowCard } from "./now-card";
 export async function NowScreen() {
   const result = await callControlPlane<AttentionView>("/api/v1/attention");
   if (!result.ok) {
-    return <p className="text-sm">{result.message}</p>;
+    return <LoadFailure message={result.message} />;
   }
 
   const view = result.data;

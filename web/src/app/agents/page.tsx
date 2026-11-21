@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageFrame } from "@/components/ui/page-frame";
+import { LoadFailure } from "@/components/ui/page-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import { SpecialistAgentDialog } from "@/components/agent/specialist-agent-dialog";
 import type { AgentView } from "@/lib/agent";
 import { capabilitiesLine } from "@/lib/agent-badge";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { AgentBadge } from "@/components/agent/agent-badge";
 
 export default async function AgentsPage({
@@ -21,17 +24,23 @@ export default async function AgentsPage({
 
   const { new: openNew } = await searchParams;
   const result = await callControlPlane<AgentView[]>("/api/v1/agents");
-  if (!result.ok) return <p className="text-sm">{result.message}</p>;
+  if (!result.ok)
+    return (
+      <PageFrame {...PAGE_HEADS.agents}>
+        <LoadFailure message={result.message} />
+      </PageFrame>
+    );
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">에이전트</h1>
-        <div className="flex flex-wrap justify-end gap-2">
+    <PageFrame
+      {...PAGE_HEADS.agents}
+      action={
+        <>
           <SpecialistAgentDialog />
           <CreateAgentDialog defaultOpen={openNew === "1"} />
-        </div>
-      </div>
+        </>
+      }
+    >
       {result.data.length === 0 ? (
         <EmptyState
           title="아직 에이전트가 없어요"
@@ -69,6 +78,6 @@ export default async function AgentsPage({
           ))}
         </ul>
       )}
-    </div>
+    </PageFrame>
   );
 }

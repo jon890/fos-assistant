@@ -30,7 +30,7 @@ test("범주마다 문항이 있고 사람 비교 문항은 범주마다 고르�
 
 test("날짜 문항은 하나이고 사람 비교 문항은 출처를 보는 문항이다", () => {
   assert.equal(file.questions.filter((question) => question.check === "date").length, 1);
-  // 그림 참고 사진을 받지 못하는 사례다(스펙 tool-fallback REQ7). 사람 비교에 넣지 않는다
+  // 사진을 찾아 그려 달라는 사례다(스펙 agent-found-image REQ9, tool-fallback REQ7). 사람 비교에 넣지 않는다
   const photo = file.questions.filter((question) => question.check === "photo-request");
   assert.equal(photo.length, 1);
   assert.equal(photo[0]!.compare, false);

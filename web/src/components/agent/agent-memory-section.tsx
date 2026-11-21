@@ -180,7 +180,7 @@ export function AgentMemorySection({ code }: Props) {
     <section
       aria-label="기억 영역"
       data-testid="agent-memory-section"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <h2 className="font-semibold">기억 영역</h2>
       <p className="mt-1 text-sm text-muted-foreground">
