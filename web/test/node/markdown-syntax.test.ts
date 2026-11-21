@@ -1,4 +1,4 @@
-// 한국어 글에서 강조 기호가 풀리는지 본다. 2026-11-21 운영 답에서 「**…‘보통’**으로」 의 별표가 그대로 보였다.
+// 한국어 글에서 강조 기호가 풀리는지 본다. 2026-11-21 답에서 「**…‘보통’**으로」 꼴의 별표가 그대로 보였다.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "../../node_modules/react/index.js";
@@ -13,8 +13,8 @@ function render(text: string): string {
 }
 
 test("닫는 ** 앞이 따옴표이고 뒤가 조사여도 굵게 보인다", () => {
-  const html = render("**CJ올리브네트웍스는 팀 성장 ‘보통’**으로 판정했어요.");
-  assert.equal(html, "<p><strong>CJ올리브네트웍스는 팀 성장 ‘보통’</strong>으로 판정했어요.</p>");
+  const html = render("**이 회사는 ‘보통’**으로 판정했어요.");
+  assert.equal(html, "<p><strong>이 회사는 ‘보통’</strong>으로 판정했어요.</p>");
 });
 
 test("닫는 쪽 앞이 괄호나 마침표여도 굵게, 기울임, 취소선이 보인다", () => {
@@ -37,4 +37,14 @@ test("물결 하나는 취소선으로 읽지 않는다", () => {
 test("영어 글의 강조 규칙은 그대로다", () => {
   assert.match(render("**bold** text and *em*"), /<strong>bold<\/strong> text and <em>em<\/em>/);
   assert.doesNotMatch(render('a**"b"**c'), /<strong>/);
+});
+
+test("코드 안의 별표는 강조로 읽지 않는다", () => {
+  assert.equal(render("`**‘보통’**으로`"), "<p><code>**‘보통’**으로</code></p>");
+});
+
+// 알려진 동작: 한글 바로 뒤의 `*` 도 여는 기호가 된다. 별표를 글자로 쓰려면 `\*` 로 쓴다.
+test("한글 바로 뒤 별표 둘 사이는 기울임이 된다", () => {
+  assert.equal(render("주의*: 값 참고*: 끝"), "<p>주의<em>: 값 참고</em>: 끝</p>");
+  assert.doesNotMatch(render("주의\\*: 값 참고\\*: 끝"), /<em>/);
 });
