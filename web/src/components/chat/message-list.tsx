@@ -19,6 +19,8 @@ import type { MemoryCapture } from "@/lib/memory-capture-api";
 import type { MemoryUse } from "@/lib/memory-use-api";
 import { visibleTurns } from "./visible-turns";
 import { isSteerTurn } from "./steer";
+import type { ReplyTarget } from "@/lib/reply";
+import { jumpToMessage } from "./use-reply-target";
 import { GeneratedImages } from "./artifact/generated-images";
 import { unboundLiveImages, withLiveImages } from "./artifact/live-images";
 
@@ -62,6 +64,8 @@ type Props = {
   liveImages?: string[];
   /** 지금 도는 turn 의 실행 번호다. 아직 저장되지 않은 답과 기다림 줄이 이 번호의 맡긴 줄을 그린다 */
   liveExecutionId?: number | null;
+  /** 메시지나 그림을 집어 입력창 위에 둔다(스펙 chat-reference REQ1) */
+  onReply?(target: ReplyTarget): void;
 };
 export function MessageList({
   turns,
@@ -91,6 +95,7 @@ export function MessageList({
   liveDelegations = [],
   liveImages = [],
   liveExecutionId = null,
+  onReply,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -167,6 +172,11 @@ export function MessageList({
     observer.observe(element);
     return () => observer.disconnect();
   }, [loading, sending, streamedAnswer]);
+  // 답장 상자를 누르면 원래 메시지로 간다(스펙 chat-reference REQ6, DECISION19).
+  const jumpTo = (messageId: number) =>
+    jumpToMessage(messageId, turns, onVersionChange, contentRef.current, () => {
+      shouldFollow.current = false;
+    });
   const scrollToBottom = () => {
     const element = scrollRef.current;
     if (!element) return;
@@ -278,6 +288,8 @@ export function MessageList({
                               )
                             : undefined
                         }
+                        onReply={onReply}
+                        onJump={jumpTo}
                         liveImages={
                           pendingAssistant && sending
                             ? pendingImages

@@ -15,6 +15,7 @@ import { imageTitle } from "@/lib/artifact-name";
 import { VAULT_ERRORS, vaultArtifact } from "@/lib/artifact-vault-api";
 import type { MessageArtifact } from "@/components/chat/message-types";
 import { ArtifactVaultStatus } from "./artifact-vault-status";
+import { ReplyPress } from "@/components/chat/reply-menu";
 
 /** 대화 결과물 폴더 안의 그림을 웹 서버 라우트로 받는 주소다. 조각마다 따로 싼다. */
 function imageUrl(conversationId: string, path: string): string {
@@ -174,11 +175,17 @@ export function GeneratedImages({
   images,
   conversationId,
   messageId,
+  onReply,
+  copyText = "",
 }: {
   images: MessageArtifact[];
   conversationId: string | null;
   /** 저장한 답의 번호다. 아직 저장하지 않은 답이면 자동 보관 상태를 그리지 않는다 */
   messageId: number | string;
+  /** 그림 한 장을 집는다(스펙 chat-reference REQ1, REQ2). 크게 보기의 「답장」 과 휴대폰의 길게 누르기다 */
+  onReply?(path: string): void;
+  /** 길게 누르기 메뉴의 「복사」 가 복사할 답 글이다(스펙 chat-reference REQ3) */
+  copyText?: string;
 }) {
   const [openPath, setOpenPath] = useState<string | null>(null);
   // 메시지를 다시 읽기 전에는 보관본 번호가 오지 않는다. 그동안 보관한 그림을 기억한다.
@@ -212,20 +219,25 @@ export function GeneratedImages({
                 ) : null}
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setOpenPath(image.path)}
-                aria-label={`${title} 크게 보기`}
-                className="block w-full overflow-hidden rounded-md border border-border"
+              <ReplyPress
+                onReply={onReply ? () => onReply(image.path) : undefined}
+                copyText={copyText}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- 결과물 주소는 로그인 쿠키로 받는 내부 주소라 next/image 최적화를 거치지 않는다 */}
-                <img
-                  src={imageUrl(conversationId, image.path)}
-                  alt={title}
-                  loading="lazy"
-                  className="h-auto w-full"
-                />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenPath(image.path)}
+                  aria-label={`${title} 크게 보기`}
+                  className="block w-full overflow-hidden rounded-md border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 결과물 주소는 로그인 쿠키로 받는 내부 주소라 next/image 최적화를 거치지 않는다 */}
+                  <img
+                    src={imageUrl(conversationId, image.path)}
+                    alt={title}
+                    loading="lazy"
+                    className="h-auto w-full"
+                  />
+                </button>
+              </ReplyPress>
             )}
             <figcaption className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
               {image.deleted ? null : (
@@ -286,6 +298,18 @@ export function GeneratedImages({
                   내려받기
                 </a>
               </Button>
+              {onReply ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOpenPath(null);
+                    onReply(opened.path);
+                  }}
+                >
+                  답장
+                </Button>
+              ) : null}
               {opened.vaultItemId ? (
                 <Link
                   href={`/files?item=${opened.vaultItemId}`}

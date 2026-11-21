@@ -43,8 +43,8 @@ export function ConversationSession(props: ConversationSessionProps) {
   const conversationQueue = useConversationQueue({
     ...state,
     ...props,
-    send: (attachmentIds, replacementText, attachments) =>
-      send(attachmentIds, replacementText, attachments),
+    send: (attachmentIds, replacementText, attachments, reply) =>
+      send(attachmentIds, replacementText, attachments, reply),
   });
   const conversationSend = useConversationSend({
     ...state,
