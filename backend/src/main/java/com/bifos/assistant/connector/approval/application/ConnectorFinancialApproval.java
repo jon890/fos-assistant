@@ -5,8 +5,6 @@ import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
-import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
-import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import static com.bifos.assistant.connector.approval.application.ConnectorFinancialProducer.require;
@@ -64,7 +62,6 @@ class ConnectorFinancialApproval {
     private final ConnectorExecutionTicket tickets;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
-    private final PurchaseLimits purchases;
     private final AppUserRepository users;
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
@@ -104,19 +101,14 @@ class ConnectorFinancialApproval {
             // 준비와 승인 사이의 재기동으로 key 파일 설정을 비우거나 목록과 상한을 줄였으면 여기서 막는다.
             // key 는 기동 뒤 처음 읽은 값을 쓰므로 실행 중에 파일만 지워서는 닫히지 않는다.
             gate.requireOpen();
-            var expected = checked.expectedTotalKrw();
-            if (expected.isEmpty()) {
+            if (checked.expectedTotalKrw().isEmpty()) {
                 gate.requireScope(user.id(), checked.scopeJson());
                 gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());
             }
             action.beginExecution(clock.instant());
             feedback.record(entry(action, FeedbackEventType.APPROVED, FeedbackActor.USER));
-            return expected.isPresent() && limitedAtApproval(action, expected.getAsLong()) ? null : checked;
+            return checked;
         });
-        if (snapshot == null) {
-            var settled = actions.findByPublicId(actionId).orElseThrow(ConnectorActionDetails::notFound);
-            return ConnectorActionDetails.view(settled, Optional.of(manifest));
-        }
         return ConnectorActionDetails.view(run(user, actionId, context, manifest, snapshot, null), Optional.of(manifest));
     }
 
@@ -182,27 +174,10 @@ class ConnectorFinancialApproval {
     }
 
 
-    /**
-     * 주문서 준비를 승인 순간의 구매 상한으로 다시 본다(spec DECISION30). 걸리면 {@code EXECUTING} 으로 옮긴 그 줄을 채우지 않고
-     * {@code FAILED} 로 끝내고 참이다. 부르는 쪽은 사용자와 승인 줄을 잠근 트랜잭션 안에 있다.
-     */
-    private boolean limitedAtApproval(ConnectorAction action, long expectedTotalKrw) {
-        try {
-            purchases.requireWithin(action.userId(), action.id(), expectedTotalKrw, clock.instant());
-            return false;
-        } catch (PurchaseLimitExceeded ex) {
-            ConnectorCheckoutOutcome.limited(action, ex, expectedTotalKrw, bodies, clock.instant());
-            feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
-            new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
-            return true;
-        }
-    }
-
-
     /** 주문서 채우기는 결과 판정이 끝내고 결제나 탭 확인을 넘긴다(ADR-20261113 / purchase-checkout). 잠근 줄만 받는다. */
     private void settleCheckout(ConnectorAction action, ConnectorActionExecution row, CallResult executed, long expectedTotalKrw,
         String connectorTitle) {
-        ConnectorCheckoutOutcome.settle(action, row, executed, expectedTotalKrw, purchases, bodies, clock.instant())
+        ConnectorCheckoutOutcome.settle(action, row, executed, expectedTotalKrw, bodies, clock.instant())
             .ifPresent(need -> notifyHandoff(action, need, connectorTitle));
         if (action.status() == ActionStatus.SUCCEEDED) {
             feedback.record(entry(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
