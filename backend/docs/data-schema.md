@@ -209,8 +209,9 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 대화와 실행 기록과 스킬 호출 이력, 예약 작업은 남고 「지운 에이전트」 로 보인다. 무엇을 지우고 무엇을 기다리는지는 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
-같은 트랜잭션에서 두 가지를 함께 지운다.
+같은 트랜잭션에서 아래를 함께 지운다.
 아직 보내지 않은 대기 메시지(`conversation.pending_messages`)는 지운 대화에 보낼 곳이 없어 비운다.
+비서가 찾은 주소의 해시(`conversation.found_link_hashes`)도 비운다. 사용자 정리처럼 이 길을 거치지 않고 지운 대화는 정리 작업이 비운다.
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다. 「참고한 기억」 단추 사건은 그 대화의 것만 지우고 넓히지 않는다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행의 답 본문과 질문 메시지 번호, 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
@@ -436,6 +437,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
 - `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `CUSTOM` 이 쓰던 `model_provider`, `model`, `reasoning_effort` 세 컬럼은 운영에서 모든 줄이 비어 있음을 확인한 뒤 `V20261102025856` 이 지웠다
+- `found_link_hashes` 는 비서가 그 대화에서 웹 검색과 페이지 읽기로 찾은 주소의 해시다([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 정해진 꼴로 바꾼 주소의 SHA-256 앞 16바이트를 16진수 32자로 적어 구분 문자 없이 이어 붙인다. 주소 원문은 두지 않는다. 엔티티가 매핑하지 않고 `ConversationRepository` 의 전용 질의로만 읽고 쓴다. 더하기는 뒤에 붙이고 뒤에서 640,000자만 남기는 `UPDATE` 한 문장이다. 테스트 스키마에는 `conversation-found-link-hashes-column.sql` 이 이 칸을 만든다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 `title_key_id`, 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `title_key_id` 가 비어 있으면 `title` 은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `conversation:<id>:title:user:<user_id>` 다. 외래 키를 두지 않는다. 칸은 암호문이 들어가도록 `VARCHAR(1024)` 이고 글자 수 상한(200자)은 평문에 대해 요청 검사가 지킨다. 읽는 곳은 `Conversation.title()` 이고 풀지 못하면 읽을 수 없다는 글을 받는다. 제목을 질의로 직접 쓰는 곳(`fillTitleIfBlank`, `renameIfActive`, `markPurged`)은 암호문과 key 번호를 함께 적는다. 사이드바의 대화 검색은 브라우저가 받은 평문 제목으로 목록을 좁히므로 서버가 이 칸을 비교하지 않는다

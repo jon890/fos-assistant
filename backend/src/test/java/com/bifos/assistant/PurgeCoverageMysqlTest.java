@@ -380,6 +380,7 @@ class PurgeCoverageMysqlTest {
                         assertCleared("conversation", "hermes_session_id");
                         assertCleared("conversation", "hermes_root_session_id");
                         assertCleared("conversation", "pending_messages");
+                        assertCleared("conversation", "found_link_hashes");
                         assertThat(value("conversation", "purged_at")).isNotNull();
                     }
                     case "agent_execution" -> {
