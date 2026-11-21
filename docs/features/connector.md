@@ -223,7 +223,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | 확인 | 보관 파일에 값이 없다 | 연결을 `PENDING` 으로 커밋하고 `CONNECTOR_NOT_CONNECTED`. 값을 다시 등록해야 한다. 카탈로그에서 빠진 플러그인은 다시 등록할 수 없어 오류 없이 `PENDING` 이다 |
 | 확인 | 확인 도구가 실패한다 | 연결을 `PENDING` 으로 커밋하고 공통 어휘의 오류로 끝낸다. 바인딩은 건드리지 않는다 |
 | 확인 | 통과한다 | 연결을 `READY` 로(카탈로그에서 빠진 플러그인은 `PENDING`) 두고 붙은 바인딩마다 「바인딩의 반영 맞추기」 를 한다. 바인딩의 외부 호출이 실패하면 그 바인딩만 `PENDING` 으로 커밋하고 `CONNECTOR_OPERATION_FAILED` |
-| 해제 | 정상 | 붙은 바인딩을 모두 떼고 보관 파일을 지운다. 연결은 `DISCONNECTED` 로 두고 칸 값을 비우며, 행은 이력을 위해 남긴다 |
+| 해제 | 정상 | 붙은 바인딩을 모두 떼고, 단추 연결이면 서비스 쪽 허락 취소를 시도한 뒤 보관 파일을 지운다. 취소 결과는 아래 「단추 연결(OAuth)」 의 `oauthRevoke` 가 갖는다. 연결은 `DISCONNECTED` 로 두고 칸 값을 비우며, 행은 이력을 위해 남긴다 |
 | 해제 | 중간에 실패한다 | 연결을 `PENDING` 으로 커밋하고 `CONNECTOR_OPERATION_FAILED`. 이미 뗀 바인딩 행은 지워진 채이고 남은 바인딩과 보관 파일에는 값이 남는다. 다시 해제하면 남은 바인딩부터 잇는다. 화면은 연결을 다시 읽어 `PENDING` 이면 다시 해제를 누르라고 안내한다 |
 | 해제 | 카탈로그에서 빠진 플러그인다 | Control Plane 이 env 이름을 몰라 설치만 끈다. env 는 대시보드가 소유 기록으로 지운다 |
 
@@ -579,7 +579,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 `outcome` 은 `CONNECTED`, `REAUTHORIZE`(함께 온 `authorizeUrl` 로 한 번 더 보낸다), `DENIED`, `INVALID_STATE`, `SCOPE_DENIED`, `APP_REJECTED`, `VERIFY_FAILED`(`reason` 에 확인 도구의 오류 코드), `SUPERSEDED`, `UNAVAILABLE` 가운데 하나다. `connectorId` 는 돌아갈 연결 화면의 플러그인이고 상태 값을 믿을 수 없으면 비어 있다.
 단추 연결은 확인을 통과한 뒤 등록과 같은 길로 저장한다. 사용자 행 잠금 안에서 보관 파일 쓰기 자리에 대시보드 commit 을 하고 붙은 바인딩을 다시 설치한다. 시작한 흐름이 끝나기 전의 연결 행은 `DISCONNECTED` 다.
-값을 붙여 넣어 다시 등록하거나 해제하면 그 연결의 토큰 통로는 닫히고 끊김 알림은 읽음이 된다. 단추 연결의 「연결 다시 확인」 은 본 자리의 토큰 통로 주소로 확인 도구를 부른다.
+값을 붙여 넣어 다시 등록하거나 해제하면 그 연결의 토큰 통로는 닫히고 끊김 알림은 읽음이 된다. 단추 연결의 해제는 바인딩을 모두 뗀 뒤 서비스 쪽 허락 취소를 시도하고, 그 응답에만 `oauthRevoke`(`status`: `revoked` 나 `failed`, `settingsUrl`, `installSettingsUrl`)를 준다. `failed` 여도 연결은 해제된다. `settingsUrl` 은 사용자가 허락을 직접 거둘 화면이고 `failed` 일 때만 있다. `installSettingsUrl` 은 앱 설치를 지울 수 있는 화면이고 그런 서비스(GitHub App)만 준다. 그 밖의 응답과 붙여 넣은 연결의 `oauthRevoke` 는 null 이다. 단추 연결의 「연결 다시 확인」 은 토큰을 먼저 새로 받고 본 자리의 토큰 통로 주소로 확인 도구를 부른다. 서비스가 갱신을 거절했으면 확인 도구 없이 `CONNECTOR_CREDENTIAL_REJECTED`, 서비스나 앱 설정 문제로 받지 못했으면 `CONNECTOR_UNAVAILABLE` 이다. 다시 연결 필요였던 연결이 새 토큰을 받으면 그 표시가 지워진다.
 순서와 실패 처리, 표식과 갱신, 끊김 알림은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
 
 ### 관리자 OAuth 앱 설정
@@ -589,3 +589,14 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 플러그인이 카탈로그에서 빠진 뒤에도 이미 저장한 플러그인별 GitHub 앱은 같은 `connectorId` 로 비울 수 있다.
 
 응답은 client ID와 App 이름, 비밀값의 입력 여부와 앞부분, 마지막 변경을 준다. 저장 위치와 연결 흐름은 [플러그인 OAuth 연결 설계](connector-oauth/design.md) 가 갖는다.
+
+### 관리자 단추 연결 서명 비밀
+
+상태 값과 토큰 통로 표식을 서명하는 비밀은 서버가 만들고 사람이 넣지 않는다. `ADMIN` 만 부른다.
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/admin/secrets/connector-oauth/signing` | 저장소를 쓸 수 있는지(`storeAvailable`), 비밀이 만들어졌는지(`set`), 마지막으로 새로 만든 사람과 시각(`updatedBy`, `updatedAt`), 통로 주소를 만들 설정이 있는지(`passageConfigured`), 해제되지 않은 단추 연결 수(`connectionCount`)를 준다 |
+| `POST /api/v1/admin/secrets/connector-oauth/signing/regenerate` | 비밀을 새로 만들고 단추 연결마다 새 통로 주소를 다시 쓴다. 바뀐 상태(`signing`)와 다시 쓴 결과(`rewrite.total`, `rewrite.failed`)를 준다 |
+
+새로 만들면 옛 표식은 바로 401 이다. 바인딩을 다시 설치하지 않으며, 떠 있는 플러그인 프로세스는 다음 프로세스부터 새 주소를 받는다. 응답에 원문과 통로 주소는 없다.
