@@ -1535,7 +1535,6 @@ function checkout(overrides: Record<string, unknown> = {}) {
     expectedTotalKrw: 25000,
     regionalExtraFee: false,
     url: "https://smartstore.naver.com/shop/products/1",
-    remainingTodayKrw: 50000,
     ...overrides,
   };
 }
@@ -1555,7 +1554,7 @@ function checkoutAction(overrides: Record<string, unknown> = {}): Action {
   });
 }
 
-test("주문서 승인 카드는 상품, 판매처, 옵션, 수량, 금액, 지역 추가 배송비 별도, 남은 한도를 보이고 배송지와 결제 수단 칸이 없다", async ({
+test("주문서 승인 카드는 상품, 판매처, 옵션, 수량, 금액, 지역 추가 배송비 별도를 보이고 배송지와 결제 수단 칸이 없다", async ({
   page,
 }) => {
   await openWith(page, "주문서 카드 검사", checkoutAction());
@@ -1573,9 +1572,6 @@ test("주문서 승인 카드는 상품, 판매처, 옵션, 수량, 금액, 지�
   );
   await expect(card.getByTestId("approval-checkout-total")).toContainText(
     "25,000원",
-  );
-  await expect(card.getByTestId("approval-checkout-remaining")).toContainText(
-    "50,000원",
   );
   await expect(summary).not.toContainText("배송지");
   await expect(summary).not.toContainText("결제 수단");

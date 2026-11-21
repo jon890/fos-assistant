@@ -19,14 +19,11 @@ import com.bifos.assistant.connector.connection.application.ConnectorCatalogCach
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionClaims;
-import com.bifos.assistant.connector.financial.application.PurchaseLimitSettings;
 import com.bifos.assistant.connector.financial.application.dto.ConnectorExecutionClaimInput;
-import com.bifos.assistant.connector.financial.domain.type.PurchaseLimitKind;
 import com.bifos.assistant.connector.handoff.application.ConnectorHandoffs;
 import com.bifos.assistant.connector.handoff.application.dto.HandoffView;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
-import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
@@ -50,7 +47,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 주문서 준비({@code CHECKOUT})가 금융 준비·승인·claim 틀을 지나며 구매 상한을 네 번 다시 보고, 결과에 따라 결제나 탭 확인을 넘기는지
+ * 주문서 준비({@code CHECKOUT})가 금융 준비·승인·claim 틀을 지나며 결제 직전에 금액을 확인하고, 결과에 따라 결제나 탭 확인을 넘기는지
  * 공개 진입점(정책 판정과 승인 API)으로 본다(spec REQ10~REQ12, ADR-20261113 / purchase-checkout).
  *
  * <p>대역 토스 플러그인의 연결 상태(보호 지원 확인)는 그대로 쓰고, 카탈로그는 실행 도구를 {@code PURCHASE}/{@code CHECKOUT} 으로
@@ -69,8 +66,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
     ConnectorCatalogCache cache;
     @Autowired
     ConnectorExecutionClaims claims;
-    @Autowired
-    PurchaseLimitSettings purchaseLimits;
     @Autowired
     ConnectorHandoffs handoffs;
     @Autowired
@@ -107,7 +102,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
             return fill.apply(sent);
         }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
         resetCache();
-        limits(100_000, 200_000);
     }
 
 
@@ -118,7 +112,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
-    @DisplayName("상한 안의 준비는 PURCHASE 승인 줄 하나와 오늘 남은 한도를 붙인 카드 요약을 만들고 토스 하루 합계에 섞이지 않는다")
+    @DisplayName("주문서 준비는 상품과 예상 합계를 담은 PURCHASE 승인 카드를 만들고 승인 전에는 실행하지 않는다")
     void preparesPurchaseCard() {
         var answer = prepare(UUID.randomUUID().toString());
         assertThat(answer.actionId()).isNotNull();
@@ -128,87 +122,31 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         var card = summaries.checkoutOf(user, answer.actionId()).orElseThrow();
         assertThat(card.available()).isTrue();
         assertThat(card.expectedTotalKrw()).isEqualTo(expected);
-        assertThat(card.remainingTodayKrw()).isEqualTo(200_000L);
+        assertThat(fills.get()).isZero();
+        assertThat(claims()).isZero();
         assertThat(summaries.summaryOf(user, answer.actionId())).as("토스 금융 요약은 붙지 않는다").isEmpty();
     }
 
 
     @Test
-    @DisplayName("상한이 0 이면 카드 없이 「상한을 정해 주세요」 로 거절한다")
-    void zeroLimitRejectsWithoutCard() {
-        limits(0, 0);
-        var answer = prepare(UUID.randomUUID().toString());
-        assertThat(answer.actionId()).isNull();
-        assertThat(answer.message()).contains("상한을 정해 주세요");
-        assertThat(rows()).isZero();
-    }
-
-
-    @Test
-    @DisplayName("카드를 만들 때 예상 합계가 한 건 상한과 같으면 지나고 1원 넘으면 카드 없이 걸린 상한을 알린다")
-    void cardCreationBoundary() {
-        limits(expected - 1, 200_000);
-        var over = prepare(UUID.randomUUID().toString());
-        assertThat(over.actionId()).isNull();
-        assertThat(over.message()).contains("한 건 구매 상한").contains(String.valueOf(expected - 1));
-        limits(expected, expected - 1);
-        var daily = prepare(UUID.randomUUID().toString());
-        assertThat(daily.actionId()).isNull();
-        assertThat(daily.message()).contains("하루 구매 상한");
-        limits(expected, expected);
-        assertThat(prepare(UUID.randomUUID().toString()).actionId()).isNotNull();
-    }
-
-
-    @Test
-    @DisplayName("승인 순간, claim 직전, 결과 판정 모두 예상 합계가 한 건과 하루 상한과 같으면 지나 결제를 넘긴다")
-    void equalLimitPassesEveryCheck() {
-        var answer = prepare(UUID.randomUUID().toString());
-        limits(expected, expected);
-        fill = claimThen(sheet(expected));
-        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
-        assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.PAYMENT);
-        assertThat(purchaseLimits.view(user).remainingTodayKrw()).isZero();
-    }
-
-
-    @Test
-    @DisplayName("결과 판정에서 하루 합계를 읽지 못하면 결제를 넘기지 않고 UNKNOWN 과 그 탭의 탭 확인으로 끝낸다")
-    void unreadableSpentEndsUnknown() {
+    @DisplayName("이전 주문의 실행 원문을 읽을 수 없어도 새 카드에서 승인하면 주문서를 채우고 결제를 넘긴다")
+    void earlierCheckoutDoesNotBlockNewApproval() {
         var first = prepare(UUID.randomUUID().toString());
         fill = claimThen(sheet(expected));
         assertThat(publicApproval.approve(user, first.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        // 이미 끝난 주문의 실행 원문을 읽지 못하는 경우다.
+        jdbc.update("update connector_action_execution set execution_args_json = 'x' where action_id = ?", action(first).id());
+
         var second = prepareOther();
-        fill = execution -> {
-            claim(execution);
-            // 같은 날 앞 줄의 실행 원문을 열 수 없게 만든다. 키를 바꾸거나 본문이 지워진 경우와 같다.
-            jdbc.update("update connector_action_execution set execution_args_json = 'x' where action_id = ?", action(first).id());
-            return sheet(expected).apply(execution);
-        };
-        assertThat(publicApproval.approve(user, second.actionId(), null, false).status()).isEqualTo(ActionStatus.UNKNOWN);
-        var card = onlyHandoff(second);
-        assertThat(card.need()).isEqualTo(HandoffNeed.TAB_CHECK);
-        assertThat(card.tab()).isEqualTo(TAB);
+        assertThat(action(second).status()).isEqualTo(ActionStatus.PENDING);
+        fill = claimThen(sheet(expected));
+        assertThat(publicApproval.approve(user, second.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(onlyHandoff(second).need()).isEqualTo(HandoffNeed.PAYMENT);
     }
 
 
     @Test
-    @DisplayName("승인 순간에 상한이 낮아졌으면 채우기를 부르지 않고 승인 줄을 FAILED(purchase_limit)로 끝내며 하루 합계에 세지 않는다")
-    void approvalMomentLimit() {
-        var answer = prepare(UUID.randomUUID().toString());
-        limits(expected - 1, 200_000);
-        var approved = publicApproval.approve(user, answer.actionId(), null, false);
-        assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(action(answer).errorCode()).isEqualTo(ConnectorCheckoutOutcome.LIMIT);
-        assertThat(ConnectorErrorDetail.fromStored(action(answer).resultText()).orElseThrow().code()).isEqualTo("PURCHASE_LIMIT");
-        assertThat(fills.get()).isZero();
-        assertThat(claims()).isZero();
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
-    }
-
-
-    @Test
-    @DisplayName("주문서의 최종 금액이 예상 합계와 같으면 SUCCEEDED 와 결제 넘기기를 적고 카드에 두 금액을 보이며 하루 합계에 센다")
+    @DisplayName("주문서의 최종 금액이 예상 합계와 같으면 SUCCEEDED 와 결제 넘기기를 적고 카드에 두 금액을 보인다")
     void sameAmountHandsOffPayment() {
         var answer = prepare(UUID.randomUUID().toString());
         fill = claimThen(sheet(expected));
@@ -221,7 +159,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(card.expectedTotalKrw()).isEqualTo(expected);
         assertThat(jdbc.queryForObject("select count(*) from notification where user_id = ? and kind = ?", Long.class, user.id(),
             NotificationKind.HANDOFF_REQUESTED.name())).isEqualTo(1L);
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
         // 같은 승인으로 다시 채우지 않는다.
         assertThatThrownBy(() -> publicApproval.approve(user, answer.actionId(), null, false))
             .isInstanceOf(ApiException.class).extracting("code").isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
@@ -237,7 +174,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         fill = claimThen(sheet(expected - 500));
         assertThat(publicApproval.approve(user, lower.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         assertThat(onlyHandoff(lower).finalAmountKrw()).isEqualTo(expected - 500);
-        long firstApproved = expected;
 
         var higher = prepareOther();
         fill = claimThen(sheet(expected + 1));
@@ -246,43 +182,11 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         var detail = ConnectorErrorDetail.fromStored(action(higher).resultText()).orElseThrow();
         assertThat(detail.details()).containsEntry("final_amount_krw", expected + 1).containsEntry("expected_total_krw", expected);
         assertThat(action(higher).handoff()).isNull();
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).as("넘기지 못한 승인은 세지 않는다").isEqualTo(firstApproved);
     }
 
 
     @Test
-    @DisplayName("claim 뒤 결과 판정 전에 상한을 낮췄으면 결제를 넘기지 않고 FAILED(purchase_limit)다")
-    void resultLimit() {
-        var answer = prepare(UUID.randomUUID().toString());
-        fill = execution -> {
-            claim(execution);
-            limits(expected - 1, 200_000);
-            return sheet(expected).apply(execution);
-        };
-        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(action(answer).errorCode()).isEqualTo(ConnectorCheckoutOutcome.LIMIT);
-        assertThat(action(answer).handoff()).isNull();
-    }
-
-
-    @Test
-    @DisplayName("승인 뒤 채우기 직전에 상한을 낮췄으면 claim 이 거절해 구매하기 전에 끝나고 승인 줄은 FAILED 다")
-    void claimLimit() {
-        var answer = prepare(UUID.randomUUID().toString());
-        fill = execution -> {
-            limits(expected - 1, 200_000);
-            assertThatThrownBy(() -> claim(execution)).isInstanceOf(ApiException.class);
-            return new CallResult(null, ConnectorCallError.FORBIDDEN,
-                new ConnectorErrorDetail("NAVER_SHOPPING_CLAIM_REJECTED", Map.of(), null), null);
-        };
-        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(contents.findById(action(answer).id()).orElseThrow().consumedAt()).isNull();
-        assertThat(action(answer).handoff()).isNull();
-    }
-
-
-    @Test
-    @DisplayName("구매하기 뒤 결과를 모르면 다시 보내지 않고 UNKNOWN 과 탭 확인을 넘기며 같은 의도의 새 준비를 막고 하루 합계에 센다")
+    @DisplayName("구매하기 뒤 결과를 모르면 다시 보내지 않고 UNKNOWN 과 탭 확인을 넘기며 같은 의도의 새 준비를 막는다")
     void unknownResultHandsOffTabCheck() {
         String toolCallId = UUID.randomUUID().toString();
         var answer = prepare(toolCallId);
@@ -296,7 +200,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         var again = prepare(UUID.randomUUID().toString());
         assertThat(again.actionId()).isNull();
         assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE.text());
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
     }
 
 
@@ -340,7 +243,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
-    @DisplayName("구매하기 전에 이어 갈 단계와 함께 멈추면 승인을 끝내지 않고 사람 기다림이고, 하루 합계에 세며 쓰지 않은 ticket 을 거둔다")
+    @DisplayName("구매하기 전에 이어 갈 단계와 함께 멈추면 승인을 끝내지 않고 사람 기다림이며 쓰지 않은 ticket 을 거둔다")
     void resumableStopWaits() {
         Instant started = browserRunning();
         var answer = prepare(UUID.randomUUID().toString());
@@ -353,7 +256,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.LOGIN);
         assertThat(jdbc.queryForObject("select count(*) from connector_action_execution where action_id = ? and ticket_id is null",
             Long.class, action.id())).isEqualTo(1L);
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
         assertThat(keptTabs.kept(user.id(), TAB, started)).as("살아 있는 표식의 탭은 닫지 않는다").isTrue();
         // 멈춤은 자동 turn 으로 모델에게 가고, 이어 가기 도구를 부르라는 안내가 붙는다
         var delivered = results.undelivered(action.conversationId());
@@ -391,7 +293,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(text).contains("상태: SUCCEEDED");
         assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.PAYMENT);
         assertThat(claims()).isEqualTo(1L);
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
         assertThat(resumes.resume(user, conversation)).as("멈출 때마다 한 번이다").isEqualTo(ConnectorApprovalResume.NONE);
     }
 
@@ -422,27 +323,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
-    @DisplayName("기다리는 사이 상한을 낮췄으면 이어 가지 않고 FAILED(purchase_limit)로 끝내며 하루 합계에서 뺀다")
-    void resumeRechecksLimit() {
-        browserRunning();
-        var answer = prepare(UUID.randomUUID().toString());
-        fill = execution -> CallResult.success(resumable("login"));
-        publicApproval.approve(user, answer.actionId(), null, false);
-        Long conversation = action(answer).conversationId();
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
-        limits(expected - 1, 200_000);
-
-        String text = resumes.resume(user, conversation);
-
-        assertThat(fills.get()).isEqualTo(1);
-        assertThat(action(answer).status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(action(answer).errorCode()).isEqualTo(ConnectorCheckoutOutcome.LIMIT);
-        assertThat(text).startsWith(ConnectorApprovalResume.ENDED_LEAD);
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
-    }
-
-
-    @Test
     @DisplayName("30분이 지났거나 브라우저가 다시 켜졌으면 이어 가지 않고 끝내며, 일정도 같은 줄을 끝내 탭 지키기를 푼다")
     void lifetimeAndBrowserEndWaiting() {
         Instant started = browserRunning();
@@ -466,7 +346,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
             user.id());
         assertThat(resumes.endStale(clock.instant())).isEqualTo(1);
         assertThat(action(restarted).status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
     }
 
 
@@ -633,17 +512,6 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
             .filter(view -> view.handoffId().equals(answer.actionId())).toList();
         assertThat(open).hasSize(1);
         return open.getFirst();
-    }
-
-
-    private void limits(long order, long daily) {
-        purchaseLimits.set(user, PurchaseLimitKind.ORDER, order, clock.instant());
-        purchaseLimits.set(user, PurchaseLimitKind.DAILY, daily, clock.instant());
-    }
-
-
-    private long rows() {
-        return jdbc.queryForObject("select count(*) from connector_action where user_id = ?", Long.class, user.id());
     }
 
 

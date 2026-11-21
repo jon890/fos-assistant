@@ -4,10 +4,12 @@
 - Date: 2026-11-13
 - **decision-type**: `architecture`
 - **areas**: `security, operations`
-- **현재 규칙의 원본**: 스펙 [`docs/features/naver-shopping/spec.md`](../features/naver-shopping/spec.md)(사용자 확인 2026-11-10)의 DECISION8, DECISION9, DECISION10, 설계 [`design.md`](../features/naver-shopping/design.md) 의 「PR3 구매 상한과 주문서」, [플러그인 도구 정책](../features/connector-policy.md)
+- **현재 규칙의 원본**: 스펙 [`docs/features/naver-shopping/spec.md`](../features/naver-shopping/spec.md)(사용자 확인 2026-11-10)의 DECISION8, DECISION9, DECISION10, 설계 [`design.md`](../features/naver-shopping/design.md) 의 「PR3 승인 카드와 주문서」, [플러그인 도구 정책](../features/connector-policy.md)
 - [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) 와 [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) 의 준비·승인·ticket·claim 틀을 그대로 쓴다. [ADR-20261015 / financial-user-limits](ADR-20261015-financial-user-limits.md) 의 사용자 상한과 같은 잠금 원칙이다. [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) 의 「읽기 도구는 누르지 않는다」 에 예외 하나를 둔다
 
 ### 결정
+
+[ADR-20261121 / purchase-approval](ADR-20261121-purchase-approval.md) 이 구매 상한과 관련한 아래 결정을 대체한다. 상한을 적용한 규칙은 당시 결정으로 기록한다.
 
 **에이전트는 사용자가 정한 구매 상한 안에서, 사람이 매번 승인한 주문서까지만 채운다. 결제 단추는 누르지 않는다.**
 
@@ -62,3 +64,5 @@
   - 주문서 화면의 칸 위치는 아직 재지 않았다. 읽지 못하면 결과 불명으로 끝난다
   - 옵션 드롭다운 열기는 네이버 계정에 남는 기록이 아니지만 읽기 도구의 첫 누르기다. 상수 식 하나와 검사로 범위를 묶는다
 - **확인 방법**: 사람 기다림과 이어 가기는 `CheckoutApprovalTest` 와 플러그인 `checkout.test.ts` 가 본다. `ToolPolicyDecisionTest`, `AttendedOnlyPrepareTest`, `PurchaseLimitSettingsTest`, `PurchaseLimitControllerTest`, 대시보드 선언 검사(`hermes/tests/test_connector_manifest.py`, `hermes/tests/test_connectors_contract.py`), 웹 `test/node/purchase-limits-route.test.ts`. 주문서 종류와 상한 판정, 결과 판정은 `CheckoutApprovalTest`, `ConnectorCheckoutSnapshotTest`, `hermes/tests/test_connector_checkout_validation.py`(Java 와 같은 사례 표 `test/resources/checkout-snapshot-v1.json`)가 본다. 플러그인 도구의 검사는 그 구현 PR 이 더한다
+
+위 테스트 이름은 상한을 적용하던 당시의 확인 항목이다. 한도 제거 뒤 전용 설정과 API 테스트는 삭제했다.
