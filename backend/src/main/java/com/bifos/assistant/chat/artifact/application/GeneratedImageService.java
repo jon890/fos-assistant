@@ -138,7 +138,10 @@ public class GeneratedImageService {
      * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
      */
     public List<String> unboundPaths(Long conversationId) {
-        return artifacts.findUnboundGeneratedImagePaths(conversationId);
+        return artifacts.findByConversationIdAndMessageIdIsNullAndGenerationCallKeyIsNotNullAndVaultUserIdIsNullAndDeletedAtIsNullOrderByIdAsc(
+            conversationId).stream()
+            .map(ChatArtifact::path)
+            .toList();
     }
 
 

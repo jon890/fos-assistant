@@ -46,20 +46,9 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<ChatArtifact> findGeneratedImages(@Param("conversationId") Long conversationId);
 
 
-    /**
-     * 그 대화에서 아직 답에 묶이지 않은 그림 행의 경로다. 저장한 순서다. {@link #bindGeneratedImages} 가 다음 답에 묶을 행과 같다.
-     * 화면이 답이 끝나기 전에 그림을 그릴 때 쓴다(generated-image 설계의 「PR7: 나오는 즉시 보이기」).
-     */
-    @Query("""
-            select a.path from ChatArtifact a
-             where a.conversationId = :conversationId
-               and a.messageId is null
-               and a.generationCallKey is not null
-               and a.vaultUserId is null
-               and a.deletedAt is null
-             order by a.id asc
-            """)
-    List<String> findUnboundGeneratedImagePaths(@Param("conversationId") Long conversationId);
+    /** 아직 답에 묶이지 않은 그림 행을 저장한 순서로 준다. {@link #bindGeneratedImages} 가 다음 답에 묶을 행과 같다. */
+    List<ChatArtifact> findByConversationIdAndMessageIdIsNullAndGenerationCallKeyIsNotNullAndVaultUserIdIsNullAndDeletedAtIsNullOrderByIdAsc(
+        Long conversationId);
 
 
     /**
