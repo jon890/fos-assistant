@@ -192,9 +192,11 @@ test("답이 도는 중 그림이 저장되면 끝 사건 전에 흐르는 답�
   page,
   hermes,
 }) => {
-  // 그림 올리기는 profile 플러그인 몫이라 `test/e2e` 의 그림 시나리오가 본다. 여기서는 대화 단위 SSE 의 `image` 사건만 넣는다.
-  // 받은 연결이 끝나면 화면이 다시 붙으므로 같은 사건이 되풀이되고, 화면은 같은 경로를 한 번만 그린다.
+  // 그림 올리기는 profile 플러그인 몫이라 `test/e2e` 의 그림 시나리오가 본다. 여기서는 대화 단위 SSE 의 `image` 사건과
+  // 묶이지 않은 그림 목록만 넣는다. 받은 연결이 끝나면 화면이 다시 붙어 목록을 다시 읽고, 같은 경로는 한 번만 그린다.
   const path = "generated/수채화 고양이.png";
+  await page.route("**/api/chat/conversations/*/live-images", (route) =>
+    route.fulfill({ status: 200, json: [path] }));
   await page.route("**/api/chat/conversations/*/events", (route) =>
     route.fulfill({
       status: 200,

@@ -241,11 +241,25 @@ export const artifactScenario: Scenario = {
       const stream = await openConversationEvents(context, imageConversationId);
       try {
         const held = await holdTurn(context, IMAGE_GENERATE_PROBE, "dad", imageConversationId);
+        let finished = false;
+        void held.turn.completed.then(() => {
+          finished = true;
+        });
         await awaitEvent(stream.events, (event) => event.type === "image" && event.detail === livePath, "만든 그림의 image 사건");
         const image = stream.events.find((event) => event.type === "image");
         expect(image?.conversationId === imageConversationId, `image 사건의 대화가 다르다: ${JSON.stringify(image)}`);
-        const finishedEarly = await Promise.race([held.turn.completed.then(() => true), Promise.resolve(false)]);
-        expect(!finishedEarly, "image 사건을 받았을 때 turn 이 이미 끝났다");
+        expect(!finished, "image 사건을 받았을 때 turn 이 이미 끝났다");
+        // 대화 단위 SSE 를 늦게 열었거나 사건을 놓친 창은 이 목록으로 맞춘다.
+        const unbound = expectStatus(
+          await call(context, `/chat/conversations/${imageConversationId}/live-images`, { token: context.tokens.dad }),
+          200,
+          "묶이지 않은 그림 목록",
+        ).json<string[]>();
+        expect(JSON.stringify(unbound) === JSON.stringify([livePath]), `묶이지 않은 그림 목록이 다르다: ${JSON.stringify(unbound)}`);
+        const strangerList = await fetch(`${context.api}/chat/conversations/${imageConversationId}/live-images`, {
+          headers: { Authorization: `Bearer ${context.tokens.kid}` },
+        });
+        expect(strangerList.status === 404, `다른 사용자가 묶이지 않은 그림 목록을 읽었다: ${strangerList.status}`);
         const liveFile = await fetchFile(context, imageConversationId, livePath);
         expect(liveFile.status === 200, `답이 끝나기 전에 그림을 받지 못했다: ${liveFile.status}`);
         const encoded = livePath.split("/").map(encodeURIComponent).join("/");
@@ -269,6 +283,12 @@ export const artifactScenario: Scenario = {
         const liveAnswer = liveMessages.find((message) => message.id === liveDone?.messageId);
         expect(liveAnswer?.artifacts.some((artifact) => artifact.path === livePath) === true,
           `바로 보인 그림이 끝난 답에 묶이지 않았다: ${JSON.stringify(liveAnswer?.artifacts)}`);
+        const afterDone = expectStatus(
+          await call(context, `/chat/conversations/${imageConversationId}/live-images`, { token: context.tokens.dad }),
+          200,
+          "끝난 뒤 묶이지 않은 그림 목록",
+        ).json<string[]>();
+        expect(afterDone.length === 0, `끝난 답에 묶인 그림이 목록에 남았다: ${JSON.stringify(afterDone)}`);
       } finally {
         await stream.close();
       }

@@ -20,7 +20,7 @@ import type { MemoryUse } from "@/lib/memory-use-api";
 import { visibleTurns } from "./visible-turns";
 import { isSteerTurn } from "./steer";
 import { GeneratedImages } from "./artifact/generated-images";
-import { withLiveImages } from "./artifact/live-images";
+import { unboundLiveImages, withLiveImages } from "./artifact/live-images";
 
 type Props = {
   turns: Turn[];
@@ -126,6 +126,7 @@ export function MessageList({
     .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
   const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}:${liveDelegations.map((line) => `${line.executionId}:${line.status}`).join("|")}:${liveImages.length}`;
+  const pendingImages = unboundLiveImages(liveImages, turns);
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
@@ -278,7 +279,9 @@ export function MessageList({
                             : undefined
                         }
                         liveImages={
-                          pendingAssistant && sending ? liveImages : undefined
+                          pendingAssistant && sending
+                            ? pendingImages
+                            : undefined
                         }
                         liveActivity={
                           pendingAssistant && hasLiveActivity
@@ -328,7 +331,7 @@ export function MessageList({
                 >
                   {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
                   <GeneratedImages
-                    images={withLiveImages([], liveImages)}
+                    images={withLiveImages([], pendingImages)}
                     conversationId={conversationId}
                     messageId="live-images"
                   />
