@@ -11,6 +11,7 @@ const NODE_TEST_READ_FILES = [
   "src/components/chat/skill-command.ts",
   "src/components/chat/visible-turns.ts",
   "src/lib/connection-oauth.ts",
+  "src/lib/connector-oauth-admin-api.ts",
   "src/lib/dev-docs/catalog.ts",
   "src/lib/dev-docs/filter.ts",
   "src/lib/dev-docs/headings.ts",

@@ -7,6 +7,7 @@ import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import { SecretConfirmDialog } from "@/components/admin/secret-confirm-dialog";
 import { VapidSecretRow } from "@/components/admin/vapid-secret-row";
+import { ConnectorOAuthSecrets } from "@/components/admin/connector-oauth-secrets";
 import { formatWhen } from "@/lib/format";
 import {
   deleteGatewaySecret,
@@ -232,6 +233,7 @@ export function AdminSecretList() {
             }
             onDelete={() => changeVapid(deleteVapid)}
           />
+          <ConnectorOAuthSecrets />
         </div>
       )}
       {result ? (
