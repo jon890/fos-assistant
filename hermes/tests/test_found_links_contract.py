@@ -31,6 +31,24 @@ class PluginValuesTest(unittest.TestCase):
             self.assertIn(tool, contract.HERMES_BUILTIN_TOOLS)
         self.assertEqual(found_links.SEARCH_FIELDS, contract.WEB_SEARCH_ITEM_FIELDS)
 
+    def test_product_reader_is_registered_as_an_async_web_tool(self):
+        """상품 페이지 읽기를 기존 web toolset에서 실행하고 내장 도구는 바꾸지 않는다."""
+        plugin = load_plugin("fos_ctx_product_page_registration", ROOT / "plugins/fos-ctx/__init__.py", self.addCleanup)
+        registered = {}
+
+        class Context:
+            def register_tool(self, **tool):
+                registered[tool["name"]] = tool
+
+            def register_hook(self, *args):
+                pass
+
+        plugin.register(Context())
+        product = registered["product_page_read"]
+        self.assertEqual(product["toolset"], "web")
+        self.assertIs(product["is_async"], True)
+        self.assertFalse(product.get("override", False))
+
 
 class HermesWebResultTest(unittest.TestCase):
     """`HERMES_SOURCE` 의 Hermes 소스에서 두 웹 도구의 결과 모양을 대조한다."""
