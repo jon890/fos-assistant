@@ -60,8 +60,10 @@ export function replyTargetOf(
     (message.steer !== undefined && message.steer !== null)
   )
     return null;
-  const photos: ReplyImage[] = (message.attachments ?? [])
-    .filter((it) => pick?.imagePath === undefined)
+  // 그림 한 장을 집었으면 사진은 담지 않는다.
+  const photos: ReplyImage[] = (
+    pick?.imagePath === undefined ? (message.attachments ?? []) : []
+  )
     .filter(
       (it) => pick?.attachmentId === undefined || it.id === pick.attachmentId,
     )
