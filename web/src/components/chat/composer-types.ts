@@ -14,6 +14,7 @@ export type Props = {
     attachmentIds: number[],
     text?: string,
     attachments?: MessageAttachment[],
+    reply?: ReplyTarget,
   ): Promise<boolean>;
   onOutgoingChange(message: OutgoingMessage | null): void;
   /** 대화가 아직 없으면 null. 사진을 고르면 이 값이 없는 채로 첫 사진을 올릴 수 없다 */

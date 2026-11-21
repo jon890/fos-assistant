@@ -74,6 +74,7 @@ export function ReplyPreview({
       <button
         type="button"
         data-testid="reply-box"
+        aria-label={`원래 메시지로 가기: ${reply.excerpt || "사진이나 그림"}`}
         onClick={() => onJump(reply.messageId)}
         className={cn(frame, "hover:bg-muted")}
       >

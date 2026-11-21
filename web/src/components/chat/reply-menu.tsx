@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** 길게 누른 것으로 보는 시간(ms)이다 */
 const LONG_PRESS_MS = 500;
@@ -55,6 +55,17 @@ export function useReplyMenu({
       }
     : { className: "" };
   const close = () => setAt(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // 열리면 첫 항목에 초점을 두고 Esc 로 닫는다.
+  useEffect(() => {
+    if (!at) return;
+    menuRef.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAt(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [at]);
   const closeOutside = () => {
     if (Date.now() - openedAt.current > 400) close();
   };
@@ -67,6 +78,7 @@ export function useReplyMenu({
       >
         <div
           role="menu"
+          ref={menuRef}
           data-testid="reply-menu"
           onClick={(event) => event.stopPropagation()}
           // 누른 자리가 이어지는 수라 클래스로 만들 수 없다. 화면 밖으로 나가지 않게 오른쪽과 아래를 줄인다

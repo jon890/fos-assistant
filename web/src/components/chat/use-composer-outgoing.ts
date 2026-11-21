@@ -15,6 +15,7 @@ type Context = ComposerState &
     | "onOutgoingChange"
     | "running"
     | "canQueue"
+    | "reply"
   > &
   ComposerAttachments;
 
@@ -35,6 +36,7 @@ export function useComposerOutgoing({
   running,
   savingModel,
   canQueue,
+  reply,
   updateItem,
   uploadOne,
   deleteAttachment,
@@ -99,6 +101,7 @@ export function useComposerOutgoing({
         attachments.map((item) => item.id),
         message.text,
         attachments,
+        message.reply,
       );
     } finally {
       submitting.current = false;
@@ -125,14 +128,18 @@ export function useComposerOutgoing({
 
   function trySend() {
     if (sendDisabled || outgoingRef.current || (running && !canQueue)) return;
+    // 집은 것은 누른 순간 이 메시지에 묶고 칩을 비운다. 사진이 올라가는 동안 새로 집은 것은 다음 메시지로 간다.
+    const picked = reply?.target;
+    reply?.onClear();
     if (itemsRef.current.length === 0) {
-      void onSend([]);
+      void onSend([], undefined, undefined, picked);
       return;
     }
     publish({
       text: value.trim(),
       items: itemsRef.current,
       errorMessage: null,
+      reply: picked,
       retry,
       omit,
       retrySend: () => {

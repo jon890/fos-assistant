@@ -243,3 +243,45 @@ test("답이 끝나면 집은 것과 함께 보내기가 켜지고, 글이 없�
   await page.getByRole("textbox", { name: "메시지" }).fill("");
   await expect(send).toBeDisabled();
 });
+
+test("보내기를 누른 순간 집은 것이 그 메시지에 묶이고 칩이 비어, 사진이 올라가는 동안 새로 집은 것은 다음 메시지로 남는다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "넓은 화면에서 본다");
+  const conversationId = await openConversation(page);
+  await withImages(page, conversationId);
+  let releaseUpload: (() => void) | null = null;
+  await page.route("**/api/chat/conversations/*/attachments", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    await route.continue();
+  });
+  const sent: { reply?: { imagePath?: string | null } }[] = [];
+  await page.route("**/api/chat/stream", async (route) => {
+    sent.push(route.request().postDataJSON());
+    // 답을 붙잡아 둔다. 집은 것이 없는 대기 메시지는 그동안에도 보낼 수 있어야 한다.
+    await new Promise(() => {});
+  });
+  await page.goto(`/chat/${conversationId}`);
+
+  await page.getByRole("button", { name: "수채화 고양이 크게 보기" }).click();
+  await page.getByTestId("generated-image-viewer").getByRole("button", { name: "답장", exact: true }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("고양이로 해 줘");
+  await page.getByTestId("attachment-input").setInputFiles([
+    { name: "photo.png", mimeType: "image/png", buffer: PNG },
+  ]);
+  await page.getByRole("button", { name: "보내기" }).click();
+  await expect(page.getByTestId("reply-chip")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "수채화 강아지 크게 보기" }).click();
+  await page.getByTestId("generated-image-viewer").getByRole("button", { name: "답장", exact: true }).click();
+  await expect.poll(() => releaseUpload !== null).toBe(true);
+  releaseUpload!();
+  await expect.poll(() => sent[0]?.reply?.imagePath).toBe("generated/수채화 고양이.png");
+  await expect(page.getByTestId("reply-chip")).toContainText("비서의 답");
+
+  // 집은 것을 닫으면 답을 만드는 중에도 글을 대기 메시지로 보낼 수 있다.
+  await page.getByRole("button", { name: "답장 취소" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("대기 글");
+  await expect(page.getByRole("button", { name: "보내기" })).toBeEnabled();
+});

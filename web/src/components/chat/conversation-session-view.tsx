@@ -295,15 +295,16 @@ export function ConversationSessionView({
           <Composer
             value={draft}
             onChange={setDraft}
-            onSend={async (attachmentIds, text, attachments) => {
-              const reply = replyRef.current ?? undefined;
+            onSend={async (attachmentIds, text, attachments, reply) => {
               const sent = await submit(
                 attachmentIds,
                 text,
                 attachments,
                 reply,
               );
-              if (sent && reply && replyRef.current === reply) setReplyTo(null);
+              // 받아들여지지 않았으면 그사이 새로 집은 것이 없을 때만 칩을 되돌린다(스펙 chat-reference REQ9).
+              if (!sent && reply && replyRef.current === null)
+                setReplyTo(reply);
               return sent;
             }}
             reply={

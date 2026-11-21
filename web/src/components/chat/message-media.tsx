@@ -79,7 +79,7 @@ function Photo({
           type="button"
           aria-label="이 사진으로 답장"
           onClick={onReply}
-          className="absolute right-1 top-1 hidden rounded bg-background/90 p-1 text-muted-foreground group-hover/photo:block group-focus-within/photo:block [@media(hover:none)]:!hidden"
+          className="absolute right-1 top-1 rounded bg-background/90 p-1 text-muted-foreground opacity-0 group-hover/photo:opacity-100 group-focus-within/photo:opacity-100 [@media(hover:none)]:sr-only"
         >
           <Reply aria-hidden="true" className="size-3.5" />
         </button>

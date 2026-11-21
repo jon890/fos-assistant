@@ -206,7 +206,8 @@ export function MessageBubble({
         {canReply ? (
           // 자리를 차지하지 않게 말풍선 아래 틈에 띄운다. 질문이 저장될 때 아래 답이 밀리지 않는다.
           // 휴대폰은 길게 누르기 메뉴를 쓴다(스펙 chat-reference REQ3).
-          <div className="absolute right-0 top-full -mt-1.5 hidden md:block">
+          // 휴대폰 화면에는 보이지 않지만 화면 낭독기로는 찾을 수 있게 남긴다.
+          <div className="max-md:sr-only md:absolute md:right-0 md:top-full md:-mt-1.5">
             <MessageActions
               content={turn.content}
               latest={false}
