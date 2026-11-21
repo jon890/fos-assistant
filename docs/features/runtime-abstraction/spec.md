@@ -121,5 +121,4 @@ PR 나눔은 DECISION7 이다. 표의 (PR n) 은 그 요구가 들어가는 PR �
 
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| DECISION3 | architecture | technical-design 이 「두 번째 런타임은 ACP 구현 하나로 붙인다」 를 새 ADR 로 남긴다. [ADR-001](../../adr/ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) 은 그대로 두고 서로 링크한다 | 이 스펙 |
-| DECISION10 | architecture | technical-design 이 「새 런타임의 명령 실행은 승인 카드를 거쳐 런타임이 도는 곳에서 돈다」 를 위 ADR 에 함께 남기고 [ADR-086](../../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 과 서로 링크한다 | 이 스펙 |
+| DECISION3, DECISION8, DECISION10, DECISION16, DECISION17 | architecture | [ADR-20261121 / acp-runtime](../../adr/ADR-20261121-acp-runtime.md). [ADR-001](../../adr/ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) 과 [ADR-086](../../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 은 Hermes 에 그대로 적용한다 | 이 스펙 |

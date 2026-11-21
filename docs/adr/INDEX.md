@@ -139,6 +139,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) | 셸 계열 도구는 local 로 켜지 않고, 정책 밖 profile 의 셸은 끈다 | backend, hermes | Accepted. ADR-086 의 「정책에 없는 profile 은 local 로 둔다」 를 대체한다 |
 | [ADR-20261120 / server-secret](ADR-20261120-server-secret.md) | 서버 비밀값은 KEK 로 감싸 데이터베이스에 두고 관리자 화면에서 바꾼다 | backend, frontend, hermes | Accepted. [ADR-20261008 / data-encryption](../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 KEK 교체 대상에 `server_secret` 을 더한다 |
 | [ADR-20261120 / web-push](ADR-20261120-web-push.md) | 알림을 그대로 웹 푸시로 보내고 기기는 사용자 줄의 JSON 칸에 두며 암호화는 JDK 로 한다 | backend, frontend | Accepted. ADR-070 의 알림 원장에 바깥 채널을 더하고 ADR-072 의 열린 질문 셋에 답한다 |
+| [ADR-20261121 / acp-runtime](ADR-20261121-acp-runtime.md) | 실행 port 를 런타임에 묶이지 않게 두고 두 번째 런타임은 ACP 구현 하나로 붙인다 | backend, frontend | Accepted. ADR-001 옆에 다른 런타임을 붙이는 경계를 정한다. ADR-086 과 [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) 은 Hermes profile 에 그대로 적용하고, 다른 런타임의 명령 실행은 승인 카드로 묻는다 |
 
 ## 보관
 

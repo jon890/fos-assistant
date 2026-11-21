@@ -31,7 +31,7 @@ Codex app-server 의 동작은 2026-11-21 에 공식 문서([app-server](https:/
 ### 실행 port 의 모양
 
 실행은 `HermesRunsClient` 하나에 모여 있고 부르는 곳은 대화 turn, 중지, 글 끼워 넣기, 재기동 복구, 위임, 사용량 정리, 대화 삭제다.
-application 은 이미 Hermes 의 상태 문자열을 보지 않는다([Hermes 버전 올리기](hermes-upgrade.md) 의 「현재 실행 조회」). 그래도 port 에는 Hermes 에만 있는 것이 남아 있다.
+실행 조회는 이미 Hermes 의 상태 문자열을 application 에 넘기지 않는다([Hermes 버전 올리기](hermes-upgrade.md) 의 「현재 실행 조회」). 끝난 결과의 상태 문자열은 application 이 읽어 취소인지 보고 실행 기록의 오류 코드로 저장한다. port 에는 그 밖에도 Hermes 에만 있는 것이 남아 있다.
 
 | port 에 남은 Hermes 전용 | 어디 | 다른 런타임에서 |
 | --- | --- | --- |
