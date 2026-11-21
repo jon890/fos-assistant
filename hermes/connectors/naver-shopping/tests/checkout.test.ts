@@ -210,6 +210,20 @@ test("옵션 있는 상품의 준비는 드롭다운을 한 번만 열고 조합
   expect(clicks.map((line) => line.source)).toEqual([OPEN_OPTION_LISTS]);
 });
 
+test("기본 배송비를 읽지 못하면 예상 합계를 만들어 승인 카드를 띄우지 않는다", async () => {
+  const { isError, body } = await prepare(
+    {
+      product: {
+        ...PLAIN_PRODUCT,
+        productDeliveryInfo: { deliveryFeeType: "PAID" },
+      },
+    },
+    { url: PRODUCT_URL, options: [], quantity: 1 },
+  );
+  expect(isError).toBe(true);
+  expect(body).toEqual({ error: { code: "NAVER_SHOPPING_PAGE_CHANGED" } });
+});
+
 for (const [name, options, code] of [
   ["맞는 조합이 없음", ["빨강", "L"], "NAVER_SHOPPING_OPTION_MISMATCH"],
   ["단계 수가 다름", ["검정"], "NAVER_SHOPPING_OPTION_MISMATCH"],

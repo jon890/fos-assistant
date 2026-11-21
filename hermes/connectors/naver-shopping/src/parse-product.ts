@@ -150,7 +150,7 @@ export function parseStoreProduct(product: Json, url: string) {
     ...(truncated ? { options_truncated: true } : {}),
     ...(unknown ? { options_unknown: true } : {}),
     shipping: {
-      fee_krw: free ? 0 : (won(pick(delivery, PRODUCT.baseFee)) ?? 0),
+      fee_krw: free ? 0 : won(pick(delivery, PRODUCT.baseFee)),
       free_over_krw: free ? null : won(pick(delivery, PRODUCT.freeOver)),
       regional_extra: PRODUCT.regional.some(
         (key) => (won(pick(delivery, [key])) ?? 0) > 0,

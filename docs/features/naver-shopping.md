@@ -42,13 +42,13 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 
 쇼핑 담당은 한 요청에서 검색을 5번까지 하고, 전체 검색에서 고른 상위 후보를 5개까지 상세로 읽는다. 요청한 옵션·사이즈의 재고와 배송비 포함 금액을 확인하면 조사를 마친다. 한도에 닿아도 확인하지 못한 항목은 답변에 표시한다. 정품과 판매처 신뢰는 웹 검색으로 공식 판매처나 유통 근거를 조사하고, 답변의 첫 판단 뒤에 「항목 | 확인 내용 | 평가」 표로 근거를 보인다.
 
-이미 만든 담당과 새 담당 모두 에이전트 상세의 「도구」 에서 「웹 검색」 을 켠다. 스위치를 바꾸면 자동으로 저장되고 다음 실행부터 적용된다. [에이전트 도구](agent-skill.md#에이전트-도구)
+이미 만든 담당과 새 담당 모두 에이전트 상세의 「도구」 에서 「웹 검색」 을 켠다. 스위치를 바꾸면 자동으로 저장되고 다음 실행부터 적용된다. 운영 담당의 스위치는 배포 뒤 코디네이터가 켠다. [에이전트 도구](agent-skill.md#에이전트-도구)
 
 ### 상품 정보
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true`. `extra_krw`, `sold_out` 이 `null` 이면 읽지 못한 것이다 |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true`. `extra_krw`, `sold_out`, `fee_krw` 가 `null` 이면 해당 값을 읽지 못한 것이다 |
 | `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽지 못해 `sellers` 는 항상 빈 목록이고 `offers_unknown` 이 참이다. 배송비 칸이 비면 `delivery_fee_krw` 와 `lowest_price_with_fee_krw` 는 `null` 이다 |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
