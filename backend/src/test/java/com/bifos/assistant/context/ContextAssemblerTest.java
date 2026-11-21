@@ -54,7 +54,7 @@ class ContextAssemblerTest {
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
     private static final String AGENT_CODE = "context-assembler-test";
     private static final String FACTS_HEADER = "# 지금 묻는 사람에 대해 기억한 것\n\n"
-        + "아래는 이 사람에 대해 기억한 것의 요약이다. 줄마다 번호로 memory_read 를 불러 상세를 읽는다.\n"
+        + "아래는 이 사람에 대해 기억한 것의 요약이다. 요약만으로 답할 수 있으면 그 줄의 상세를 읽는 memory_read 는 부르지 않는다. 상세가 필요하면 줄의 번호로 memory_read 를 불러 읽는다.\n"
         + "일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 상세를 읽는다.\n"
         + "진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.";
     private static final String INDEX_HEADER = "# 더 물어볼 수 있는 것";
@@ -226,10 +226,13 @@ class ContextAssemblerTest {
                 "검색으로 확인하지 못했다는 것",
                 "기준 시점",
                 "다른 도구로 이번 실행에서 확인한 사실",
-                "주소를 함께 돌려받아")
-            .containsSubsequence("# 답변 형식", "# 도구 호출", "# 최신 정보와 출처", "# 기억");
-        assertThat(scheduled).doesNotContain("# 최신 정보와 출처", "web_search").contains("# 기억");
-        assertThat(proactive).doesNotContain("# 최신 정보와 출처", "web_search", "# 기억");
+                "주소를 함께 돌려받아",
+                "서로 기대지 않는 검색은 한 차례에 5~8개를 함께 부른다",
+                "주소마다 web_extract 를 따로 부르고 한 차례에 함께 부른다",
+                "execute_code 안에서 web_search 나 web_extract 를 반복문으로 부르지 않는다")
+            .containsSubsequence("# 답변 형식", "# 도구 호출", "# 최신 정보와 출처", "# 확인을 마치고 답하기", "# 기억");
+        assertThat(scheduled).doesNotContain("# 최신 정보와 출처", "web_search", "# 확인을 마치고 답하기").contains("# 기억");
+        assertThat(proactive).doesNotContain("# 최신 정보와 출처", "web_search", "# 확인을 마치고 답하기", "# 기억");
         String search = conversation.substring(
             conversation.indexOf("# 최신 정보와 출처"), conversation.indexOf("# 기억"));
         assertThat(conversation.replace(search, "")).isEqualTo(scheduled);
@@ -253,6 +256,12 @@ class ContextAssemblerTest {
                     "그 안내를 첫 줄에 두고 그 다음에 핵심 답을 둔다",
                     "단계와 나열은 목록",
                     "셋 이상을 두 기준 이상으로 비교하면 표",
+                    "문장으로 이어 쓰고 싶을 때도 표로 쓴다",
+                    "첫 줄에 판단과 확신 정도(높음, 중간, 낮음)를 쓰고",
+                    "답 끝에 「현재 판단」 한 줄과 사용자가 바로 할 행동 하나를 둔다",
+                    "그 안내를 첫 줄에 두고 다음 줄에 판단과 확신 정도를 쓴다",
+                    "「항목 | 확인 내용 | 평가」 표",
+                    "확인, 주장, 미확인 중 하나",
                     "```mermaid",
                     "세로 방향 flowchart",
                     "짧은 답과 단순 나열에는 그리지 않는다",

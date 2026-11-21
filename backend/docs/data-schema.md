@@ -437,7 +437,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
 - `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `CUSTOM` 이 쓰던 `model_provider`, `model`, `reasoning_effort` 세 컬럼은 운영에서 모든 줄이 비어 있음을 확인한 뒤 `V20261102025856` 이 지웠다
-- `found_link_hashes` 는 비서가 그 대화에서 웹 검색과 페이지 읽기로 찾은 주소의 해시다([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 정해진 꼴로 바꾼 주소의 SHA-256 앞 16바이트를 16진수 32자로 적어 구분 문자 없이 이어 붙인다. 주소 원문은 두지 않는다. 엔티티가 매핑하지 않고 `ConversationRepository` 의 전용 질의로만 읽고 쓴다. 더하기는 뒤에 붙이고 뒤에서 640,000자만 남기는 `UPDATE` 한 문장이다. 테스트 스키마에는 `conversation-found-link-hashes-column.sql` 이 이 칸을 만든다
+- `found_link_hashes` 는 비서가 그 대화에서 웹 검색과 페이지 읽기로 찾은 주소의 해시다([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 정해진 꼴로 바꾼 주소의 SHA-256 앞 16바이트를 16진수 32자로 적어 구분 문자 없이 이어 붙인다. 상품 사진을 읽은 페이지와 고른 사진에는 주소 해시의 첫 글자를 각각 `p`, `i`로 바꾼 표시도 둔다([비서가 찾은 사진 기술 설계](../../docs/features/agent-found-image/design.md)의 「상품 페이지에서 대표 사진 고르기」). 주소 원문은 두지 않는다. 엔티티가 매핑하지 않고 `ConversationRepository` 의 전용 질의로만 읽고 쓴다. 더하기는 뒤에 붙이고 뒤에서 640,000자만 남기는 `UPDATE` 한 문장이다. 테스트 스키마에는 `conversation-found-link-hashes-column.sql` 이 이 칸을 만든다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 `title_key_id`, 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `title_key_id` 가 비어 있으면 `title` 은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `conversation:<id>:title:user:<user_id>` 다. 외래 키를 두지 않는다. 칸은 암호문이 들어가도록 `VARCHAR(1024)` 이고 글자 수 상한(200자)은 평문에 대해 요청 검사가 지킨다. 읽는 곳은 `Conversation.title()` 이고 풀지 못하면 읽을 수 없다는 글을 받는다. 제목을 질의로 직접 쓰는 곳(`fillTitleIfBlank`, `renameIfActive`, `markPurged`)은 암호문과 key 번호를 함께 적는다. 사이드바의 대화 검색은 브라우저가 받은 평문 제목으로 목록을 좁히므로 서버가 이 칸을 비교하지 않는다
@@ -455,6 +455,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `content_key_id` 가 비어 있으면 `content` 는 평문이다. 외래 키를 두지 않는다
 - `sender_user_id` 는 `ASSISTANT` 와 `SYSTEM` 에서, `execution_id` 는 `USER` 와 `SYSTEM` 에서 비어 있다
 - `steer_state`, `steer_execution_id`, `steer_child` 는 답이 도는 중 도는 실행에 끼워 넣은 사용자 글(steer 말풍선)에만 찬다. 상태는 `DELIVERED`(받아 둠), `CARRIED_OVER`(돌아와 다음 turn 으로 감), `UNCONFIRMED`(들어갔는지 모름), `NOT_DELIVERED`(중지한 결과가 돌려줘 들어가지 않음)이고 `steer_execution_id` 는 끼워 넣은 turn 의 루트 실행이다. `execution_id` 가 `USER` 행에서 비어 있다는 규칙을 지키려고 칸을 따로 둔다. 답 줄로 읽는 질의가 `execution_id` 로 답을 고르기 때문이다. 흐름과 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다
+- `reply_message_id`, `reply_attachment_id`, `reply_artifact_id` 는 사용자가 메시지나 그림을 집어 보낸 답장의 사용자 줄에만 찬다. 집은 메시지 줄과, 사진이나 그림 한 장을 집었으면 그 첨부나 그림 행이다. 둘 다 비면 메시지 전체를 집은 것이다. 외래 키를 두지 않는다. 다시 만들기는 질문 줄의 이 칸을 다시 읽는다. 흐름은 [`docs/features/chat-reference.md`](../../docs/features/chat-reference.md) 가 갖는다. 칸은 `V20261105074442__chat_message_reply.sql` 이 갖는다
 - `content` 를 `LONGTEXT` 로 못 박는다. 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다
 
 **본문은 저장할 때 암호화한다.** KEK 설정이 있으면 새 메시지를 빈 글로 넣고 같은 트랜잭션에서 암호문으로 고친다.
@@ -575,9 +576,10 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `generation_prompt_key_id` | 지시문을 암호화한 `user_data_key.id`. 비어 있으면 평문이다 |
 | `generation_source_links` | 그림을 만들 때 참고한 링크 주소를 줄바꿈으로 이은 글([ADR-20261120 / link-image-source](../../docs/adr/ADR-20261120-link-image-source.md)). `generation_source_links_key_id` 가 있으면 대화 요청자의 데이터 key 로 암호화한 글이다. 링크를 쓰지 않은 그림은 비어 있다. 대화를 정리할 때 행과 함께 지운다 |
 | `generation_source_links_key_id` | 참고한 링크를 암호화한 `user_data_key.id`. 지시문의 key 와 따로 둔다. 비어 있으면 평문이다 |
+| `generation_found_link_flags` | `generation_source_links` 의 링크마다 비서가 그 대화에서 찾은 것이면 `1`, 사용자가 보낸 것이면 `0` 을 같은 순서로 이은 글([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 화면의 「비서가 찾음」 이 된다. 찾은 링크가 없으면 비어 있다. 링크 수와 길이가 다르면 표시가 없는 것으로 읽는다. 링크 상한(16개)과 길이가 묶여 있다 |
 | `generation_call_key` | 올린 호출의 session, `tool_call_id`, 그림 SHA-256 을 묶은 SHA-256 16진수. 유일 제약이 있어 같은 올리기가 다시 와도 한 행이다. 값이 있는 행이 만든 그림 행이다 |
 
-그림 행의 `path` 는 `generated/<제목>.<확장자>` 다. 제목이 파일 이름이라 보관 사본과 내려받기가 같은 제목을 쓴다. 칸은 `V20261105074416__chat_artifact_generated_image.sql` 이 갖고, 참고한 링크의 두 칸(`generation_source_links`, `generation_source_links_key_id`)은 `V20261105074423__chat_artifact_source_links.sql` 이 갖는다.
+그림 행의 `path` 는 `generated/<제목>.<확장자>` 다. 제목이 파일 이름이라 보관 사본과 내려받기가 같은 제목을 쓴다. 칸은 `V20261105074416__chat_artifact_generated_image.sql` 이 갖고, 참고한 링크의 두 칸(`generation_source_links`, `generation_source_links_key_id`)은 `V20261105074423__chat_artifact_source_links.sql` 이 갖는다. 찾은 링크 표시(`generation_found_link_flags`)는 `V20261105074441__chat_artifact_found_link_flags.sql` 이 갖는다.
 
 **「내 파일」 에 넣은 파일의 제목과 들어온 길, 내준 답도 같은 표의 컬럼이다**([ADR-20261119 / file-space-put](../../docs/adr/ADR-20261119-file-space-put.md)). 새 표를 두지 않는다.
 

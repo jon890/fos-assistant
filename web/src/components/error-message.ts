@@ -32,6 +32,9 @@ const MESSAGES: Record<string, string> = {
     "대화를 찾지 못했어요. 대화 목록으로 돌아가 다시 골라 주세요.",
   MESSAGE_NOT_LATEST: "그사이 대화가 바뀌었어요. 최신 대화를 다시 불러왔어요.",
   CONVERSATION_BUSY: "아직 답을 만들고 있어요. 답이 끝난 뒤 다시 눌러 주세요.",
+  // 답장으로 집은 메시지나 그림을 쓸 수 없다(스펙 chat-reference REQ9, REQ14).
+  MESSAGE_NOT_FOUND: "원래 메시지를 찾을 수 없어요. 다시 집어 주세요.",
+  REPLY_SOURCE_UNAVAILABLE: "원래 메시지를 찾을 수 없어요. 다시 집어 주세요.",
   USER_BUSY:
     "진행 중인 작업이 많아요. 진행 중인 작업이 끝난 뒤 다시 보내 주세요.",
   PENDING_QUEUE_FULL:
@@ -143,6 +146,10 @@ const ADMIN_MESSAGES: Record<string, string> = {
   HERMES_UNAVAILABLE:
     "Hermes 런타임에 연결하지 못했어요. 연결 상태를 확인해 주세요.",
   SECRET_STORE_UNAVAILABLE: "KEK 가 없어 저장할 수 없습니다",
+  EVALUATION_USER_MISSING:
+    "평가 사용자가 없어 확인을 시작하지 못했어요. 먼저 평가 사용자를 준비해 주세요.",
+  QUALITY_CHECK_NOT_FOUND:
+    "그 확인 기록을 찾지 못했어요. 화면을 새로 읽어 주세요.",
   VAPID_STATE_CHANGED:
     "그사이 VAPID 키가 바뀌었어요. 화면을 새로 읽었으니 다시 확인해 주세요.",
 };

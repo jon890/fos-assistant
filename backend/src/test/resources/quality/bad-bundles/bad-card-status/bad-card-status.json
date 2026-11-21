@@ -1,0 +1,1 @@
+{"id":"bad-card-status","title":"t","questions":[{"id":"a","tag":"x","turns":[{"text":"x","card":"approve"}],"expect":{"cardStatus":"DONE"}}]}

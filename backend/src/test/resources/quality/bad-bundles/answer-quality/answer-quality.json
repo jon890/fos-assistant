@@ -1,1 +1,1 @@
-{"id":"answer-quality","title":"t","pass":{"type":"answer-quality"},"questions":[{"id":"a","turns":[{"text":"x"}]}]}
+{"id":"answer-quality","title":"t","pass":{"type":"answer-quality"},"questions":[{"id":"a","tag":"x","expect":{"includes":["y"]},"turns":[{"text":"x"}]}]}

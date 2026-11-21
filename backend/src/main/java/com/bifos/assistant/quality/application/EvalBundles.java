@@ -1,5 +1,6 @@
 package com.bifos.assistant.quality.application;
 
+import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.quality.config.QualityProperties;
 import com.bifos.assistant.quality.domain.EvalBundle;
 import com.bifos.assistant.quality.domain.EvalBundle.EvalExpect;
@@ -9,6 +10,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -20,6 +22,7 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -123,6 +126,10 @@ public class EvalBundles {
         for (Resource file : files) {
             loaded.add(read(file));
         }
+        if (loaded.isEmpty()) {
+            // 운영 jar 에서 폴더를 찾지 못해도 조용히 빈 목록으로 뜨면 평가가 돌지 않은 것을 모른다.
+            throw new IllegalStateException("no eval bundles at " + folder);
+        }
         loaded.sort(Comparator.comparing(EvalBundle::id));
         Map<String, EvalBundle> byId = new LinkedHashMap<>();
         for (EvalBundle bundle : loaded) {
@@ -179,6 +186,9 @@ public class EvalBundles {
             if (!ids.add(question.id())) {
                 throw invalid(name, "duplicate question id " + question.id());
             }
+            if (question.tag() == null || question.tag().isBlank()) {
+                throw invalid(name, "question " + question.id() + " has no tag");
+            }
             if (question.turns().isEmpty()) {
                 throw invalid(name, "question " + question.id() + " has no turns");
             }
@@ -187,11 +197,27 @@ public class EvalBundles {
                     throw invalid(name, "question " + question.id() + " has an empty turn");
                 }
                 slots(name, question.id(), turn.text());
+                if (turn.attachment() != null && !new ClassPathResource("quality/" + turn.attachment()).exists()) {
+                    throw invalid(name, "question " + question.id() + " attaches a missing resource " + turn.attachment());
+                }
             }
             EvalExpect expect = question.expect();
-            for (List<String> values : List.of(expect.links(), expect.linkPrefixes(), expect.noLinkPrefixes(), expect.tools(),
-                expect.includes(), expect.absent(), expect.instructionIncludes())) {
-                values.forEach(value -> slots(name, question.id(), value));
+            List<List<String>> lists = List.of(expect.links(), expect.linkPrefixes(), expect.noLinkPrefixes(), expect.tools(),
+                expect.includes(), expect.absent(), expect.instructionIncludes());
+            if (lists.stream().allMatch(List::isEmpty) && expect.cardStatus() == null) {
+                // 기대가 없으면 무엇을 답해도 통과한다. 옛 평가 세트의 형식 검사와 같이 막는다.
+                throw invalid(name, "question " + question.id() + " has no expectation");
+            }
+            for (List<String> values : lists) {
+                for (String value : values) {
+                    if (value == null || value.isBlank()) {
+                        throw invalid(name, "question " + question.id() + " has an empty expectation value");
+                    }
+                    slots(name, question.id(), value);
+                }
+            }
+            if (expect.cardStatus() != null && Arrays.stream(ActionStatus.values()).noneMatch(status -> status.name().equals(expect.cardStatus()))) {
+                throw invalid(name, "question " + question.id() + " expects an unknown card status " + expect.cardStatus());
             }
         }
     }

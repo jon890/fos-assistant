@@ -2685,6 +2685,10 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | OpenAI 내장 검색 | `search_backend` 가 `openai-native` 이고 요청이 ChatGPT 구독 경로(Codex backend)로 갈 때, 모델에 주는 `web_search` 함수를 OpenAI 서버가 실행하는 내장 검색 도구로 바꿔 보낸다. 검색만 맡고 본문 읽기는 다른 서비스가 맡는다 | `agent/transports/codex.py`, `plugins/web/openai_native/provider.py` |
 | 내장 검색의 사건 | 서버에서 돈 검색은 응답의 `web_search_call` 항목으로 오고 Hermes 는 이것을 도구 호출로 다루지 않는다. `tool.started` 와 `tool.completed` 가 오지 않아 Control Plane 의 실행 사건에 검색이 남지 않는다. 답의 출처 주석도 읽지 않아 출처는 모델이 답 글에 쓴 링크로만 남는다 | `agent/codex_responses_adapter.py` |
 | 내장 검색과 다른 경로 | 내장 검색을 고른 채 ChatGPT 구독 경로가 아닌 모델로 돌면 `web_search` 가 오류를 돌려준다. 다른 서비스로 넘어가지 않는다 | `plugins/web/openai_native/provider.py` |
+| key 가 있는 서비스의 순서 | 고른 값이 없으면 `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, `EXA_API_KEY`, `PARALLEL_API_KEY`, `KEENABLE_API_KEY`, `FIRECRAWL_API_KEY` 순으로 key 가 있는 첫 서비스를 쓰고, 없으면 key 없는 무료 서비스 묶음을 돌아가며 쓴다 | `tools/web_tools.py` 의 `_autodetect_backend`, `_keyless_backend` (2026-11-21 확인) |
+| key 를 읽는 곳 | profile 마다 실행 범위가 따로라 Hermes 프로세스의 환경 변수는 보이지 않는다. 그 profile 의 `.env` 나, 모든 profile 에 덮어 적용되는 관리용(managed scope) `.env` 에 있어야 한다 | `agent/secret_scope.py` 의 `get_secret`, `build_profile_secret_scope` (2026-11-21 확인) |
+| key 가 있는 호출이 실패했을 때 | `web.keyless_rescue`(기본 켜짐)이면 그 호출 하나만 key 없는 무료 서비스로 다시 해 본다. 다음 호출은 다시 key 가 있는 서비스로 간다. 실패한 응답은 캐시하지 않는다 | `tools/web_tools_rescue.py`, `tools/web_tools.py` 의 `_memoized_search` (2026-11-21 확인) |
+| 본문 읽기 제한 시간 | `web.extract_timeout` 초(기본 120)가 지나면 그 호출에 담긴 주소 모두를 시간 초과 실패로 돌려준다. 한 호출 안의 주소는 같은 제한 시간을 나눠 쓴다. 제한은 첫 서비스에만 걸린다. key 가 있는 서비스가 시간 초과되면 무료 등급으로 다시 해 보는 쪽에는 제한이 없다. key 가 없으면 첫 서비스가 무료 등급이고 다시 해 보지 않아 호출 전체가 제한 안에 든다 | `tools/web_tools_extract.py` 의 `_extract_timeout_seconds` (2026-11-21 확인) |
 | 날짜 | 시스템 프롬프트에 대화를 시작한 날짜와, 문맥을 마지막으로 다시 만든 때의 오늘 날짜가 든다. turn 마다 갱신되지 않는다. 그래서 Control Plane 이 대화 turn 마다 날짜 줄을 따로 넣는다 | `agent/system_prompt.py` |
 
 #### 웹 도구의 결과
@@ -2698,6 +2702,10 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | `web_extract` 의 결과 | JSON 글 `{"results": [{"url", "title", "content", "error"}]}` 이다. `url` 은 요청한 주소, `content` 는 마크다운 본문이다. 본문을 LLM 으로 요약하지 않는다. 상한(기본 15,000자)을 넘는 본문은 앞과 뒤만 남긴다. 본문 안의 base64 사진은 `[IMAGE: alt]` 로 바꾸고 사진의 실제 주소는 링크로 남긴다 | `tools/web_tools.py` 의 `web_extract_tool`, `tools/web_tools_extract.py` 의 `_result_entry` |
 | 결과 hook 이 받는 글 | `transform_tool_result` 는 자르지 않은 결과 글 전체와 `tool_call_id` 를 받는다. Control Plane 이 받는 `tool.completed` 의 `preview` 는 500자로 잘려 있어 주소를 뽑는 데 쓸 수 없다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
 | OpenAI 내장 검색 | 검색이 Hermes 의 도구로 돌지 않아 결과 hook 이 불리지 않는다. 위 「웹 검색 서비스」 를 본다 | `agent/codex_responses_adapter.py` |
+
+상품 사진을 위한 `product_page_read`는 fos-ctx가 `PluginContext.register_tool`로 web toolset에 추가하는 비동기 도구다. Hermes는 web toolset의 내장 도구 목록에 registry에서 같은 toolset으로 등록한 도구도 합친다. 기본 `web_extract`의 등록부는 마크다운으로 읽고, `_trim_results`가 제공자 메타데이터를 빼므로 상품 사진용 원본 HTML은 별도로 받는다.
+
+플러그인은 Hermes의 무료 Firecrawl 클라이언트와 같은 API에 `rawHtml`을 요청한다. `_validate_extract_urls`, `async_is_safe_url`, `check_website_access`로 읽기 시작 주소를 확인하고, 응답의 `_final_url`에도 공개 네트워크·웹사이트 정책을 적용한다. 사용하는 내부 함수와 등록부는 `hermes/tests/test_found_links_contract.py`가 대조한다. 원본 HTML은 상품 사진 후보를 뽑은 뒤 버린다.
 
 `_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
 없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.

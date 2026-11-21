@@ -376,6 +376,8 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 
 **`delegation` 은 대화 단위 SSE 로만 간다.** turn 이 바로 맡긴 위임의 실행 줄이 생길 때와 끝날 때 한 번씩 낸다. 보낸 turn 이 도는 동안에도 `approval` 처럼 미루지 않는다. 그리는 규칙은 [에이전트 팀](agent-team.md) 의 「대화 안의 협업」 이 갖는다.
 
+**`image` 도 대화 단위 SSE 로만 간다.** 비서가 만든 그림이 대화 폴더에 저장될 때 보내고, 화면은 아직 답에 묶이지 않은 그림 목록을 다시 읽어 답이 끝나기 전에 흐르는 답에 그린다. 규칙은 [`generated-image/design.md`](generated-image/design.md) 의 「PR7: 나오는 즉시 보이기」 가 갖는다.
+
 **`started` 는 대화 turn 의 루트 실행 번호를 싣는다.**
 중지는 루트 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다. 화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 
@@ -424,6 +426,10 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 
 turn 이 도는 동안 보낸 글을 Control Plane 이 대기 메시지로 쌓았다가 다음 turn 으로 합쳐 보낸다.
 보내는 때와 합치기, 상한, 중지 뒤 멈춰 두기, 재시작은 [ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 결정 표가 갖는다.
+
+| 결정 | 사용자 결정 2026-11-21 |
+| --- | --- |
+| 답이 도는 중 새 메시지 | 운영에서는 `assistant.chat.steer.enabled` 를 끈다. 글은 대기 줄에 두고 답이 끝나면 다음 차례로 보낸다. 방향을 바꾸려면 「중지」 를 누른 뒤 새 글을 보내고, 같은 대화의 다음 turn 은 Hermes 가 저장한 답 조각까지 이어받는다. 별도 답장 기능에서 메시지나 그림을 집은 경우에는 앞 답이 끝난 뒤 사용자가 직접 보내도록 정했다 |
 
 **다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다.**
 `TurnCancellation` 의 종료 리스너는 이것 하나만 건다.
@@ -477,7 +483,7 @@ turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 글을 빼지 않고 대기
 
 ### 도는 실행에 끼워 넣기
 
-설정 `assistant.chat.steer.enabled` 가 켜져 있으면 답이 도는 중 대화 주인이 입력창에 쓴 글을 대기 줄에 저장한 뒤 그 대화의 루트 실행에 Hermes `steer` 로 넣어 본다. 기본은 꺼짐이고 끄면 위 대기열 그대로다. 결정은 [ADR-20261116 / run-steer](../adr/ADR-20261116-run-steer.md), 바뀐 요구와 인수 조건은 [`chat/spec.md`](chat/spec.md), 구조는 [`chat/design.md`](chat/design.md) 가 갖는다.
+이 절은 기본값이 꺼짐인 `assistant.chat.steer.enabled` 를 다시 켰을 때의 동작을 기록한다. 설정을 켜면 답이 도는 중 대화 주인이 입력창에 쓴 글을 대기 줄에 저장한 뒤 그 대화의 루트 실행에 Hermes `steer` 로 넣어 본다. 이 구현의 결정은 [ADR-20261116 / run-steer](../adr/ADR-20261116-run-steer.md), 당시 요구와 인수 조건은 [`chat/spec.md`](chat/spec.md), 구조는 [`chat/design.md`](chat/design.md) 가 갖는다.
 
 **끼우는 것은 `POST .../pending` 에 `steer: true` 가 실리고, 스킬 커맨드가 아니고, 대기 줄이 비어 있고, 그 대화의 turn 이 사람이 보낸 질문·대기 글·다시 생성·위임 결과 turn 이며 루트 run 이 있을 때뿐이다.**
 대기 줄에 글이 있으면 새 글은 뒤에 더해 순서대로 간다. 끼울 run 은 요청 본문이 아니라 `TurnCancellation` 의 그 대화 표시에서 찾는다.
@@ -538,6 +544,8 @@ turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으
 그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 루트로 갖는지로 본다.
 멈춘 turn 의 루트 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓰고, 토큰과 비용은 그대로 둔다.
 멈춘 자리까지의 답은 남긴다([ADR-021](../../backend/docs/adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md)).
+같은 대화에서 이어 보낸 글은 기존 Hermes session 으로 간다. Hermes 는 모델이 답을 내는 중에 중지하면 받은 답 조각을 session 에 남기고, 다음 turn 은 그 session 에 남은 맥락을 읽는다. [Hermes 의 중지 처리](https://github.com/NousResearch/hermes-agent/blob/ae2a81ccc00e9b7c06301523e5bb09608397149c/agent/turn_api_call.py#L177-L217), [다음 실행의 이력 조회](https://github.com/NousResearch/hermes-agent/blob/ae2a81ccc00e9b7c06301523e5bb09608397149c/gateway/platforms/api_server_runs.py#L842-L852).
+session 이 달라지는 경우는 [Hermes 계약의 「취소한 실행의 조회 응답」](../../hermes/docs/hermes-contract.md#취소한-실행의-조회-응답) 에 있다.
 
 **다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 줄 상태로 보면 자식이 도는 동안 「돌지 않는다」 고 답하게 된다.
 `running` 경로는 표시가 가진 루트 실행 번호와 그 실행 줄의 `startedAt` 을 돌려준다.

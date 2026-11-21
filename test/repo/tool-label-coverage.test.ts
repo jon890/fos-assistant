@@ -180,7 +180,8 @@ test("도구를 등록하는 곳을 읽어 낸 목록이 비지 않는다", () =
   }
   assert.ok(reachableBuiltinTools().includes("image_generate"));
   assert.ok(reachableBuiltinTools().includes("delegate_task"));
-  assert.deepEqual(fosCtxTools(), ["attachment_inspect"]);
+  assert.ok(fosCtxTools().includes("attachment_inspect"));
+  assert.ok(fosCtxTools().includes("product_page_read"));
 });
 
 test("Control Plane MCP 도구는 모두 한국어 이름과 종류가 있다", () => {

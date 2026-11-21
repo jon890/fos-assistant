@@ -27,6 +27,7 @@
 | `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
 | `/connections` | 「외부 서비스 연결」. 플러그인 카드 목록. [`docs/features/connector.md`](../../docs/features/connector.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
 | `/connections/{id}` | 플러그인 하나의 외부 서비스 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
+| `/connections/oauth/callback` | 단추 연결의 서비스 화면에서 돌아오는 주소. 결과를 그 연결 화면으로 넘긴다([`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md) 의 「웹 화면」) |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 설정의 「연결」 묶음과 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`docs/features/user-browser.md`](../../docs/features/user-browser.md)) |
 | `/files` | 파일 공간. 「내 파일」 목록을 먼저 보이고 「에이전트 작업 폴더」 는 링크로 들어간다. 옛 실행 공간 주소(`?path=`, `?file=`)는 `/files/workspace` 의 같은 자리로 넘긴다. 설정의 「내 데이터」 묶음에서 간다. [`docs/features/workspace.md`](../../docs/features/workspace.md) 의 「파일 공간」 |
@@ -37,7 +38,8 @@
 | `/tasks/new` | 예약 작업 만들기 |
 | `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
 | `/notifications` | 전의 알림 화면 주소. 「알림」 탭이 열린 `/now?tab=notifications` 로 넘긴다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」) |
-| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)) |
+| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)). 평가 전용 사용자는 두 카드의 합계에서 빠지고 사용량 카드에 「평가」 한 줄로 따로 보인다 |
+| `/admin/quality` | 품질. 첫 칸은 배포 뒤 확인 기록이다. 시각, 계기, 결과, 걸린 시간을 한 줄로, 펼치면 기능별 결과와 까닭을 보인다. 실패 기능은 남겨 둔 평가 대화의 실행 트리(`/admin/quality/executions/{id}`)로 잇는다. 「확인 시작」, 「다시 확인」. 평가 사용자가 없거나 덜 준비됐으면 「평가 사용자 준비」 칸을 보인다([`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md)) |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |
 | `/admin/agents/{code}` | 에이전트 하나의 관리. 일반 상세의 절에 「모델」, 「기억 영역」, 「관리」 절이 더해진다 |
@@ -47,7 +49,7 @@
 | `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「로그와 저장」 이 갖는다 |
 | `/admin/connections` | 자동 반영이 실패했거나 24시간 넘게 남은 바인딩의 「다시 확인」([`docs/features/connector.md`](../../docs/features/connector.md)) |
 | `/admin/browsers` | 모든 사용자 브라우저의 사용자 이름, 상태, 마지막 사용 시각, 오류 코드와 끄기, 지우기 |
-| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md)) |
+| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 단추 연결의 OAuth 앱 줄과 서명 비밀 줄도 둔다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md), [`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md)) |
 | `/admin/workspaces` | 실행 공간마다 주인, 용량, 항목 수와 일부만 셌는지. 주인은 사용자 이름이거나 「에이전트 · <이름>」 이고 이름이 없으면 「알 수 없음」 이다. 일부만 센 공간에 「일부만 셈」 배지. 루트가 없으면 「파일 공간을 쓸 수 없어요」, 공간이 없으면 「아직 실행 공간이 없어요」, 실패는 「불러오지 못했어요」 와 다시 읽기. 관리자 영역이지만 오류 코드와 파일 이름은 그리지 않는다 |
 
 `/admin` 아래는 `ADMIN` 만 연다.

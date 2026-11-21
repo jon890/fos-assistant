@@ -46,6 +46,11 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<ChatArtifact> findGeneratedImages(@Param("conversationId") Long conversationId);
 
 
+    /** 아직 답에 묶이지 않은 그림 행을 저장한 순서로 준다. {@link #bindGeneratedImages} 가 다음 답에 묶을 행과 같다. */
+    List<ChatArtifact> findByConversationIdAndMessageIdIsNullAndGenerationCallKeyIsNotNullAndVaultUserIdIsNullAndDeletedAtIsNullOrderByIdAsc(
+        Long conversationId);
+
+
     /**
      * 그 대화에서 아직 답에 묶이지 않은 그림 행을 이 답에 묶는다(ADR-20261119 / generated-image).
      *

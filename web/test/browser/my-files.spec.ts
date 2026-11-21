@@ -254,3 +254,37 @@ test("휴대폰 폭에서도 검색, 종류 고르기, 미리보기 시트, 내�
   const sheetBox = (await page.getByTestId("my-file-preview").boundingBox())!;
   expect(sheetBox.width).toBeGreaterThanOrEqual(359);
 });
+
+test("넓은 화면에서도 미리보기는 목록을 덮는 창이고 Esc 와 바깥 누르기로 닫힌다", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fixBrowserTime(page, NOW);
+  await fakeList(page);
+  await page.goto("/files");
+
+  const open = rows(page).filter({ hasText: "회의록" }).getByRole("button", { name: "회의록 미리보기" });
+  await open.click();
+  const sheet = page.getByRole("dialog").filter({ has: page.getByTestId("my-file-text") });
+  await expect(sheet.getByTestId("my-file-text")).toBeVisible();
+  const box = (await page.getByTestId("my-file-preview").boundingBox())!;
+  // 목록 칸이 좁아지지 않고, 창은 본문 폭보다 넓게 화면을 덮는다.
+  expect(box.width).toBeGreaterThan(1000);
+  expect(box.x + box.width).toBeLessThanOrEqual(1440);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(open).toBeFocused();
+
+  await open.click();
+  await expect(sheet).toBeVisible();
+  await page.mouse.click(8, 450);
+  await expect(sheet).toHaveCount(0);
+
+  // Safari 는 눌러도 단추에 포커스를 주지 않는다. 포커스를 옮기지 않는 click 으로 열어도 닫은 뒤 그 단추로 돌아온다.
+  await page.locator("body").focus();
+  await open.dispatchEvent("click");
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("button", { name: "닫기" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(open).toBeFocused();
+});

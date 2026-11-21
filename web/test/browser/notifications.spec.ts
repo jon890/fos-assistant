@@ -234,3 +234,22 @@ test("좁은 화면 위 막대의 「지금 볼 것」 단추에도 할 것의 �
   await expect(button.getByTestId("now-count")).toHaveText("3");
   await expect(button.getByTestId("now-dot")).toHaveCount(0);
 });
+
+test("단추 연결 앱 거절 알림을 누르면 서버 비밀값 화면으로 간다", async ({ page }) => {
+  const rejected: Item = {
+    ...item(TARGETED_ID, "GitHub 앱(커리어) 설정을 확인해 주세요", null),
+    kind: "CONNECTOR_OAUTH_APP_REJECTED",
+    title: "단추 연결 앱 설정을 확인해 주세요",
+    targetType: "ADMIN_SECRETS",
+  };
+  const state = { items: [rejected], unread: 1 };
+  await routeNotifications(page, state, null);
+  await page.route("**/api/notifications/*/read", (route: Route) =>
+    route.fulfill({ json: { ...rejected, readAt: "2026-10-01T12:05:00Z" } }),
+  );
+
+  await page.goto("/now?tab=notifications");
+  await page.getByTestId("notification-item").click();
+  await expect(page).toHaveURL(/\/admin\/secrets$/);
+  await expect(page.getByRole("heading", { level: 1, name: "서버 비밀값" })).toBeVisible();
+});

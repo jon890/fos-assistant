@@ -11,6 +11,7 @@ import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUseReaction;
 import com.bifos.assistant.chat.turn.application.dto.PendingQueue;
+import com.bifos.assistant.chat.reply.application.dto.ReplyPick;
 import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
@@ -23,6 +24,7 @@ import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -42,13 +44,15 @@ public final class ChatDtos {
     /**
      * @param delegateTo 대화 중 {@code @} 로 고른 에이전트의 코드. 있으면 대화의 에이전트 대신 그 에이전트에게 바로 맡긴다
      * (ADR-20261112 / mention-delegation). 비었으면 보통 보내기다
+     * @param reply 답장으로 집은 것(스펙 chat-reference). 흐르는 보내기만 받는다. 답장이 아니면 null
      */
     public record SendMessageRequest(
         UUID conversationId,
         @NotBlank @Size(max = 8000) String text,
         String agentCode,
         List<Long> attachmentIds,
-        @Size(max = 64) String delegateTo) {
+        @Size(max = 64) String delegateTo,
+        @Valid ReplyRequest reply) {
 
         public SendMessageRequest {
             attachmentIds = attachmentIds == null ? List.of() : attachmentIds;
@@ -56,8 +60,26 @@ public final class ChatDtos {
 
 
         public SendMessageRequest(UUID conversationId, String text, String agentCode, List<Long> attachmentIds) {
-            this(conversationId, text, agentCode, attachmentIds, null);
+            this(conversationId, text, agentCode, attachmentIds, null, null);
         }
+
+
+        public SendMessageRequest(
+            UUID conversationId, String text, String agentCode, List<Long> attachmentIds, String delegateTo) {
+            this(conversationId, text, agentCode, attachmentIds, delegateTo, null);
+        }
+
+
+        /** 검사하기 전의 집은 것이다. 답장이 아니면 null 이다. */
+        public ReplyPick replyPick() {
+            return reply == null ? null : new ReplyPick(reply.messageId(), reply.attachmentId(), reply.imagePath());
+        }
+    }
+
+    /**
+     * 답장으로 집은 것이다(스펙 chat-reference REQ1). 사진이나 그림 한 장을 집었으면 그 번호나 이력의 그림 경로 하나가 찬다.
+     */
+    public record ReplyRequest(@NotNull Long messageId, Long attachmentId, @Size(max = 512) String imagePath) {
     }
 
     /** 사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려고 메시지 없이 대화를 만든다. */
@@ -84,6 +106,7 @@ public final class ChatDtos {
      * @param delegatedTo {@code @} 로 맡긴 질문이면 그 맡김. 부모 실행 번호는 비어 있다. 아니면 null
      * @param steer 도는 실행에 끼워 넣은 사용자 글이면 그 상태와 자식 종류(ADR-20261116 / run-steer). 아니면 null
      * @param nativeResult Hermes 내장 위임 결과 알림 줄이면 그 결과 상태(ADR-20261117 / native-delegation-wake). 아니면 null
+     * @param reply 답장으로 보낸 사용자 메시지면 집은 것의 상자(스펙 chat-reference REQ6). 아니면 null
      */
     public record MessageView(
         Long id,
@@ -106,7 +129,31 @@ public final class ChatDtos {
         AgentLabel answeredBy,
         DelegationLine delegatedTo,
         SteerView steer,
-        NativeResultView nativeResult) {
+        NativeResultView nativeResult,
+        ReplyView reply) {
+    }
+
+    /**
+     * 보낸 답장 위에 그리는 상자다(스펙 chat-reference REQ6, REQ13).
+     *
+     * @param messageId 집은 메시지 줄. 화면이 그 자리로 스크롤한다
+     * @param role 집은 메시지의 {@code USER} 나 {@code ASSISTANT}. 원래를 찾지 못하면 null
+     * @param excerpt 그림 경로를 가린 글의 빈 줄이 아닌 앞 두 줄. 원래를 찾지 못하면 빈 글
+     * @param available 원래 메시지 줄이 있다
+     * @param images 집은 그림 한 장, 또는 메시지 전체를 집었으면 그 메시지의 사진과 그림
+     */
+    public record ReplyView(Long messageId, String role, String excerpt, boolean available, List<ReplyImageView> images) {
+    }
+
+    /**
+     * 상자의 작은 그림 하나다.
+     *
+     * @param kind {@code GENERATED} 는 만든 그림, {@code ATTACHMENT} 는 올린 사진
+     * @param path 만든 그림이면 그 경로. 사진이면 null
+     * @param attachmentId 사진이면 그 첨부 번호. 그림이면 null
+     * @param deleted 파일이 지워져 볼 수 없다
+     */
+    public record ReplyImageView(String kind, String path, Long attachmentId, boolean deleted) {
     }
 
     /**
@@ -195,10 +242,11 @@ public final class ChatDtos {
      * @param vaultItemId 그 그림이나 넣은 파일의 살아 있는 보관본 번호. 없으면 null
      * @param title {@code FILE} 의 제목. 없으면 null 이고 화면이 파일 이름을 쓴다
      * @param sourceLinks 그림을 만들 때 참고한 링크 주소. 쓴 순서다. 그림이 아니거나 없으면 빈 목록이다
+     * @param foundSourceLinks {@code sourceLinks} 가운데 비서가 찾은 주소. 같은 순서다. 화면이 「비서가 찾음」 을 붙인다. 없으면 빈 목록이다
      */
     public record ArtifactView(
         String path, long byteSize, boolean deleted, String autoVault, String autoVaultError, String kind, String prompt,
-        Long vaultItemId, String title, List<String> sourceLinks) {
+        Long vaultItemId, String title, List<String> sourceLinks, List<String> foundSourceLinks) {
         static ArtifactView from(ChatArtifact artifact, GeneratedImageDetail image) {
             return new ArtifactView(
                 artifact.path(),
@@ -210,13 +258,15 @@ public final class ChatDtos {
                 image == null ? null : image.prompt(),
                 image == null ? null : image.vaultItemId(),
                 null,
-                image == null ? List.of() : image.sourceLinks());
+                image == null ? List.of() : image.sourceLinks(),
+                image == null ? List.of() : image.foundSourceLinks());
         }
 
 
         static ArtifactView from(PutFileDetail file) {
             return new ArtifactView(
-                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title(), List.of());
+                file.path(), file.byteSize(), file.deleted(), null, null, "FILE", null, file.vaultItemId(), file.title(), List.of(),
+                List.of());
         }
     }
 
@@ -341,23 +391,19 @@ public final class ChatDtos {
         }
     }
 
-    /**
-     * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
-     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code SEARCH}, {@code READ} 이고 본문은 싣지 않는다.
-     */
     /** 「참고한 기억」 항목 단추의 요청이다. 어느 답의 어느 기억인지와 누른 단추만 받는다. */
     public record MemoryUseReactionRequest(
         @NotNull Long executionId, @NotNull Long memoryId, @NotNull MemoryUseReaction reaction) {
     }
 
-    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
+    /** 작업 과정의 「참고한 기억」 에 보일 기억 하나다(ADR-20261008 / memory-facts). 본문은 내지 않는다. */
+    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope) {
         static MemoryUseView from(MemoryUse use) {
             return new MemoryUseView(
                 use.executionId(),
                 use.memoryId(),
                 use.title(),
-                use.scope().name(),
-                use.via().name());
+                use.scope().name());
         }
     }
 }

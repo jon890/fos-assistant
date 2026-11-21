@@ -145,16 +145,17 @@ class DeployCheckRunner {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
         }
+        if (attempt.conversationId != null) {
+            // 문항이 돌다 기억 도구로 남긴 것은 통과와 상관없이 되돌린다. 대화 번호로 찾아 함께 도는 평가의 기억은 건드리지 않는다.
+            // 아래 조회가 실패해도 건너뛰지 않게 먼저 부른다.
+            cleaner.forgetCaptured(evaluation, attempt.conversationId);
+        }
         long elapsedMs = Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
         List<Long> executionIds = attempt.conversationId == null
             ? List.of()
             : observer.roots(attempt.conversationId).stream().map(AgentExecution::id).toList();
         int modelCalls = attempt.conversationId == null ? 0 : observer.modelCalls(attempt.conversationId);
         boolean passed = verdict.status() == FeatureStatus.PASSED;
-        if (attempt.conversationId != null) {
-            // 문항이 돌다 기억 도구로 남긴 것은 통과와 상관없이 지운다. 대화 번호로 찾아 함께 도는 평가의 기억은 건드리지 않는다.
-            cleaner.forgetCaptured(evaluation, attempt.conversationId);
-        }
         if (passed && attempt.conversationId != null) {
             cleaner.dropConversation(evaluation, attempt.conversationId);
         }

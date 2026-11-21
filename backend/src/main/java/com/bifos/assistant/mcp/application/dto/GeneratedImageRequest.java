@@ -23,6 +23,9 @@ import tools.jackson.databind.JsonNode;
  *
  * @param title 모델이 붙인 제목. 없으면 빈 글이다
  * @param prompt 이미지 도구에 넘긴 지시문
+ * @param sourceLinks 참고한 링크 주소. 쓴 순서다. 없으면 빈 목록이다
+ * @param foundLinks {@code sourceLinks} 가운데 비서가 그 대화에서 찾은 주소. 같은 순서이고 없으면 빈 목록이다
+ * (ADR-20261121 / found-link-image-source)
  * @param imageSha256 그림 바이트의 SHA-256 소문자 16진수
  */
 @Slf4j
@@ -33,6 +36,7 @@ public record GeneratedImageRequest(
     String title,
     String prompt,
     List<String> sourceLinks,
+    List<String> foundLinks,
     String imageSha256) {
 
 
@@ -46,6 +50,7 @@ public record GeneratedImageRequest(
      * <p>받기 경로가 정해진 꼴(한글을 퍼센트 인코딩한 주소)로 바꾼 주소도 이 상한 안에서만 받는다. 받기는 되는데 올리기에서 막혀 그림을 잃지 않게 한다.
      */
     public static final int MAX_LINK_CHARS = 8192;
+    /** 올리면 {@code chat_artifact.generation_found_link_flags}(VARCHAR(16)) 도 넓힌다. 링크마다 한 글자를 둔다. */
     private static final int MAX_LINKS = 16;
 
     /**
@@ -69,7 +74,11 @@ public record GeneratedImageRequest(
         String toolCallId = requireId(meta, "tool_call_id");
         String title = text(meta, "title", MAX_TITLE_CHARS);
         String prompt = text(meta, "prompt", MAX_PROMPT_CHARS);
-        List<String> sourceLinks = links(meta.get("source_links"));
+        List<String> sourceLinks = links(meta.get("source_links"), "source_links");
+        List<String> foundLinks = links(meta.get("found_links"), "found_links");
+        if (!sourceLinks.containsAll(foundLinks)) {
+            throw reject("found_links 에 source_links 에 없는 주소가 있다");
+        }
         String signature = requireId(meta, "sig");
         if (!McpCallContext.SIGNATURE.matcher(signature).matches()) {
             throw reject("서명이 소문자 16진수 64자가 아니다");
@@ -88,10 +97,14 @@ public record GeneratedImageRequest(
             // 링크가 있을 때만 여덟째 줄을 더한다. 링크 없는 올리기는 옛 fos-ctx 와 같은 일곱 줄 그대로다.
             signed += "\n" + sha256(String.join("\n", sourceLinks).getBytes(StandardCharsets.UTF_8));
         }
+        if (!foundLinks.isEmpty()) {
+            // 찾은 주소가 있을 때만 아홉째 줄을 더한다. 찾은 주소는 링크의 부분이라 여덟째 줄이 늘 앞에 있다.
+            signed += "\n" + sha256(String.join("\n", foundLinks).getBytes(StandardCharsets.UTF_8));
+        }
         if (!MessageDigest.isEqual(McpCallContext.hmac(tokenHash, signed), HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");
         }
-        return new GeneratedImageRequest(rootSessionId, sessionId, toolCallId, title, prompt, sourceLinks, imageSha256);
+        return new GeneratedImageRequest(rootSessionId, sessionId, toolCallId, title, prompt, sourceLinks, foundLinks, imageSha256);
     }
 
 
@@ -125,19 +138,22 @@ public record GeneratedImageRequest(
     }
 
 
-    /** {@code source_links} 는 없거나, {@code https://} 로 시작하는 줄바꿈 없는 주소의 배열이다(ADR-20261120 / link-image-source). */
-    private static List<String> links(JsonNode value) {
+    /**
+     * {@code source_links} 와 {@code found_links} 는 없거나, {@code https://} 로 시작하는 줄바꿈 없는 주소의 배열이다
+     * (ADR-20261120 / link-image-source).
+     */
+    private static List<String> links(JsonNode value, String key) {
         if (value == null || value.isNull()) {
             return List.of();
         }
         if (!value.isArray() || value.size() > MAX_LINKS) {
-            throw reject("source_links 가 배열이 아니거나 너무 많다");
+            throw reject(key + " 가 배열이 아니거나 너무 많다");
         }
         List<String> links = new ArrayList<>(value.size());
         for (JsonNode item : value) {
             String link = item.isString() ? item.asString() : "";
             if (!link.startsWith("https://") || link.length() > MAX_LINK_CHARS || link.chars().anyMatch(c -> c <= 0x20 || c == 0x7f)) {
-                throw reject("source_links 의 항목이 https 주소가 아니다");
+                throw reject(key + " 의 항목이 https 주소가 아니다");
             }
             links.add(link);
         }

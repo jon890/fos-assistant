@@ -7,6 +7,7 @@ import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
 import { AgentMention, mentionOptionId } from "./agent-mention";
 import { DelegateChip } from "./delegate-chip";
+import { ReplyPreview } from "./reply-box";
 import { SkillCommandMenu } from "./skill-command-menu";
 import { skillOptionId } from "./skill-command";
 import { ModelTierPicker } from "./model-picker";
@@ -39,6 +40,7 @@ export function Composer(props: Props) {
     modelTier,
     modelChoiceUnknown,
     delegateTarget,
+    reply,
   } = props;
   const {
     blocking,
@@ -154,6 +156,25 @@ export function Composer(props: Props) {
           onClear={delegateTarget.onClear}
           disabled={disabled || outgoing !== null}
         />
+      ) : null}
+
+      {reply ? (
+        <div className="mb-2">
+          <ReplyPreview
+            reply={reply.target}
+            conversationId={props.conversationId}
+            onClear={reply.onClear}
+          />
+          {running ? (
+            // 대기 줄은 글만 받아 집은 것을 붙일 수 없다(스펙 chat-reference DECISION18)
+            <p
+              data-testid="reply-wait"
+              className="mt-1 text-xs text-muted-foreground"
+            >
+              답이 끝나면 보낼 수 있어요
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {pickNotice ? (

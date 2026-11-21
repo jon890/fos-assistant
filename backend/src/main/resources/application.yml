@@ -404,7 +404,7 @@ assistant:
     link-retention: 30d
     cleanup-cron: "0 15 5 * * *"
     # 평가 묶음 파일을 읽는 폴더. e2e 가 테스트 묶음 폴더로 바꾼다
-    bundle-location: ${ASSISTANT_QUALITY_BUNDLE_LOCATION:classpath:quality/bundles/}
+    bundle-location: ${ASSISTANT_QUALITY_BUNDLE_LOCATION:classpath*:quality/bundles/}
     # 있으면 모든 묶음의 문항 상한을 이 값으로 바꾼다. 테스트와 e2e 만 줄이고 운영은 비운다
     eval-timeout-override: ${ASSISTANT_QUALITY_EVAL_TIMEOUT_OVERRIDE:}
   pricing:

@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageStored;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.GeneratedImageTitle;
@@ -19,7 +20,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,13 +31,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
  * 비서가 만든 그림 하나를 대화의 결과물 폴더에 쓰고 결과물 행으로 남긴다(ADR-20261119 / generated-image).
  *
  * <p>누구의 어느 대화인지는 부르는 쪽({@code mcp})이 origin 실행에서 정해 넘긴다. 이 서비스는 요청 본문에서 그것을 읽지 않는다.
- * 답에 묶는 일은 turn 이 끝날 때 {@link ArtifactService#recordTurn} 이 한다.
+ * 답에 묶는 일은 turn 이 끝날 때 {@link ArtifactService#recordTurn} 이 한다. 새로 저장하면 {@link GeneratedImageStored} 를 내 화면이
+ * 답이 끝나기 전에 그림을 그리게 한다.
  *
  * <p>이름 정하기부터 행 만들기까지 대화마다 한 번에 하나만 돈다. 겹침을 그 대화의 그림 행으로 보므로, 둘이 함께 돌면 같은 이름을 고른다.
  * Control Plane 을 한 대만 띄운다는 전제다.
@@ -50,16 +55,23 @@ public class GeneratedImageService {
     private final ChatArtifactRepository artifacts;
     private final TextCipher cipher;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final long maxBytes;
     private final ReentrantLock[] locks = new ReentrantLock[LOCK_COUNT];
 
 
     public GeneratedImageService(
-        ArtifactStore store, ChatArtifactRepository artifacts, TextCipher cipher, Clock clock, ArtifactProperties properties) {
+        ArtifactStore store,
+        ChatArtifactRepository artifacts,
+        TextCipher cipher,
+        Clock clock,
+        ArtifactProperties properties,
+        ApplicationEventPublisher events) {
         this.store = store;
         this.artifacts = artifacts;
         this.cipher = cipher;
         this.clock = clock;
+        this.events = events;
         this.maxBytes = properties.generatedImageMaxBytes();
         for (int index = 0; index < LOCK_COUNT; index++) {
             locks[index] = new ReentrantLock();
@@ -88,7 +100,27 @@ public class GeneratedImageService {
      */
     public GeneratedImageSaved save(
         Long conversationId, Long ownerUserId, String callKey, String title, String prompt, List<String> sourceLinks, byte[] image) {
+        return save(conversationId, ownerUserId, callKey, title, prompt, sourceLinks, List.of(), image);
+    }
+
+
+    /**
+     * 참고한 링크와 그 가운데 비서가 찾은 주소를 함께 저장한다(ADR-20261121 / found-link-image-source).
+     *
+     * @param foundLinks {@code sourceLinks} 가운데 비서가 그 대화에서 찾은 주소. 없으면 빈 목록이다
+     */
+    public GeneratedImageSaved save(
+        Long conversationId,
+        Long ownerUserId,
+        String callKey,
+        String title,
+        String prompt,
+        List<String> sourceLinks,
+        List<String> foundLinks,
+        byte[] image) {
         String extension = extensionOf(image);
+        String path;
+        String name;
         ReentrantLock lock = locks[Math.floorMod(conversationId.hashCode(), LOCK_COUNT)];
         lock.lock();
         try {
@@ -96,8 +128,8 @@ public class GeneratedImageService {
             if (existing.isPresent()) {
                 return new GeneratedImageSaved(GeneratedImageTitle.ofPath(existing.get().path()));
             }
-            String name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()), extension);
-            String path = FOLDER + name + "." + extension;
+            name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()), extension);
+            path = FOLDER + name + "." + extension;
             long byteSize = store.write(conversationId, path, image);
             try {
                 SealedText sealed = seal(ownerUserId, aad(ownerUserId, callKey), prompt == null ? "" : prompt);
@@ -105,15 +137,32 @@ public class GeneratedImageService {
                     ? new SealedText(null, null)
                     : seal(ownerUserId, linksAad(ownerUserId, callKey), String.join("\n", sourceLinks));
                 artifacts.save(ChatArtifact.generatedImage(
-                    conversationId, path, byteSize, sealed.content(), sealed.keyId(), links.content(), links.keyId(), callKey));
+                    conversationId, path, byteSize, sealed.content(), sealed.keyId(), links.content(), links.keyId(),
+                    foundFlags(sourceLinks, foundLinks), callKey));
             } catch (RuntimeException ex) {
                 removeQuietly(conversationId, path);
                 throw ex;
             }
-            return new GeneratedImageSaved(name);
         } finally {
             lock.unlock();
         }
+        // 잠금을 푼 뒤 알린다. 받는 쪽이 SSE 로 보내는 동안 같은 대화의 다음 그림 저장을 막지 않는다. 사건의 순서는 뒤바뀔 수 있어
+        // 화면은 사건을 받으면 저장한 순서의 목록({@link #unboundPaths})을 다시 읽는다.
+        events.publishEvent(new GeneratedImageStored(conversationId, path));
+        return new GeneratedImageSaved(name);
+    }
+
+
+    /**
+     * 그 대화에서 아직 답에 묶이지 않은 그림의 경로를 저장한 순서대로 준다. 답이 끝나면 다음 답에 묶일 그림이다.
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public List<String> unboundPaths(Long conversationId) {
+        return artifacts.findByConversationIdAndMessageIdIsNullAndGenerationCallKeyIsNotNullAndVaultUserIdIsNullAndDeletedAtIsNullOrderByIdAsc(
+            conversationId).stream()
+            .map(ChatArtifact::path)
+            .toList();
     }
 
 
@@ -138,8 +187,10 @@ public class GeneratedImageService {
         }
         Map<Long, GeneratedImageDetail> details = new HashMap<>();
         for (ChatArtifact image : images) {
+            List<String> links = sourceLinksOf(image, ownerUserId);
             details.put(image.id(), new GeneratedImageDetail(
-                promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()), sourceLinksOf(image, ownerUserId)));
+                promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()), links,
+                foundOf(links, image.generationFoundLinkFlags())));
         }
         return details;
     }
@@ -194,6 +245,44 @@ public class GeneratedImageService {
     }
 
 
+    /**
+     * 그 답에 묶인 그림 행이다. 만든 순서다(스펙 chat-reference REQ1). 파일이 지워진 행도 낸다.
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public List<ChatArtifact> imagesOfMessage(Long messageId) {
+        return artifacts.findByMessageId(messageId).stream()
+            .filter(ChatArtifact::isGeneratedImage)
+            .sorted(Comparator.comparing(ChatArtifact::id))
+            .toList();
+    }
+
+
+    /**
+     * 그림 행의 원본 바이트다. 파일이 지워졌거나 상한을 넘거나 읽지 못하면 비어 있다(스펙 chat-reference REQ9, REQ15).
+     *
+     * <p>부르는 쪽이 요청자가 그 대화의 주인임을 먼저 확인한다.
+     */
+    public Optional<byte[]> readLive(ChatArtifact image) {
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(image.conversationId(), image.path());
+        if (file.isEmpty() || !Files.isRegularFile(file.get())) {
+            return Optional.empty();
+        }
+        try {
+            return Files.size(file.get()) > maxBytes ? Optional.empty() : Optional.of(Files.readAllBytes(file.get()));
+        } catch (IOException | ApiException ex) {
+            return Optional.empty();
+        }
+    }
+
+
+    /** 그림 행의 파일이 남아 있다. 바이트는 읽지 않는다. */
+    public boolean isLive(ChatArtifact image) {
+        Optional<Path> file = image.isDeleted() ? Optional.empty() : store.resolveInside(image.conversationId(), image.path());
+        return file.isPresent() && Files.isRegularFile(file.get());
+    }
+
+
     private ChatArtifact findByTitle(Long conversationId, String title) {
         return artifacts.findGeneratedImages(conversationId).stream()
             .filter(it -> GeneratedImageTitle.ofPath(it.path()).equals(title))
@@ -242,6 +331,34 @@ public class GeneratedImageService {
             : cipher.open(
                 artifact.generationSourceLinksKeyId(), ownerUserId, linksAad(ownerUserId, artifact.generationCallKey()), stored);
         return opened.map(text -> text.lines().filter(line -> !line.isBlank()).toList()).orElse(List.of());
+    }
+
+
+    /** 링크마다 찾은 주소면 {@code 1}, 아니면 {@code 0} 을 이은 글이다. 찾은 주소가 없으면 null 이다. */
+    static String foundFlags(List<String> sourceLinks, List<String> foundLinks) {
+        if (foundLinks.isEmpty()) {
+            return null;
+        }
+        StringBuilder flags = new StringBuilder(sourceLinks.size());
+        for (String link : sourceLinks) {
+            flags.append(foundLinks.contains(link) ? '1' : '0');
+        }
+        return flags.indexOf("1") < 0 ? null : flags.toString();
+    }
+
+
+    /** 표시와 링크의 수가 다르면 표시가 틀리게 붙지 않게 모두 없는 것으로 읽는다. */
+    static List<String> foundOf(List<String> sourceLinks, String flags) {
+        if (flags == null || flags.length() != sourceLinks.size()) {
+            return List.of();
+        }
+        List<String> found = new ArrayList<>();
+        for (int i = 0; i < flags.length(); i++) {
+            if (flags.charAt(i) == '1') {
+                found.add(sourceLinks.get(i));
+            }
+        }
+        return List.copyOf(found);
     }
 
 

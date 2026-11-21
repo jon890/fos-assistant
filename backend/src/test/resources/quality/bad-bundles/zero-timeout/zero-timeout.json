@@ -1,1 +1,1 @@
-{"id":"zero-timeout","title":"t","timeoutMinutes":0,"questions":[{"id":"a","turns":[{"text":"x"}]}]}
+{"id":"zero-timeout","title":"t","timeoutMinutes":0,"questions":[{"id":"a","tag":"x","expect":{"includes":["y"]},"turns":[{"text":"x"}]}]}
