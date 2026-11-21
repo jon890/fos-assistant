@@ -6,6 +6,7 @@ import vm from "node:vm";
 import ts from "../../node_modules/typescript/lib/typescript.js";
 import { toolText } from "../../src/lib/connector-tool-text.ts";
 import * as connection from "../../src/lib/connection.ts";
+import * as connectionOAuth from "../../src/lib/connection-oauth.ts";
 import { AGENT_CODE_PATTERN } from "../../src/lib/agent.ts";
 
 const CODE = "a".repeat(12);
@@ -37,6 +38,7 @@ async function bind(answer: unknown): Promise<Response> {
       },
     },
     "@/lib/connection": connection,
+    "@/lib/connection-oauth": connectionOAuth,
     "@/lib/connector-tool-text": { toolText },
     "@/lib/agent": { AGENT_CODE_PATTERN },
     "@/lib/json-body": {},
