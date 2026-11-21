@@ -1,0 +1,91 @@
+{
+  "name": "eval-runner",
+  "description": "평가 전용 사용자로 묶음 문항을 돌리는 실행기와 서비스 개념 묶음",
+  "pr_scope": "Control Plane 안의 평가 실행기가 서비스 개념 묶음을 평가 전용 사용자로 돌리고, 카드 처리와 비우기를 하며, 관리자 API 로 시작하고 결과를 읽게 한다.",
+  "deferred": [
+    {
+      "what": "답변 품질 묶음: 답변 품질 판정(형식 검사, 사진 요청)과 묶음 파일, answer-quality 통과 규칙, 공개 주소 읽기 꺼내기와 링크 열기, scripts/dev/run-eval.ts",
+      "why": "운영 코드 상한(1500줄) 안에 들도록 design.md 「PR2a 나눔」 이 둘째 PR 로 나눴다",
+      "after": "이 계획의 PR 이 머지되고 배포 뒤 서비스 개념 묶음을 한 번 돌려 본 뒤"
+    },
+    {
+      "what": "화면과 정리: 품질 화면 둘째 칸과 「지금 돌리기」, 옛 TypeScript 평가 스크립트 지우기, AGENTS.md 와 서비스 개념·답변 품질 문서 고치기",
+      "why": "design.md 「PR2a 나눔」 의 셋째 PR 이다. 옛 스크립트는 두 묶음이 운영에서 같은 판정을 낸 뒤에 지운다",
+      "after": "답변 품질 묶음 PR 이 머지되고 PR1 의 화면 PR 이 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/agent-quality/spec.md",
+  "design": "docs/features/agent-quality/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ5",
+    "REQ6",
+    "REQ9",
+    "REQ15",
+    "REQ16",
+    "REQ17"
+  ],
+  "total_phases": 6,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ17"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5",
+        "REQ6",
+        "REQ16"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ17"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ15"
+      ]
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ9",
+        "REQ15",
+        "REQ16",
+        "REQ17"
+      ]
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5",
+        "REQ9",
+        "REQ15",
+        "REQ16",
+        "REQ17"
+      ]
+    }
+  ]
+}
