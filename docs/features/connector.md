@@ -248,6 +248,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았다. 결과 트랜잭션이 같은 설치 시도의 새 바인딩 행만 지운다.
 붙인 바인딩은 늘 `PENDING` 이다. 답의 `restart_required` 가 참이고 `cycle_available` 이면 재시작 대기 대신 그 서버만 껐다 켜는 단계(`IDLE_WAIT`)로 둔다(아래 「껐다 켜기」). 그 밖에 `restart_required` 나 `plugin_updated` 가 참이면 재시작 대기로 두고 그 시각을 적는다. 둘 다 거짓이고 `reload_pending` 이 참이면 `assistant.connector.binding.apply-delay` 뒤를 반영 예정 시각으로 적는다.
 답의 `skipped_skills`(설치하지 못한 에이전트용 스킬과 까닭)는 바인딩의 `skipped_skills` 에 덮어쓰고 연결 목록 응답의 `skippedSkills` 로 낸다. 칸이 없는 옛 대시보드 plugin 의 답은 빈 목록이고, 설치가 실패하면 옛 기록을 둔다.
+설치 상태 조회(`GET /api/connectors`)도 바인딩한 항목마다 지금 profile 기준의 `skipped_skills` 를 낸다. 정의 어긋남 점검이 설치가 반영된 바인딩에서 그 답으로 기록을 맞춘다. 이름이 겹친 스킬은 설치 판정이 어긋남으로 보지 않아 재설치가 없으므로, 설치 응답만으로는 까닭이 남지 않기 때문이다. 조회 응답에 칸이 없으면 기록을 두고, 빈 목록이면 비운다.
 그 시간을 정한 까닭은 `ConnectorBindingProperties` 의 주석과 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
 
 떼기는 이렇게 갈린다.

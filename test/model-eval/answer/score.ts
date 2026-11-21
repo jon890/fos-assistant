@@ -233,12 +233,19 @@ export function linkState(status: number | null): LinkState {
   return status >= 200 && status < 400 ? "open" : "closed";
 }
 
-/** 사진이나 링크를 보내 달라고 부탁하는 말이 있는가(스펙 tool-fallback REQ7). 「사진을 올려 주세요」, 「링크를 보내 주시면」 을 받는다. 「링크를 공유합니다」 처럼 부탁이 아닌 말은 받지 않는다. */
+/** 사진이나 링크를 보내 달라고 부탁하는 말이 있는가(스펙 tool-fallback REQ7, agent-found-image REQ6). 사진을 받지 못해 그리지 않고 대안을 알린 답을 알아본다. 「사진을 올려 주세요」, 「링크를 보내 주시면」 을 받는다. 「링크를 공유합니다」 처럼 부탁이 아닌 말은 받지 않는다. */
 // 부탁하는 끝맺음만 받는다. 「보내 주실 필요는 없어요」, 「보내 주지 않아도 돼요」 같은 부정은 받지 않는다.
 const PHOTO_REQUEST = /(사진|이미지|링크|주소)[^\n]{0,40}(보내|올려|첨부해|공유해|붙여) ?(주세요|주시면|주실 수|주시겠|줄래|주면|달라)/;
 
 export function asksForPhoto(text: string): boolean {
   return PHOTO_REQUEST.test(text);
+}
+
+/** 실행 트리에서 그림 만들기 도구가 실패 없이 끝난 적이 있는가. 막힌 호출은 사건이 남지 않으므로 끝 사건이 있으면 그림을 만든 것이다. */
+export function drewImage(root: ExecutionNode | null): boolean {
+  if (!root) return false;
+  if (root.events.some((event) => event.eventType === "TOOL_COMPLETED" && event.toolName === "image_generate" && !event.failed)) return true;
+  return root.children.some(drewImage);
 }
 
 export function scoreQuestion(
@@ -257,7 +264,7 @@ export function scoreQuestion(
       : question.check === "date"
         ? answers.some((text) => mentionsDate(text, startedAt))
         : question.check === "photo-request"
-          ? answers.some(asksForPhoto)
+          ? drewImage(root) || answers.some(asksForPhoto)
           : urls.length > 0;
   return {
     id: question.id,
@@ -319,7 +326,7 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
     reasons.push(`열린 링크 ${openLinks}/${checkedLinks} (기준 90% 이상)`);
   if (!datePassed) reasons.push("오늘 날짜 문항이 그날 날짜로 답하지 않았다");
   const photoMissed = scores.filter((score) => score.check === "photo-request" && !score.passed && !score.error).length;
-  if (photoMissed > 0) reasons.push(`참고 사진을 받지 못한 그림 문항 ${photoMissed}개가 사진이나 링크를 보내 달라고 하지 않았다`);
+  if (photoMissed > 0) reasons.push(`사진을 찾아 그려 달라는 문항 ${photoMissed}개가 그림을 만들지도, 사진이나 링크를 보내 달라고 하지도 않았다`);
   const similarNeeded = Math.ceil(compareIds.size * SIMILAR_RATIO - 1e-9);
   const compareDone = given.length >= compareIds.size;
   if (compareDone && similar < similarNeeded) reasons.push(`「비슷하다」 ${similar}/${compareIds.size} (기준 ${similarNeeded} 이상)`);

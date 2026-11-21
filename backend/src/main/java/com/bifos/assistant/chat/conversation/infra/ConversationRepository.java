@@ -365,4 +365,32 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     /** 대기 줄이 있는 대화의 번호다. 멈춘 줄도 낸다. 빈 줄은 저장하지 않으므로 보내지 않은 글이 있는 대화만 나온다. */
     @Query(value = "select id from conversation where pending_messages is not null order by id", nativeQuery = true)
     List<Long> findIdsWithPendingMessages();
+
+
+    /**
+     * 비서가 그 대화에서 찾은 주소의 해시를 이어 붙인 글이다(ADR-20261121 / found-link-image-source). 비었거나 대화가 없으면 빈 값이다.
+     *
+     * <p>엔티티는 이 칸을 읽지 않는다. 대화를 읽을 때마다 이 칸까지 읽지 않으려는 것이다.
+     */
+    @Query(value = "select found_link_hashes from conversation where id = :id", nativeQuery = true)
+    Optional<String> findFoundLinkHashes(@Param("id") Long id);
+
+
+    /**
+     * 찾은 주소의 해시를 뒤에 붙이고 뒤에서 {@code limit} 글자만 남긴다. 지운 대화에는 붙이지 않는다.
+     *
+     * <p>읽고 고쳐 쓰지 않고 한 문장으로 붙인다. 한 실행의 도구 결과 여럿이 동시에 알려도 서로를 덮지 않는다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(
+        value = "update conversation set found_link_hashes = right(concat(coalesce(found_link_hashes, ''), :hashes), :limit)"
+            + " where id = :id and deleted_at is null",
+        nativeQuery = true)
+    int appendFoundLinkHashes(@Param("id") Long id, @Param("hashes") String hashes, @Param("limit") int limit);
+
+
+    /** 찾은 주소의 해시를 비운다. 대화를 지울 때 부른다. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update conversation set found_link_hashes = null where id = :id", nativeQuery = true)
+    int clearFoundLinkHashes(@Param("id") Long id);
 }
