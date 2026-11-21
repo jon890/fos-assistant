@@ -1,16 +1,14 @@
 import { memoryRequest } from "@/lib/memory-api";
 
 /**
- * 답을 만든 실행이 본문을 받은 기억 한 줄이다. `ChatDtos.MemoryUseView` 를 그대로 받는다.
- *
- * <p>`via` 는 받은 길이다. `ALWAYS` 는 항상 층, `FACTS` 는 요약 구역, `SEARCH` 는 질문과 관련된 기억 구역, `LINK` 는 실린 기억과 이어진 연결된 기억 구역, `READ` 는 `memory_read` 로 읽은 것이다.
+ * 답을 만든 실행이 `memory_read` 로 본문을 읽은 기억 한 줄이다. `ChatDtos.MemoryUseView` 를 그대로 받는다.
+ * 요약 구역처럼 조립이 넣은 기억은 오지 않는다.
  */
 export type MemoryUse = {
   executionId: number;
   memoryId: number;
   title: string;
   scope: "USER" | "GROUP";
-  via: "ALWAYS" | "FACTS" | "SEARCH" | "LINK" | "READ";
 };
 
 const READ_FAILED = "참고한 기억을 읽지 못했어요.";

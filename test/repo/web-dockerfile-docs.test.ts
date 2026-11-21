@@ -29,6 +29,14 @@ test("web Dockerfile 은 문서 위치와 배포 커밋을 실행 환경에 둔�
 });
 
 /**
+ * public 은 builder 의 `COPY . .` 로 들어온 checkout 권한(운영은 파일 600)을 그대로 가져오면 nextjs 가 sw.js 를 못 읽어 500 이 난다.
+ * 빌더에서 runner 로 복사하는 소스 문맥 디렉터리(public)에는 --chmod 가 있어야 한다.
+ */
+test("web Dockerfile 은 public 복사에 읽기 권한을 연다", () => {
+  assert.match(DOCKERFILE, /^COPY\s+--from=builder\s+--chmod=[0-7][0-7][57]\s+\/app\/public\s+\.\/public\s*$/m);
+});
+
+/**
  * 운영 배포의 소스 checkout 은 디렉터리 700, 파일 600 이라 COPY 가 그 권한을 가져오면 nextjs 가 읽지 못한다.
  * Dockerfile 이 쓰는 COPY 옵션을 그대로 뽑아 좁은 권한의 문맥으로 작은 이미지를 만들어 nextjs 로 읽어 본다.
  */
