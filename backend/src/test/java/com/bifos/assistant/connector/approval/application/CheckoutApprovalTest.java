@@ -140,6 +140,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
         var second = prepareOther();
         assertThat(action(second).status()).isEqualTo(ActionStatus.PENDING);
+        fill = claimThen(sheet(expected));
         assertThat(publicApproval.approve(user, second.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         assertThat(onlyHandoff(second).need()).isEqualTo(HandoffNeed.PAYMENT);
     }
