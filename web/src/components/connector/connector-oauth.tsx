@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import type { ConnectionStatus } from "@/lib/connection";
+import type {
+  ConnectionStatus,
+  ConnectorConnection,
+  ConnectorField,
+} from "@/lib/connection";
 import {
   oauthOutcomeMessage,
   providerName,
@@ -227,4 +231,23 @@ export function useOAuthNotices(
       window.history.replaceState(null, "", `/connections/${id}`);
   }, [id, oauthResult]);
   return { returned, setReturned, revoke, setRevoke };
+}
+
+/**
+ * 단추가 보낼 단추 밖 칸 값이다. 입력한 값을 앞뒤 공백을 지워 쓰고, 입력하지 않은 비밀 아닌 칸은 저장된 값을 쓴다.
+ * 다시 연결할 때 저장소 이름 같은 칸을 또 넣지 않게 한다. 비밀 칸은 저장된 원문이 없어 늘 새로 넣는다.
+ */
+export function oauthStartValues(
+  fields: ConnectorField[],
+  typed: Record<string, string>,
+  connection: ConnectorConnection,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const field of fields) {
+    const value =
+      typed[field.key]?.trim() ||
+      (field.secret ? "" : (connection.values[field.key] ?? ""));
+    if (value) result[field.key] = value;
+  }
+  return result;
 }

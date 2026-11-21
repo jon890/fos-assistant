@@ -208,3 +208,19 @@ test("단추 연결을 해제하고 허락 취소가 실패하면 직접 거두�
   await expect(notice.getByRole("link", { name: "앱 설치 화면 열기" })).toHaveAttribute("href", INSTALL);
   await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
 });
+
+test("다시 연결은 저장된 저장소 칸을 다시 넣지 않아도 저장된 값으로 시작한다", async ({ page }) => {
+  await serve(page, OAUTH, connected);
+  let started: unknown;
+  await page.route(`**/api/connections/${ID}/oauth/start`, (route) => {
+    started = route.request().postDataJSON();
+    return route.fulfill({ json: { authorizeUrl: AUTHORIZE } });
+  });
+  await page.route("https://github.com/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<p>GitHub 대역</p>" }),
+  );
+  await page.goto(`/connections/${ID}`);
+  await page.getByRole("button", { name: "GitHub 으로 다시 연결" }).click();
+  await page.waitForURL(AUTHORIZE);
+  expect(started).toEqual({ values: { repo: "me/site" } });
+});

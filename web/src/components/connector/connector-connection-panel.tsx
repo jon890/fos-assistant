@@ -20,6 +20,7 @@ import { ConnectorFieldInput } from "@/components/connector/connector-field-inpu
 import {
   OAuthConnect,
   OAuthNotices,
+  oauthStartValues,
   useOAuthNotices,
   oauthMethodLabel,
 } from "@/components/connector/connector-oauth";
@@ -116,29 +117,19 @@ export function ConnectorConnectionPanel({
     (field) => !field.required || values[field.key]?.trim(),
   );
   const buttonFields = fields.filter((field) => !folded.has(field.key));
+  const startValues = oauthStartValues(buttonFields, values, connection);
   const canStart = buttonFields.every(
-    (field) => !field.required || values[field.key]?.trim(),
+    (field) => !field.required || startValues[field.key],
   );
-
-  /** 채운 칸의 값만 앞뒤 공백을 지워 모은다. */
-  function filled(list: ConnectorField[]): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const field of list) {
-      const value = values[field.key]?.trim();
-      if (value) result[field.key] = value;
-    }
-    return result;
-  }
 
   /** 단추 밖 칸 값만 보내고 받은 로그인 주소로 이 창을 보낸다. */
   async function connectWithOAuth() {
     if (busy || !canStart) return;
-    const submitted = filled(buttonFields);
     setPending("oauth");
     setError(null);
     notices.setReturned(null);
     notices.setRevoke(null);
-    const started = await startOAuth(id, submitted);
+    const started = await startOAuth(id, startValues);
     if (!started.ok) {
       setPending(null);
       return setError(started);
@@ -200,7 +191,11 @@ export function ConnectorConnectionPanel({
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !complete) return;
-    const submitted = filled(fields);
+    const submitted: Record<string, string> = {};
+    for (const field of fields) {
+      const value = values[field.key]?.trim();
+      if (value) submitted[field.key] = value;
+    }
     // 비밀 원문은 보낸 직후 화면에서 비운다.
     setValues((current) => {
       const next = { ...current };
