@@ -16,6 +16,6 @@ application 직하의 클래스는 25개를 넘지 않는다.
 ## 이 저장소의 사례
 
 [ADR-20261015-package-layout.md](../../backend/docs/adr/ADR-20261015-package-layout.md)에서 확인한다.
-ADR-20261015 / package-layout의 하위 기능 표가 나눈 기능과 그 순서를 갖는다.
+[ADR-20261015 / package-layout](../../backend/docs/adr/ADR-20261015-package-layout.md)의 하위 기능 표가 나눈 기능과 그 순서를 갖는다.
 
 결정과 근거는 [ADR-20261015 / package-layout](../../backend/docs/adr/ADR-20261015-package-layout.md)가, 책임과 실행 절차는 [code-architecture.md](../../backend/docs/code-architecture.md)가 갖는다.

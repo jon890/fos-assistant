@@ -118,7 +118,7 @@
 | 결정 | 종류 | ADR 또는 필요 없음의 이유 | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | 스펙 DECISION1, DECISION17, 이 문서 DECISION1~2 | architecture, areas: security | [ADR-20261120 / no-local-shell](../../adr/ADR-20261120-no-local-shell.md)(PR1). ADR-086 의 local 허용을 대체한다 | `hermes/README.md` 의 「셸 실행 공간」, `toolconfig.py` |
-| 스펙 DECISION3, 이 문서 DECISION3 | architecture, areas: operations | PR2 에서 새 ADR | `hermes/README.md` 의 「셸 실행 공간」 |
-| 스펙 DECISION6, DECISION10 | domain-policy, areas: security | PR3 에서 새 ADR. ADR-029 의 등급 표와 ADR-20261008 / default-toolsets 의 기본 비서 한정을 대체한다 | `AgentToolPolicy`, `docs/features/agent-skill.md` 의 「에이전트 도구」 |
+| 스펙 DECISION3, 이 문서 DECISION3 | architecture, areas: operations | [ADR-20261121 / sandbox-default-policy](../../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)(PR2) | `hermes/README.md` 의 「셸 실행 공간」 |
+| 스펙 DECISION6, DECISION10 | domain-policy, areas: security | PR3 에서 새 ADR. ADR-029 의 등급 표와 [ADR-20261008 / default-toolsets](../../adr/ADR-20261008-default-toolsets.md) 의 기본 비서 한정을 대체한다 | `AgentToolPolicy`, `docs/features/agent-skill.md` 의 「에이전트 도구」 |
 | 스펙 DECISION4, DECISION9, DECISION18 | architecture, areas: security | PR4 에서 새 ADR. ADR-086 의 주인 바꾸기 금지와 ADR-029 의 그룹 공개 금지(셸 계열)를 대체한다 | `Agent.sandboxOwner()` |
-| 스펙 DECISION5, DECISION7, DECISION19 | domain-policy, areas: security | PR5 에서 새 ADR. ADR-082, ADR-085, ADR-20261105 / event-watch 의 셸 계열 차단을 대체한다 | [`proactive.md`](../proactive.md) |
+| 스펙 DECISION5, DECISION7, DECISION19 | domain-policy, areas: security | PR5 에서 새 ADR. ADR-082, ADR-085, [ADR-20261105 / event-watch](../../adr/ADR-20261105-event-watch.md) 의 셸 계열 차단을 대체한다 | [`proactive.md`](../proactive.md) |
