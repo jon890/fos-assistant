@@ -312,7 +312,9 @@ test("고른 사이즈 재고를 읽지 못해도 준비는 표시된 가격과 
   expect(detail.isError).toBe(false);
   expect(detail.body.options[1]).toMatchObject({
     name: "사이즈",
-    values: expect.arrayContaining([{ label: "L", extra_krw: null, sold_out: null }]),
+    values: expect.arrayContaining([
+      { label: "L", extra_krw: null, sold_out: null },
+    ]),
   });
   shop!.stop();
   const { isError, body } = await prepare(

@@ -96,9 +96,18 @@ test("상품 찾기는 선택한 정렬을 네이버 검색 주소로 보내고 
     .map(({ params }) => new URL(params.url));
   expect(urls.map((url) => [...url.searchParams])).toEqual([
     [["query", "물티슈 100매"]],
-    [["query", "물티슈 100매"], ["sort", "LOW_PRICE"]],
-    [["query", "물티슈 100매"], ["sort", "HIGH_PRICE"]],
-    [["query", "물티슈 100매"], ["sort", "REVIEW"]],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "LOW_PRICE"],
+    ],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "HIGH_PRICE"],
+    ],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "REVIEW"],
+    ],
   ]);
 });
 
