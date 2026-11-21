@@ -12,10 +12,52 @@ export type BrowserGatewaySecret = {
   bindingCount: number | null;
 };
 
+export type VapidSecret = {
+  set: boolean;
+  /** 공개 키는 비밀이 아니라 원문이다. 꺼졌으면 null */
+  publicKey: string | null;
+  subject: string | null;
+  updatedBy: SecretUpdatedBy | null;
+  updatedAt: string | null;
+  /** 지금 등록된 기기 수. 확인 창이 「등록된 기기 N대」 로 보인다 */
+  deviceCount: number;
+};
+
 export type ServerSecretOverview = {
   storeAvailable: boolean;
   browserGateway: BrowserGatewaySecret;
+  vapid: VapidSecret;
 };
+
+export type VapidChanged = {
+  storeAvailable: boolean;
+  vapid: VapidSecret;
+  releasedUsers: number;
+};
+
+/** `expectedPublicKey` 는 화면이 읽은 공개 키다. 키가 없던 화면이면 null 이고, 서버는 지금 키가 다르면 거절한다. */
+export function regenerateVapid(
+  subject: string,
+  expectedPublicKey: string | null,
+): Promise<Response> {
+  return fetch("/api/admin/secrets/vapid/regenerate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subject: subject.trim() || undefined,
+      expectedPublicKey,
+    }),
+  });
+}
+
+export function deleteVapid(): Promise<Response> {
+  return fetch("/api/admin/secrets/vapid", { method: "DELETE" });
+}
+
+/** VAPID 키를 바꾸거나 지울 때 확인 창의 설명이다(서버 비밀값 스펙 REQ6). */
+export function vapidConfirmText(deviceCount: number): string {
+  return `등록된 기기 ${deviceCount}대가 모두 해제되고 사용자마다 다시 등록해야 합니다.`;
+}
 
 export type BindingReinstall = {
   total: number;

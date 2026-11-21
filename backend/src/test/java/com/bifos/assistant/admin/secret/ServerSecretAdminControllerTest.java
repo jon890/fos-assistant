@@ -12,6 +12,7 @@ import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminController
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.crypto.domain.ServerSecrets;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.notification.infra.VapidKeys;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
@@ -42,6 +43,9 @@ class ServerSecretAdminControllerTest {
 
     @Autowired
     HermesConnectorClient connector;
+
+    @Autowired
+    VapidKeys vapidKeys;
 
     @Autowired
     AppUserRepository users;
@@ -123,6 +127,59 @@ class ServerSecretAdminControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.browserGateway.set").value(true))
             .andExpect(jsonPath("$.reinstall.catalogUnavailable").value(true));
+    }
+
+
+    @Test
+    @DisplayName("MEMBER 역할은 VAPID 만들기와 지우기도 403 이고 키가 그대로다")
+    void forbidsMemberOnVapid() throws Exception {
+        String before = vapidKeys.publicKeyBase64Url();
+        signIn(member);
+
+        mvc.perform(post("/api/v1/admin/secrets/vapid/regenerate")).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/admin/secrets/vapid")).andExpect(status().isForbidden());
+
+        assertThat(vapidKeys.publicKeyBase64Url()).isEqualTo(before);
+    }
+
+
+    @Test
+    @DisplayName("VAPID 를 지우면 꺼짐이 보이고 연락처 없이 만들면 관리자 이메일이 연락처가 되며 응답에 비밀 키가 없다")
+    void vapidDefaultsToAdminEmail() throws Exception {
+        signIn(admin);
+        mvc.perform(delete("/api/v1/admin/secrets/vapid"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.vapid.set").value(false))
+            .andExpect(jsonPath("$.vapid.publicKey").doesNotExist());
+
+        String created = mvc.perform(post("/api/v1/admin/secrets/vapid/regenerate"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.vapid.set").value(true))
+            .andExpect(jsonPath("$.vapid.subject").value("mailto:" + admin.email()))
+            .andExpect(jsonPath("$.vapid.updatedBy.name").value("관리자"))
+            .andExpect(jsonPath("$.vapid.deviceCount").value(0))
+            .andReturn().getResponse().getContentAsString();
+        String sealed = secrets.read(VapidKeys.SECRET_NAME).orElseThrow();
+        String overview = mvc.perform(get("/api/v1/admin/secrets"))
+            .andExpect(jsonPath("$.vapid.publicKey").value(vapidKeys.publicKeyBase64Url()))
+            .andReturn().getResponse().getContentAsString();
+
+        assertThat(created).doesNotContain(sealed).doesNotContain("privateKey");
+        assertThat(overview).doesNotContain(sealed).doesNotContain("privateKey");
+    }
+
+
+    @Test
+    @DisplayName("연락처가 주소 모양이 아니면 400 이고 키가 그대로다")
+    void rejectsBadVapidSubject() throws Exception {
+        String before = vapidKeys.publicKeyBase64Url();
+        signIn(admin);
+
+        mvc.perform(post("/api/v1/admin/secrets/vapid/regenerate")
+            .contentType("application/json").content("{\"subject\":\"not-an-address\"}"))
+            .andExpect(status().isBadRequest());
+
+        assertThat(vapidKeys.publicKeyBase64Url()).isEqualTo(before);
     }
 
 
