@@ -33,7 +33,7 @@ test("web Dockerfile 은 문서 위치와 배포 커밋을 실행 환경에 둔�
  * 빌더에서 runner 로 복사하는 소스 문맥 디렉터리(public)에는 --chmod 가 있어야 한다.
  */
 test("web Dockerfile 은 public 복사에 읽기 권한을 연다", () => {
-  assert.match(DOCKERFILE, /^COPY\s+--from=builder\s+--chmod=\S+\s+\/app\/public\s+\.\/public\s*$/m);
+  assert.match(DOCKERFILE, /^COPY\s+--from=builder\s+--chmod=[0-7][0-7][57]\s+\/app\/public\s+\.\/public\s*$/m);
 });
 
 /**
