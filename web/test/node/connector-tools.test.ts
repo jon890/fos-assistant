@@ -5,6 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import { renderToStaticMarkup } from "../../node_modules/react-dom/server.js";
 import * as connection from "../../src/lib/connection.ts";
+import * as connectionOAuth from "../../src/lib/connection-oauth.ts";
 import { toolText } from "../../src/lib/connector-tool-text.ts";
 import ts from "../../node_modules/typescript/lib/typescript.js";
 
@@ -44,6 +45,7 @@ async function load(): Promise<ToolsModule> {
   const module = { exports: {} as ToolsModule };
   const dependencies: Record<string, unknown> = {
     "@/lib/connection": connection,
+    "@/lib/connection-oauth": connectionOAuth,
     "@/lib/connector-tool-text": { toolText },
     "@/components/ui/badge": {
       Badge: ({ children }: { children: React.ReactNode }) => children,

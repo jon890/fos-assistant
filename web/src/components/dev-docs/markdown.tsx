@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { rehypeHeadingIds } from "@/lib/dev-docs/headings";
 import { resolveDocLink } from "@/lib/dev-docs/links";
 import { MermaidBlock } from "@/components/ui/mermaid-block";
+import { MARKDOWN_SYNTAX_PLUGINS } from "@/lib/markdown-syntax";
 
 type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
@@ -174,7 +174,7 @@ export function DevDocMarkdown({
   return (
     <article className="min-w-0 text-sm leading-6">
       <ReactMarkdown
-        remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
+        remarkPlugins={MARKDOWN_SYNTAX_PLUGINS}
         rehypePlugins={[rehypeHeadingIds]}
         components={components}
       >

@@ -77,7 +77,7 @@ export function PushSettings({
         ) : null}
         {view.state === "ready" ? (
           <Button onClick={() => void enable()} disabled={busy}>
-            이 기기에서 알림 받기
+            {busy ? "알림을 켜는 중…" : "이 기기에서 알림 받기"}
           </Button>
         ) : null}
         {view.state === "registered" ? (
