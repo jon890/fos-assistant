@@ -1,0 +1,22 @@
+{
+  "name": "found-mark",
+  "description": "이름만 말해도 찾기, 다시 시도, 사람과 캐릭터 규칙, 출처 줄과 「비서가 찾음」 표시",
+  "pr_scope": "스펙 agent-found-image 의 PR2 를 완성한다.",
+  "deferred": [],
+  "status": "pending",
+  "created_at": "2026-11-21",
+  "spec": "docs/features/agent-found-image/spec.md",
+  "design": "docs/features/agent-found-image/design.md",
+  "verification_plan": "phase-01.md",
+  "requirements": ["REQ1", "REQ4", "REQ5", "REQ6", "REQ7", "REQ10"],
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": ["REQ1", "REQ4", "REQ5", "REQ6", "REQ7", "REQ10"]
+    }
+  ]
+}
