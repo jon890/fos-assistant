@@ -47,7 +47,7 @@ public class ArtifactService {
      * <p>{@code 제목:} 줄은 fos-ctx 가 떼어 제목으로 쓴다. 글자를 바꾸면 {@code hermes/plugins/fos-ctx/generated_image.py} 의
      * {@code TITLE_PREFIX} 도 함께 바꾼다. {@code attachment:} 와 {@code generated:} 는 같은 plugin 의 {@code image_source.py} 가 읽는다.
      */
-    static final String IMAGE_RULES = "아래 열두 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
+    static final String IMAGE_RULES = "아래 열세 줄은 image_generate 도구가 있고 사용자가 그림을 만들거나 고쳐 달라고 했을 때만 따른다.\n"
         + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
         + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
@@ -66,8 +66,10 @@ public class ArtifactService {
         + " 얼굴 위주로 정한 때가 아니면 사람은 머리부터 발까지 들어오고 얼굴이 잘 보이게 지시문에 적는다.\n"
         + "- 이 대화에 보낸 사진이나 이 대화에서 만든 그림을 바탕으로 고칠 때는 바탕 한 장을 image_url 에, 참고할 것을 reference_image_urls 에 넣는다."
         + " 사진은 attachment:<사진 참조 목록의 attachment_id>, 만든 그림은 generated:<그림 제목> 으로 적는다.\n"
-        + "- 사용자가 이 대화에 보낸 링크(상품 페이지나 사진 주소)의 사진을 바탕이나 참고로 쓸 때는 link:<사용자가 보낸 주소 그대로> 로 적는다."
-        + " 검색이나 페이지에서 찾은 주소는 쓰지 않는다.\n"
+        + "- 사용자가 이 대화에 보낸 링크(상품 페이지나 사진 주소)의 사진을 바탕이나 참고로 쓸 때는 link:<사용자가 보낸 주소 그대로> 로 적는다.\n"
+        + "- 웹 검색(web_search)과 페이지 읽기(web_extract) 결과에 나온 페이지 주소나 사진 주소의 사진을 바탕이나 참고로 쓸 때도"
+        + " link:<결과에 나온 주소 그대로> 로 적는다. 주소를 고치거나 지어내지 않는다. 스스로 적어 넣어 읽은 주소는 쓰지 못한다."
+        + " 결과에 / 나 // 로 시작하는 꼴로 나온 사진 주소는 그 페이지의 주소를 기준으로 완전한 https:// 주소로 적는다.\n"
         + "- 바탕과 참고에는 attachment:, generated:, link: 가리킴만 쓰고 파일 경로나 맨 주소는 쓰지 않는다.\n"
         + "- 고치는 지시문에는 바꿀 곳, 그대로 지킬 곳, 참고 사진의 어느 부분을 쓰는지를 적는다."
         + " 올린 사진은 대화에서 몇 번째 사진인지로, 만든 그림은 제목으로 가리키고 입력 순서(바탕이 첫째)를 함께 적는다.\n"

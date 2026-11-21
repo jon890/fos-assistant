@@ -444,6 +444,8 @@ class ConnectorOAuthFlowTest {
         mvc.perform(complete(started("{\"repo\":\"me/notes\"}"), CODE, null, null)).andExpect(jsonPath("$.outcome").value("CONNECTED"));
         ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), CONNECTOR).orElseThrow();
         String mark = signer.currentUrl(connection.id()).orElseThrow().substring(TOKEN_BASE.length());
+        when(oauth.refresh(eq(connection.vault()), eq(CONNECTOR), any()))
+            .thenReturn(new Token(Outcome.OK, "access-token-after-check", clock.instant().plusSeconds(3600)));
 
         mvc.perform(post("/api/v1/connections/" + CONNECTOR + "/check"))
             .andExpect(status().isOk())

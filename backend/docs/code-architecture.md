@@ -296,7 +296,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `people` 은 사용자 정리 때 위 패키지 표의 줄을 직접 지우지 않는다. `people.application.port`에 port(`UserPurgeParticipant`)를 두고 `connector`, `task` 가 구현한다. 아래 패키지의 표는 그 패키지의 정리 빈을 부른다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 `workspace` 는 `quality` 아래다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. `admin` 을 뺀 어느 패키지도 `workspace` 를 import 하지 않는다.
-`quality` 는 `workspace` 위다. 평가 전용 사용자를 준비하고 확인을 돌리려고 `people`, `user`, `agent`, `memory`, `chat`, `usage`, `task`, `notification`, `orchestration` 을 부른다. `admin` 을 뺀 어느 패키지도 `quality` 를 import 하지 않는다.
+`quality` 는 `workspace` 위다. 평가 전용 사용자를 준비하고 확인을 돌리려고 `people`, `user`, `agent`, `memory`, `chat`, `usage`, `task`, `notification`, `orchestration` 을 부르고, 쓰기 도구의 승인 카드가 떴는지 보려고 `connector` 를 읽는다. `admin` 을 뺀 어느 패키지도 `quality` 를 import 하지 않는다.
 `admin` 은 `quality` 위, 맨 위다. 관리자 전용 화면과 API 가 기능의 `application` 을 부르고, 어느 패키지도 `admin` 을 import 하지 않는다(`ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN`).
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 

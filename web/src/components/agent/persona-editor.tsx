@@ -81,8 +81,7 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <h1 className="mb-2 text-xl font-semibold">{name}</h1>
+    <div>
       <p className="mb-6 text-sm leading-6 text-muted-foreground">
         이 에이전트가 대화마다 따르는 성격이에요. 저장한 내용은 다음 대화부터
         반영돼요.

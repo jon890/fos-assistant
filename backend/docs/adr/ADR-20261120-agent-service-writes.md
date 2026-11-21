@@ -3,7 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-11-20
 - 스펙은 [서비스 개념 스펙](../../../docs/features/service-concepts/spec.md)(DECISION4, DECISION5, DECISION6, DECISION10, DECISION31, DECISION32), 구조는 같은 폴더 [`design.md`](../../../docs/features/service-concepts/design.md) 의 「PR2 예약 작업 도구」 가 갖는다.
-- [ADR-082](../../../docs/adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) 의 「살펴보기의 쓰기는 관리자가 켠다」 를 Control Plane 의 서비스 쓰기 도구에도 쓴다. [ADR-085](../../../docs/adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md) 의 할 일 제안 규칙은 PR3 이 이 결정 위에서 바꾼다.
+- [ADR-082](../../../docs/adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) 의 「살펴보기의 쓰기는 관리자가 켠다」 를 Control Plane 의 서비스 쓰기 도구에도 쓴다. [ADR-073](../../../docs/adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) 결정 1 「에이전트는 제안만 한다」 를 좁혔다. 사용자가 직접 시킨 할 일은 바로 `OPEN` 으로 만든다(PR3).
 
 ### 결정
 

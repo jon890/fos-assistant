@@ -54,7 +54,7 @@ class ContextAssemblerTest {
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
     private static final String AGENT_CODE = "context-assembler-test";
     private static final String FACTS_HEADER = "# 지금 묻는 사람에 대해 기억한 것\n\n"
-        + "아래는 이 사람에 대해 기억한 것의 요약이다. 줄마다 번호로 memory_read 를 불러 상세를 읽는다.\n"
+        + "아래는 이 사람에 대해 기억한 것의 요약이다. 요약만으로 답할 수 있으면 그 줄의 상세를 읽는 memory_read 는 부르지 않는다. 상세가 필요하면 줄의 번호로 memory_read 를 불러 읽는다.\n"
         + "일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 상세를 읽는다.\n"
         + "진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.";
     private static final String INDEX_HEADER = "# 더 물어볼 수 있는 것";

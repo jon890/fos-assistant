@@ -14,6 +14,8 @@ import {
   matchesFilter,
   type MemoryFilter,
 } from "./memory-filter";
+import { PageFrame } from "@/components/ui/page-frame";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
 import { MemoryMaintenanceSection } from "./memory-maintenance-section";
@@ -158,12 +160,7 @@ export function MemoryList({
   );
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <h1 className="mb-2 text-xl font-semibold">기억</h1>
-      <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        에이전트가 대화하며 남긴 기억이에요. 받아들인 기억만 다음 대화에
-        사용해요. 눌러서 내용을 보고 고치거나 지울 수 있어요.
-      </p>
+    <PageFrame {...PAGE_HEADS.memory}>
       {documents ? <MemoryTabs value={tab} onChange={setTab} /> : null}
       {/* 탭을 바꿔도 펼친 줄과 고치던 글이 남도록 두 판을 모두 그리고 하나만 숨긴다. */}
       <div
@@ -184,6 +181,6 @@ export function MemoryList({
           {documents}
         </div>
       ) : null}
-    </div>
+    </PageFrame>
   );
 }

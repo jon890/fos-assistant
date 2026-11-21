@@ -1,5 +1,11 @@
-import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 
 export default function Loading() {
-  return <PageSkeleton shape="cards" width="2xl" title />;
+  return (
+    <PageFrame {...PAGE_HEADS.agents} busy>
+      <ListSkeleton />
+    </PageFrame>
+  );
 }

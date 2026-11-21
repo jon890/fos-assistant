@@ -3,6 +3,7 @@ package com.bifos.assistant.notification.application;
 import com.bifos.assistant.notification.application.dto.PushConfig;
 import com.bifos.assistant.notification.application.dto.PushRegistration;
 import com.bifos.assistant.notification.config.PushProperties;
+import com.bifos.assistant.notification.domain.VapidKeyPair;
 import com.bifos.assistant.notification.domain.PushDevice;
 import com.bifos.assistant.notification.domain.PushDevices;
 import com.bifos.assistant.notification.domain.PushEndpointPolicy;
@@ -80,7 +81,9 @@ public class PushDeviceService {
 
     /** 화면이 구독을 만들 때 읽는 서버 설정이다. */
     public PushConfig config() {
-        return new PushConfig(keys.enabled(), keys.enabled() ? keys.publicKeyBase64Url() : null);
+        // 한 번 읽은 값으로 두 칸을 채운다. 따로 읽으면 그 사이 키가 지워져 켜짐인데 공개 키가 없는 응답이 나온다.
+        Optional<VapidKeyPair> pair = keys.current();
+        return new PushConfig(pair.isPresent(), pair.map(VapidKeyPair::publicKeyBase64Url).orElse(null));
     }
 
 
@@ -106,6 +109,14 @@ public class PushDeviceService {
             registration.timeZone(),
             clock.instant());
         return lock.run(() -> newTransaction.execute(status -> {
+            // 키를 바꾼 뒤 옛 키로 만든 구독이 등록되면 푸시 서비스가 403 을 답해 자동 정리도 안 된다. 키를 바꾸는 쪽도 이 잠금을 잡으므로
+            // 잠금 안에서 확인해야 바꾼 직후의 등록이 기기를 되살리지 못한다.
+            if (!keys.enabled()) {
+                throw new ApiException(ErrorCode.PUSH_NOT_CONFIGURED, "web push is not configured on this server");
+            }
+            if (registration.publicKey() == null || !registration.publicKey().equals(keys.publicKeyBase64Url())) {
+                throw new ApiException(ErrorCode.PUSH_KEY_CHANGED, "the subscription was made with another VAPID public key");
+            }
             TreeSet<Long> owners = new TreeSet<>(repository.findUserIdsHoldingHash(hash));
             owners.add(user.id());
             Map<Long, PushDevices> locked = new TreeMap<>();

@@ -66,7 +66,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-069](ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) | 사용자 전체 실행 한도는 turn 자리와 실행 줄을 사용자 잠금 하나에서 센다 | backend, frontend | Accepted |
 | [ADR-070](ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) | 알림은 Control Plane 의 `notification` 표가 원장이고 웹은 사용자 단위 SSE 로 받는다 | backend, frontend | Accepted |
 | [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted. 매일 루프 판정을 후보 기록에 더하는 부분은 [ADR-20261008 / daily-loop](archive/ADR-20261008-daily-loop.md) 이 정했고, 그 ADR 은 대체됐다 |
-| [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted |
+| [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted. 결정 1 은 [ADR-20261120 / agent-service-writes](../../backend/docs/adr/ADR-20261120-agent-service-writes.md) 가 사용자가 직접 시킨 할 일로 좁혔다 |
 | [ADR-075](ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md) | 결과 전달은 묶음과 시도로 남기고 사용자가 저장된 결과만 다시 전달한다 | backend, frontend | Accepted. ADR-040 의 「turn 이 실패해도 같은 결과로 다시 깨우지 않는다」 는 그대로 두고 사용자가 요청하는 복구를 더한다 |
 | [ADR-078](ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md) | 예약 작업의 결과는 실행마다 새 대화가 기본이고 목록은 작업으로 묶는다 | backend, frontend | Accepted. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted. ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 에 살펴보기 트리의 예외를 둔다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
@@ -136,10 +136,11 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261120 / connector-oauth](ADR-20261120-connector-oauth.md) | 플러그인 OAuth 는 대시보드 plugin 이 아는 제공자만 쓰고, 만료 토큰은 Control Plane 의 토큰 통로로 받는다 | backend, hermes | Accepted. [ADR-043](../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 일부를 바꾼다 |
 | [ADR-20261120 / generated-image-draft](ADR-20261120-generated-image-draft.md) | 만든 그림은 사진 첨부 사본으로 블로그 원고에 넣는다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 그림 행을 원고의 사진 판정에 잇되 원고의 두 지문은 바꾸지 않는다 |
 | [ADR-20261120 / image-source](ADR-20261120-image-source.md) | 그림을 고칠 바탕 사진은 모델이 가리키고 fos-ctx 가 Control Plane 에서 받아 넘긴다 | backend, hermes | Accepted. [ADR-20261119 / generated-image](ADR-20261119-generated-image.md) 의 hook 에 받기를 더하고 ADR-091 의 사진 권한은 넓히지 않는다 |
-| [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) | 사용자가 보낸 링크의 사진은 Control Plane 이 대화에 있는지 확인하고 허용 목록 없이 공개 주소에서만 받는다 | backend, hermes | Accepted. [ADR-20261120 / image-source](ADR-20261120-image-source.md) 의 받기 길에 `link:` 가리킴을 더한다 |
+| [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) | 사용자가 보낸 링크의 사진은 Control Plane 이 대화에 있는지 확인하고 허용 목록 없이 공개 주소에서만 받는다 | backend, hermes | Accepted. [ADR-20261120 / image-source](ADR-20261120-image-source.md) 의 받기 길에 `link:` 가리킴을 더한다. 비서가 찾은 주소를 받지 않는 부분은 [ADR-20261121 / found-link-image-source](ADR-20261121-found-link-image-source.md) 가 대체했다 |
 | [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) | 셸 계열 도구는 local 로 켜지 않고, 정책 밖 profile 의 셸은 끈다 | backend, hermes | Accepted. ADR-086 의 「정책에 없는 profile 은 local 로 둔다」 를 대체한다 |
 | [ADR-20261120 / server-secret](ADR-20261120-server-secret.md) | 서버 비밀값은 KEK 로 감싸 데이터베이스에 두고 관리자 화면에서 바꾼다 | backend, frontend, hermes | Accepted. [ADR-20261008 / data-encryption](../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 KEK 교체 대상에 `server_secret` 을 더한다 |
 | [ADR-20261120 / web-push](ADR-20261120-web-push.md) | 알림을 그대로 웹 푸시로 보내고 기기는 사용자 줄의 JSON 칸에 두며 암호화는 JDK 로 한다 | backend, frontend | Accepted. ADR-070 의 알림 원장에 바깥 채널을 더하고 ADR-072 의 열린 질문 셋에 답한다 |
+| [ADR-20261121 / found-link-image-source](ADR-20261121-found-link-image-source.md) | 비서가 찾은 주소의 사진은 fos-ctx 가 결과에서 뽑아 알린 주소일 때만 받는다 | backend, hermes | Accepted. [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) 의 「비서가 찾은 주소는 받지 않는다」 를 대체한다 |
 
 ## 보관
 
