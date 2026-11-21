@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { useMediaQuery } from "@/components/ui/use-media-query";
 import { describeFailure } from "@/components/error-message";
 import { MyFilePreview } from "@/components/files/my-file-preview";
 import { MyFileRow } from "@/components/files/my-file-row";
@@ -40,7 +39,6 @@ const SEARCH_DELAY_MS = 300;
 export function MyFiles() {
   const params = useSearchParams();
   const router = useRouter();
-  const wide = useMediaQuery("(min-width: 1024px)");
   const [now] = useState(() => new Date());
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -165,7 +163,6 @@ export function MyFiles() {
         <MyFilePreview
           key={preview.id}
           item={preview}
-          wide={wide}
           onClose={closePreview}
           onDelete={() => setDeleting(preview)}
         />
