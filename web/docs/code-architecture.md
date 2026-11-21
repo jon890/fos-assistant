@@ -27,6 +27,7 @@
 | `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
 | `/connections` | 「외부 서비스 연결」. 플러그인 카드 목록. [`docs/features/connector.md`](../../docs/features/connector.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
 | `/connections/{id}` | 플러그인 하나의 외부 서비스 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
+| `/connections/oauth/callback` | 단추 연결의 서비스 화면에서 돌아오는 주소. 결과를 그 연결 화면으로 넘긴다([`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md) 의 「웹 화면」) |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 설정의 「연결」 묶음과 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`docs/features/user-browser.md`](../../docs/features/user-browser.md)) |
 | `/files` | 파일 공간. 「내 파일」 목록을 먼저 보이고 「에이전트 작업 폴더」 는 링크로 들어간다. 옛 실행 공간 주소(`?path=`, `?file=`)는 `/files/workspace` 의 같은 자리로 넘긴다. 설정의 「내 데이터」 묶음에서 간다. [`docs/features/workspace.md`](../../docs/features/workspace.md) 의 「파일 공간」 |
