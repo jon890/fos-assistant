@@ -9,8 +9,10 @@ import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { ARTIFACT_PROBE, ARTIFACT_WRITE_PROBE, IMAGE_GENERATE_PROBE, IMAGE_GENERATE_PROMPT, IMAGE_GENERATE_TITLE } from "../fake-hermes.ts";
 import { ONE_PIXEL_PNG } from "../fake-hermes/scenario-fixtures.ts";
 import { DAD_BINDING } from "./binding.ts";
+import { holdTurn } from "./chat-queue.ts";
+import { within } from "../delegation-support.ts";
 
-type ChatEvent = { type: string; conversationId?: string; messageId?: number };
+type ChatEvent = { type: string; conversationId?: string; messageId?: number; detail?: string };
 type Message = {
   id: number;
   role: "USER" | "ASSISTANT";
@@ -33,6 +35,39 @@ async function fetchFile(context: Context, conversationId: string, path: string)
   return fetch(`${context.api}/chat/conversations/${conversationId}/files/${encoded}`, {
     headers: { Authorization: `Bearer ${context.tokens.dad}` },
   });
+}
+
+/** 대화 단위 SSE 를 열어 받은 사건을 모은다. 응답 머리를 받으면 구독이 걸린 것이다. */
+async function openConversationEvents(
+  context: Context,
+  conversationId: string,
+): Promise<{ events: ChatEvent[]; close: () => Promise<void> }> {
+  const controller = new AbortController();
+  const response = await fetch(`${context.api}/chat/conversations/${conversationId}/events`, {
+    headers: { Authorization: `Bearer ${context.tokens.dad}` },
+    signal: controller.signal,
+  });
+  expect(response.status === 200, `대화 단위 SSE 를 열지 못했다: ${response.status}`);
+  const events: ChatEvent[] = [];
+  const reading = readEventStream<ChatEvent>(response, (event) => {
+    events.push(event);
+  }).catch(() => undefined);
+  return {
+    events,
+    async close() {
+      controller.abort();
+      await reading;
+    },
+  };
+}
+
+async function awaitEvent(events: ChatEvent[], matches: (event: ChatEvent) => boolean, what: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (events.some(matches)) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  expect(false, `${what}: 10초 안에 대화 단위 SSE 로 오지 않았다. 받은 사건: ${JSON.stringify(events)}`);
 }
 
 export const artifactScenario: Scenario = {
@@ -199,6 +234,44 @@ export const artifactScenario: Scenario = {
       expect(madeFile.status === 200 && madeFile.headers.get("content-type") === "image/png",
         `올린 그림을 받지 못했다: ${madeFile.status}`);
       expect(Buffer.from(await madeFile.arrayBuffer()).equals(ONE_PIXEL_PNG), "받은 그림이 올린 원본과 다르다");
+
+      step("그림을 올리면 답이 끝나기 전에 대화 단위 SSE 로 그 경로가 오고, 다른 사용자는 그 경로로 열지 못한다");
+      const imageConversationId = imageDone!.conversationId!;
+      const livePath = `generated/${IMAGE_GENERATE_TITLE} 2.png`;
+      const stream = await openConversationEvents(context, imageConversationId);
+      try {
+        const held = await holdTurn(context, IMAGE_GENERATE_PROBE, "dad", imageConversationId);
+        await awaitEvent(stream.events, (event) => event.type === "image" && event.detail === livePath, "만든 그림의 image 사건");
+        const image = stream.events.find((event) => event.type === "image");
+        expect(image?.conversationId === imageConversationId, `image 사건의 대화가 다르다: ${JSON.stringify(image)}`);
+        const finishedEarly = await Promise.race([held.turn.completed.then(() => true), Promise.resolve(false)]);
+        expect(!finishedEarly, "image 사건을 받았을 때 turn 이 이미 끝났다");
+        const liveFile = await fetchFile(context, imageConversationId, livePath);
+        expect(liveFile.status === 200, `답이 끝나기 전에 그림을 받지 못했다: ${liveFile.status}`);
+        const encoded = livePath.split("/").map(encodeURIComponent).join("/");
+        const stranger = await fetch(`${context.api}/chat/conversations/${imageConversationId}/files/${encoded}`, {
+          headers: { Authorization: `Bearer ${context.tokens.kid}` },
+        });
+        expect(stranger.status === 404, `다른 사용자가 만든 그림을 열었다: ${stranger.status}`);
+        const strangerEvents = await fetch(`${context.api}/chat/conversations/${imageConversationId}/events`, {
+          headers: { Authorization: `Bearer ${context.tokens.kid}` },
+        });
+        expect(strangerEvents.status === 404, `다른 사용자가 대화 단위 SSE 를 열었다: ${strangerEvents.status}`);
+        await strangerEvents.body?.cancel();
+        context.hermes.releaseHeldRun();
+        const events = await within(held.turn.completed, 15_000, "그림 turn 의 스트림이 끝나지 않았다");
+        const liveDone = events.find((event) => event.type === "done") as ChatEvent | undefined;
+        const liveMessages = expectStatus(
+          await call(context, `/chat/conversations/${imageConversationId}/messages`, { token: context.tokens.dad }),
+          200,
+          "바로 보인 그림의 대화 이력",
+        ).json<ImageMessage[]>();
+        const liveAnswer = liveMessages.find((message) => message.id === liveDone?.messageId);
+        expect(liveAnswer?.artifacts.some((artifact) => artifact.path === livePath) === true,
+          `바로 보인 그림이 끝난 답에 묶이지 않았다: ${JSON.stringify(liveAnswer?.artifacts)}`);
+      } finally {
+        await stream.close();
+      }
     } finally {
       expectStatus(await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }),
         200,
