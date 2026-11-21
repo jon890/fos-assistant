@@ -104,6 +104,17 @@ class DeployCheckJudgeTest {
 
 
     @Test
+    @DisplayName("파일 넣기 도구 이름에 MCP 서버 이름이 빠지면 호출을 인정하지 않는다")
+    void rejectsIncompleteMcpPrefix() {
+        TurnObservation put = turn("넣었다", List.of(ok("mcp__file_space_put")));
+        assertVerdict(
+            judge.judge(QualityFeature.FILE_PUT, new CheckObservation(List.of(put), 1, false, null, null, false)),
+            FeatureStatus.FAILED,
+            "NO_VAULT_ROW");
+    }
+
+
+    @Test
     @DisplayName("그림은 답에 그림 결과물이 묶여야 통과다")
     void image() {
         TurnObservation withImage = new TurnObservation("그렸다", "SUCCEEDED", null, List.of(), List.of(), List.of("IMAGE"), false);
