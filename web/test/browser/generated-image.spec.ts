@@ -18,6 +18,7 @@ type Artifact = {
   prompt: string | null;
   vaultItemId: number | null;
   sourceLinks?: string[];
+  foundSourceLinks?: string[];
 };
 
 function image(title: string, extra: Partial<Artifact> = {}): Artifact {
@@ -100,6 +101,24 @@ for (const width of [1280, 390]) {
     await expect(images.nth(1).getByTestId("generated-image-source-links")).toHaveCount(0);
   });
 }
+
+test("비서가 찾은 링크에만 「비서가 찾음」 이 붙고 사용자가 보낸 링크와 옛 응답에는 없다", async ({ page }) => {
+  const sent = "https://shop.example.com/goods/1";
+  const found = "https://img.example.com/p.png";
+  await openWithImages(page, [
+    image("양말 신은 아이", { sourceLinks: [sent, found], foundSourceLinks: [found] }),
+    image("옛 응답 그림", { sourceLinks: [found] }),
+  ]);
+
+  const images = page.getByTestId("assistant-message").last().getByTestId("generated-image");
+  await images.nth(0).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+  const items = images.nth(0).getByTestId("generated-image-source-links").getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).getByTestId("generated-image-found-link")).toHaveCount(0);
+  await expect(items.nth(1).getByTestId("generated-image-found-link")).toHaveText("비서가 찾음");
+  await images.nth(1).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+  await expect(images.nth(1).getByTestId("generated-image-found-link")).toHaveCount(0);
+});
 
 test("그림을 누르면 크게 보이고 내려받는 파일 이름이 제목이며 보관본이 없으면 보관할 수 있다", async ({ page }) => {
   const conversationId = await openWithImages(page, [image("수채화 고양이")]);
