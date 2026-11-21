@@ -6,6 +6,7 @@ import vm from "node:vm";
 import ts from "../../node_modules/typescript/lib/typescript.js";
 import * as action from "../../src/lib/connector-action.ts";
 import * as connection from "../../src/lib/connection.ts";
+import * as connectionOAuth from "../../src/lib/connection-oauth.ts";
 
 const LIMITS = {
   orderKrw: 50000,
@@ -35,6 +36,7 @@ async function callRoute(
     },
     "@/lib/connector-action": action,
     "@/lib/connection": connection,
+    "@/lib/connection-oauth": connectionOAuth,
     "@/lib/conversation-id": {
       isConversationId: () => true,
       isPublicId: () => true,

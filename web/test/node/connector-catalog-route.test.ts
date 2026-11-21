@@ -6,6 +6,7 @@ import vm from "node:vm";
 import ts from "../../node_modules/typescript/lib/typescript.js";
 import { toolText } from "../../src/lib/connector-tool-text.ts";
 import * as connection from "../../src/lib/connection.ts";
+import * as connectionOAuth from "../../src/lib/connection-oauth.ts";
 import { AGENT_CODE_PATTERN } from "../../src/lib/agent.ts";
 
 const SVG =
@@ -30,6 +31,7 @@ function summary(change: Record<string, unknown> = {}) {
     standardPlugin: false,
     singleBinding: false,
     ownerBrowser: false,
+    oauth: null,
     ...change,
   };
 }
@@ -47,6 +49,7 @@ async function getCatalog(items: unknown[]): Promise<Response> {
       },
     },
     "@/lib/connection": connection,
+    "@/lib/connection-oauth": connectionOAuth,
     "@/lib/connector-tool-text": { toolText },
     "@/lib/agent": { AGENT_CODE_PATTERN },
     "@/lib/json-body": {},
@@ -331,4 +334,43 @@ test("웹 카탈로그 라우트는 ownerBrowser 표시를 참일 때만 옮기�
     ),
     [true, false, false],
   );
+});
+
+test("단추 연결 선언은 계약의 칸만 옮기고 https 가 아닌 설정 주소는 버린다", async () => {
+  const oauth = {
+    provider: "github",
+    ready: true,
+    fields: ["github_token", "BAD KEY"],
+    settingsUrl: "https://github.com/settings/applications",
+    installSettingsUrl: "javascript:alert(1)",
+    clientSecret: "옮기면 안 되는 값",
+  };
+  const response = await getCatalog([summary({ oauth })]);
+  assert.deepEqual(await response.json(), [
+    summary({
+      icon: null,
+      link: null,
+      oauth: {
+        provider: "github",
+        ready: true,
+        fields: ["github_token"],
+        settingsUrl: "https://github.com/settings/applications",
+        installSettingsUrl: null,
+      },
+    }),
+  ]);
+});
+
+test("단추 연결 선언의 모양이 틀리면 그 칸만 null 로 두고 플러그인은 입력 칸으로 남긴다", async () => {
+  for (const oauth of [
+    { provider: "GitHub!", ready: true, fields: ["token"] },
+    { provider: "github", ready: true, fields: [] },
+    { provider: "github", ready: true },
+    "github",
+  ]) {
+    const response = await getCatalog([summary({ oauth })]);
+    assert.equal(response.status, 200);
+    const [item] = (await response.json()) as { oauth: unknown }[];
+    assert.equal(item.oauth, null);
+  }
 });
