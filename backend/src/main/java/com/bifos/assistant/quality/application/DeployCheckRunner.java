@@ -155,7 +155,9 @@ class DeployCheckRunner {
             CheckObservation observation = feature == QualityFeature.TASK_FIRE
                 ? fireTask(evaluation, deadline, attempt)
                 : converse(feature, evaluation, deadline, attempt);
-            verdict = attempt.busy ? FeatureVerdict.failed(CheckReason.BUSY) : judge.judge(feature, observation);
+            verdict = attempt.busy ? FeatureVerdict.failed(CheckReason.BUSY)
+                : attempt.rejected ? FeatureVerdict.failed(CheckReason.RUN_FAILED)
+                    : judge.judge(feature, observation);
         } catch (RuntimeException ex) {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
@@ -185,6 +187,8 @@ class DeployCheckRunner {
         private Long conversationId;
         private UUID conversationPublicId;
         private boolean busy;
+        /** 문항이 실행 줄을 만들기 전에 {@code BUSY} 가 아닌 까닭으로 거절됐다. 판정은 기능 규칙 대신 {@code RUN_FAILED} 다. */
+        private boolean rejected;
         private boolean timedOut;
     }
 
@@ -219,7 +223,7 @@ class DeployCheckRunner {
         Agent target = evaluationUsers.delegateAgent(evaluation)
             .orElseThrow(() -> new IllegalStateException("evaluation user has no delegate agent"));
         send(evaluation, attempt, DeployCheckItems.DELEGATION_PROMPT.formatted(target.code()), List.of(), deadline);
-        if (attempt.timedOut || attempt.busy) {
+        if (attempt.timedOut || attempt.busy || attempt.rejected) {
             return;
         }
         Long conversationId = attempt.conversationId;
@@ -237,10 +241,11 @@ class DeployCheckRunner {
      * 끝났으면 보내지 않는다.
      */
     private void send(CurrentUser evaluation, Attempt attempt, String text, List<Long> attachmentIds, Instant deadline) {
-        if (attempt.timedOut || attempt.busy) {
+        if (attempt.timedOut || attempt.busy || attempt.rejected) {
             return;
         }
         Long conversationId = attempt.conversationId;
+        int rootsBefore = observer.roots(conversationId).size();
         CompletableFuture<Void> sent = new CompletableFuture<>();
         background.start("deploy-check-send-" + conversationId, () -> {
             try {
@@ -252,8 +257,14 @@ class DeployCheckRunner {
         });
         if (!waitUntil(deadline, sent::isDone)) {
             attempt.timedOut = true;
-            stopConversation(evaluation, conversationId);
-            waitUntil(clock.instant().plus(STOP_GRACE), sent::isDone);
+            // 마감 때 아직 turn 을 열지 않았거나 실행 번호가 붙기 전일 수 있다. 끝날 때까지 되풀이해 멈춰, 늦게 열린 turn 도 제출 즉시 멈춘다.
+            waitUntil(clock.instant().plus(STOP_GRACE), () -> {
+                if (sent.isDone()) {
+                    return true;
+                }
+                stopConversation(evaluation, conversationId);
+                return false;
+            });
             return;
         }
         try {
@@ -262,8 +273,10 @@ class DeployCheckRunner {
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
             if (cause instanceof ApiException api && BUSY.contains(api.code())) {
                 attempt.busy = true;
+            } else if (observer.roots(conversationId).size() == rootsBefore) {
+                attempt.rejected = true;
             }
-            // 실행 실패는 실행 줄에 남아 판정이 읽는다. 실행 줄이 생기기 전의 거절은 BUSY 말고는 판정이 RUN_FAILED 로 본다.
+            // 실행 실패는 실행 줄에 남아 판정이 그 줄의 오류 코드로 읽는다. 실행 줄이 생기기 전의 거절은 BUSY 가 아니면 RUN_FAILED 다.
             log.info("배포 뒤 확인 문항이 예외로 끝났다 conversationId={} cause={}", conversationId, cause.toString());
         }
     }
@@ -345,9 +358,16 @@ class DeployCheckRunner {
     }
 
 
-    /** 도는 turn 을 멈추고, 대화의 루트마다 도는 위임 자식을 멈춘다. 이미 끝났으면 아무것도 하지 않는다. */
+    /**
+     * 도는 turn 을 멈추고, 대화의 루트마다 도는 위임 자식을 멈춘다. 이미 끝났으면 아무것도 하지 않는다.
+     *
+     * <p>turn 을 열었지만 실행 번호가 붙기 전이면 취소 표시만 켠다. Hermes run 이 제출되는 즉시 그 표시를 보고 멈춘다.
+     */
     private void stopConversation(CurrentUser evaluation, Long conversationId) {
         TurnMark mark = turns.markOf(conversationId);
+        if (mark.running() && mark.executionId() == null) {
+            turns.findByConversation(conversationId).ifPresent(turns::cancel);
+        }
         if (mark.executionId() != null) {
             try {
                 chat.stop(evaluation, mark.executionId());
