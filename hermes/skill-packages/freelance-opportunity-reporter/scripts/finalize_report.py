@@ -45,7 +45,7 @@ def ensure_combined(paths: dict[str, Path | list[Path]], report_date: str) -> Pa
     return combined
 
 
-def build_summary(combined: Path) -> dict[str, object]:
+def build_summary(combined: Path, first_win: bool = False) -> dict[str, object]:
     audit_result = audit(json.loads(combined.read_text(encoding="utf-8")))
     if audit_result["missing_fields"] or audit_result["duplicate_keys"]:
         raise ValueError("원자료에 필수 필드 누락 또는 중복 공고가 있습니다")
@@ -53,13 +53,17 @@ def build_summary(combined: Path) -> dict[str, object]:
     candidates = load_candidates(combined)
     if not candidates:
         raise ValueError("원격 조건을 통과한 검토 후보가 없습니다")
-    scored = [score(item, remote_only=True) for item in candidates]
+    scored = [score(item, remote_only=True, first_win=first_win) for item in candidates]
     review = [row for row in scored if selected_action(row) != "avoid"]
     apply_now = [row for row in review if selected_action(row) == "apply-now"]
     clarify = [row for row in review if selected_action(row) == "clarify-first"]
     top = sorted(review, key=rank_key, reverse=True)[:3]
+    # 일부만 모았거나 접근하지 못한 플랫폼이다. 리포트를 전달하는 대화 답에 함께 알린다.
+    coverage_gaps = [row for row in audit_result["coverage"] if row["coverage_status"] not in ("complete", "not-applicable")]
     return {
         "audit_status": audit_result["status"],
+        "evaluation": "first-win" if first_win else "standard",
+        "coverage_gaps": coverage_gaps,
         "candidate_count": len(review),
         "apply_now_count": len(apply_now),
         "clarify_first_count": len(clarify),
@@ -74,8 +78,8 @@ def build_summary(combined: Path) -> dict[str, object]:
     }
 
 
-def render_html(combined: Path, html_path: Path, report_date: str) -> None:
-    document = render_document(load_candidates(combined), report_date)
+def render_html(combined: Path, html_path: Path, report_date: str, first_win: bool = False) -> None:
+    document = render_document(load_candidates(combined), report_date, first_win=first_win)
     required = ("검토 후보", "플랫폼별 상위 후보", "수집한 공고 목록")
     missing = [label for label in required if label not in document]
     if missing:
@@ -88,14 +92,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", default=datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat())
     parser.add_argument("--runtime-dir", type=Path, default=Path("freelance-reports"))
+    parser.add_argument("--first-win", action="store_true", help="기억의 외주 이력이 0회인 사용자다. 요약과 HTML 이 같은 첫 수주 관점을 쓴다.")
     args = parser.parse_args()
 
     paths = artifact_paths(args.runtime_dir, args.date)
     combined = ensure_combined(paths, args.date)
-    summary = build_summary(combined)
+    summary = build_summary(combined, first_win=args.first_win)
     html_path = paths["html"]
     assert isinstance(html_path, Path)
-    render_html(combined, html_path, args.date)
+    render_html(combined, html_path, args.date, first_win=args.first_win)
 
     result: dict[str, object] = {
         "status": "ready",

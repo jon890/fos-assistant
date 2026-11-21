@@ -90,7 +90,10 @@ def audit(payload: dict | list) -> dict:
             if coverage_expected and advertised is not None
             else None
         )
-        if not coverage_expected:
+        access_status = source.get("access_status")
+        if access_status not in (None, "", "ok"):
+            coverage_status = "access-failed"
+        elif not coverage_expected:
             coverage_status = "not-applicable"
         elif missing_count is None:
             coverage_status = "unchecked"
@@ -106,6 +109,7 @@ def audit(payload: dict | list) -> dict:
                 "collected_count": collected,
                 "missing_count": missing_count,
                 "coverage_status": coverage_status,
+                "access_status": access_status,
             }
         )
 
@@ -113,7 +117,7 @@ def audit(payload: dict | list) -> dict:
     incomplete_coverage = (
         not coverage
         or any(row["coverage_status"] == "unchecked" for row in coverage)
-        or any(row["coverage_status"] == "incomplete" for row in coverage)
+        or any(row["coverage_status"] in ("incomplete", "access-failed") for row in coverage)
         or bool(untracked_sources)
     )
     status = (

@@ -123,7 +123,8 @@ def first_win_result(item: dict, remote_only: bool) -> tuple[float, str]:
     return total, "avoid"
 
 
-def score(item: dict, remote_only: bool = False) -> dict:
+def score(item: dict, remote_only: bool = False, first_win: bool = False) -> dict:
+    """일반 점수를 매긴다. first_win 은 기억의 외주 이력으로 정한 평가 방식이고, 참일 때만 첫 수주 관점을 매긴다."""
     fit = float(item.get("fit", 3))
     risk = float(item.get("risk", 3))
     portfolio = float(item.get("portfolio", 3))
@@ -158,7 +159,7 @@ def score(item: dict, remote_only: bool = False) -> dict:
         action = "avoid"
 
     result = {**item, "score": total, "action": action}
-    if is_first_win_candidate(item):
+    if first_win and is_first_win_candidate(item):
         first_win_score, first_win_action = first_win_result(item, remote_only)
         result["first_win_score"] = first_win_score
         result["first_win_action"] = first_win_action
@@ -197,7 +198,7 @@ def main() -> None:
     parser.add_argument(
         "--first-win",
         action="store_true",
-        help="첫 수주 적합도 우선으로 정렬합니다.",
+        help="외주 이력이 없는 사용자다. 첫 수주 관점을 매기고 그 적합도 우선으로 정렬합니다.",
     )
     args = parser.parse_args()
 
@@ -208,7 +209,7 @@ def main() -> None:
         else (lambda row: row["score"])
     )
     scored = sorted(
-        (score(item, remote_only=args.remote_only) for item in items),
+        (score(item, remote_only=args.remote_only, first_win=args.first_win) for item in items),
         key=sort_key,
         reverse=True,
     )

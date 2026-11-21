@@ -36,7 +36,7 @@ class ScoreOpportunitiesTest(unittest.TestCase):
             "reputation_value": 5,
         }
 
-        result = score(item, remote_only=True)
+        result = score(item, remote_only=True, first_win=True)
 
         self.assertEqual(result["score"], 62)
         self.assertEqual(result["action"], "clarify-first")
@@ -59,7 +59,7 @@ class ScoreOpportunitiesTest(unittest.TestCase):
             "reputation_value": 5,
         }
 
-        result = score(item, remote_only=True)
+        result = score(item, remote_only=True, first_win=True)
 
         self.assertEqual(result["first_win_score"], 49)
         self.assertEqual(result["first_win_action"], "avoid")
@@ -98,10 +98,35 @@ class ScoreOpportunitiesTest(unittest.TestCase):
                 "reputation_value": 5,
             },
             remote_only=True,
+            first_win=True,
         )
 
         self.assertEqual(result["recommended_track"], "first-win")
         self.assertEqual(result["first_win_action"], "clarify-first")
+
+    def test_first_win_track_needs_first_win_evaluation(self) -> None:
+        # 외주 이력이 있는 사용자(기본)는 짧은 공고도 일반 점수와 판단을 그대로 쓴다.
+        item = {
+            "budget_krw": 2_000_000,
+            "duration_days": 5,
+            "applicants": 2,
+            "fit": 4,
+            "risk": 2,
+            "portfolio": 3,
+            "remote": 5,
+            "remote_only_pass": True,
+            "scope_clarity": 5,
+            "delivery_confidence": 5,
+            "experience_match": 5,
+            "reputation_value": 5,
+        }
+
+        standard = score(item, remote_only=True)
+        first_win = score(item, remote_only=True, first_win=True)
+
+        self.assertEqual(standard["recommended_track"], "standard")
+        self.assertNotIn("first_win_score", standard)
+        self.assertEqual(first_win["recommended_track"], "first-win")
 
     def test_zero_budget_is_not_first_win_even_when_explicitly_enabled(self) -> None:
         result = score(
@@ -294,8 +319,9 @@ class RenderReportTest(unittest.TestCase):
                 "risk": 3,
             },
             remote_only=True,
+            first_win=True,
         )
-        standard = score(self.items[1], remote_only=True)
+        standard = score(self.items[1], remote_only=True, first_win=True)
 
         ranked = sorted([standard, first_win], key=rank_key, reverse=True)
 
@@ -316,6 +342,16 @@ class RenderReportTest(unittest.TestCase):
         action_section = document.split("<h2>이번 회차 액션</h2>", 1)[1].split("</section>", 1)[0]
 
         self.assertLess(action_section.index("바로 지원 공고"), action_section.index("먼저 확인 공고"))
+
+    def test_non_web_url_is_shown_without_link(self) -> None:
+        unsafe = {**self.items[0], "url": "javascript:alert(1)", "title": "주소가 이상한 공고"}
+
+        document = render_document([unsafe], "2026-08-11")
+        action_section = document.split("<h2>이번 회차 액션</h2>", 1)[1].split("</section>", 1)[0]
+
+        self.assertNotIn("javascript:", document)
+        self.assertIn("주소가 이상한 공고 <span class=\"unlinked\">(상세 링크 미확인)</span>", action_section)
+        self.assertEqual(document.count("(상세 링크 미확인)"), 3)
 
 
 class AssembleReportDataTest(unittest.TestCase):
@@ -346,14 +382,56 @@ class AssembleReportDataTest(unittest.TestCase):
         ]
         with TemporaryDirectory() as directory:
             path = Path(directory) / "wanted.json"
-            path.write_text(json.dumps(rows), encoding="utf-8")
+            path.write_text(json.dumps({"platform": "원티드 긱스", "advertised_count": 2, "items": rows}), encoding="utf-8")
+            listed = Path(directory) / "listed.json"
+            listed.write_text(json.dumps(rows), encoding="utf-8")
 
             payload = assemble([path], "2026-08-11T10:30:00+09:00")
+            list_only = assemble([listed], "2026-08-11T10:30:00+09:00")
 
         self.assertEqual(payload["collection"][0]["advertised_count"], 2)
         self.assertEqual(payload["items"][0]["eligibility_status"], "candidate")
         self.assertEqual(payload["items"][1]["eligibility_status"], "excluded")
         self.assertEqual(audit(payload)["status"], "complete")
+        # 표시 건수 없는 배열 모양은 받은 건수로 채우지 않고 미확인으로 남긴다.
+        self.assertIsNone(list_only["collection"][0]["advertised_count"])
+        self.assertEqual(audit(list_only)["coverage"][0]["coverage_status"], "unchecked")
+
+    def test_keeps_advertised_count_when_only_first_page_was_saved(self) -> None:
+        row = {
+            "platform": "위시켓",
+            "project_id": "1",
+            "title": "첫 페이지 공고",
+            "url": "https://example.com/1",
+            "registered_at": None,
+            "list_page": 1,
+            "detail_status": "confirmed",
+            "remote_only_pass": True,
+            "fit": 5,
+        }
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "wishket.json"
+            path.write_text(json.dumps({"platform": "위시켓", "advertised_count": 30, "pages_scanned": 1, "items": [row]}), encoding="utf-8")
+
+            payload = assemble([path], "2026-08-11T10:30:00+09:00")
+
+        result = audit(payload)
+        self.assertEqual(payload["collection"][0]["advertised_count"], 30)
+        self.assertEqual(result["coverage"][0]["missing_count"], 29)
+        self.assertEqual(result["status"], "incomplete")
+
+    def test_keeps_platform_that_could_not_be_accessed(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "wishket.json"
+            path.write_text(json.dumps({"platform": "위시켓", "access_status": "인증 만료", "items": []}), encoding="utf-8")
+
+            payload = assemble([path], "2026-08-11T10:30:00+09:00")
+
+        result = audit(payload)
+        self.assertEqual(payload["collection"][0]["platform"], "위시켓")
+        self.assertEqual(result["coverage"][0]["coverage_status"], "access-failed")
+        self.assertEqual(result["coverage"][0]["access_status"], "인증 만료")
+        self.assertEqual(result["status"], "incomplete")
 
     def test_excludes_rows_with_unconfirmed_remote_status(self) -> None:
         rows = [
@@ -500,8 +578,60 @@ class FinalizeReportTest(unittest.TestCase):
             self.assertEqual(summary["status"], "ready")
             self.assertEqual(summary["candidate_count"], 1)
             self.assertEqual(summary["audit_status"], "complete")
+            self.assertEqual(summary["evaluation"], "standard")
+            self.assertEqual(summary["coverage_gaps"], [])
             self.assertEqual(html_path, paths["html"])
             self.assertIn("수집한 공고 목록", html_path.read_text(encoding="utf-8"))
+
+    def test_cli_uses_same_evaluation_for_summary_and_html(self) -> None:
+        item = {
+            "platform": "위시켓",
+            "project_id": "1",
+            "title": "짧은 연동 작업",
+            "url": "https://example.com/1",
+            "registered_at": "2026-08-24",
+            "collected_at": "2026-08-24T07:30:00+09:00",
+            "list_page": 1,
+            "collection_source": "wishket-active-scope",
+            "detail_status": "confirmed",
+            "eligibility_status": "candidate",
+            "exclusion_reason": None,
+            "budget_krw": 2_000_000,
+            "duration_days": 5,
+            "applicants": 2,
+            "fit": 4,
+            "risk": 2,
+            "portfolio": 3,
+            "remote": 5,
+            "remote_only_pass": True,
+            "scope_clarity": 5,
+            "delivery_confidence": 5,
+            "experience_match": 5,
+            "reputation_value": 5,
+        }
+        payload = {
+            "collection": [{"platform": "위시켓", "source_id": "wishket-active-scope", "advertised_count": 2}],
+            "items": [item],
+        }
+        script = str(Path(__file__).with_name("finalize_report.py"))
+        for flags, track_label in (([], "일반"), (["--first-win"], "첫 수주")):
+            with TemporaryDirectory() as directory:
+                combined = artifact_paths(Path(directory), "2026-08-24")["combined"]
+                self.assertIsInstance(combined, Path)
+                combined.write_text(json.dumps(payload), encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, script, "--date", "2026-08-24", "--runtime-dir", directory, *flags],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                summary = json.loads(result.stdout)
+                document = Path(summary["html"]).read_text(encoding="utf-8")
+
+                top = summary["top_candidates"][0]
+                self.assertEqual(summary["evaluation"], "first-win" if flags else "standard")
+                self.assertIn(f"{track_label} {top['score']}점", document)
+                self.assertEqual(summary["coverage_gaps"][0]["missing_count"], 1)
 
 
 if __name__ == "__main__":

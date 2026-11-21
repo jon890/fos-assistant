@@ -41,6 +41,25 @@
 - `coverage_note`: 대조 결과와 중단 근거를 사람이 읽을 문장으로 남긴다.
   `audit_collection.py`의 계산에는 쓰이지 않는다.
 
+## 플랫폼별 수집 파일
+
+플랫폼마다 `*-enriched-YYYY-MM-DD.json` 하나를 아래 객체로 저장한다. 조립 스크립트가 `items` 밖의 칸을 원자료 `collection[]` 로 옮긴다.
+
+```json
+{
+  "platform": "위시켓",
+  "advertised_count": 30,
+  "pages_scanned": 3,
+  "access_status": "ok",
+  "coverage_note": "표시 30건과 고유 ID 30건이 일치했다.",
+  "items": []
+}
+```
+
+- `advertised_count` 는 플랫폼이 표시한 전체 건수다. 모르면 빼거나 `null` 로 둔다. 저장한 공고 수로 채우지 않는다.
+- `access_status` 는 접근했으면 `ok`, 못 했으면 `인증 만료`, `접근 제한` 같은 까닭이다. 접근하지 못한 플랫폼도 `items` 를 비운 채 파일을 남긴다.
+- 공고 배열만 담은 옛 모양도 받지만 표시 건수를 모르므로 검사가 그 플랫폼을 「미확인」 으로 본다.
+
 ## 원자료 형식
 
 원자료 `freelance-opportunities-YYYY-MM-DD.json`은 아래 구조를 사용한다.

@@ -38,10 +38,19 @@ AI 자동화, 백엔드 API·데이터·인증·연동, 대시보드, 크롤링,
 같은 기준을 이 파일에 옮겨 적지 않는다.
 기억의 사용자 조건이 `classification.md` 보다 우선한다.
 
+## 비공개 에이전트에서만 쓴다
+
+이 스킬은 사용자의 경력과 외주 조건으로 공고를 평가한 원자료와 HTML 을 셸 작업 폴더에 남기고, 같은 날 다시 쓴다.
+그룹에 공개한 에이전트는 쓰는 사람들이 같은 셸 작업 공간을 함께 쓰므로, 남긴 파일이 다른 사용자에게 보일 수 있다.
+
+- 주인 한 사람만 쓰는 비공개 에이전트에만 올린다.
+- 이 에이전트를 다른 사용자도 쓰는 것으로 보이거나 확실하지 않으면 파일을 만들지 않고, `freelance-reports/` 의 기존 파일을 읽거나 다시 쓰지 않는다. 후보는 대화 답의 목록으로만 주고 그 까닭을 한 줄로 알린다.
+
 ## 실행 환경
 
 - 원자료와 HTML 은 셸 작업 폴더의 `freelance-reports/` 에 둔다. 사용자는 「에이전트 작업 폴더」 에서 연다.
 - 스크립트는 `skill_view` 가 알려 준 이 스킬 디렉터리의 `scripts/` 에서 `python3` 로 부른다. 아래 명령의 `<스킬 디렉터리>` 가 그 경로다.
+- 평가 방식은 기억의 외주 이력으로 정한다. 외주 이력이 0회이면 마감 스크립트와 점수 스크립트에 `--first-win` 을 준다. 이력이 있거나 모르면 주지 않는다. 같은 회차의 모든 스크립트 호출에 같은 방식을 쓴다.
 - 셸(`terminal`)이 꺼져 있거나 `python3` 가 없으면 스크립트를 부르지 않는다. 같은 기준으로 후보를 골라 대화 답의 목록으로 주고, 점수와 HTML 을 만들지 못했다고 알린다. 계산한 척하지 않는다.
 
 ## 작업 절차
@@ -54,11 +63,12 @@ AI 자동화, 백엔드 API·데이터·인증·연동, 대시보드, 크롤링,
 
    ```bash
    python3 <스킬 디렉터리>/scripts/finalize_report.py \
-     --date YYYY-MM-DD
+     --date YYYY-MM-DD   # 외주 이력이 0회이면 --first-win 을 더한다
    ```
 
    스크립트의 `candidate_count`, `apply_now_count`, `clarify_first_count`,
    `top_candidates`와 `html` 경로로 최종 응답을 만든다.
+   `coverage_gaps` 가 비어 있지 않으면 일부만 모았거나 접근하지 못한 플랫폼이다. 그 플랫폼과 까닭을 최종 응답에 한 줄로 함께 알린다.
 
 1. 수집 범위를 정한다.
    기본 수집 대상은 아래 세 곳의 공개 프로젝트 목록이다.
@@ -98,6 +108,8 @@ AI 자동화, 백엔드 API·데이터·인증·연동, 대시보드, 크롤링,
    `execute_code` 로 수집할 때는 플랫폼별 브라우저 수집을 서로 다른 호출 묶음으로 나눈다.
    한 번의 `execute_code`에서 35회 이상 외부 도구를 호출하지 않는다.
    호출이 길어지면 현재 플랫폼의 `*-enriched-YYYY-MM-DD.json`을 먼저 저장하고 다음 호출에서 계속한다.
+   이 파일의 모양(플랫폼이 표시한 전체 건수, 접근 상태)은 `references/collection.md`의 「플랫폼별 수집 파일」을 따른다.
+   접근하지 못한 플랫폼도 빈 공고 목록과 접근 상태로 파일을 남긴다.
    6단계의 마감 스크립트를 실행할 호출 여유를 남긴다.
 
 3. 공고 필드를 정리한다.
@@ -184,11 +196,11 @@ AI 자동화, 백엔드 API·데이터·인증·연동, 대시보드, 크롤링,
 
    ```bash
    python3 <스킬 디렉터리>/scripts/finalize_report.py \
-     --date YYYY-MM-DD
+     --date YYYY-MM-DD   # 외주 이력이 0회이면 --first-win 을 더한다
    ```
 
    일부 플랫폼 수집에 실패해도 다른 플랫폼의 검증된 후보가 1건 이상 있으면 확인한 후보로 리포트를 만든다.
-   누락된 플랫폼과 접근 제한은 최종 응답에 한 줄로 알린다.
+   누락된 플랫폼과 접근 제한은 마감 스크립트의 `coverage_gaps` 로 확인해 최종 응답에 한 줄로 알린다.
    필수 플랫폼의 인증 만료나 접근 제한은 알릴 내용이 없는 상태가 아니다.
    다른 플랫폼에서도 후보를 찾지 못했더라도 빈 답으로 끝내지 말고,
    확인한 플랫폼과 제외 사유를 짧게 알린다.
@@ -243,7 +255,7 @@ python3 <스킬 디렉터리>/scripts/assemble_report_data.py \
   freelance-reports/*-enriched-YYYY-MM-DD.json \
   --output freelance-reports/freelance-opportunities-YYYY-MM-DD.json
 python3 <스킬 디렉터리>/scripts/audit_collection.py freelance-reports/freelance-opportunities-YYYY-MM-DD.json --pretty
-python3 <스킬 디렉터리>/scripts/score_opportunities.py freelance-reports/freelance-opportunities-YYYY-MM-DD.json --remote-only --first-win --pretty
+python3 <스킬 디렉터리>/scripts/score_opportunities.py freelance-reports/freelance-opportunities-YYYY-MM-DD.json --remote-only --pretty   # 외주 이력이 0회이면 --first-win
 ```
 
 리포트를 만든 뒤 아래를 확인한다.

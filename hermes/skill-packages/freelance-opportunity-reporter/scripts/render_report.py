@@ -8,6 +8,7 @@ import html
 import json
 from datetime import date as date_type
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from score_opportunities import score
 
@@ -22,6 +23,27 @@ ACTION_LABELS = {
 
 def escape(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def safe_url(value: object) -> str | None:
+    """공고 상세 주소가 http 나 https 의 웹 주소일 때만 돌려준다. 아니면 None 이다."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parts = urlsplit(value.strip())
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
+        return None
+    return value.strip()
+
+
+def title_link(row: dict) -> str:
+    """공고 제목을 상세 링크로 만든다. 웹 주소가 아니면 제목과 「상세 링크 미확인」 만 보인다."""
+    url = safe_url(row.get("url"))
+    if url is None:
+        return f'{escape(row["title"])} <span class="unlinked">(상세 링크 미확인)</span>'
+    return f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer">{escape(row["title"])}</a>'
 
 
 def load_candidates(path: Path) -> list[dict]:
@@ -80,7 +102,7 @@ def render_table(rows: list[dict], label: str) -> str:
     for row in rows:
         action = selected_action(row)
         cells = (
-            f'<a href="{escape(row["url"])}" target="_blank" rel="noopener noreferrer">{escape(row["title"])}</a>',
+            title_link(row),
             escape(row.get("budget_display") or "미확인"),
             escape(row.get("duration_display") or "미확인"),
             escape(applicants_label(row)),
@@ -96,8 +118,8 @@ def render_table(rows: list[dict], label: str) -> str:
     </table></div>'''
 
 
-def render_document(items: list[dict], report_date: str) -> str:
-    scored = [score(item, remote_only=True) for item in items]
+def render_document(items: list[dict], report_date: str, first_win: bool = False) -> str:
+    scored = [score(item, remote_only=True, first_win=first_win) for item in items]
     has_remote_uncertainty = any(
         row.get("remote_only_pass") is None for row in scored
     )
@@ -132,7 +154,7 @@ def render_document(items: list[dict], report_date: str) -> str:
         for platform, rows in by_platform.items()
     )
     action_items = "".join(
-        f'<li><a href="{escape(row["url"])}" target="_blank" rel="noopener noreferrer">{escape(row["title"])}</a><span>{escape(row.get("check_first") or "범위를 확인한다.")}</span></li>'
+        f'<li>{title_link(row)}<span>{escape(row.get("check_first") or "범위를 확인한다.")}</span></li>'
         for row in actions
     ) or "<li>현재 바로 검토할 후보가 없습니다.</li>"
     access_note = (
@@ -181,6 +203,7 @@ def render_document(items: list[dict], report_date: str) -> str:
     .avoid {{ background:#fde8e8; color:var(--bad); }}
     .actions {{ margin:0; padding-left:22px; }}
     .actions li {{ margin:12px 0; }}
+    .unlinked {{ color:var(--muted); font-weight:400; }}
     .actions span {{ display:block; color:var(--muted); }}
     @media (max-width:720px) {{ main {{ width:min(100% - 20px,1480px); margin-top:12px; }} header,section {{ padding:17px; border-radius:14px; }} .metrics {{ grid-template-columns:1fr; }} }}
   </style>
@@ -214,11 +237,12 @@ def main() -> None:
     parser.add_argument("input", type=Path)
     parser.add_argument("--date", default=date_type.today().isoformat())
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--first-win", action="store_true", help="외주 이력이 없는 사용자의 첫 수주 관점을 함께 쓴다.")
     args = parser.parse_args()
 
     candidates = load_candidates(args.input)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(render_document(candidates, args.date), encoding="utf-8")
+    args.output.write_text(render_document(candidates, args.date, first_win=args.first_win), encoding="utf-8")
     print(json.dumps({"output": str(args.output), "candidate_count": len(candidates)}, ensure_ascii=False))
 
 
