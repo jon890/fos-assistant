@@ -221,6 +221,16 @@ Control Plane 의 예약 작업이 10분마다 `READY` 인 OAuth 연결을 훑�
 | GitHub | 그 플러그인 App 의 사용자 허락(grant)을 취소한다. 앱이 플러그인마다라(스펙 DECISION9) 다른 플러그인 연결에 닿지 않는다. 같은 GitHub 계정을 두 사용자가 같은 플러그인에 연결했다면 둘 다 끊긴다. 가족 설치에서 드문 일로 받아들인다 | 그 access token 하나만 취소한다. 기존 연결의 허락은 남는다 |
 | Google | 같은 사용자의 다른 `READY` Google OAuth 연결이 있으면 취소하지 않고 「직접 거두기」 안내를 보인다. Google 은 토큰 하나를 취소해도 그 앱의 허락 전체가 사라져 다른 Google 플러그인 연결까지 끊기기 때문이다. 없으면 refresh token 을 취소한다 | 취소하지 않는다. 다시 연결하던 기존 Gmail 연결이 함께 끊기지 않게 한다 |
 
+### 웹 화면
+
+| 자리 | 하는 일 |
+| --- | --- |
+| `POST /api/connections/{id}/oauth/start` | 같은 출처 검사 뒤 요청의 `Origin`(없으면 앞단이 넘긴 host 와 scheme)으로 돌아오는 주소 `/connections/oauth/callback` 을 만들어 Control Plane 에 넘긴다. 화면이 돌아오는 주소를 정하지 못한다. 받은 `authorizeUrl` 은 `https://` 만 옮긴다 |
+| `/connections/oauth/callback` | 검색어 `state`, `code`, `error`, `setup_action` 을 `POST /api/connections/oauth/complete` 로 한 번 넘긴다. `REAUTHORIZE` 면 받은 주소로 다시 보내고, 플러그인을 알면 `/connections/{id}?oauth=<결과>&reason=<코드>` 로 간다. 모르면 그 자리에 까닭을 보인다 |
+| `/connections/{id}` | 결과 검색어를 읽어 보이고 주소에서 지운다. 관리자 안내는 서버가 읽은 역할로 정한다. 단추가 대신하는 칸은 `oauth.fields` 로 고른다 |
+
+제공자의 화면 이름(GitHub, Google)은 웹의 `connection-oauth.ts` 가 갖는다. 주소와 토큰은 다루지 않는다.
+
 ## 실패와 일관성
 
 - **돌아오기의 순서**: begin(대기 보관 파일) → 교환(대기 OAuth 파일, 메모리 대기 칸) → 확인 도구 → commit → 연결 커밋 → 바인딩 다시 설치. 확인 도구가 실패하면 discard 한다. commit 전에는 본 자리의 옛 파일과 메모리 현재 칸이 그대로라 실패가 기존 연결을 깨지 않는다
