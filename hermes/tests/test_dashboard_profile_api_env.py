@@ -18,7 +18,7 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
             status = self.connector_status()
             self.assertEqual(status.status_code, 200)
             self.assertEqual(status.body["connectors"], [
-                {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+                {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []},
             ])
             self.assertEqual(self.binding_install().status_code, 200)
             self.assertTrue(self.connector_status().body["connectors"][0]["configured"])

@@ -434,7 +434,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 플러그인 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 플러그인 경로를 Control Plane 이 쓰는 방법은 [플러그인 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 플러그인 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 상태 조회의 설치 항목은 에이전트용 스킬이 있으면 `skipped_skills: [{name, reasons}]` 도 낸다. 지금 profile 기준으로 설치되지 않은 스킬과 까닭이고, Control Plane 은 칸이 없으면 기록을 두고 빈 목록이면 비운다. 플러그인 경로를 Control Plane 이 쓰는 방법은 [플러그인 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.

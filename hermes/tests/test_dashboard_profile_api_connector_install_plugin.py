@@ -30,7 +30,7 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         # hook 은 접두사로 서버를 잡아 묻는다. 그 플러그인 항목만 설치가 덜 된 것이고 `policy_hook` 은 참이다.
         status = self.connector_status()
         self.assertEqual(status.body["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []},
             {"plugin": OTHER, "enabled": False, "configured": False, "mode": "bind"},
         ])
         self.assertIs(status.body["policy_hook"], True)
@@ -198,7 +198,7 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.body["connectors"], [
-            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind", "skipped_skills": []},
             {"plugin": OTHER, "enabled": False, "configured": False, "mode": "bind"},
         ])
         self.assertIs(status.body["policy_hook"], True)
