@@ -43,7 +43,7 @@ const KINDS: Record<
   { name: string; tools: string[] }
 > = {
   search: { name: "웹 검색", tools: ["web_search"] },
-  page: { name: "페이지 읽기", tools: ["web_extract"] },
+  page: { name: "페이지 읽기", tools: ["web_extract", "product_page_read"] },
   memory: {
     name: "기억",
     tools: [
