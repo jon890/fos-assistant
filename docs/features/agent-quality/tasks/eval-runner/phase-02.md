@@ -6,7 +6,7 @@
 
 `quality/bundles/*.json` 의 묶음 파일을 기동 때 읽어 검사하고, 서비스 개념 평가의 문항을 첫 묶음 파일로 옮긴다. 새 묶음은 파일만 더하면 실행기를 고치지 않고 돈다(REQ5). `test/model-eval/concepts/score.ts` 의 판정을 네트워크 없는 Java 순수 함수로 옮기고 승인 카드 결과(`cardStatus`) 판정을 더한다(REQ6, REQ16).
 
-**범위 외**: 관찰값 모으기와 실행(phase 05). 답변 품질 묶음과 `answer-quality` 통과 규칙은 다음 계획이다.
+**범위 외**: 관찰값 모으기와 실행(다음 PR 의 실행기). 답변 품질 묶음과 `answer-quality` 통과 규칙은 다음 계획이다.
 
 ## 컨텍스트
 
@@ -50,7 +50,7 @@ record `EvalBundle(id, title, timeoutMinutes, PassRule pass, List<EvalQuestion> 
 ### 5. `quality/application/dto/EvalObservation.java`, `quality/application/EvalJudge.java`
 
 `EvalObservation`: 마지막 답 글, 성공으로 끝난 도구 이름 집합(접두사 `mcp__fos_assistant__` 를 뗀 이름), 답이 링크한 예약 작업 id 별 지시문, 마지막으로 누른 카드 줄의 상태(없으면 null).
-`EvalJudge.judge(EvalQuestion, EvalObservation)` → 통과 여부와 까닭 목록. 도구는 옛 `completedTools` 처럼 실행 트리의 실패 아닌 `TOOL_COMPLETED` 사건 이름에서 접두사를 떼어 기대 이름과 같은지 본다. `linkedTaskIds(answer)` 는 phase 05 가 지시문을 읽을 때 쓴다. `bundleResult(PassRule, List<ItemResult>)` 는 `SKIPPED` 를 분모에서 빼고 `ceil(ratio × 돈 문항)` 이상 통과면 통과다.
+`EvalJudge.judge(EvalQuestion, EvalObservation)` → 통과 여부와 까닭 목록. 도구는 옛 `completedTools` 처럼 실행 트리의 `TOOL_COMPLETED` 사건 이름(옛 판정처럼 실패 여부는 보지 않는다)에서 접두사를 떼어 기대 이름과 같은지 본다. `linkedTaskIds(answer)` 는 다음 PR 의 실행기가 지시문을 읽을 때 쓴다. `bundleResult(PassRule, List<ItemResult>)` 는 `SKIPPED` 를 분모에서 빼고 `ceil(ratio × 돈 문항)` 이상 통과면 통과다.
 
 ### 6. 테스트
 
