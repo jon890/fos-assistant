@@ -106,7 +106,7 @@ export function SettingsShell({
         <nav
           aria-label="설정 메뉴"
           className={cn(
-            "flex shrink-0 flex-col gap-2 overflow-y-auto bg-muted px-3 py-4 md:w-56 md:border-r md:border-border",
+            "flex shrink-0 flex-col gap-2 overflow-y-auto bg-muted px-3 py-4 md:w-64 md:border-r md:border-border",
             onList ? "min-h-0 flex-1 md:flex-none" : "max-md:hidden",
           )}
         >

@@ -344,23 +344,19 @@ public final class ChatDtos {
         }
     }
 
-    /**
-     * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
-     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code SEARCH}, {@code READ} 이고 본문은 싣지 않는다.
-     */
     /** 「참고한 기억」 항목 단추의 요청이다. 어느 답의 어느 기억인지와 누른 단추만 받는다. */
     public record MemoryUseReactionRequest(
         @NotNull Long executionId, @NotNull Long memoryId, @NotNull MemoryUseReaction reaction) {
     }
 
-    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
+    /** 작업 과정의 「참고한 기억」 에 보일 기억 하나다(ADR-20261008 / memory-facts). 본문은 내지 않는다. */
+    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope) {
         static MemoryUseView from(MemoryUse use) {
             return new MemoryUseView(
                 use.executionId(),
                 use.memoryId(),
                 use.title(),
-                use.scope().name(),
-                use.via().name());
+                use.scope().name());
         }
     }
 }

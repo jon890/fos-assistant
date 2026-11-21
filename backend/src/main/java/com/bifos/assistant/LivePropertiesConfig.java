@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
+import com.bifos.assistant.quality.config.QualityProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import com.bifos.assistant.usage.pricing.config.PricingProperties;
@@ -84,6 +85,12 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<WorkspaceProperties> workspacePropertiesLive(WorkspaceProperties value) {
         return LiveProperties.fixed(WorkspaceProperties.class, value);
+    }
+
+
+    @Bean
+    public LiveProperties<QualityProperties> qualityPropertiesLive(QualityProperties value) {
+        return LiveProperties.fixed(QualityProperties.class, value);
     }
 
 
