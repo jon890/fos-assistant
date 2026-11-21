@@ -43,8 +43,9 @@ test("에이전트 목록은 조회 중에도 화면에 맞는 뼈대를 곧바�
   await page.goto("/agents");
   await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
   const memberSkeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);
-  expect(memberSkeleton).toContain("max-w-2xl");
-  expect(memberSkeleton).toContain("h-14");
+  // 일반 화면의 뼈대는 화면 머리 틀이 그린다. 제목이 그대로 보이고 폭이 다른 화면과 같다.
+  expect(memberSkeleton).toContain("max-w-4xl");
+  expect(memberSkeleton).toContain(">에이전트</h1>");
   expect(memberSkeleton).not.toContain("h-[46.875rem]");
 });
 

@@ -61,7 +61,7 @@ PR1 은 운영 코드 상한 때문에 backend(기기 저장과 보내기)와 we
 | 예약 작업 | `TASK_SUCCEEDED`, `TASK_FAILED`, `TASK_SKIPPED` |
 | 살펴보기 보고 | `EVENT_CHECK_REPORTED` |
 | 연결 문제 | `EVENT_WATCH_FAILED` |
-| 관리자 할 일 | `CONNECTOR_REINSTALLED`, `DEFAULT_TOOLS_PENDING` |
+| 관리자 할 일 | `CONNECTOR_REINSTALLED`, `DEFAULT_TOOLS_PENDING`, `QUALITY_CHECK_FAILED` |
 
 새 알림 종류(예: 「터미널 기본」 의 셸 사용 알림)는 더할 때 묶음 하나에 넣는다. 묶음이 없는 종류는 테스트가 막는다.
 

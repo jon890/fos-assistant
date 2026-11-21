@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { describeAdminError, describeError } from "@/components/error-message";
 import { AgentDetailBody } from "@/components/agent/agent-detail-body";
 import { Notice } from "@/components/ui/notice";
+import { PageFrame } from "@/components/ui/page-frame";
 import { callControlPlane } from "@/lib/control-plane";
 import type {
   AdminAgent,
@@ -11,6 +12,7 @@ import type {
   PersonaView,
 } from "@/lib/agent";
 import type { AgentConnectionsList } from "@/lib/agent-connection";
+import { PAGE_HEADS } from "@/lib/page-head";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
 
@@ -166,13 +168,13 @@ export async function loadAgentDetail(
           primary={primary}
           adminError={null}
           listHref={listHref}
+          admin={admin}
           introduction={introduction}
         />
       );
     }
-    return (
-      <div className="mx-auto w-full max-w-2xl">
-        <h1 className="mb-4 text-xl font-semibold">{name}</h1>
+    const failure = (
+      <>
         <Notice variant="error" role="alert">
           {describeError(personaResult.code, personaResult.message)}
         </Notice>
@@ -181,7 +183,20 @@ export async function loadAgentDetail(
             관리 정보를 불러오지 못했어요. {adminError}
           </Notice>
         ) : null}
+      </>
+    );
+    return admin ? (
+      <div className="mx-auto w-full max-w-2xl">
+        <h1 className="mb-4 text-xl font-semibold">{name}</h1>
+        {failure}
       </div>
+    ) : (
+      <PageFrame
+        title={name}
+        back={{ href: listHref, label: PAGE_HEADS.agents.title }}
+      >
+        {failure}
+      </PageFrame>
     );
   }
 
@@ -200,6 +215,7 @@ export async function loadAgentDetail(
       primary={primary}
       adminError={adminError}
       listHref={listHref}
+      admin={admin}
       chatHref={chatHref}
       introduction={introduction}
     />

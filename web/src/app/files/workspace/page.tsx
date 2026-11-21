@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/auth";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton } from "@/components/ui/page-state";
 import { WorkspaceExplorer } from "@/components/workspace/workspace-explorer";
 
 export const metadata: Metadata = { title: "에이전트 작업 폴더" };
@@ -16,21 +17,14 @@ export default async function WorkspaceFolderPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/signin");
   return (
-    <div className="mx-auto w-full max-w-6xl">
-      <Link
-        href="/files"
-        prefetch={false}
-        className="text-sm underline underline-offset-4"
-      >
-        ← 내 파일
-      </Link>
-      <h1 className="mt-1 mb-3 text-xl font-semibold">에이전트 작업 폴더</h1>
+    <PageFrame
+      title="에이전트 작업 폴더"
+      back={{ href: "/files", label: "내 파일" }}
+    >
       {/* 주소의 `path`, `file` 을 useSearchParams 로 읽으므로 Suspense 로 감싼다. */}
-      <Suspense
-        fallback={<p className="text-sm text-muted-foreground">불러오는 중…</p>}
-      >
+      <Suspense fallback={<ListSkeleton />}>
         <WorkspaceExplorer />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
