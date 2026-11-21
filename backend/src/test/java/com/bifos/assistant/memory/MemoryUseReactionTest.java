@@ -109,7 +109,7 @@ class MemoryUseReactionTest {
             dad, MemoryScope.USER, "취미", "등산을 좋아한다", "core", MemoryRetrieval.SEARCH);
         run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, "fos-" + UUID.randomUUID());
         messages.save(ChatMessage.fromAssistant(conversation.id(), "답", run.id(), Instant.now()));
-        contextSources.save(ExecutionContextSource.of(run.id(), 0, "MEMORY_FACTS", "memory:" + used.id(), "INLINE", "FRESH"));
+        contextSources.save(ExecutionContextSource.of(run.id(), 0, "MEMORY_READ", "memory:" + used.id(), "INLINE", "FRESH"));
     }
 
 

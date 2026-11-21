@@ -5,8 +5,7 @@ import { ChevronRight, CircleAlert, CircleCheck, Square } from "lucide-react";
 import { cn } from "cn";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed, formatSeconds } from "@/lib/format";
-import { fetchExecutionTree } from "@/lib/usage-api";
-import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
+import { loadExecutionTree } from "@/lib/execution-tree-load";
 import type { MemoryUse } from "@/lib/memory-use-api";
 import type { SourceReadSummary } from "@/components/chat/message-types";
 import { ActivityReferences } from "./activity-references";
@@ -160,11 +159,8 @@ export function ActivityBlock(props: Props) {
   useEffect(() => {
     if (!expanded || executionId === null || savedItems !== null) return;
     let active = true;
-    fetchExecutionTree(executionId)
-      .then((response) => {
-        if (!response.ok) throw new Error("작업 과정을 불러오지 못했어요");
-        return response.json() as Promise<ExecutionTreeResponse>;
-      })
+    // 첫 읽기가 일시적으로 실패해도 한 번은 저절로 다시 읽는다. 그래도 안 되면 「다시 읽기」 를 보인다.
+    loadExecutionTree(executionId, { stopped: () => !active })
       .then((tree) => {
         if (active) {
           setSavedItems(fromTree(tree, { cancelled }));
