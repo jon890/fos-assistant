@@ -11,7 +11,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * 비서가 만든 그림이 저장되면 그 대화를 보는 모든 창에 {@code image} 사건을 보낸다(docs/features/generated-image/design.md 의 「PR7」).
+ * 비서가 만든 그림이 저장되면 그 대화를 보는 모든 창에 {@code image} 사건을 보낸다(docs/features/generated-image/design.md 의 「PR7: 나오는 즉시 보이기」).
  *
  * <p>그림은 turn 의 스트림과 다른 올리기 요청에서 저장되고 turn 밖에서도 오므로 대화 단위 SSE 로만 보낸다. 보내다 실패해도 올리기는
  * 성공한다. 화면은 답이 끝나 이력을 다시 읽을 때 그림을 본다.
