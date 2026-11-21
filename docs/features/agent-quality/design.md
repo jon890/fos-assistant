@@ -246,7 +246,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 
 ### 묶음 파일
 
-`backend/src/main/resources/quality/bundles/<묶음 id>.json` 하나가 묶음 하나다. 읽는 자리는 설정 `assistant.quality.bundle-location`(기본 `classpath:quality/bundles/`)이고, e2e 는 테스트 묶음 폴더로 바꾼다. 새 묶음은 파일을 더해 만들고 실행기를 고치지 않는다(REQ5). 기동 때 모두 읽어 형식을 검사하고, 틀린 파일이 있으면 기동을 멈춘다. 저장소 테스트가 같은 검사를 CI 에서 돌린다.
+`backend/src/main/resources/quality/bundles/<묶음 id>.json` 하나가 묶음 하나다. 읽는 자리는 설정 `assistant.quality.bundle-location`(기본 `classpath*:quality/bundles/`)이고, e2e 는 테스트 묶음 폴더로 바꾼다. 새 묶음은 파일을 더해 만들고 실행기를 고치지 않는다(REQ5). 기동 때 모두 읽어 형식을 검사하고, 틀린 파일이 있으면 기동을 멈춘다. 저장소 테스트가 같은 검사를 CI 에서 돌린다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -297,7 +297,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | 칸 | `EVAL` 에서 |
 | --- | --- |
 | `kind`, `trigger_type` | `EVAL`, `ADMIN`. PR2b 가 `SCHEDULED` 를 더한다 |
-| `result_json` | `{tier, bundles[], items[]}`. `bundles` 는 묶음마다 `id`, `status`, 통과 수, 문항 수, 건너뜀 수, 답변 품질 기준 숫자. `items` 는 문항마다 `bundle`, `question`, `status`(`PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `elapsedMs`, 규칙 숫자, `conversationPublicId` 와 `executionIds`(실패나 `keepConversation` 만, 30일), `created`(만든 것의 번호) |
+| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(보내기·읽기 오류와 시간 초과 문항 수). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
 
 `result_json` 의 모양이 `kind` 마다 다르다. 지금 `QualityRun.results` 는 `FeatureResultsConverter` 로 `List<FeatureResult>` 에 묶여 있고 JPA 변환기는 `kind` 를 보지 못한다. 그래서 엔티티 칸을 JSON 문자열로 두고, `kind` 별 읽기·쓰기는 domain 의 codec 두 개(지금 `FeatureResultsConverter` 를 JPA 변환기에서 정적 codec 으로 바꾼 것과 새 `EvalResult` codec)가 한다. 지금 변환기처럼 codec 안의 정적 `JsonMapper` 를 쓴다. 엔티티는 `kind` 가 맞지 않는 읽기·쓰기를 거절한다. `item_count` 는 `EVAL` 에서 고른 문항 수이고 PR1 의 `record` 처럼 결과 수로 덮지 않는다. 답 본문과 질문 본문은 담지 않는다.
 
@@ -320,7 +320,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 실행 끝에 모든 문항의 대화로 위 표를 지우고 줄에 「비우기 끝남」 을 적는다. 대화와 결과물은 통과하면 바로, 실패와 `keepConversation` 은 하루 정리가 30일 뒤 지운다.
 「비우기 끝남」 이 없는 끝난 `EVAL` 줄(끊김, 비우기 실패)은 재기동 처리, 다음 실행 시작, 하루 정리가 다시 지운다(스펙 DECISION37). 그래서 수동 실행이 다시 없어도 남은 예약 작업이 하루를 넘겨 발화하지 않는다.
 
-**PR1 배포 뒤 확인의 기억 지우기도 대화로 바꾼다.** 지금은 확인 시작 뒤 생긴 기억을 모두 지워(`DeployCheckCleaner.forgetNewMemories`), 함께 도는 평가 문항이 막 만든 기억까지 지운다. 확인 기능의 대화의 `memory_capture` 로 지우게 바꿔 서로의 것을 건드리지 않는다.
+**PR1 배포 뒤 확인의 기억 지우기도 대화로 바꿨다.** 예전에는 확인 시작 뒤 생긴 기억을 모두 지워 함께 도는 평가 문항이 막 만든 기억까지 지웠다. 이제 기능마다 그 대화의 `memory_capture` 로 되돌린다(`DeployCheckCleaner.forgetCaptured`). 그 대화가 만들거나 제안한 기억은 지우고, 고치기만 한 기억은 늦게 고친 것부터 되돌린다.
 
 ### 평가 실행 API
 
@@ -377,7 +377,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | --- | --- | --- |
 | 기록 종류와 묶음 판정 | 저장 형식의 `kind` 구분과 PR1 의 재기동·하루 정리·기억 지우기 변경, 보내기·마감의 `TurnDriver` 꺼내기, 묶음 파일 읽기, 서비스 개념 판정 옮기기와 그 묶음 파일(REQ5, REQ6 의 판정) | 배포 뒤 확인 한 번이 전과 같이 통과·실패를 내는지 본다 |
 | 평가 실행기와 API | 평가 문항 비우기, 평가 실행기와 카드 처리, 평가 실행 API 와 e2e(REQ9 API, REQ15 부터 REQ17 까지) | 배포 뒤 서비스 개념 묶음을 한 번 돌려 옛 스크립트의 마지막 결과와 비교한다 |
-| 답변 품질 묶음 | 답변 품질 판정(형식 검사, 사진 요청 포함) 옮기기와 그 묶음 파일, `answer-quality` 통과 규칙, `keepConversation`, 공개 주소 읽기 꺼내기와 링크 열기, `run-eval.ts`(REQ6 의 답변 품질, REQ18 의 스크립트) | 배포 뒤 답변 품질 묶음을 한 번 돌려 옛 결과와 비교한다 |
+| 답변 품질 묶음 | 답변 품질 판정(형식 검사, 사진 요청 포함) 옮기기와 그 묶음 파일, `answer-quality` 통과 규칙, `keepConversation` 을 쓰는 문항(칸은 첫 PR 이 먼저 둔다), 공개 주소 읽기 꺼내기와 링크 열기, `run-eval.ts`(REQ6 의 답변 품질, REQ18 의 스크립트) | 배포 뒤 답변 품질 묶음을 한 번 돌려 옛 결과와 비교한다 |
 | 화면과 정리 | 품질 화면 둘째 칸과 「지금 돌리기」, 옛 TypeScript 평가 스크립트 지우기(`test/model-eval/answer/`, `test/model-eval/concepts/`. 블로그 평가가 쓰는 `control-plane.ts` 는 남긴다), `AGENTS.md` 와 서비스 개념·답변 품질 문서 고치기(REQ6 의 지우기, REQ9 화면, REQ18) | 브라우저 테스트 |
 
 ## 결정

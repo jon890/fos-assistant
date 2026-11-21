@@ -13,7 +13,7 @@
 - 옮길 코드: `quality/application/DeployCheckRunner.java` 의 `send(evaluation, attempt, text, attachmentIds, deadline)`, `waitUntil(deadline, condition)`, 마감 뒤 `TurnCancellation.markOf` 와 `ChatService.stop`, `AgentDelegationService` 의 위임 자식 중지, `HERMES_RUN_TIMEOUT` 과 `USER_BUSY`·`CONVERSATION_BUSY` 처리. 보내기 전 빈 대화 만들기(`ChatService.startEmpty`)와 그 대화의 도는 turn 이 없어질 때까지 기다리기.
 - 설계의 근거: `docs/features/agent-quality/design.md` 의 「기능마다 10분 마감」, DECISION9.
 
-**요구사항**: REQ15
+**요구사항**: REQ17
 
 **근거 문서**: `docs/features/agent-quality/design.md` 의 「PR2a: 평가 사용자로 묶음 문항 돌리기」 의 「책임과 경계」
 
