@@ -1,6 +1,6 @@
 # 에이전트 품질 기술 설계
 
-스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ4 까지)을 설계한다. PR2 와 PR3 은 이 PR 이 정하는 경계(저장 표, 평가 전용 사용자, 실행기)만 적고, 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙 [`spec.md`](spec.md) 의 PR1(REQ1 부터 REQ4 까지)과 PR2a(REQ5, REQ6, REQ9 의 「지금 돌리기」, REQ15 부터 REQ18 까지)를 설계한다. PR2a 는 아래 「PR2a: 평가 사용자로 묶음 문항 돌리기」 절이 갖는다. PR2b 와 PR3 은 이 문서가 정하는 경계(저장 표, 평가 전용 사용자, 실행기)만 적고, 그 PR 을 시작할 때 절을 더한다.
 
 ## 요구사항 연결
 
@@ -10,16 +10,20 @@
 | REQ2 | `app_user.evaluation` 칸이 평가 전용 사용자를 표시한다. 실행기는 이 사용자의 `CurrentUser` 로만 돌고, 사용자 목록·에이전트 고르기·멘션·반응·사용량 집계의 조회가 이 사용자를 뺀다 |
 | REQ3 | 확인이 실패로 끝나면 `NotificationService` 로 그룹의 `ADMIN` 마다 새 알림 종류 `QUALITY_CHECK_FAILED` 를 남긴다. 파이프라인은 같은 조회 API 의 `status` 로 자기 알림을 보낸다 |
 | REQ4 | 웹 `/admin/quality` 첫 칸이 확인 목록 API 를 그린다. 실패 줄은 남겨 둔 평가 대화의 관리자 실행 상세로 잇고, 「다시 확인」 은 같은 기능 묶음으로 새 확인을 시작한다 |
-| REQ5 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
-| REQ6 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
-| REQ7 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
-| REQ8 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
-| REQ9 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
-| REQ10 | PR2 가 설계한다. 이 PR 의 실행기와 `quality_run` 을 다시 쓴다 |
+| REQ5 | PR2a. 아래 「묶음 파일」 과 「판정」 |
+| REQ6 | PR2a. 아래 「묶음 파일」 과 「판정」 |
+| REQ7 | PR2b 가 설계한다. PR2a 의 평가 실행기와 `quality_run` 을 다시 쓴다 |
+| REQ8 | PR2b 가 설계한다. PR2a 의 평가 실행기와 `quality_run` 을 다시 쓴다 |
+| REQ9 | 「지금 돌리기」 는 PR2a 의 「평가 실행 API」 와 「화면」. 주 1회 실행은 PR2b 가 설계한다 |
+| REQ10 | PR2b 가 설계한다. PR2a 의 평가 실행기와 `quality_run` 을 다시 쓴다 |
 | REQ11 | PR3 가 설계한다. 반응은 `decision_feedback_event`, 문항 후보는 `quality_run` 의 JSON 칸으로 받는다(스펙 DECISION18, 이 문서 DECISION1) |
 | REQ12 | PR3 가 설계한다. 반응은 `decision_feedback_event`, 문항 후보는 `quality_run` 의 JSON 칸으로 받는다(스펙 DECISION18, 이 문서 DECISION1) |
 | REQ13 | PR3 가 설계한다. 반응은 `decision_feedback_event`, 문항 후보는 `quality_run` 의 JSON 칸으로 받는다(스펙 DECISION18, 이 문서 DECISION1) |
 | REQ14 | PR3 가 설계한다. 반응은 `decision_feedback_event`, 문항 후보는 `quality_run` 의 JSON 칸으로 받는다(스펙 DECISION18, 이 문서 DECISION1) |
+| REQ15 | PR2a. `quality` 의 평가 실행기가 평가 전용 사용자의 `CurrentUser` 로 `ChatService` 를 부른다(「평가 실행기」). 관리자 API 와 품질 화면 둘째 칸이 시작하고 결과를 보인다 |
+| REQ16 | PR2a. 문항의 차례마다 `card` 를 적고, 실행기가 화면과 같은 승인 서비스를 평가 사용자로 부른다(「여러 차례와 승인 카드」) |
+| REQ17 | PR2a. 문항마다 만든 것을 기록하고 실행 끝에 지운다(「비우기」) |
+| REQ18 | PR2a. 기능 묶음 파일과 관리자 API 를 부르는 실행 스크립트, 루트 `AGENTS.md` 와 서비스 개념 문서의 규칙 변경(「기능 PR 의 배포 뒤 확인」) |
 
 ## 책임과 경계
 
@@ -224,6 +228,161 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 4. 평가 전용 사용자의 Hermes profile 은 Control Plane 이 만든다. 운영 저장소는 profile 을 따로 만들지 않는다.
 5. 평가 사용자를 준비하기 전에 그 profile 을 실행 공간 정책과 첨부(`vision`) 정책에 등록한다. 그림 만들기와 사진 조회 도구는 등록된 profile 에서만 켜진다([ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md), ADR-091). 공유 gateway 를 다시 띄우는 배포 단계가 그 profile 도 포함하는지 확인한다.
 
+## PR2a: 평가 사용자로 묶음 문항 돌리기
+
+스펙 REQ5, REQ6, REQ9 의 「지금 돌리기」, REQ15 부터 REQ18 까지를 설계한다. PR1 의 실행기(`DeployCheckRunner`, `DeployCheckObserver`, `DeployCheckCleaner`)가 머지된 뒤 그 위에 얹는다.
+
+### 책임과 경계
+
+| 모듈 | 맡는 것 |
+| --- | --- |
+| `backend` 의 `followup` | 평가 사용자의 한 대화가 만든 할 일을 지우는 메서드. 지금은 닫기와 사용자 전체 정리만 있다 |
+| `backend` 의 `quality` | 묶음 파일 읽기, 평가 한 번(`kind` `EVAL`)의 시작과 상태 전이, 문항 실행, 규칙 판정, 묶음 결과, 문항마다 만든 것의 기록과 비우기, 출처 링크 열어 보기 |
+| `backend` 의 `admin.quality` | 평가 실행 API 와 평가 사용자 대화 읽기. `quality.application` 만 부른다 |
+| `backend` 의 `shared` | 공개 주소로만 여는 HTTP 읽기(주소 검사, 이름 풀이 뒤 공개 IP 판정, 풀어 낸 IP 에 고정한 연결, 넘겨주기마다 다시 검사)를 `chat.artifact.infra` 의 `LinkImageFetcher` 와 `ArtifactSourceFetcher` 에서 꺼내 둔다. 두 그림 받기와 출처 링크 열기가 함께 쓴다 |
+| `web` | `/admin/quality` 둘째 칸(평가 기록)과 「지금 돌리기」 |
+| `scripts/dev/run-eval.ts` | 코디네이터가 관리자 토큰으로 평가를 시작하고 끝날 때까지 기다려 결과를 보이는 스크립트. 기능 완료 증거에 붙일 글을 낸다 |
+
+**평가 실행기는 배포 뒤 확인 실행기와 따로 두고 아래 부품을 함께 쓴다.** 문항을 별도 작업에서 `send` 로 보내고 끝남 조건을 보는 부분, 마감이 지나면 turn 과 위임 자식을 멈추는 부분, 관찰(`DeployCheckObserver`)과 대화 지우기(`DeployCheckCleaner.dropConversation`)다. 함께 쓰는 부분은 PR2a 가 `quality.application` 안에서 이름을 바꿔 꺼낸다(배포 뒤 확인 전용 이름이 아니게). 확인은 기능이 고정이고 평가는 문항이 파일에서 오므로, 한 실행기에 넣으면 기능 분기와 문항 분기가 섞인다.
+
+**문항은 사람과 같은 길로 보낸다.** `ChatService` 의 대화 만들기, 모델 단계 고르기, `send`, 첨부 올리기와 `ConnectorActionService` 의 승인·거절을 평가 사용자의 `CurrentUser` 로 부른다. 평가만을 위한 판정이나 허락은 두지 않는다. `quality` 는 층 순서에서 `chat`, `connector`, `task`, `followup`, `memory` 위라 모두 부를 수 있다.
+
+### 묶음 파일
+
+`backend/src/main/resources/quality/bundles/<묶음 id>.json` 하나가 묶음 하나다. 읽는 자리는 설정 `assistant.quality.bundle-location`(기본 `classpath*:quality/bundles/`)이고, e2e 는 테스트 묶음 폴더로 바꾼다. 새 묶음은 파일을 더해 만들고 실행기를 고치지 않는다(REQ5). 기동 때 모두 읽어 형식을 검사하고, 틀린 파일이 있으면 기동을 멈춘다. 저장소 테스트가 같은 검사를 CI 에서 돌린다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `id`, `title` | 묶음 id(파일 이름과 같다)와 화면에 보일 이름 |
+| `timeoutMinutes` | 문항 하나의 상한. 없으면 10(스펙 DECISION40) |
+| `pass` | 묶음 통과 규칙. `{"type":"ratio","ratio":0.85}` 는 통과 문항 비율, `{"type":"answer-quality"}` 는 지금 `answer/score.ts` 의 `scoreSet` 기준(출처 15/17 비율, 열린 링크 90%, 날짜 문항, 사진 요청 문항). 없으면 `ratio` 0.85 |
+| `questions[]` | 문항. 아래 표 |
+
+| 문항 칸 | 뜻 |
+| --- | --- |
+| `id` | 묶음 안에서 유일 |
+| `turns[]` | 차례. 각 차례는 `text`(보낼 글), 선택 `attachment`(리소스 사진 이름), 선택 `card`(`approve`, `reject`, `leave`) |
+| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
+| `keepConversation` | 통과해도 대화를 30일 남긴다. 답변 품질의 사람 비교 문항(스펙 DECISION38) |
+
+옛 `questions.json` 의 문항은 `messages` 를 `turns` 로 바꿔 그대로 옮긴다. 「답변 품질」 묶음은 `timeoutMinutes` 15, `pass` `answer-quality` 이고, 「서비스 개념」 묶음은 `ratio` 0.85 다.
+문항의 자리(`{otherAgentCode}`, `{otherAgentName}`, `{connectorId}`, `{connectorTitle}`)는 실행기가 평가 사용자의 위임 대상 에이전트와, 그룹 카탈로그에서 평가 사용자가 연결하지 않은 첫 플러그인으로 채운다. 값이 없으면 그 문항은 「건너뜀」 이고 분모에서 빠진다(스펙 DECISION35).
+
+### 평가 한 번의 흐름
+
+1. 시작은 평가 사용자 행 잠금(`AppUserRepository.findByIdForUpdate`) 안에서 `RUNNING` 인 `EVAL` 줄을 찾는다. 있으면 새로 만들지 않고 그 줄을 돌려준다(REQ9). `DEPLOY_CHECK` 는 보지 않는다(스펙 DECISION23).
+2. 「비우기 끝남」 이 없는 끝난 `EVAL` 줄의 문항 대화를 다시 비운다(「비우기」).
+3. 고른 묶음의 문항을 파일 순서대로 하나씩 돈다. 문항마다 새 대화를 만들고, 모델 단계를 골랐으면 그 대화의 단계를 바꾼 뒤 차례를 보낸다. 고르지 않았으면 평가 사용자에게 걸리는 기본 단계(`ModelTierService` 의 사용자 기본, 없으면 그룹 기본)이고, 실행 시작 때 실제로 쓴 단계를 `result_json.tier` 에 적는다.
+4. 문항이 끝나면 판정하고 결과를 `result_json` 에 더해 저장한다. 사용자 실행 한도로 거절되면 PR1 처럼 `FAILED`, 까닭 `BUSY` 다. 판정 직후 그 문항이 만든 예약 작업을 지우고 남긴 카드를 거절한다. 실행 도중 발화해 비용이 들고 사용자 실행 자리를 잡지 않게 한다. 통과했고 `keepConversation` 이 아니면 그 뒤 대화를 지운다.
+5. 모두 끝나면 묶음 결과를 계산해 `PASSED`(모든 고른 묶음이 통과)나 `FAILED` 로 끝내고, 문항이 만든 나머지를 지운다.
+
+사용자 실행 한도(`max-running` 4)는 평가 한 문항(위임이나 승인 뒤 다시 도는 turn 이면 둘)과 함께 도는 배포 뒤 확인(위임이면 둘)을 받는다. 평가가 만든 예약 작업은 판정 직후 지워 발화가 자리를 잡지 않는다. 그래서 평가는 문항을 차례로 돌고 확인과는 겹쳐도 된다. 겹쳐 `USER_BUSY` 가 나면 PR1 처럼 그 문항을 `BUSY` 로 적는다.
+마감과 멈춤은 PR1 의 「기능마다 10분 마감」 과 같고 상한만 묶음 값이다. 넘으면 그 문항만 `TIMED_OUT` 이다. 테스트와 e2e 는 설정 `assistant.quality.eval-timeout-override`(기본 없음)로 모든 묶음의 상한을 줄인다.
+재기동 때 `RUNNING` 인 `EVAL` 줄은 `FAILED`, 까닭 `INTERRUPTED` 로 끝낸다. 끝내지 못한 문항은 실패로 적어 대화를 30일 남긴다(스펙 DECISION37).
+
+### 여러 차례와 승인 카드
+
+차례마다 `send` 가 돌아온 뒤 그 대화의 `connector_action` 가운데 이번 차례가 만든 `PENDING` 줄을 찾는다(`DeployCheckObserver` 가 이미 읽는 조회). `card` 가 `approve` 면 `ConnectorActionService.approve(평가 사용자, actionId, null, false)`, `reject` 면 `reject` 를 부른다. 화면 단추와 같은 서비스다(`ConnectorActionController`). 원고 저장 승인처럼 다른 길로 가는 줄은 평가 문항에 쓰지 않는다.
+`card` 를 적지 않았는데 카드가 뜨면 `leave` 로 본다. 남긴 카드는 판정 직후, 대화를 지우기 전에 거절한다(스펙 REQ16).
+카드를 누르면 결과가 대화로 가고 에이전트가 한 번 더 돌 수 있다(`ConnectorActionListener`, `NextTurnDispatcher`). 그래서 다음 차례는 위임과 같은 끝남 조건(대화에 도는 turn 이 없고 `ChatService.deliveryStates` 의 전달이 끝남)을 기다린 뒤 보낸다. 이 기다림도 문항 상한 안이다. 판정은 문항의 모든 루트 실행 트리와 마지막 답을 본다. `expect.cardStatus` 는 마지막으로 누른 줄의 상태를 본다.
+카드 줄이 원고 저장 승인(`ContentDraftSaveApproval.select` 가 고르는 줄)이면 누르지 않고 그 문항을 `FAILED`, 까닭 `CARD_FAILED` 로 적는다. 화면은 그 줄을 다른 길로 승인하기 때문이다.
+
+### 판정
+
+`test/model-eval/concepts/score.ts` 와 `test/model-eval/answer/score.ts` 의 판정을 Java 의 순수 함수로 옮긴다. 답변 품질은 사진 요청 판정(`photo-request`)과 답 형식 검사(`formatCheck`)까지 옮긴다. 사람 비교 결과를 받는 `--compare` 는 옮기지 않는다. 사람 판정을 적을 자리는 PR2b(REQ8)가 만들고, 그때까지 답변 품질 묶음은 규칙 기준을 넘으면 지금처럼 「사람 비교 대기」 로 보인다. 옮긴 판정은 같은 입력에 같은 결과를 내는지 옛 테스트의 사례를 그대로 단위 테스트로 옮겨 본다(REQ6).
+출처 링크 열어 보기는 GET 으로 열고 본문은 읽지 않는다. `shared` 로 꺼낸 공개 주소 읽기를 쓴다. 호스트를 풀어 공개 IP 일 때만 그 IP 에 고정해 연결하고, 넘겨주기(redirect)마다 다시 본다. 이름 풀이를 바꿔치기해 내부 주소로 가는 것을 막는다. 열지 못하면 옛 판정처럼 「확인 못 함」 이고 비율에서 뺀다.
+`instructionIncludes` 는 답이 링크한 예약 작업의 지시문을 `TaskService` 로 읽어 본다.
+
+### 저장: `quality_run` 의 `EVAL`
+
+PR1 의 표를 그대로 쓴다. 새 칸은 없다.
+
+| 칸 | `EVAL` 에서 |
+| --- | --- |
+| `kind`, `trigger_type` | `EVAL`, `ADMIN`. PR2b 가 `SCHEDULED` 를 더한다 |
+| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(보내기·읽기 오류와 시간 초과 문항 수). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
+
+`result_json` 의 모양이 `kind` 마다 다르다. 지금 `QualityRun.results` 는 `FeatureResultsConverter` 로 `List<FeatureResult>` 에 묶여 있고 JPA 변환기는 `kind` 를 보지 못한다. 그래서 엔티티 칸을 JSON 문자열로 두고, `kind` 별 읽기·쓰기는 domain 의 codec 두 개(지금 `FeatureResultsConverter` 를 JPA 변환기에서 정적 codec 으로 바꾼 것과 새 `EvalResult` codec)가 한다. 지금 변환기처럼 codec 안의 정적 `JsonMapper` 를 쓴다. 엔티티는 `kind` 가 맞지 않는 읽기·쓰기를 거절한다. `item_count` 는 `EVAL` 에서 고른 문항 수이고 PR1 의 `record` 처럼 결과 수로 덮지 않는다. 답 본문과 질문 본문은 담지 않는다.
+
+**PR1 코드도 `kind` 를 본다.** 재기동 처리(`DeployCheckRuns.interruptRunning`)와 하루 정리(`DeployCheckCleaner.sweepExpired`)는 지금 `kind` 를 가리지 않는다. 그대로면 도는 `EVAL` 줄에 배포 기능을 채우고 배포 뒤 확인 실패 알림을 보내며, `EVAL` 줄을 `FeatureResult` 로 읽다 멈춘다. 두 곳을 `kind` 로 나누고, 하루 정리는 통과한 `EVAL` 줄의 `keepConversation` 대화도 30일 뒤 지운다.
+
+### 비우기
+
+**문항이 만든 것은 그 문항의 대화 번호로 찾는다.** 평가 사용자의 대화는 문항마다 새로 만들므로 대화 번호가 문항을 가린다. 함께 도는 배포 뒤 확인의 것은 대화가 달라 섞이지 않는다.
+
+| 만든 것 | 찾는 길 | 지우는 길 |
+| --- | --- | --- |
+| 예약 작업 | 루트 실행이 만든 것은 `task.conversation_id`(`task_create` 가 원래 대화를 넣는다, `TaskAgentRequests`). 위임 자식이 만든 것은 대화 칸이 비므로, 그 문항이 도는 동안 생긴 평가 사용자의 대화 칸이 빈 작업 가운데 배포 뒤 확인의 고정 지시문이 아닌 것 | 판정 직후 보관 처리한다 |
+| 기억 | 그 대화의 `memory_capture`(`MemoryCaptureService.capturesOf`) | `CREATED` 와 `PROPOSED` 는 그 기억을 지우고, `UPDATED` 는 늦은 것부터 되돌린다(`undo`). 준비 때 넣은 기억이 고쳐졌으면 되돌아온다 |
+| 할 일 | `follow_up.conversation_id` | `followup` 에 더하는 대화 단위 지우기 |
+| 승인 줄 | `connector_action.conversation_id` | 기다리는 줄을 거절로 닫는다. 승인 줄은 감사 기록이라 줄 자체는 남는다(`ConnectorConversationActionPurge`) |
+| 보관본 | PR1 의 `ArtifactVaultFinder.putIdsOf` | 판정 직후 통과·실패와 상관없이 지운다(스펙 REQ17) |
+| 대화와 결과물 | 문항 대화 | 통과하면 바로, 실패와 `keepConversation` 은 30일 뒤(PR1 의 `dropConversation`) |
+
+문항이 시작할 때 대화 번호를 `result_json` 의 그 문항에 먼저 적는다. 끊겨도 무엇을 지울지 남는다.
+실행 끝에 모든 문항의 대화로 위 표를 지우고 줄에 「비우기 끝남」 을 적는다. 대화와 결과물은 통과하면 바로, 실패와 `keepConversation` 은 하루 정리가 30일 뒤 지운다.
+「비우기 끝남」 이 없는 끝난 `EVAL` 줄(끊김, 비우기 실패)은 재기동 처리, 다음 실행 시작, 하루 정리가 다시 지운다(스펙 DECISION37). 그래서 수동 실행이 다시 없어도 남은 예약 작업이 하루를 넘겨 발화하지 않는다.
+
+**PR1 배포 뒤 확인의 기억 지우기도 대화로 바꿨다.** 예전에는 확인 시작 뒤 생긴 기억을 모두 지워 함께 도는 평가 문항이 막 만든 기억까지 지웠다. 이제 기능마다 그 대화의 `memory_capture` 로 되돌린다(`DeployCheckCleaner.forgetCaptured`). 그 대화가 만들거나 제안한 기억은 지우고, 고치기만 한 기억은 늦게 고친 것부터 되돌린다.
+
+### 평가 실행 API
+
+| 요청 | 응답 |
+| --- | --- |
+| `GET /api/v1/admin/quality/eval-bundles` | 묶음 목록(`id`, `title`, 문항 수, 상한) |
+| `POST /api/v1/admin/quality/evals` | 본문 `{bundles: [id...], tier}`. `bundles` 가 비면 전체, `tier` 가 없으면 평가 사용자에게 걸리는 기본 단계(스펙 DECISION41). 202 와 새 줄. 도는 평가가 있으면 새로 만들지 않고 200 과 그 줄(PR1 의 확인 시작과 같다). 화면과 스크립트는 200 이면 「평가가 돌고 있다」 를 보인다. 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING`. 없는 묶음 id 는 400 `QUALITY_EVAL_BUNDLE_UNKNOWN`, 모르는 단계는 400 |
+| `GET /api/v1/admin/quality/evals?cursor=` | 최근 순 목록. 품질 화면 둘째 칸 |
+| `GET /api/v1/admin/quality/evals/{publicId}` | 한 줄과 묶음 결과, 문항 결과 |
+| `GET /api/v1/admin/quality/conversations/{publicId}/messages` | 평가 사용자의 대화만 연다. 남겨 둔 실패 대화와 사람 비교 문항의 답을 관리자가 읽는다. 다른 사용자의 대화는 404 다(PR1 의 트리 조회와 같은 이유, 이 문서 DECISION8) |
+
+### 화면
+
+`/admin/quality` 둘째 칸에 평가 목록을 그린다. 줄마다 시각, 고른 묶음, 모델 단계, 결과, 걸린 시간이다. 펼치면 묶음 결과와 문항 결과, 실패와 사람 비교 문항의 대화 보기(위 메시지 API)와 실행 트리 보기(PR1)로 잇는다.
+「지금 돌리기」 는 묶음을 여럿 고르고(기본 전체) 모델 단계를 고르는 작은 창이다. 도는 평가가 있으면 단추를 막고 「평가가 돌고 있다」 와 그 줄로 가는 길을 보인다.
+
+### 기능 PR 의 배포 뒤 확인
+
+- 기능 PR 은 `quality/bundles/` 에 자기 기능 묶음 파일을 더하거나 문항을 더한다. 묶음 id 는 기능 폴더 id 를 쓴다.
+- 배포 뒤 코디네이터가 `scripts/dev/run-eval.ts --bundle <id>` 로 돌린다. 스크립트는 관리자 API 로 시작하고 끝날 때까지 기다린 뒤 묶음 결과와 문항 결과 표를 낸다. 종료 코드는 0 통과, 1 미달, 2 실행 오류다. 토큰과 주소는 환경 변수로만 받고 출력하지 않는다.
+- 루트 `AGENTS.md` 의 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」 를 「기능 묶음을 돌려 본다」 로 고치고, 묶음으로 못 하는 확인만 사람 계정으로 한다는 예외를 적는다(스펙 REQ18).
+- 서비스 개념 스펙 REQ6, DECISION33 과 설계 「평가 세트」, `docs/features/answer-quality.md` 의 실행 방법을 이 길로 고친다.
+
+### 실패와 일관성
+
+| 상황 | 처리 |
+| --- | --- |
+| 평가를 두 번 시작 | 평가 사용자 행 잠금 안에서 `RUNNING` 인 `EVAL` 을 찾아 하나만 만들고, 둘째 요청에는 200 과 그 줄을 돌려준다 |
+| 함께 도는 배포 뒤 확인 | 막지 않는다. 둘 다 자기 대화 번호로 만든 것을 찾아 서로의 것을 지우지 않는다 |
+| 묶음 파일 형식 오류 | 기동을 멈춘다. CI 의 저장소 테스트가 먼저 막는다 |
+| 링크 열기 실패, 시간 초과 | 그 링크는 「확인 못 함」. 문항 판정은 계속한다 |
+| 승인 호출 실패 | 그 문항 `FAILED`, 까닭 `CARD_FAILED` |
+| 비우기 실패 | 결과는 바꾸지 않고 경고 로그. 「비우기 끝남」 이 없어 재기동 처리, 다음 시작, 하루 정리가 다시 지운다 |
+| 서버 재기동 | `INTERRUPTED`. 재기동 처리가 바로 남은 것을 지운다 |
+| 카드가 원고 저장 승인 줄 | 누르지 않고 `CARD_FAILED` |
+
+### 검증 전략
+
+| ID | 경계와 환경 |
+| --- | --- |
+| REQ5 | 묶음 파일 형식 검사와 묶음 고르기는 단위·통합 테스트. 새 묶음 파일 하나를 테스트 리소스로 더해 실행기를 고치지 않고 도는지 본다 |
+| REQ6 | 옮긴 판정 함수에 옛 `score.ts` 테스트 사례를 그대로 옮겨 같은 결과를 본다. 운영에서 PR2a 배포 뒤 두 묶음을 한 번 돌려, 옛 스크립트의 마지막 결과와 묶음 결과가 크게 다르지 않은지 사람이 본다. 그 뒤 옛 스크립트를 지운다 |
+| REQ9 | 「지금 돌리기」 의 중복 시작 409 와 모델 단계 적용은 통합 테스트, 화면은 브라우저 테스트 |
+| REQ15 | 가짜 Hermes e2e 로 평가 한 번을 돌리고, 다른 사용자의 기억·할 일·예약 작업·대화 수가 전후로 같은지 센다 |
+| REQ16 | 카드를 띄우는 가짜 Hermes 응답으로 `approve`, `reject`, `leave` 차례를 e2e 로 돌려 승인 줄 상태와 `cardStatus` 판정을 본다 |
+| REQ17 | 통합 테스트로 문항의 대화로 만든 예약 작업·기억·할 일·승인 줄이 지워지거나 닫히는지, 준비 때 넣은 기억을 고친 문항 뒤 되돌아오는지, 배포 뒤 확인의 대화로 만든 것은 남는지, 「비우기 끝남」 이 없는 줄을 재기동과 하루 정리가 지우는지 본다. PR1 의 재기동 처리와 하루 정리가 `EVAL` 줄을 건드리지 않는지도 본다 |
+| REQ18 | `run-eval.ts` 의 인자와 종료 코드는 단위 테스트. 문서 규칙은 리뷰가 본다 |
+
+### PR2a 나눔
+
+운영 코드 상한(1500줄)을 넘을 것이므로 나눈다(나누는 선과 순서는 사용자 2026-11-21). 구현해 보니 첫 PR 도 상한을 넘어 둘로 더 나눴다(코디네이터 2026-11-21). 각 PR 이 설계와 구현을 함께 담는다. 사용자 기억을 바꾼 서비스 개념 평가를 먼저 평가 사용자로 옮긴다.
+
+| PR | 범위 | 남은 확인 |
+| --- | --- | --- |
+| 기록 종류와 묶음 판정 | 저장 형식의 `kind` 구분과 PR1 의 재기동·하루 정리·기억 지우기 변경, 보내기·마감의 `TurnDriver` 꺼내기, 묶음 파일 읽기, 서비스 개념 판정 옮기기와 그 묶음 파일(REQ5, REQ6 의 판정) | 배포 뒤 확인 한 번이 전과 같이 통과·실패를 내는지 본다 |
+| 평가 실행기와 API | 평가 문항 비우기, 평가 실행기와 카드 처리, 평가 실행 API 와 e2e(REQ9 API, REQ15 부터 REQ17 까지) | 배포 뒤 서비스 개념 묶음을 한 번 돌려 옛 스크립트의 마지막 결과와 비교한다 |
+| 답변 품질 묶음 | 답변 품질 판정(형식 검사, 사진 요청 포함) 옮기기와 그 묶음 파일, `answer-quality` 통과 규칙, `keepConversation` 을 쓰는 문항(칸은 첫 PR 이 먼저 둔다), 공개 주소 읽기 꺼내기와 링크 열기, `run-eval.ts`(REQ6 의 답변 품질, REQ18 의 스크립트) | 배포 뒤 답변 품질 묶음을 한 번 돌려 옛 결과와 비교한다 |
+| 화면과 정리 | 품질 화면 둘째 칸과 「지금 돌리기」, 옛 TypeScript 평가 스크립트 지우기(`test/model-eval/answer/`, `test/model-eval/concepts/`. 블로그 평가가 쓰는 `control-plane.ts` 는 남긴다), `AGENTS.md` 와 서비스 개념·답변 품질 문서 고치기(REQ6 의 지우기, REQ9 화면, REQ18) | 브라우저 테스트 |
+
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
@@ -236,6 +395,11 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | DECISION6 | 문항과 판정의 자리 | 실행기 코드의 상수와 순수 판정 함수 | 작성자 | PR1 의 문항은 기능마다 하나라 파일 형식을 만들 까닭이 없다. PR2 의 묶음 파일 형식이 생기면 그때 옮긴다 |
 | DECISION8 | 관리자가 평가 사용자의 실행을 여는 길 | `admin.quality` 에 평가 사용자 실행만 여는 트리 조회를 둔다 | 작성자 | 지금 실행 트리 조회는 주인만 연다. 모든 사용자의 실행을 여는 관리자 조회는 범위가 넓어 평가 사용자로 좁힌다 |
 | DECISION7 | 재기동 때 도는 확인 | `INTERRUPTED` 로 끝내고 다시 돌리지 않는다 | 작성자 | 배포 자체가 재기동이라 다시 돌리면 같은 배포의 확인이 겹친다. 파이프라인이 실패로 보고 사람이 「다시 확인」 한다 |
+| DECISION9 | 평가 실행기의 자리 | 배포 뒤 확인 실행기와 따로 두고 보내기·마감·관찰·대화 지우기만 함께 쓴다 | 작성자 | 확인은 기능이 고정이고 평가는 문항이 파일에서 온다. 한 실행기에 넣으면 두 분기가 섞인다 |
+| DECISION10 | 묶음 파일의 자리와 형식 | `backend` 리소스의 묶음마다 JSON 파일 하나. 옛 `questions.json` 의 칸을 이어 쓰고 `messages` 를 `turns` 로 바꾼다 | 작성자 | 실행기가 Control Plane 안에 있어(스펙 DECISION17) 배포에 함께 실린다. 옛 칸을 이어 써 옮길 때 문항 글이 바뀌지 않는다 |
+| DECISION11 | 만든 것을 가리는 방법 | 문항의 대화 번호로 찾는다. 예약 작업은 `task.conversation_id`, 기억은 `memory_capture`, 할 일과 승인 줄은 `conversation_id` 다. 위임 자식이 만든 예약 작업만 대화 칸이 비어 문항 시간 범위와 배포 뒤 확인의 고정 지시문으로 가린다. PR1 의 기억 지우기도 대화 방식으로 바꾼다 | 작성자 | 문항마다 대화가 새로 생겨 대화 번호가 문항을 정확히 가린다. 시각 비교는 함께 도는 배포 뒤 확인의 것을 지우고 고친 기억을 놓친다 |
+| DECISION12 | 출처 링크를 여는 곳 | Control Plane 이 공개 IP 에 고정한 연결로만 연다. 그림 받기 두 곳의 공개 주소 읽기를 `shared` 로 꺼내 함께 쓴다 | 작성자 | 실행기가 Control Plane 안이라 서버가 열어야 한다. 모델이 쓴 주소를 서버가 열면 내부 주소로 갈 수 있어, 이미 검증한 판정과 IP 고정 연결을 다시 쓴다 |
+| DECISION13 | 코디네이터가 평가를 부르는 길 | 관리자 토큰으로 관리자 API 를 부르는 `scripts/dev/run-eval.ts`(`scripts/README.md` 의 폴더 규칙) | 작성자 | 기존 관리자 토큰 경계(DECISION4)를 그대로 쓰고, 기능 완료 증거에 붙일 결과를 한 명령으로 낸다 |
 
 ## 결정 기록 연결
 
