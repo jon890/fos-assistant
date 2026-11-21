@@ -98,6 +98,7 @@ function PersonRows({
       <TableRow>
         <TableHead scope="row" className="px-3 text-foreground">
           {person.displayName}
+          {person.evaluation ? <Badge className="ml-2">평가용</Badge> : null}
         </TableHead>
         <TableCell className="px-3">{person.email}</TableCell>
         <TableCell className="px-3">{person.hermesProfile}</TableCell>

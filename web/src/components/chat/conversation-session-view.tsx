@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useReplyTarget } from "./use-reply-target";
 import { Composer } from "./composer";
 import { ConversationHeader } from "./conversation-header";
 import {
@@ -85,6 +86,12 @@ export function ConversationSessionView({
   delegateTo,
   setDelegateTo,
 }: Props) {
+  const { replyTo, replyRef, setReplyTo } = useReplyTarget();
+  // 맡김은 사진을 받지 않아 집은 것과 함께 보내지 않는다. 나중에 고른 것이 남는다(설계 chat-reference DECISION8).
+  const pickDelegate = (code: string | null) => {
+    setDelegateTo(code);
+    if (code !== null) setReplyTo(null);
+  };
   // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 훅이라 이른 반환보다 앞에 둔다.
   const { delegateAgents, delegating, delegateAgent } = useDelegateTarget({
     agents,
@@ -226,6 +233,10 @@ export function ConversationSessionView({
             onAnswer={(text) => {
               void submit([], text);
             }}
+            onReply={(target) => {
+              setReplyTo(target);
+              setDelegateTo(null);
+            }}
           />
         )}
 
@@ -284,8 +295,22 @@ export function ConversationSessionView({
           <Composer
             value={draft}
             onChange={setDraft}
-            onSend={(attachmentIds, text, attachments) =>
-              submit(attachmentIds, text, attachments)
+            onSend={async (attachmentIds, text, attachments, reply) => {
+              const sent = await submit(
+                attachmentIds,
+                text,
+                attachments,
+                reply,
+              );
+              // 받아들여지지 않았으면 그사이 새로 집은 것이 없을 때만 칩을 되돌린다(스펙 chat-reference REQ9).
+              if (!sent && reply && replyRef.current === null)
+                setReplyTo(reply);
+              return sent;
+            }}
+            reply={
+              replyTo
+                ? { target: replyTo, onClear: () => setReplyTo(null) }
+                : undefined
             }
             onOutgoingChange={setOutgoing}
             disabled={conversationId === null && agents.length === 0}
@@ -298,7 +323,7 @@ export function ConversationSessionView({
             ensureConversation={ensureConversation}
             running={sending}
             // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
-            canQueue={conversationId !== null}
+            canQueue={conversationId !== null && replyTo === null}
             canStop={executionId !== null && !stopRequested}
             onStop={() => {
               void stop();
@@ -307,7 +332,7 @@ export function ConversationSessionView({
               startScreen && !agentLocked && agents.length > 0
                 ? { agents, onPick: onAgentCodeChange }
                 : delegating
-                  ? { agents: delegateAgents, onPick: setDelegateTo }
+                  ? { agents: delegateAgents, onPick: pickDelegate }
                   : undefined
             }
             delegateTarget={

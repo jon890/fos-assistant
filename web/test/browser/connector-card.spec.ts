@@ -373,7 +373,8 @@ test("두 화면 폭에서 각 구역의 열 수와 카드 높이, 주 단추 �
   ]);
   await page.goto("/connections");
   await expect(page.getByTestId("connector-card")).toHaveCount(7);
-  const expectedColumns = page.viewportSize()!.width >= 1280 ? 3 : 1;
+  // 본문 폭에서 세 열은 설명이 잘려 두 열까지만 둔다(app-shell spec DECISION26).
+  const expectedColumns = page.viewportSize()!.width >= 768 ? 2 : 1;
   const connected = page.getByRole("region", {
     name: "연결한 서비스",
     exact: true,
@@ -626,3 +627,22 @@ for (const viewport of [
     );
   });
 }
+
+test("넓은 화면에서도 두 열까지만 보인다", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await listConnectors(page, [connector("first"), connector("second"), rich]);
+  await page.goto("/connections");
+  await expect(page.getByTestId("connector-card")).toHaveCount(3);
+  expect(
+    await page
+      .getByTestId("connector-grid")
+      .evaluate(
+        (node) => getComputedStyle(node).gridTemplateColumns.split(" ").length,
+      ),
+  ).toBe(2);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
