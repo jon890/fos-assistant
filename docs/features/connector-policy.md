@@ -238,7 +238,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 - 상시 허락은 그 사용자가 그 플러그인의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 지운 에이전트를 정리해 승인 줄의 에이전트가 빈 허락은 어느 실행에도 통하지 않고 목록에도 없다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
 - 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고, 상한 거절과 같은 의도 차단을 빼면 거절은 어느 검사에 걸렸는지 밝히지 않는다(답의 종류는 [토스증권 플러그인](tossinvest-connector.md)이 갖는다). 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
-- `PURCHASE` 도구는 `FINANCIAL` 과 같이 직접 호출을 `RISK_NOT_OPEN` 으로 거절하고 상시 허락과 대화 허락을 만들지 않는다. 금융 보호 선언의 `operations` 에 든 도구만 연다(선언 검사가 본다). 구매 상한은 금융 주문 상한과 따로 `app_user` 의 구매 상한 컬럼이 갖는다
+- `PURCHASE` 도구는 `FINANCIAL` 과 같이 직접 호출을 `RISK_NOT_OPEN` 으로 거절하고 상시 허락과 대화 허락을 만들지 않는다. 금융 보호 선언의 `operations` 에 든 도구만 연다(선언 검사가 본다).
 - 금융 준비 도구가 `attended_only` 이고 호출한 실행이 사람이 없는 실행이면 금융 준비로 넘기지 않고 아래 판정이 `ATTENDED_ONLY` 로 거절한다. 같은 키의 금융 줄이 이미 있는 다시 오기는 지금처럼 금융 준비가 맡는다([ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md))
 - `attended_only` 를 선언한 도구를 사람이 없는 실행이 부르면 위험도와 상관없이 `ATTENDED_ONLY` 로 거절하고 승인 줄을 만들지 않는다. 사람이 없는 실행은 호출한 실행의 트리 루트 줄의 `agent_execution.unattended` 가 참인 것이다. 예약 작업 turn, 먼저 살펴보기 turn(매일 깨우기와 사건 감지 포함), 그 트리가 맡긴 일의 결과를 전하는 turn 이 참이다. 순서는 `RISK_NOT_OPEN` 뒤, 아래 살펴보기 읽기 경계 앞이다. Control Plane 은 boolean 이 아닌 값을 참으로 읽는다([ADR-20261110 / naver-shopping-connector](../adr/ADR-20261110-naver-shopping-connector.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
@@ -296,7 +296,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 | 상황 | 처리 |
 | --- | --- |
 | 같은 승인을 두 번 누른다 | 둘째는 `CONNECTOR_ACTION_NOT_PENDING` 이다. 실행은 한 번이다 |
-| 「내 브라우저」 를 쓰는 플러그인의 줄을 승인했는데 브라우저를 켜지 못한다 | 승인 트랜잭션 전에 켜 보고(`ConnectorApprovalBrowser`), 못 켜면 409 `CONNECTOR_BROWSER_UNAVAILABLE` 이다. 줄은 `PENDING` 그대로라 다시 승인할 수 있고, 피드백 사건과 구매 하루 합계에 남지 않는다. 기능이 꺼졌으면 `BROWSER_DISABLED` 다. 브라우저를 쓰지 않는 상한 변경 줄은 켜지 않는다([browser-cowork 스펙](browser-cowork/spec.md) 의 REQ2) |
+| 「내 브라우저」 를 쓰는 플러그인의 줄을 승인했는데 브라우저를 켜지 못한다 | 승인 트랜잭션 전에 켜 보고(`ConnectorApprovalBrowser`), 못 켜면 409 `CONNECTOR_BROWSER_UNAVAILABLE` 이다. 줄은 `PENDING` 그대로라 다시 승인할 수 있고, 승인 피드백 사건도 생기지 않는다. 기능이 꺼졌으면 `BROWSER_DISABLED` 다. 브라우저를 쓰지 않는 상한 변경 줄은 켜지 않는다([browser-cowork 스펙](browser-cowork/spec.md) 의 REQ2) |
 | 실행 요청이 시간 안에 답하지 않거나 연결이 끊긴다 | `UNKNOWN`. 다시 실행하지 않는다 |
 | 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난다 | `UNKNOWN`. 다시 실행하지 않는다. 그 코드와, 선언한 `retry_key` 의 값 하나를 `result_text` 에 남겨 자동 turn 입력에 싣는다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md)). 에이전트가 그 값을 실어 같은 도구를 다시 부르면 상시 허락과 대화 허락을 보지 않고 새 승인을 받는다 |
 | 실행을 보낸 뒤 서버가 다시 뜬다 | 기동 정리(`ConnectorActionSweeper`)가 `EXECUTING` 을 `UNKNOWN` 으로 바꾸고 대화에 전한다 |
@@ -723,7 +723,7 @@ key 파일이 운영에서 금융을 여는 마지막 잠금이다. key를 쓰�
 준비는 prepare 전에 key 파일과 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
 허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 플러그인](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
 승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌와 그 주인을 본다.
-주문서 준비(`CHECKOUT`)는 계좌가 없어 허용 목록과 금융 상한 대신 사용자의 구매 상한을 준비, 승인, claim, 결과 판정에서 본다. key 파일 검사는 같다. 판정하는 때와 결과는 [네이버 쇼핑 설계](naver-shopping/design.md)의 「상한을 보는 때(REQ10, REQ12, PR3b)」 가 갖는다.
+주문서 준비(`CHECKOUT`)에는 key 파일과 같은 의도 검사를 적용한다. 주문서의 최종 금액은 승인한 예상 합계와 비교한다. [네이버 쇼핑 설계](naver-shopping/design.md)의 「결과 판정」 이 규칙을 갖는다.
 하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 key 파일과 계좌 허용 목록만 본다. 하루 합계에는 금액이 있는 주문만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정은 거절한다.
 조건주문은 leg 마다 수량 × max(주문가, 감시가) 를 한 건 금액으로 보고, 두 leg(OCO, OTO)는 큰 값을 쓴다. 생성은 그 금액을, 정정은 바뀐 뒤 금액을 하루 합계에 그대로 더하고 원주문 금액을 빼지 않는다(사용자 결정 2026-11-12). 주문가가 없는 시장가 조건주문은 거절하고 조건 취소는 금액이 없다.
 
@@ -769,8 +769,9 @@ purge는 메시지와 첨부를 정리하면서 두 플러그인 테이블의 �
 
 | 승인 줄 | 본문을 지우는 때 |
 | --- | --- |
-| `PENDING`, `EXECUTING`, `UNKNOWN` | 그 상태를 벗어난 뒤. `UNKNOWN`이 해소되지 않으면 본문도 계속 남음 |
+| `PENDING`, `EXECUTING`, `UNKNOWN`, `WAITING` | 그 상태를 벗어난 뒤. `UNKNOWN`이 해소되지 않으면 본문도 계속 남음 |
 | `FINANCIAL`의 `SUCCEEDED`이며 승인 시각이 KST 오늘 이후인 줄 | 하루 상한 합계가 더는 읽지 않는 다음 KST 날짜부터 |
+| `PURCHASE` 의 `SUCCEEDED` 이며 승인 시각이 KST 오늘 이후인 줄 | 다음 KST 날짜부터 |
 | 나머지 판정·승인 줄 | 대화 purge 때 |
 
 하루 상한과 같은 `decided_at` 기준을 사용하므로 당일 성공 본문을 먼저 지워 후속 주문을 막거나 상한 합계를 빠뜨리지 않는다.

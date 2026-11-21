@@ -48,7 +48,7 @@
       "attended_only": true,
       "title": "주문서 준비하기",
       "summary": "상품 하나와 옵션, 수량으로 주문 내용을 정리해 승인 카드를 띄워요. 이 단계에서는 주문서를 열지 않아요.",
-      "description": "Prepare Naver shopping checkout for one product before user approval. 입력은 {v: 1, tool: \"fill_checkout\", args: {url, options, quantity}}입니다. url은 get_product_detail의 kind가 store인 상품 주소, options는 옵션 단계 순서대로 고를 옵션 값 글(옵션 없는 상품은 빈 배열, 3개까지), quantity는 1~99입니다. 상품 화면을 다시 읽어 금액을 계산하고 승인 카드를 띄웁니다. 이 호출은 주문서를 열지 않으며, 사용자가 카드에서 승인한 뒤에만 주문서를 한 번 채웁니다. 결제 단추는 누르지 않고 결제는 사람이 내 브라우저에서 합니다. 구매 상한이 0이거나 넘으면 거절됩니다. 거절되거나 결과를 알 수 없으면 다시 부르지 않습니다."
+      "description": "Prepare Naver shopping checkout for one product before user approval. 입력은 {v: 1, tool: \"fill_checkout\", args: {url, options, quantity}}입니다. url은 get_product_detail의 kind가 store인 상품 주소, options는 옵션 단계 순서대로 고를 옵션 값 글(옵션 없는 상품은 빈 배열, 3개까지), quantity는 1~99입니다. 상품 화면을 다시 읽어 금액을 계산하고 승인 카드를 띄웁니다. 이 호출은 주문서를 열지 않으며, 사용자가 카드에서 승인한 뒤에만 주문서를 한 번 채웁니다. 결제 단추는 누르지 않고 결제는 사람이 내 브라우저에서 합니다. 거절되거나 결과를 알 수 없으면 다시 부르지 않습니다."
     },
     "fill_checkout": {
       "risk": "PURCHASE",

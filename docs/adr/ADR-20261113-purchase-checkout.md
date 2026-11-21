@@ -4,10 +4,12 @@
 - Date: 2026-11-13
 - **decision-type**: `architecture`
 - **areas**: `security, operations`
-- **현재 규칙의 원본**: 스펙 [`docs/features/naver-shopping/spec.md`](../features/naver-shopping/spec.md)(사용자 확인 2026-11-10)의 DECISION8, DECISION9, DECISION10, 설계 [`design.md`](../features/naver-shopping/design.md) 의 「PR3 구매 상한과 주문서」, [플러그인 도구 정책](../features/connector-policy.md)
+- **현재 규칙의 원본**: 스펙 [`docs/features/naver-shopping/spec.md`](../features/naver-shopping/spec.md)(사용자 확인 2026-11-10)의 DECISION8, DECISION9, DECISION10, 설계 [`design.md`](../features/naver-shopping/design.md) 의 「PR3 승인 카드와 주문서」, [플러그인 도구 정책](../features/connector-policy.md)
 - [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) 와 [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) 의 준비·승인·ticket·claim 틀을 그대로 쓴다. [ADR-20261015 / financial-user-limits](ADR-20261015-financial-user-limits.md) 의 사용자 상한과 같은 잠금 원칙이다. [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) 의 「읽기 도구는 누르지 않는다」 에 예외 하나를 둔다
 
 ### 결정
+
+[ADR-20261121 / purchase-approval](ADR-20261121-purchase-approval.md) 이 구매 상한과 관련한 아래 결정을 대체한다. 상한을 적용한 규칙은 당시 결정으로 기록한다.
 
 **에이전트는 사용자가 정한 구매 상한 안에서, 사람이 매번 승인한 주문서까지만 채운다. 결제 단추는 누르지 않는다.**
 
