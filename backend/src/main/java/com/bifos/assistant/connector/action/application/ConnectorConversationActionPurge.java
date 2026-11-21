@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 class ConnectorConversationActionPurge implements ConversationActionPurge {
     private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN,
         ActionStatus.WAITING);
-    /** 하루 합계가 본문을 읽는 위험도다. 금융 주문과 주문서 준비다(ADR-20261113 / purchase-checkout). */
+    /** 대화 삭제 뒤에도 KST 당일 성공 본문을 보존하는 위험도다. 금융 주문은 하루 합계가 본문을 읽는다. */
     private static final Set<ToolRisk> SPENDING = Set.of(ToolRisk.FINANCIAL, ToolRisk.PURCHASE);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final ConnectorActionRepository actions;
