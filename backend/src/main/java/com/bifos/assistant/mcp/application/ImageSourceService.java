@@ -110,7 +110,11 @@ public class ImageSourceService {
         if (found.uri() == null) {
             throw new ApiException(ErrorCode.IMAGE_SOURCE_LINK_NO_IMAGE, "no image in the extracted page");
         }
-        return readImageLink(found.uri(), true, found.directPhoto());
+        ImageSourceResult result = readImageLink(found.uri(), true, found.directPhoto());
+        if (found.directPhoto()) {
+            foundLinks.rememberPhoto(conversationId, found.uri());
+        }
+        return result;
     }
 
 

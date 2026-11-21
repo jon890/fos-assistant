@@ -170,16 +170,26 @@ public class FoundLinks {
                 boolean directPhoto = chooseImage && contains(stored, directMarker);
                 if (chooseImage && !directPhoto && contains(stored, marker)) {
                     Optional<FoundPageImages.Candidate> photo = pageImages.choose(conversationId, hash, image -> contains(stored, image));
-                    String photoHashes = photo.map(image -> image.hash() + photoMarker(image.hash())).orElse("");
-                    conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHashes, MAX_HASHES * HASH_CHARS);
+                    String photoHash = photo.map(FoundPageImages.Candidate::hash).orElse("");
+                    conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHash, MAX_HASHES * HASH_CHARS);
                     return Optional.of(new FoundImageLink(photo.map(FoundPageImages.Candidate::uri).orElse(null), true));
                 }
                 // 쓴 주소를 뒤로 옮겨, 뒤에 읽은 페이지들에 밀려나 다음 장면에서 빠지는 일을 줄인다.
-                conversations.appendFoundLinkHashes(conversationId, directPhoto ? hash + directMarker : hash, MAX_HASHES * HASH_CHARS);
+                if (!directPhoto) {
+                    conversations.appendFoundLinkHashes(conversationId, hash, MAX_HASHES * HASH_CHARS);
+                }
                 return target.get().fetchUri().map(uri -> new FoundImageLink(uri, directPhoto));
             }
         }
         return Optional.empty();
+    }
+
+
+    /** 선택한 주소에서 실제 사진을 받은 뒤에만 다음에도 사진으로 받도록 표시한다. */
+    @Transactional
+    public void rememberPhoto(Long conversationId, URI photo) {
+        LinkTarget.of(photo.toASCIIString()).map(LinkTarget::hash).ifPresent(
+            hash -> conversations.appendFoundLinkHashes(conversationId, hash + photoMarker(hash), MAX_HASHES * HASH_CHARS));
     }
 
 

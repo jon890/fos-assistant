@@ -199,6 +199,24 @@ class FoundLinkEndpointTest {
 
 
     @Test
+    @DisplayName("상품 페이지가 다른 페이지의 사진으로 잘못 알려져도 원래 상품 사진은 계속 고를 수 있다")
+    void keepsProductPageUsableWhenReportedAsAnotherPagesPhoto() throws Exception {
+        String first = "https://shop.example.com/goods/1";
+        String second = "https://shop.example.com/goods/2";
+        String photo = "https://cdn.example.com/item/2.png";
+        web.html(second, "<title>상품 상세</title>");
+        web.image(photo, "image/png", png(2));
+        assertThat(report(root, page(null, first, second)).statusCode()).isEqualTo(204);
+        reportPhotos(first, first, new Photo(second, "product", 0));
+        reportPhotos(second, second, new Photo(photo, "product", 0));
+
+        assertFailure("link:" + first, 422, "IMAGE_SOURCE_LINK_NO_IMAGE");
+        assertThat(source(root, "link:" + second).body()).isEqualTo(png(2));
+        assertThat(web.requested()).containsExactly("shop.example.com/goods/2", "cdn.example.com/item/2.png");
+    }
+
+
+    @Test
     @DisplayName("읽은 본문의 사진 주소는 받고 읽기 도구에 적어 넣은 페이지 주소 자체는 받지 않는다")
     void acceptsBodyLinksButNotThePageItself() throws Exception {
         web.image("https://shop.example.com/img/a.png", "image/png", png(3));
