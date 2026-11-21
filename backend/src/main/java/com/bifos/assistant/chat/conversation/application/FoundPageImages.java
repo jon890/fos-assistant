@@ -20,13 +20,13 @@ class FoundPageImages {
     private static final Pattern SHARED_IMAGE = Pattern.compile(
         "(?i)(?:^|[/_.-])(?:all[_-]og|og[_-]default|og[_-]image|default|logo|placeholder|favicon|social[_-]share)(?:$|[/_.-])"
             + "|/(?:common|branding|social|site-assets)/");
-    private static final Comparator<Candidate> PREFERENCE = Comparator.comparing(Candidate::kind)
-        .thenComparing(Comparator.comparingLong(Candidate::size).reversed());
+    private static final Comparator<FoundPhotoCandidate> PREFERENCE = Comparator.comparing(FoundPhotoCandidate::kind)
+        .thenComparing(Comparator.comparingLong(FoundPhotoCandidate::size).reversed());
 
     private final Map<Key, Page> pages = new LinkedHashMap<>();
 
 
-    synchronized void remember(Long conversationId, String address, URI base, String pageHash, List<Candidate> images) {
+    synchronized void remember(Long conversationId, String address, URI base, String pageHash, List<FoundPhotoCandidate> images) {
         long now = System.nanoTime();
         expire(now);
         Key key = new Key(conversationId, address);
@@ -38,7 +38,7 @@ class FoundPageImages {
     }
 
 
-    synchronized Optional<Candidate> choose(Long conversationId, String address, Predicate<String> recorded) {
+    synchronized Optional<FoundPhotoCandidate> choose(Long conversationId, String address, Predicate<String> recorded) {
         expire(System.nanoTime());
         Page page = pages.get(new Key(conversationId, address));
         if (page == null) {
@@ -46,7 +46,7 @@ class FoundPageImages {
         }
         List<String> commonOg = page.images().stream()
             .filter(image -> image.kind() == Kind.OG && sharedOg(conversationId, page, image))
-            .map(Candidate::hash)
+            .map(FoundPhotoCandidate::hash)
             .toList();
         return page.images().stream()
             .filter(image -> image.kind() == Kind.PRODUCT || !sharedPath(image.uri()) && !commonOg.contains(image.hash()))
@@ -66,7 +66,7 @@ class FoundPageImages {
     }
 
 
-    private boolean sharedOg(Long conversationId, Page page, Candidate image) {
+    private boolean sharedOg(Long conversationId, Page page, FoundPhotoCandidate image) {
         return pages.entrySet().stream()
             .filter(entry -> entry.getKey().conversationId().equals(conversationId))
             .map(Map.Entry::getValue)
@@ -81,12 +81,9 @@ class FoundPageImages {
     }
 
 
-    record Candidate(URI uri, String hash, Kind kind, long size) {
-    }
-
     private record Key(Long conversationId, String address) {
     }
 
-    private record Page(String host, String hash, List<Candidate> images, long savedAt) {
+    private record Page(String host, String hash, List<FoundPhotoCandidate> images, long savedAt) {
     }
 }

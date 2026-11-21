@@ -97,7 +97,7 @@ public class FoundLinks {
         addresses.add(own);
         // 요청 주소는 이 호출에서 비서가 읽은 주소로 함께 알려졌을 때만 이동 전 주소로 기억한다.
         LinkTarget.of(page.requested()).map(LinkTarget::hash).filter(excluded::contains).ifPresent(addresses::add);
-        List<FoundPageImages.Candidate> images = page.images().stream()
+        List<FoundPhotoCandidate> images = page.images().stream()
             .filter(image -> page.links().contains(image.url()))
             .map(image -> photoCandidate(image, base, pageHashes))
             .flatMap(Optional::stream)
@@ -106,14 +106,14 @@ public class FoundLinks {
     }
 
 
-    private static Optional<FoundPageImages.Candidate> photoCandidate(FoundImage image, URI base, Set<String> pageHashes) {
+    private static Optional<FoundPhotoCandidate> photoCandidate(FoundImage image, URI base, Set<String> pageHashes) {
         // HTML 엔티티가 든 주소는 푼 쪽을 먼저 쓰고 같은 후보의 두 꼴을 중복해서 고르지 않는다.
         return forms(LinkTarget.decodeEntities(image.url()), base).stream()
             .map(LinkTarget::of)
             .flatMap(Optional::stream)
             .filter(target -> pageHashes.contains(target.hash()))
             .flatMap(target -> target.fetchUri()
-                .map(uri -> new FoundPageImages.Candidate(uri, target.hash(), image.kind(), image.size()))
+                .map(uri -> new FoundPhotoCandidate(uri, target.hash(), image.kind(), image.size()))
                 .stream())
             .findFirst();
     }
@@ -169,10 +169,10 @@ public class FoundLinks {
                 String directMarker = photoMarker(hash);
                 boolean directPhoto = chooseImage && contains(stored, directMarker);
                 if (chooseImage && !directPhoto && contains(stored, marker)) {
-                    Optional<FoundPageImages.Candidate> photo = pageImages.choose(conversationId, hash, image -> contains(stored, image));
-                    String photoHash = photo.map(FoundPageImages.Candidate::hash).orElse("");
+                    Optional<FoundPhotoCandidate> photo = pageImages.choose(conversationId, hash, image -> contains(stored, image));
+                    String photoHash = photo.map(FoundPhotoCandidate::hash).orElse("");
                     conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHash, MAX_HASHES * HASH_CHARS);
-                    return Optional.of(new FoundImageLink(photo.map(FoundPageImages.Candidate::uri).orElse(null), true));
+                    return Optional.of(new FoundImageLink(photo.map(FoundPhotoCandidate::uri).orElse(null), true));
                 }
                 // 쓴 주소를 뒤로 옮겨, 뒤에 읽은 페이지들에 밀려나 다음 장면에서 빠지는 일을 줄인다.
                 if (!directPhoto) {
@@ -290,6 +290,6 @@ public class FoundLinks {
     }
 
 
-    private record ReadPage(URI base, String hash, Set<String> addresses, List<FoundPageImages.Candidate> images) {
+    private record ReadPage(URI base, String hash, Set<String> addresses, List<FoundPhotoCandidate> images) {
     }
 }
