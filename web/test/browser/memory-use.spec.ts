@@ -9,7 +9,6 @@ type Use = {
   memoryId: number;
   title: string;
   scope: "USER" | "GROUP";
-  via: "ALWAYS" | "FACTS" | "SEARCH" | "LINK" | "READ";
 };
 
 /**
@@ -78,26 +77,23 @@ function threeUses(executionId: number): Use[] {
       memoryId: 12,
       title: "딸 이름",
       scope: "USER",
-      via: "FACTS",
     },
     {
       executionId,
       memoryId: 40,
       title: "우리 집 규칙",
       scope: "GROUP",
-      via: "ALWAYS",
     },
     {
       executionId,
       memoryId: 77,
       title: "경력 요약",
       scope: "USER",
-      via: "READ",
     },
   ];
 }
 
-/** 세 줄 뒤에 질문으로 찾은 기억과 연결된 기억 한 줄씩을 더한다. */
+/** 세 줄 뒤에 두 줄을 더한다. */
 function fiveUses(executionId: number): Use[] {
   return [
     ...threeUses(executionId),
@@ -106,14 +102,12 @@ function fiveUses(executionId: number): Use[] {
       memoryId: 91,
       title: "자동차 관리",
       scope: "USER",
-      via: "SEARCH",
     },
     {
       executionId,
       memoryId: 92,
       title: "타이어 교체",
       scope: "USER",
-      via: "LINK",
     },
   ];
 }
@@ -128,7 +122,7 @@ test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
-test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치면 제목과 출처와 링크가 보인다", async ({
+test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치면 제목과 링크가 보인다", async ({
   page,
 }) => {
   const { conversationId, executionId } = await createConversation(
@@ -159,16 +153,11 @@ test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치
   const items = page.getByTestId("activity-memory-use");
   await expect(items).toHaveCount(5);
   await expect(items.nth(0)).toContainText("딸 이름");
-  await expect(items.nth(0)).toContainText("기억한 사실");
   await expect(items.nth(1)).toContainText("우리 집 규칙");
-  await expect(items.nth(1)).toContainText("항상");
   await expect(items.nth(1)).toContainText("그룹");
   await expect(items.nth(2)).toContainText("경력 요약");
-  await expect(items.nth(2)).toContainText("찾아 읽음");
   await expect(items.nth(3)).toContainText("자동차 관리");
-  await expect(items.nth(3)).toContainText("질문으로 찾은 기억");
   await expect(items.nth(4)).toContainText("타이어 교체");
-  await expect(items.nth(4)).toContainText("연결된 기억");
   await expect(items.nth(0)).not.toContainText("그룹");
   const link = page
     .getByTestId("activity-memory-uses")
@@ -301,7 +290,6 @@ test("제목은 글자 그대로 보인다", async ({ page }) => {
             memoryId: 5,
             title: "<b>굵게</b>",
             scope: "USER",
-            via: "FACTS",
           },
         ],
       }),
