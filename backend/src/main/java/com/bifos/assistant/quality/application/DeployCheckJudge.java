@@ -161,7 +161,18 @@ public class DeployCheckJudge {
 
     /** 그 도구의 끝 사건이 실패 없이 하나라도 있는가. */
     private static boolean completed(TurnObservation turn, String toolName) {
-        return turn.tools().stream().filter(tool -> toolName.equals(tool.toolName())).anyMatch(tool -> !tool.failed());
+        return turn.tools().stream().anyMatch(tool -> !tool.failed() && toolName.equals(withoutMcpPrefix(tool.toolName())));
+    }
+
+
+    /** Hermes 가 붙인 서버 이름을 빼고 도구 이름을 비교한다. */
+    private static String withoutMcpPrefix(String name) {
+        String prefix = "mcp__";
+        if (name == null || !name.startsWith(prefix)) {
+            return name;
+        }
+        int separator = name.indexOf("__", prefix.length());
+        return separator > prefix.length() ? name.substring(separator + 2) : name;
     }
 
 
