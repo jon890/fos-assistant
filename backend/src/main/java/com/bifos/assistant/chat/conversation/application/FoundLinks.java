@@ -1,10 +1,14 @@
 package com.bifos.assistant.chat.conversation.application;
 
+import com.bifos.assistant.chat.conversation.application.dto.FoundImage;
+import com.bifos.assistant.chat.conversation.application.dto.FoundImageLink;
 import com.bifos.assistant.chat.conversation.application.dto.FoundPage;
+import com.bifos.assistant.chat.conversation.application.dto.FoundPhotoCandidate;
 import com.bifos.assistant.chat.conversation.application.dto.LinkTarget;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -18,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 비서가 웹 검색과 페이지 읽기로 찾은 주소를 대화마다 해시로 남기고, 모델이 가리킨 주소가 그 안에 있는지 답한다
  * (ADR-20261121 / found-link-image-source, 스펙 agent-found-image REQ2).
  *
- * <p>주소 원문은 남기지 않는다. 판정에는 있었는지만 필요하다. 해시는 {@code conversation.found_link_hashes} 에 32자씩 이어 붙이고,
+ * <p>데이터베이스에는 해시와 읽은 페이지·고른 사진의 표시만 둔다. {@code conversation.found_link_hashes} 에 32자씩 이어 붙이고,
  * 더하기는 {@code UPDATE} 한 문장이라 한 실행의 도구 결과 여럿이 동시에 알려도 서로를 덮지 않는다. 상한을 넘으면 오래된 것부터 밀려난다.
  *
  * <p>같은 주소로 보는 규칙은 {@link LinkTarget} 이 갖는다. 거기에 결과만으로 정해지는 변환(엔티티 풀기, {@code //}, 상대 주소)을 더한다
@@ -34,6 +38,7 @@ public class FoundLinks {
     static final int MAX_LINK_CHARS = 2_048;
 
     private final ConversationRepository conversations;
+    private final FoundPageImages pageImages;
 
 
     /**
@@ -51,9 +56,11 @@ public class FoundLinks {
             LinkTarget.of(url).map(LinkTarget::hash).ifPresent(excluded::add);
         }
         Set<String> hashes = new LinkedHashSet<>();
+        List<ReadPage> readPages = new ArrayList<>();
         for (FoundPage page : pages) {
             URI base = absolute(page.base());
             String own = base == null ? null : LinkTarget.of(base.toString()).map(LinkTarget::hash).orElse(null);
+            Set<String> pageHashes = new LinkedHashSet<>();
             for (String link : page.links()) {
                 // 후보에서 만든 꼴 가운데 하나라도 페이지 자신이나 적어 넣은 주소면 그 후보의 꼴을 모두 뺀다.
                 // 꼴마다 따로 빼면 본문이 자기 주소를 &amp; 로 되풀이했을 때 적힌 꼴이 남는다.
@@ -63,16 +70,64 @@ public class FoundLinks {
                     .map(LinkTarget::hash)
                     .toList();
                 if (formed.stream().noneMatch(hash -> hash.equals(own) || excluded.contains(hash))) {
-                    hashes.addAll(formed);
+                    pageHashes.addAll(formed);
                 }
+            }
+            hashes.addAll(pageHashes);
+            if (base != null && own != null && page.images() != null) {
+                ReadPage read = readPage(page, base, own, pageHashes, excluded);
+                read.addresses().forEach(address -> hashes.add(readMarker(address)));
+                readPages.add(read);
             }
         }
         if (hashes.isEmpty()) {
             return 0;
         }
         List<String> kept = hashes.stream().skip(Math.max(0, hashes.size() - MAX_HASHES)).toList();
-        conversations.appendFoundLinkHashes(conversationId, String.join("", kept), MAX_HASHES * HASH_CHARS);
+        if (conversations.appendFoundLinkHashes(conversationId, String.join("", kept), MAX_HASHES * HASH_CHARS) > 0) {
+            for (ReadPage read : readPages) {
+                read.addresses().forEach(address -> pageImages.remember(conversationId, address, read.base(), read.hash(), read.images()));
+            }
+        }
         return kept.size();
+    }
+
+
+    private static ReadPage readPage(FoundPage page, URI base, String own, Set<String> pageHashes, Set<String> excluded) {
+        Set<String> addresses = new LinkedHashSet<>();
+        addresses.add(own);
+        // 요청 주소는 이 호출에서 비서가 읽은 주소로 함께 알려졌을 때만 이동 전 주소로 기억한다.
+        LinkTarget.of(page.requested()).map(LinkTarget::hash).filter(excluded::contains).ifPresent(addresses::add);
+        List<FoundPhotoCandidate> images = page.images().stream()
+            .filter(image -> page.links().contains(image.url()))
+            .map(image -> photoCandidate(image, base, pageHashes))
+            .flatMap(Optional::stream)
+            .toList();
+        return new ReadPage(base, own, addresses, images);
+    }
+
+
+    private static Optional<FoundPhotoCandidate> photoCandidate(FoundImage image, URI base, Set<String> pageHashes) {
+        // HTML 엔티티가 든 주소는 푼 쪽을 먼저 쓰고 같은 후보의 두 꼴을 중복해서 고르지 않는다.
+        return forms(LinkTarget.decodeEntities(image.url()), base).stream()
+            .map(LinkTarget::of)
+            .flatMap(Optional::stream)
+            .filter(target -> pageHashes.contains(target.hash()))
+            .flatMap(target -> target.fetchUri()
+                .map(uri -> new FoundPhotoCandidate(uri, target.hash(), image.kind(), image.size()))
+                .stream())
+            .findFirst();
+    }
+
+
+    private static String readMarker(String address) {
+        // 첫 글자는 16진수 밖에 둬 주소 해시와 구별하고, 저장 칸의 폭은 같다.
+        return "p" + address.substring(1);
+    }
+
+
+    private static String photoMarker(String address) {
+        return "i" + address.substring(1);
     }
 
 
@@ -82,6 +137,18 @@ public class FoundLinks {
      */
     @Transactional
     public Optional<URI> find(Long conversationId, String link) {
+        return find(conversationId, link, false).map(FoundImageLink::uri);
+    }
+
+
+    /** 읽은 상품 페이지의 대화 확인을 통과한 뒤, 같은 대화에서 확인된 대표 사진 주소를 고른다. */
+    @Transactional
+    public Optional<FoundImageLink> findForImage(Long conversationId, String link) {
+        return find(conversationId, link, true);
+    }
+
+
+    private Optional<FoundImageLink> find(Long conversationId, String link, boolean chooseImage) {
         if (link == null) {
             return Optional.empty();
         }
@@ -94,13 +161,36 @@ public class FoundLinks {
         candidates.add(link);
         for (String candidate : candidates) {
             Optional<LinkTarget> target = LinkTarget.of(candidate);
-            if (target.isPresent() && contains(stored, target.get().hash())) {
+            if (target.isPresent()) {
+                String hash = target.get().hash();
+                if (!contains(stored, hash)) {
+                    continue;
+                }
+                String marker = readMarker(hash);
+                String directMarker = photoMarker(hash);
+                boolean directPhoto = chooseImage && contains(stored, directMarker);
+                if (chooseImage && !directPhoto && contains(stored, marker)) {
+                    Optional<FoundPhotoCandidate> photo = pageImages.choose(conversationId, hash, image -> contains(stored, image));
+                    String photoHash = photo.map(FoundPhotoCandidate::hash).orElse("");
+                    conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHash, MAX_HASHES * HASH_CHARS);
+                    return Optional.of(new FoundImageLink(photo.map(FoundPhotoCandidate::uri).orElse(null), true));
+                }
                 // 쓴 주소를 뒤로 옮겨, 뒤에 읽은 페이지들에 밀려나 다음 장면에서 빠지는 일을 줄인다.
-                conversations.appendFoundLinkHashes(conversationId, target.get().hash(), MAX_HASHES * HASH_CHARS);
-                return target.get().fetchUri();
+                if (!directPhoto) {
+                    conversations.appendFoundLinkHashes(conversationId, hash, MAX_HASHES * HASH_CHARS);
+                }
+                return target.get().fetchUri().map(uri -> new FoundImageLink(uri, directPhoto));
             }
         }
         return Optional.empty();
+    }
+
+
+    /** 선택한 주소에서 실제 사진을 받은 뒤에만 다음에도 사진으로 받도록 표시한다. */
+    @Transactional
+    public void rememberPhoto(Long conversationId, URI photo) {
+        LinkTarget.of(photo.toASCIIString()).map(LinkTarget::hash).ifPresent(
+            hash -> conversations.appendFoundLinkHashes(conversationId, hash + photoMarker(hash), MAX_HASHES * HASH_CHARS));
     }
 
 
@@ -108,6 +198,7 @@ public class FoundLinks {
     @Transactional
     public void clear(Long conversationId) {
         conversations.clearFoundLinkHashes(conversationId);
+        pageImages.clear(conversationId);
     }
 
 
@@ -197,5 +288,9 @@ public class FoundLinks {
         } catch (URISyntaxException ex) {
             return null;
         }
+    }
+
+
+    private record ReadPage(URI base, String hash, Set<String> addresses, List<FoundPhotoCandidate> images) {
     }
 }

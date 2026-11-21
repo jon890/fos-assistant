@@ -3,6 +3,7 @@ package com.bifos.assistant.quality.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.quality.domain.type.EvalItemStatus;
 import com.bifos.assistant.quality.domain.type.FeatureStatus;
 import com.bifos.assistant.quality.domain.type.QualityFeature;
 import com.bifos.assistant.quality.domain.type.QualityRunKind;
@@ -113,5 +114,43 @@ class QualityRunTest {
         assertThat(run.results().get(0).executionIds()).isEmpty();
         assertThat(run.results().get(1).conversationPublicId()).isEqualTo(kept.conversationPublicId());
         assertThat(run.results().get(1).executionIds()).containsExactly(2L);
+    }
+
+
+    @Test
+    @DisplayName("평가 줄은 고른 문항 수를 그대로 두고 결과를 바꿔 적으며, 배포 뒤 확인 메서드는 거절한다")
+    void evalRunKeepsItemCountAndRejectsDeployCheckMethods() {
+        QualityRun run = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, 7L, 5, EvalResult.started("MEDIUM", List.of("service-concepts")), START);
+        EvalResult.ItemResult item = new EvalResult.ItemResult("service-concepts", "files-put", EvalItemStatus.PASSED, null, List.of(), 1200,
+            START, 31L, null, List.of(), false);
+
+        run.recordEval(run.evalResult().withItem(item), 2);
+
+        assertThat(run.kind()).isEqualTo(QualityRunKind.EVAL);
+        assertThat(run.itemCount()).isEqualTo(5);
+        assertThat(run.modelCallCount()).isEqualTo(2);
+        assertThat(run.evalResult().tier()).isEqualTo("MEDIUM");
+        assertThat(run.evalResult().items()).containsExactly(item);
+        assertThatThrownBy(run::results).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> run.record(failed(QualityFeature.SEARCH), 1)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> running().evalResult()).isInstanceOf(IllegalStateException.class);
+    }
+
+
+    @Test
+    @DisplayName("같은 문항을 다시 적으면 앞 줄을 바꾸고, 끝난 평가도 비우기 끝남을 적을 수 있다")
+    void evalItemIsReplacedAndCleanedAfterFinish() {
+        QualityRun run = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, 7L, 1, EvalResult.started("MEDIUM", List.of("b")), START);
+        EvalResult.ItemResult started = new EvalResult.ItemResult("b", "q", EvalItemStatus.RUNNING, null, List.of(), 0, START, 31L, null, List.of(), false);
+        run.recordEval(run.evalResult().withItem(started), 0);
+        run.recordEval(run.evalResult().withItem(new EvalResult.ItemResult("b", "q", EvalItemStatus.FAILED, "MISSING_TOOL", List.of("MISSING_TOOL:task_create"),
+            10, START, 31L, UUID.randomUUID(), List.of(5L), false)), 1);
+        run.finish(QualityRunStatus.FAILED, START.plusSeconds(5));
+
+        run.replaceEval(run.evalResult().markCleaned());
+
+        assertThat(run.evalResult().items()).singleElement().extracting(EvalResult.ItemResult::status).isEqualTo(EvalItemStatus.FAILED);
+        assertThat(run.evalResult().cleaned()).isTrue();
+        assertThatThrownBy(() -> run.recordEval(run.evalResult(), 0)).isInstanceOf(IllegalStateException.class);
     }
 }

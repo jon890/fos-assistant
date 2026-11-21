@@ -68,7 +68,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | 도구 | 위험도 | `attended_only` | 인자 | 결과 |
 | --- | --- | --- | --- | --- |
 | `check_shopping_login` | `READ` | 참 | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED` |
-| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄) | `{query, count, products: [...]}` |
+| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄), 선택 `sort`(값은 [기능 문서](../naver-shopping.md#도구와-정책)) | `{query, count, products: [...]}` |
 | `get_product_detail` | `READ` | 참 | `url`(검색 결과의 상품 주소, 2,048자까지) | 종류별 결과(아래) |
 
 확인 도구도 `attended_only` 다. 에이전트에게도 MCP 도구로 보여 예약 작업이 부르면 꺼진 브라우저를 켠다. 연결 확인은 도구 판정을 거치지 않는 대시보드 직접 호출이라 칸이 있어도 막히지 않는다.
@@ -83,7 +83,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21) |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21). 무료 배송의 `fee_krw` 는 0 이고, 기본 배송비를 읽지 못하면 `null` 이다 |
 | `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽고, 판매처별 가격 목록은 읽는 칸을 가려내지 못해 `sellers` 는 빈 목록이다(2026-11-13 실측). spec 의 REQ3·DECISION28 이 말하는 판매처 목록 돌려주기는 판매처 목록을 가려낼 때까지 미룬다(2026-11-13 사용자 결정) |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 

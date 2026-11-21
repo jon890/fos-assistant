@@ -28,7 +28,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
 | `check_shopping_login` | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED`. 탭을 열지 않는다 |
-| `search_products` | `query`(한 줄 1자에서 100자) | `{query, count, products: [{rank, title, price_krw, store, url, kind, naver_pay, ad}]}`. 처음 실린 상품을 40개까지 |
+| `search_products` | `query`(한 줄 1자에서 100자), 선택 `sort`(`LOW_PRICE` 낮은 가격순, `HIGH_PRICE` 높은 가격순, `REVIEW` 리뷰 많은 순) | `{query, count, products: [{rank, title, price_krw, store, url, kind, naver_pay, ad}]}`. 정렬을 생략하면 네이버 랭킹순이다. 첫 페이지에 처음 실린 상품을 40개까지 읽는다 |
 | `get_product_detail` | `url`(2,048자까지) | 아래 「상품 정보」 |
 | `check_shopping_order` | 모델이 넣는 인자는 없다. fos-ctx 가 `_fos_payment` 를 넣는다 | `{status, message, final_amount_krw?, order?: {status, paid_amount_krw, ordered_at}}`. 아래 「주문 확인」 |
 | `prepare_checkout` | `{v: 1, tool: "fill_checkout", args: {url, options, quantity}}` | `{v: 1, executionArgs, summary}`. 모델이 아니라 대시보드의 준비 경로가 받는다. 아래 「주문서 준비와 채우기」 |
@@ -38,11 +38,17 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 - **`READ` 로 둔 까닭**: 사용자가 만든 내용(글, 장바구니, 주문)을 바꾸지 않는다. 로그인한 브라우저로 검색하고 상품을 열면 네이버의 최근 검색어와 최근 본 상품에 남는다. 사람이 직접 검색할 때와 같은 기록이라 감수한다
 - **도구 이름과 설명**: 도구 검색이 영어 낱말로만 걸려 설명을 영어 요지 문장으로 시작한다. 확인 도구는 블로그의 `session_status` 와 겹치지 않게 지었다. 검사는 `hermes/tests/test_connectors_contract.py` 가 한다
 
+### 쇼핑 담당의 탐색
+
+쇼핑 담당은 한 요청에서 검색을 5번까지 하고, 전체 검색에서 고른 상위 후보를 5개까지 상세로 읽는다. 요청한 옵션·사이즈의 재고와 배송비 포함 금액을 확인하면 조사를 마친다. 한도에 닿아도 확인하지 못한 항목은 답변에 표시한다. 정품과 판매처 신뢰는 웹 검색으로 공식 판매처나 유통 근거를 조사하고, 답변의 첫 판단 뒤에 「항목 | 확인 내용 | 평가」 표로 근거를 보인다.
+
+이미 만든 담당과 새 담당 모두 에이전트 상세의 「도구」 에서 「웹 검색」 을 켠다. 스위치를 바꾸면 자동으로 저장되고 다음 실행부터 적용된다. 운영 담당의 스위치는 배포 뒤 코디네이터가 켠다. [에이전트 도구](agent-skill.md#에이전트-도구)
+
 ### 상품 정보
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true`. `extra_krw`, `sold_out` 이 `null` 이면 읽지 못한 것이다 |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true`. `extra_krw`, `sold_out`, `fee_krw` 가 `null` 이면 해당 값을 읽지 못한 것이다 |
 | `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽지 못해 `sellers` 는 항상 빈 목록이고 `offers_unknown` 이 참이다. 배송비 칸이 비면 `delivery_fee_krw` 와 `lowest_price_with_fee_krw` 는 `null` 이다 |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
@@ -147,6 +153,7 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 4. `NAVER_SHOPPING_PAGE_CHANGED` 가 나오면 그 profile 의 MCP 표준 오류 기록에서 `naver_shopping_diagnostic` 줄에 적힌 `missing` 목록을 보고 `src/fields.ts` 의 칸 위치를 고친다. 기록을 읽는 방법은 `fos-home-infra` 가 갖는다
 5. 예약 작업 하나에 상품을 찾으라고 지시해 돌려 보고, 도구가 `ATTENDED_ONLY` 로 거절되는지 본다
 6. 「내 브라우저」 에서 네이버를 로그아웃한 뒤 상품을 찾아 달라고 한다. 대화에 「로그인해 주세요」 카드와 알림이 뜨는지, 「내 브라우저 열기」 가 로그인 화면 탭을 고른 채 여는지 본다. 로그인한 뒤 「다 했어요」 를 누르면 검색이 이어지고 카드가 사라지며 남긴 탭이 닫히는지 본다
+7. 쇼핑 담당에 「웹 검색」 을 켜고 옵션과 최저가, 정품 근거를 한 번에 요청한다. 추가 지시 없이 검색어 또는 정렬을 바꾸고 상세를 확인해 요청한 사이즈의 재고, 배송비 포함 금액, 정품 근거와 출처를 표로 답하는지 본다
 
 ### 주문서까지 가 보기
 
