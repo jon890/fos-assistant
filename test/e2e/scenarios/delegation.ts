@@ -188,6 +188,24 @@ export const delegationScenario: Scenario = {
         );
       }
 
+      step("맡긴 자식의 도구 사건이 그 자식 노드에 빈틈없는 번호로 남고 delegated 가 참이다");
+      const firstNode = grown.root.children.find((child) => child.executionId === first.execution_id);
+      const firstEvents = firstNode?.events ?? [];
+      expect(firstNode?.delegated === true, `맡긴 자식의 delegated 가 참이 아니다: ${JSON.stringify(firstNode)}`);
+      expect(
+        firstEvents.some((event) => event.eventType === "TOOL_STARTED" && event.toolName === "fake-tool")
+          && firstEvents.some((event) => event.eventType === "TOOL_COMPLETED" && event.toolName === "fake-tool"),
+        `맡긴 자식에 도구 사건이 없다: ${JSON.stringify(firstEvents)}`,
+      );
+      expect(
+        firstEvents.every((event, index) => event.sequence === index + 1),
+        `맡긴 자식의 사건 번호에 빈틈이 있다: ${JSON.stringify(firstEvents.map((event) => event.sequence))}`,
+      );
+      expect(
+        firstEvents.at(-1)?.eventType === "RUN_COMPLETED",
+        `맡긴 자식의 마지막 사건이 끝 사건이 아니다: ${JSON.stringify(firstEvents.map((event) => event.eventType))}`,
+      );
+
       step("사용자가 turn 을 멈추면 그 turn 이 도는 동안 맡긴 자식도 멈춘다");
       context.hermes.holdNextRun();
       const third = parsed<Status>(await delegate("turn 과 함께 멈출 일"), "셋째 agent_delegate");

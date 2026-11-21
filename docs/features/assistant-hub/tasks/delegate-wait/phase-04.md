@@ -24,17 +24,17 @@
 
 ## 작업 항목
 
-### 1. `test/e2e/scenarios/delegation.ts` 와 `test/e2e/fake-hermes.ts`
+### 1. `test/e2e/scenarios/delegation.ts` 와 `test/e2e/delegation-support.ts`
 
-- 가짜 Hermes 가 맡긴 자식 run 의 사건 스트림(`/v1/runs/{id}/events`)에 도구 사건 한 쌍(`tool.started`, `tool.completed`)을 내도록 한다. 지금 대화 turn 의 run 이 사건을 내는 방식(`fake-hermes.ts` 의 사건 대본)을 자식 run 에도 쓰게 하는 것이 먼저다.
+- 가짜 Hermes 는 붙잡은 자식 run 의 사건 스트림에도 기본 도구 사건(`fake-tool`, `fake-reader`)을 이미 낸다(`test/e2e/fake-hermes/event-routes.ts`). 가짜는 바꾸지 않는다.
 - 새 단계 「맡긴 실행의 도구 사건」: 맡긴 자식이 끝난 뒤 `tree`(`test/e2e/delegation-support.ts`)의 그 자식 노드에 `TOOL_STARTED`, `TOOL_COMPLETED` 가 있고, 사건 순서 번호가 1 부터 빈틈없으며, 노드의 `delegated` 가 참이다.
 
 ### 2. `web/test/browser/agent-team-delegation.spec.ts`
 
-- 도는 답 만들기: `web/test/browser/activity-progress.spec.ts` 처럼 가짜 Hermes 대본에 `SCRIPT_PAUSE_EVENT` 를 넣어 답을 붙잡는다.
-- 대역 SSE 의 순서: 이 파일의 `routeEvents(page, id, first, ready)` 에 `delegation_activity` 두 개를 `first` 로 주고, `ready` 는 도는 답의 작업 과정 줄(`activity-current`)이 보인 뒤에 푼다. 그래서 사건이 도는 답보다 먼저 와 버려지지 않는다.
-- 단언 1: 블록을 펼치면 「쇼핑 담당」 도우미 줄 아래 검색 줄이 보인다.
-- 단언 2: `hermes.releaseLongActivity()` 로 답을 끝내면 접힌 줄이 「끝까지 하지 못했어요」 가 아니고 도우미 줄에 「끝나면 이어서 알려 드려요」 가 보인다.
+- 도는 답 만들기: 이 파일의 「자동 turn 이 도는 동안에도 결과 도착 줄은…」 사례처럼 대역 SSE 의 `started` 로 자동 turn 을 연다.
+- 대역 SSE 의 순서: `routeEvents` 의 `first` 에 `started` 를 먼저, 그 뒤에 `delegation_activity` 두 개(시작, 끝)를 둔다. 도는 답이 없을 때 온 사건은 버리므로 이 순서를 지킨다.
+- 단언: 기다림 줄의 블록을 펼치면 「쇼핑 담당」 도우미 줄이 하나 있고, 검색 줄(`data-tool="web_search"`)이 끝남 상태로 검색어와 함께 보인다.
+- 답이 끝날 때의 「맡겨 둠」 은 이력 대역과 자동 turn 의 끝을 함께 맞춰야 해 브라우저 테스트가 흔들린다. phase 03 의 `web/test/unit/activity-state.test.ts` 가 `failActivity`, `fromTree` 경로로 본다.
 
 ## 검증
 
@@ -51,5 +51,5 @@ node --test test/repo/doc-links.test.ts test/repo/doc-files.test.ts
 | 파일 | 변경 |
 |---|---|
 | `test/e2e/scenarios/delegation.ts` | 수정 |
-| `test/e2e/fake-hermes.ts` | 수정 |
+| `test/e2e/delegation-support.ts` | 수정 (트리 노드 타입에 사건과 위임 칸) |
 | `web/test/browser/agent-team-delegation.spec.ts` | 수정 |

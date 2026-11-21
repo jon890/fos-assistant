@@ -210,6 +210,43 @@ test("자동 turn 이 도는 동안에도 결과 도착 줄은 이름표로 보�
   ).toHaveText("진행 중");
 });
 
+test("도는 답의 작업 과정에 맡은 에이전트의 도우미 줄과 그 아래 도구 줄이 보인다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(page, "맡긴 도구 줄 검사");
+  const activity = (phase: "started" | "completed") => ({
+    type: "delegation_activity",
+    conversationId,
+    executionId: CHILD_EXECUTION_ID + 20,
+    toolName: "web_search",
+    detail: phase === "started" ? "운동화" : "",
+    phase,
+    durationMs: phase === "completed" ? 300 : null,
+    failed: phase === "completed" ? false : null,
+    delegation: {
+      ...delegation(AUTO_EXECUTION_ID + 20, "RUNNING"),
+      executionId: CHILD_EXECUTION_ID + 20,
+    },
+  });
+  // 자동 turn 이 시작한 뒤에 맡긴 실행의 도구 사건이 온다. 도는 답이 없을 때 온 사건은 버리므로 순서를 지킨다.
+  await routeEvents(page, conversationId, [
+    { type: "started", conversationId, executionId: AUTO_EXECUTION_ID + 20 },
+    activity("started"),
+    activity("completed"),
+  ]);
+
+  await page.goto(`/chat/${conversationId}`);
+
+  const waiting = page.getByTestId("pending-assistant");
+  await waiting.getByTestId("activity-toggle").click();
+  const items = waiting.getByTestId("activity-item");
+  await expect(items.filter({ hasText: "쇼핑 담당" })).toHaveCount(1);
+  const search = items.and(waiting.locator('[data-tool="web_search"]'));
+  await expect(search).toHaveCount(1);
+  await expect(search).toHaveAttribute("data-state", "done");
+  await expect(search).toContainText("운동화");
+});
+
 test("결과 도착 줄은 맡은 에이전트의 이름표와 글로 보이고 그 아래 답은 대화 에이전트의 이름표다", async ({
   page,
 }) => {
