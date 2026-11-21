@@ -2,9 +2,9 @@
 
 import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { cn } from "cn";
 import { normalizeMarkdown } from "@/components/chat/normalize-markdown";
+import { MARKDOWN_SYNTAX_PLUGINS } from "@/lib/markdown-syntax";
 import {
   DENSITY,
   markdownComponents,
@@ -42,7 +42,7 @@ export const Markdown = memo(function Markdown({
     <div className={cn("min-w-0 break-words", DENSITY[density].root)}>
       <ReactMarkdown
         remarkPlugins={[
-          [remarkGfm, { singleTilde: false }],
+          ...MARKDOWN_SYNTAX_PLUGINS,
           [remarkOpenFence, { streaming }],
         ]}
         rehypePlugins={

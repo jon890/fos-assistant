@@ -2,11 +2,13 @@ package com.bifos.assistant.chat.artifact.presentation;
 
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactFile;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
@@ -39,8 +41,20 @@ public class ArtifactController {
     static final String CONTENT_SECURITY_POLICY = SandboxedContentPolicy.HTML;
 
     private final ArtifactService artifacts;
+    private final GeneratedImageService images;
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
+
+
+    /**
+     * 아직 답에 묶이지 않은 그림의 결과물 폴더 안 경로를 저장한 순서대로 준다. 화면이 답이 끝나기 전에 그림을 그린다
+     * (generated-image 설계의 「PR7: 나오는 즉시 보이기」). 남의 대화는 다른 경로와 같은 404 다.
+     */
+    @GetMapping("/conversations/{conversationId}/live-images")
+    public List<String> liveImages(@PathVariable UUID conversationId) {
+        CurrentUser user = currentUser.require();
+        return images.unboundPaths(access.requireOwnId(user, conversationId));
+    }
 
 
     /**

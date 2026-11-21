@@ -51,6 +51,7 @@ export function ConversationSessionView({
   setDraft,
   executionId,
   liveDelegations,
+  liveImages,
   stopRequested,
   setComposerBlocking,
   replace,
@@ -171,6 +172,7 @@ export function ConversationSessionView({
           <MessageList
             turns={turns}
             liveDelegations={liveDelegations}
+            liveImages={liveImages}
             liveExecutionId={executionId}
             outgoing={outgoing}
             loading={messagesLoading}

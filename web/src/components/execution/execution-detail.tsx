@@ -16,6 +16,7 @@ import {
 import { providerLabel } from "@/lib/provider-label";
 import { executionStatusVariant } from "@/lib/execution-status";
 import { fetchExecutionTree } from "@/lib/usage-api";
+import { fetchQualityExecutionTree } from "@/lib/quality-api";
 import {
   ExecutionTree,
   type ExecutionContextSource,
@@ -147,8 +148,18 @@ function interval(from: string, to: string): string | null {
     : null;
 }
 
-/** 실행 하나의 머리 요약과 트리를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
-export function ExecutionDetail({ executionId }: { executionId: number }) {
+/**
+ * 실행 하나의 머리 요약과 트리를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다.
+ *
+ * <p>`source` 가 `quality` 면 관리자 품질 화면에서 평가 전용 사용자의 실행을 연다. 없으면 품질 화면으로 돌아간다.
+ */
+export function ExecutionDetail({
+  executionId,
+  source = "own",
+}: {
+  executionId: number;
+  source?: "own" | "quality";
+}) {
   const router = useRouter();
   const isAdmin = useAdminView();
   // 어느 실행을 읽은 결과인지 함께 둔다. 실행이 바뀌면 새 결과가 올 때까지 읽는 중으로 그린다.
@@ -163,7 +174,10 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     let cancelled = false;
     const setState = (next: FetchState) =>
       setLoaded({ executionId, state: next });
-    fetchExecutionTree(executionId)
+    (source === "quality"
+      ? fetchQualityExecutionTree(executionId)
+      : fetchExecutionTree(executionId)
+    )
       .then(async (response) => {
         if (cancelled) return;
         if (response.status === 404) {
@@ -183,12 +197,18 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [executionId]);
+  }, [executionId, source]);
 
   useEffect(() => {
     if (state.kind === "not-found")
-      router.replace(isAdmin ? "/admin/usage" : "/now");
-  }, [state.kind, router, isAdmin]);
+      router.replace(
+        source === "quality"
+          ? "/admin/quality"
+          : isAdmin
+            ? "/admin/usage"
+            : "/now",
+      );
+  }, [state.kind, router, isAdmin, source]);
 
   if (state.kind === "loading" || state.kind === "not-found") {
     return <p className="text-sm text-muted-foreground">불러오고 있어요.</p>;

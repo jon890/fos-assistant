@@ -27,7 +27,7 @@ function lineText(line: OverviewFailureLine): string {
  * 「품질과 실패」 카드다. 그룹 전체의 최근 7일 실패 수와 최근 세 건을 보인다.
  *
  * <p>관리자 자신의 실행만 실행 상세로 잇는다. 남의 실행은 이름과 오류 코드만 보이고 열 길이 없다.
- * 품질 확인 결과는 에이전트 품질 스펙이 같은 카드의 아래 자리에 더한다.
+ * 평가 전용 사용자의 실행은 세지 않는다. 배포 뒤 확인 기록은 품질 화면이 보이므로 그 화면으로 잇는다.
  */
 export function OverviewFailuresCard() {
   const [read, retry] = useOverviewRead(readOverviewFailures);
@@ -74,7 +74,15 @@ export function OverviewFailuresCard() {
               ))}
             </ul>
           )}
-          <p className="text-muted-foreground">아직 품질 확인 결과가 없어요</p>
+          <p className="text-muted-foreground">
+            평가 사용자의 실행은 여기서 빠져요.{" "}
+            <Link
+              href="/admin/quality"
+              className="underline underline-offset-4"
+            >
+              배포 뒤 확인 기록은 품질 화면에서 봐요
+            </Link>
+          </p>
         </>
       )}
     </OverviewCard>

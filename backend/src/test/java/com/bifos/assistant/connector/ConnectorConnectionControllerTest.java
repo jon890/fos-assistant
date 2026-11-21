@@ -20,6 +20,7 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
@@ -267,18 +268,23 @@ class ConnectorConnectionControllerTest {
     void checksAndDisconnectsForLoggedInUserWithoutRequestBody() throws Exception {
         when(service.check(MEMBER, DEMO)).thenReturn(snapshot(ConnectionStatus.PENDING));
         when(service.disconnect(MEMBER, DEMO))
-            .thenReturn(new ConnectionSnapshot(
-                DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), null, List.of(), 0));
+            .thenReturn(new ConnectionSnapshot(DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), null, List.of(), 0)
+                .withOAuthRevoke(new ConnectionOAuthRevoke(
+                    ConnectionOAuthRevoke.Status.FAILED, "https://accounts.example.test/settings", null)));
 
         mvc.perform(post("/api/v1/connections/" + DEMO + "/check"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("PENDING"))
-            .andExpect(jsonPath("$.undeclaredTools").value(2));
+            .andExpect(jsonPath("$.undeclaredTools").value(2))
+            .andExpect(jsonPath("$.oauthRevoke").isEmpty());
         mvc.perform(delete("/api/v1/connections/" + DEMO))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DISCONNECTED"))
             .andExpect(jsonPath("$.bindings").isEmpty())
-            .andExpect(jsonPath("$.secretPrefixes").isEmpty());
+            .andExpect(jsonPath("$.secretPrefixes").isEmpty())
+            .andExpect(jsonPath("$.oauthRevoke.status").value("failed"))
+            .andExpect(jsonPath("$.oauthRevoke.settingsUrl").value("https://accounts.example.test/settings"))
+            .andExpect(jsonPath("$.oauthRevoke.installSettingsUrl").isEmpty());
 
         verify(service).check(MEMBER, DEMO);
         verify(service).disconnect(MEMBER, DEMO);

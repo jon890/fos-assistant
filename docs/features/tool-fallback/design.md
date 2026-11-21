@@ -79,7 +79,7 @@ Control Plane 판정 글은 Control Plane 이 이미 끝 줄을 붙여 보내므
 | `image_source.py` | `IMAGE_SOURCE_LINK_BLOCKED` | 바로 알림(DECISION9) |
 | `image_source.py` | `IMAGE_SOURCE_LINK_TOO_LARGE` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 더 작은 사진을 올려 달라고 먼저 알린다 |
 | `image_source.py` | `FAILED` | 다음 방법: 설명만으로 비슷하게 그려 넣지 말고, 잠시 뒤 다시 해 달라고 알린다(DECISION10, 스펙 REQ7) |
-| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 사용자가 보낸 주소면 `link:` 로 고쳐 다시 부르고 넘길 수 없는 주소(비서가 찾은 주소)면 그려 넣지 말고 먼저 알리기, `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴을 찾고 없으면 그려 넣지 말고 먼저 알리기(스펙 REQ7), `TOO_MANY` 는 바로 알림(어느 사진을 뺄지는 사용자가 정한다, generated-image 스펙 DECISION25), `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. 「그림을 만들지 않았다」 는 `TAIL` 대신 `HEAD` 로 옮기고 `TAIL` 을 없앤다. 그래야 문제가 여럿인 글도 마지막 문제의 끝 줄로 끝난다(스펙 REQ3) |
+| `image_source.py` | `NOT_REFERENCE`, `UNKNOWN`, `GONE`, `TOO_MANY`, `OLD_SERVER`, `NO_CONTEXT`, `TAIL` | `NOT_REFERENCE` 는 사용자가 보낸 주소면 `link:` 로 고쳐 다시 부르고 넘길 수 없는 주소면 그려 넣지 말고 먼저 알리기(검색·읽기 결과에 나온 주소는 [비서가 찾은 사진 설계](../agent-found-image/design.md) 대로 `link:` 로 넘긴다), `UNKNOWN` 은 대화의 첨부·링크·그림 가운데 맞는 가리킴을 찾고 없으면 그려 넣지 말고 먼저 알리기(스펙 REQ7), `TOO_MANY` 는 바로 알림(어느 사진을 뺄지는 사용자가 정한다, generated-image 스펙 DECISION25), `NO_CONTEXT` 는 지금 글대로 대화에서 직접 `image_generate` 를 부르기. 나머지는 바로 알림. 「그림을 만들지 않았다」 는 `TAIL` 대신 `HEAD` 로 옮기고 `TAIL` 을 없앤다. 그래야 문제가 여럿인 글도 마지막 문제의 끝 줄로 끝난다(스펙 REQ3) |
 | `attachment_inspect.py` | `FAILURE` | 바로 알림. 재업로드를 요구하지 않는 지금 뜻을 지킨다(DECISION8). `region_required` 와 한도 초과의 다시 조회 안내는 이미 다음 방법이라 꼴만 맞춘다. 인자가 틀린 호출은 다음 방법: 인자를 고쳐 다시 부른다 |
 | `generated_image.py` | `FAILED_MESSAGE` | 바로 알림 |
 | `approval_guard.py` | `DANGEROUS_COMMAND_MESSAGE`, `COMPUTER_USE_MESSAGE` | 다음 방법: 막히지 않은 다른 명령이나 도구로 같은 일을 한다(DECISION9) |

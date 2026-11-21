@@ -185,6 +185,31 @@ test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 �
   ).toBeLessThanOrEqual(0);
 });
 
+test("작업 과정의 첫 읽기만 실패하면 누르지 않아도 다시 읽어 보인다", async ({
+  page,
+}) => {
+  await page.goto("/new");
+  await pickAgent(page, "브라우저 비서");
+  await page.getByRole("textbox", { name: "메시지" }).fill("첫 읽기 실패");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+  let calls = 0;
+  await page.route("**/api/usage/executions/*/tree", (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 502, body: "{}" })
+      : route.continue();
+  });
+  await block.getByTestId("activity-toggle").click();
+  await expect(block.locator('[data-kind="tool"]')).toHaveCount(2);
+  await expect(block.getByTestId("activity-load-error")).toHaveCount(0);
+  expect(calls).toBe(2);
+});
+
 /**
  * 접힌 줄과 펼친 목록 어디에도 수와 모델과 토큰이 글자로 나오지 않는다.
  *

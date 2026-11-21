@@ -10,6 +10,7 @@ export { AssistantRow };
 import { AnswerBody } from "./answer-body";
 import { formatWhen } from "@/lib/format";
 import { GeneratedImages } from "./artifact/generated-images";
+import { withLiveImages } from "./artifact/live-images";
 import { PutFiles } from "./artifact/put-files";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
@@ -49,6 +50,7 @@ export function MessageBubble({
   onOpenArtifact,
   skillCommandChip = false,
   liveActivity,
+  liveImages = [],
   memoryUses,
   onRetryDelivery,
   deliveryRetrying = false,
@@ -78,6 +80,8 @@ export function MessageBubble({
   skillCommandChip?: boolean;
   /** 답이 흘러나오는 동안의 진행 중 작업 과정이다. 저장된 블록과 같은 자리에 그린다 */
   liveActivity?: React.ReactNode;
+  /** 답이 흘러나오는 동안 받은, 아직 답에 묶이지 않은 그림 경로다 */
+  liveImages?: string[];
   /** 이 답의 실행이 본문을 받은 기억이다. 저장된 작업 과정을 펼쳤을 때만 보인다 */
   memoryUses?: MemoryUse[];
   /** 실패하거나 중지한 결과 전달의 「결과 다시 전달」 을 누르면 그 묶음 번호로 부른다 */
@@ -296,8 +300,11 @@ export function MessageBubble({
         copyText={turn.content}
       />
       <GeneratedImages
-        images={(turn.artifacts ?? []).filter(
-          (artifact) => artifact.kind === "IMAGE",
+        images={withLiveImages(
+          (turn.artifacts ?? []).filter(
+            (artifact) => artifact.kind === "IMAGE",
+          ),
+          liveImages,
         )}
         conversationId={conversationId}
         messageId={turn.id}

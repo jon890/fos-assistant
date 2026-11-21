@@ -5,7 +5,7 @@
 covers: `backend/src/main/java/com/bifos/assistant/context/application/ServiceConceptsInstructions.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpConnectorListTool.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpTaskTools.java`, `backend/src/main/java/com/bifos/assistant/task/application/TaskAgentRequests.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/ControlPlaneApprovals.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpFollowUpTools.java`, `backend/src/main/java/com/bifos/assistant/followup/application/FollowUpAgentRequests.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpMemoryForgetTool.java`, `backend/src/main/java/com/bifos/assistant/memory/application/MemoryForgetting.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpConnectorAttachTool.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/ConnectorAttachRequester.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/ConnectorAttachRunner.java`, `test/model-eval/concepts/`, `backend/src/main/java/com/bifos/assistant/chat/artifact/application/ArtifactService.java`
 
 요구와 결정은 스펙 [`service-concepts/spec.md`](service-concepts/spec.md), 구조는 설계 [`service-concepts/design.md`](service-concepts/design.md) 가 갖는다.
-스펙의 PR1 이 들어오면 모든 실행의 공통 지시문에 개념 목록이 들고, 에이전트는 직접 못 하는 기능을 그 화면 링크로 안내한다. PR2 부터 에이전트가 예약 작업을 바로 만들고 고치고 멈추고 다시 켜며, 지우기는 승인 카드로 한다. PR3 부터 사용자가 시킨 할 일을 바로 적고 끝내며, 기억 지우기는 승인 카드로 한다. PR4 부터 이미 연결한 서비스를 지금 에이전트에 붙이는 일을 승인 카드로 한다.
+모든 실행의 공통 지시문에 개념 목록이 들고, 에이전트는 직접 못 하는 기능을 그 화면 링크로 안내한다. 에이전트는 예약 작업을 바로 만들고 고치고 멈추고 다시 켜며, 사용자가 시킨 할 일을 바로 적고 끝낸다. 예약 작업 지우기, 기억 지우기, 이미 연결한 서비스를 지금 에이전트에 붙이는 일은 승인 카드로 한다.
 
 ## 개념 목록
 

@@ -85,11 +85,11 @@
 
 | 요청 | 응답 |
 | --- | --- |
-| `POST /api/v1/admin/quality/checks` | 202 와 `{publicId, status}`. 도는 `DEPLOY_CHECK` 가 있으면 새로 만들지 않고 그 줄을 `200` 으로 돌려준다(같은 배포에서 두 번 불러도 하나). 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING` |
+| `POST /api/v1/admin/quality/checks` | 202 와 확인 한 줄(`trigger` `PIPELINE`). 도는 `DEPLOY_CHECK` 가 있으면 새로 만들지 않고 그 줄을 `200` 으로 돌려준다(같은 배포에서 두 번 불러도 하나). 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING` |
 | `GET /api/v1/admin/quality/checks/{publicId}` | 한 줄과 기능별 결과. 파이프라인이 이 `status` 를 읽는다 |
 | `GET /api/v1/admin/quality/checks?cursor=` | 최근 순 목록. 품질 화면 첫 칸 |
 | `POST /api/v1/admin/quality/checks/{publicId}/retry` | 같은 기능 묶음으로 새 확인을 시작한다(`trigger_type` `ADMIN`). 도는 확인이 있으면 첫 줄처럼 그 줄을 돌려주고, 화면은 「이미 확인이 돌고 있다」 를 보인다 |
-| `GET /api/v1/admin/quality/executions/{executionId}/tree` | 평가 사용자의 실행 트리만 연다. 다른 사용자의 실행은 404 다. 지금 실행 트리 조회(`ExecutionTreeService`)는 주인만 열어 관리자가 평가 사용자의 실패를 볼 길이 없다(ADR-063 의 관리자 영역 규칙대로 `admin.quality` 에 둔다) |
+| `GET /api/v1/admin/quality/executions/{executionId}/tree` | 평가 사용자의 실행 트리만 연다. 응답은 `/api/v1/usage/executions/{id}/tree` 와 같은 모양이고, 내부 값은 보는 관리자 기준으로 싣는다(`ExecutionTreeService.ofOwner`). 다른 사용자의 실행은 404 다. 지금 실행 트리 조회(`ExecutionTreeService`)는 주인만 열어 관리자가 평가 사용자의 실패를 볼 길이 없다(ADR-063 의 관리자 영역 규칙대로 `admin.quality` 에 둔다) |
 | `POST /api/v1/admin/quality/evaluation-user` | 평가 전용 사용자를 준비하고 상태를 돌려준다 |
 | `GET /api/v1/admin/quality/evaluation-user` | 준비됐는지, 빠진 것 |
 
@@ -128,7 +128,7 @@ sequenceDiagram
 1. 문항은 별도 작업(`BackgroundTasks`)에서 `send` 로 보낸다. 실행기 스레드는 그 기능의 끝남 조건을 1초 남짓 간격으로 본다.
 2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, `ChatService.deliveryStates` 의 그 대화 전달이 `DELIVERED` 이고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다.
 3. 10분이 지나면 도는 turn 의 실행 번호를 `TurnCancellation.markOf(conversationId)` 로 읽어 `ChatService.stop` 을 부르고, 도는 위임 자식은 `AgentDelegationService` 의 중지로 멈춘다. 그 기능을 `TIMED_OUT` 으로 적는다.
-4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 실행을 `ChatService.stop` 으로 멈추고 `TIMED_OUT` 으로 적는다.
+4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 기능을 `TIMED_OUT`(까닭 `HERMES_TIMEOUT`)으로 적는다. turn 잠금은 이미 풀려 `ChatService.stop` 으로 멈출 수 없고, 남은 원격 run 은 기존 잃은 run 정리(`LostRunRelease`)가 다음 제출 때 푼다.
 5. 대화에 도는 turn 이 없어진 뒤에 다음 기능으로 간다. 사용자 실행 자리를 겹쳐 쓰지 않게 한다.
 
 **확인 하나는 서버 하나에서 돈다.** 시작은 `BackgroundTasks` 로 띄운다. 서버가 도중에 다시 뜨면 기동 때 `RUNNING` 인 줄을 `FAILED`, 까닭 `INTERRUPTED` 로 끝낸다. 다시 돌리지 않는다.
@@ -147,7 +147,7 @@ sequenceDiagram
 | 예약 작업 발화 | 문항을 보내지 않는다. 실행기가 `TaskService` 로 평가 전용 사용자의 `TURN` 작업을 한 번(`ONCE`, 지금 뒤 1분. `ONCE` 는 지금보다 뒤여야 한다)으로 만들어 발화기에 맡긴다. 끝남 조건은 그 작업의 `task_run` 이 끝난 상태가 된 것이다. 지시는 짧은 고정 글이다 | 그 작업의 `task_run` 이 `SUCCEEDED` 로 끝나고 `execution_id` 가 찬다 | 예약 작업과 그 대화 |
 | 원본 사진 조회 | 앞 메시지에 합성 사진(심은 글자)을 올리고 다음 메시지에서 글자를 묻는다 | 답에 심은 글자가 들고, 둘째 turn 트리에 `attachment_inspect` 의 `TOOL_COMPLETED` 가 실패 없이 있다. `inspected` 단계 사건은 로그에만 남아 Control Plane 이 읽지 못한다(`MediaPipelineEvents`) | 첨부, 대화 |
 
-합성 사진은 `test/model-eval/blog/make_photos.py` 와 같은 방식으로 만든 파일 하나를 `backend` 리소스로 둔다.
+합성 사진은 표지판에 심은 글자를 그린 단순한 그림 하나를 `backend/src/main/resources/quality/deploy-check-photo.png` 에 둔다.
 확인 시작 뒤 평가 사용자에게 생긴 기억 가운데 미리 넣은 한 줄이 아닌 것은 확인이 끝날 때 기능의 통과와 상관없이 지운다(문항이 돌다 `memory_remember` 로 생길 수 있다). 「정리」 는 통과한 기능에만 바로 한다. 실패한 기능의 대화와 만든 것은 30일 뒤 정리 작업이 지운다(스펙 DECISION16, DECISION19). 정리 작업은 하루 한 번 돌고, 대화를 지운 뒤 `quality_run.result_json` 의 `conversationPublicId` 와 `executionIds` 를 비운다. 그래서 30일 뒤에는 화면에 링크가 없다. 줄과 숫자는 남는다. 실행 기록 줄 자체는 기존 실행 기록 보존(rule-49)을 따른다.
 
 ### 실패 알림
@@ -159,7 +159,10 @@ sequenceDiagram
 `/admin/quality` 를 새로 만들고 첫 칸만 그린다. 나머지 칸은 PR2 와 PR3 이 더한다.
 평가 전용 사용자가 없으면 칸 대신 「평가 사용자 준비」 단추와 한 줄 안내를 보인다.
 확인 목록은 시각, 계기, 결과, 걸린 시간을 한 줄로, 펼치면 기능별 결과와 까닭을 보인다. 실패 기능은 `executionIds` 마다 관리자 품질 화면 안의 실행 트리 보기로 잇는다. 그 보기는 위 `admin.quality` 의 트리 조회를 쓴다. 30일이 지나 비워진 줄은 링크를 그리지 않는다.
-관리자 메뉴 자리는 관리자 영역 재편 스펙을 따른다. 그 스펙이 아직 머지되지 않았으면 지금 관리자 메뉴 끝에 「품질」 로 더하고 재편 PR 이 옮긴다.
+관리자 메뉴 자리는 관리자 영역 재편 스펙의 「살펴보기」 묶음 두 번째다.
+화면에 「확인 시작」 단추를 둔다. 파이프라인과 같은 `POST /api/v1/admin/quality/checks` 를 부르므로 계기는 `PIPELINE` 으로 남는다. 「다시 확인」 만 `ADMIN` 이다.
+도는 확인이 있으면 10초마다 목록을 다시 읽는다.
+사용량의 「평가」 한 줄은 관리자 요약의 「이번 달 사용량」 카드에 둔다. 사용자별 사용량 화면이 없어, 그룹 합계에서 평가 사용자를 빼고 그 아래 한 줄로 따로 센다. 「최근 실패」 카드에서도 평가 사용자의 실행을 뺀다. 평가 실패는 이 화면이 보인다.
 
 ### 실행기 구현 메모
 
@@ -176,6 +179,9 @@ sequenceDiagram
 - **e2e 시나리오는 `test/e2e/run.ts` 의 맨 끝에 등록한다.** 사용자를 하나 더 만들어 앞 시나리오의 사람 수 세기를 깨지 않게 한다.
 - **화면 PR 전까지 알림의 이동 대상 `/admin/quality` 는 없는 화면이다.** 실행기 PR 과 화면 PR 을 같은 배포에 묶거나, 화면 PR 이 먼저 머지되게 한다.
 - 까닭 코드에는 기능 규칙의 코드와 함께 `BUSY`, `INTERRUPTED`, `RUN_FAILED`, `TIMED_OUT` 을 둔다.
+- **문항을 보내기 전에 빈 평가 대화를 먼저 만든다(`ChatService.startEmpty`).** 마감이 지났을 때 실행기 스레드가 그 대화의 도는 turn 을 찾아 멈추려면 `send` 가 돌아오기 전에 대화 번호를 알아야 한다. 사진 조회도 이 대화에 사진을 먼저 올린다.
+- **실행 줄이 생기기 전의 거절은 `USER_BUSY`, `CONVERSATION_BUSY` 만 `BUSY` 로 적는다.** 그 밖의 거절과 실행기 쪽 예외는 `RUN_FAILED` 다. 실행이 실패한 것은 실행 줄에 남아 판정이 읽는다.
+- **30일 정리는 `assistant.quality.cleanup-cron`(기본 매일 05:15) 에 돈다.** 보관 기간은 `assistant.quality.link-retention`(기본 30일)이다.
 
 ## 실패와 일관성
 
@@ -184,7 +190,8 @@ sequenceDiagram
 | 확인을 두 번 시작 | 도는 `DEPLOY_CHECK` 를 그대로 돌려준다. 시작은 평가 사용자 행 잠금(`AppUserRepository.findByIdForUpdate`) 안에서 `RUNNING` 인 `DEPLOY_CHECK` 를 찾아 하나만 만든다(「실행기 구현 메모」) |
 | `USER_BUSY`, `CONVERSATION_BUSY` | 평가 전용 사용자는 실행기만 쓰므로 정상이면 일어나지 않는다. 일어나면 그 기능을 `FAILED`, 까닭 `BUSY` 로 적는다 |
 | Hermes 연결 실패, 시간 초과, 실행 실패 | 그 기능 `FAILED`, 까닭은 실행 줄의 오류 종류를 고정 코드로 옮긴다 |
-| 정리 실패 | 결과는 바꾸지 않는다. 경고 로그를 남기고 하루 정리 작업이 다시 지운다 |
+| 정리 실패 | 결과는 바꾸지 않고 경고 로그를 남긴다. 실패한 기능의 대화는 하루 정리 작업이 30일 뒤 다시 지운다. 통과한 기능의 대화와 확인 중 생긴 기억은 결과에 번호가 없어 다시 지우지 않는다. 평가 전용 사용자에게만 남는다 |
+| 재기동으로 끊긴 기능 | 대화 번호 없이 `INTERRUPTED` 로 적어 그 대화는 정리되지 않는다. 예약 작업 발화 도중이면 보관 처리하지 못한 작업이 재기동 뒤 한 번 발화한다. 둘 다 평가 전용 사용자에게만 남는다 |
 | 서버 재기동 | 「확인 하나는 서버 하나에서 돈다」 대로 `INTERRUPTED` |
 | 배포 순서 | 마이그레이션(칸과 표)과 코드가 한 PR 이다. 파이프라인 요청은 이 PR 이 배포되고 평가 사용자를 준비한 뒤에 켠다 |
 
@@ -204,7 +211,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | PR | 범위 | 남은 확인 |
 | --- | --- | --- |
 | 기반 | `app_user.evaluation`, `quality_run`, 평가 전용 사용자 준비와 관리자 API, 숨기는 곳, 기능별 규칙 판정(REQ1 의 판정, 사용량 「평가」 한 줄을 뺀 REQ2) | 배포하고 아래 요청 5 를 마친 뒤 관리자가 평가 사용자를 준비해 상태에 빠진 것이 없고, 관리자 사용자 목록에 「평가용」 줄이 하나인지 본다 |
-| 실행기 | 확인 시작·조회 API, 기능 차례 실행과 10분 마감, 실패 알림, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3) | 배포 뒤 운영에서 확인 한 번을 돌려 본다 |
+| 실행기 | 확인 시작·조회 API, 평가 사용자 실행 트리 조회, 기능 차례 실행과 10분 마감, 실패 알림과 그 알림의 웹 이동, 30일 정리, 가짜 Hermes e2e(REQ1, REQ3) | 배포 뒤 관리자가 평가 사용자를 준비하고 확인 한 번을 돌려 본다 |
 | 화면 | `/admin/quality` 첫 칸과 사용량 「평가」 한 줄(REQ4, REQ2 의 나머지). 실행기 PR 과 같은 배포에 묶는다 | 브라우저 테스트 |
 
 ## 운영 저장소에 넘길 요청
@@ -215,7 +222,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 2. `GET /api/v1/admin/quality/checks/{publicId}` 를 1분마다 부르고, `status` 가 `PASSED` 나 `FAILED` 가 되면 멈춘다. 기다리는 상한은 기능 수에 10분을 곱하고 10분을 더한 값이다. 넘거나 Control Plane 이 응답하지 않으면 실패로 본다.
 3. `FAILED` 나 실패로 본 경우 파이프라인 알림을 보낸다. 되돌리기는 하지 않는다.
 4. 평가 전용 사용자의 Hermes profile 은 Control Plane 이 만든다. 운영 저장소는 profile 을 따로 만들지 않는다.
-5. 평가 사용자를 준비하기 전에 그 profile 을 실행 공간 정책과 첨부(`vision`) 정책에 등록한다. 그림 만들기와 사진 조회 도구는 등록된 profile 에서만 켜진다(ADR-20261119 / image-gen-defaults, ADR-091). 공유 gateway 를 다시 띄우는 배포 단계가 그 profile 도 포함하는지 확인한다.
+5. 평가 사용자를 준비하기 전에 그 profile 을 실행 공간 정책과 첨부(`vision`) 정책에 등록한다. 그림 만들기와 사진 조회 도구는 등록된 profile 에서만 켜진다([ADR-20261119 / image-gen-defaults](../../adr/ADR-20261119-image-gen-defaults.md), ADR-091). 공유 gateway 를 다시 띄우는 배포 단계가 그 profile 도 포함하는지 확인한다.
 
 ## 결정
 

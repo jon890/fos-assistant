@@ -35,7 +35,7 @@ PR 하나가 한 단계다. 앞 단계가 머지된 뒤 다음 단계를 계획�
 | 순서 | 단계 | 상태 | 담는 것 |
 | --- | --- | --- | --- |
 | 1 | 형식 수용과 원격 MCP | 머지 | 대시보드 plugin 의 manifest 읽기, `assistant.json` 과 옛 `connector.json`, `type: http` 서버의 설치와 호출, 문서. 이 저장소의 로컬 커넥터는 그대로 돈다 |
-| 2 | 금융 워크벤치 전환 | 머지 | 워크벤치 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다(사용자 결정 2026-10-26). 두 플러그인을 겹쳐 두지 않고 한 번에 바꾼다(사용자 결정 2026-11-02) |
+| 2 | 금융 워크벤치 전환 | 머지 | 워크벤치 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 [ADR-20261025 / connector-operator-base-url](archive/ADR-20261025-connector-operator-base-url.md) 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다(사용자 결정 2026-10-26). 두 플러그인을 겹쳐 두지 않고 한 번에 바꾼다(사용자 결정 2026-11-02) |
 | 3 | 이름 변경 | 진행 | 화면과 문서, 용어표의 「커넥터」 를 「플러그인」 으로 바꾸고 이 저장소 커넥터의 `connector.json` 을 `assistant.json` 으로 옮긴다([ADR-20261026 / plugin-naming](../../../docs/adr/ADR-20261026-plugin-naming.md)) |
 | 4 | `assistant.json` 없는 플러그인 | 머지 | 선언하지 않은 도구를 「묻는다」 로 판정하고 입력 칸을 MCP 정의에서 추론한다. Control Plane 과 화면이 바뀐다. 결정과 그 안의 단계는 [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) 이 갖는다 |
 
@@ -50,7 +50,7 @@ Hermes 는 이미 `mcp_servers` 에 `url` 과 `${이름}` 을 참조하는 헤�
 
 ### 대안 기각
 
-- **사용자가 주소를 넣는다**: 대시보드 plugin 과 Hermes 는 홈서버 안에서 돈다. 사용자가 넣은 주소로 내부망을 부르는 SSRF 가 된다. ADR-20261025 가 같은 까닭으로 버렸다.
+- **사용자가 주소를 넣는다**: 대시보드 plugin 과 Hermes 는 홈서버 안에서 돈다. 사용자가 넣은 주소로 내부망을 부르는 SSRF 가 된다. [ADR-20261025 / connector-operator-base-url](archive/ADR-20261025-connector-operator-base-url.md) 가 같은 까닭으로 버렸다.
 - **원격 MCP 의 OAuth 로그인을 이번에 넣는다**: 동적 등록, 인가 코드와 PKCE, 갱신 토큰을 저장하고 돌리는 일을 대시보드 plugin 과 Hermes 설정이 함께 맡아야 한다. Hermes core 를 고치지 않는 경계([ADR-001](../../../docs/adr/ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md)) 안에서 갱신 토큰을 profile 마다 맞추는 방법도 아직 없다. 첫 대상은 개인 연동 토큰을 받으므로 미룬다.
 - **원격 서버를 로컬 실행형 중계(`mcp-remote` 같은 것)로 감싼다**: 지금 검증을 그대로 쓰지만 새 실행 파일 의존이 생기고, 토큰이 자식 프로세스의 인자나 env 로 한 번 더 건너간다.
 - **marketplace 에서 플러그인을 내려받는다**: 실행 중에 바깥 저장소의 내용이 바뀌면 운영자가 읽어 보지 않은 스킬과 위험도 선언이 들어온다. 홈서버의 가계부 연결도 운영자가 믿은 checkout 만 읽는다.

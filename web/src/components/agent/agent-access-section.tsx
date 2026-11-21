@@ -182,7 +182,7 @@ export function AgentAccessSection({
   return (
     <section
       aria-label="공개와 삭제"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>

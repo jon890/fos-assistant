@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { MyFiles } from "@/components/files/my-files";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 
 export const metadata: Metadata = { title: "파일 공간" };
 
@@ -28,11 +31,10 @@ export default async function FilesPage({
   }
   if (legacy.size > 0) redirect(`/files/workspace?${legacy}`);
   // 목록은 서버에서 읽지 않는다. 실패와 다시 읽기를 브라우저가 다룬다.
-  // 폭은 목록 옆에 미리보기 패널이 붙도록 넓게 둔다.
   return (
-    <div className="mx-auto w-full max-w-6xl">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">파일 공간</h1>
+    <PageFrame
+      {...PAGE_HEADS.files}
+      action={
         <Link
           href="/files/workspace"
           prefetch={false}
@@ -40,13 +42,12 @@ export default async function FilesPage({
         >
           에이전트 작업 폴더
         </Link>
-      </div>
+      }
+    >
       {/* 주소의 `item` 을 useSearchParams 로 읽으므로 Suspense 로 감싼다. */}
-      <Suspense
-        fallback={<p className="text-sm text-muted-foreground">불러오는 중…</p>}
-      >
+      <Suspense fallback={<ListSkeleton />}>
         <MyFiles />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }

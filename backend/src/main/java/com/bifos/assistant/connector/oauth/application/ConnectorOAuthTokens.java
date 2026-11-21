@@ -158,7 +158,12 @@ public class ConnectorOAuthTokens {
             return Outcome.UNAVAILABLE;
         }
         switch (token.outcome()) {
-            case OK -> current.put(connection.id(), new ConnectorOAuthToken(token.accessToken(), token.expiresAt()));
+            case OK -> {
+                current.put(connection.id(), new ConnectorOAuthToken(token.accessToken(), token.expiresAt()));
+                if (connection.fields().auth().reconnectRequired()) {
+                    alerts.recovered(connection);
+                }
+            }
             case GRANT_REVOKED -> {
                 current.remove(connection.id());
                 alerts.reconnectRequired(connection, manifest.title());
