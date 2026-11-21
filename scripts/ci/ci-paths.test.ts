@@ -275,6 +275,8 @@ test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 
 test("모델 지시문을 만드는 파일을 바꾸면 E2E 만 라벨 없이 돌린다", () => {
   const guide = [
     "backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
+    "backend/src/main/java/com/bifos/assistant/context/application/AnswerFormatInstructions.java",
+    "backend/src/main/java/com/bifos/assistant/context/application/VerifyBeforeAnswerInstructions.java",
     "test/e2e/fake-hermes/scenario-fixtures.ts",
   ];
   for (const file of guide) {
