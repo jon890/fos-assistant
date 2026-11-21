@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.artifact.application.ArtifactVaultFinder;
 import com.bifos.assistant.chat.artifact.application.ArtifactVaultService;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultItem;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
@@ -102,6 +103,9 @@ class McpFileSpacePutToolTest {
     ArtifactVaultService vault;
 
     @Autowired
+    ArtifactVaultFinder vaultFinder;
+
+    @Autowired
     AgentExecutionRepository executions;
 
     @Autowired
@@ -188,6 +192,7 @@ class McpFileSpacePutToolTest {
         List<ArtifactVaultItem> kept = vault.list(dad.id());
         assertThat(kept).extracting(ArtifactVaultItem::path).contains("reports/가계부.xlsx");
         ArtifactVaultItem item = kept.stream().filter(it -> it.path().equals("reports/가계부.xlsx")).findFirst().orElseThrow();
+        assertThat(vaultFinder.putIdsOf(dad.id(), conversation.id())).containsExactly(item.id());
         assertThat(vault.read(dad.id(), item.id()).body()).isEqualTo(xlsx);
         assertThat(vault.list(mom.id())).as("에이전트 주인의 보관함에는 없다").isEmpty();
         assertThatThrownBy(() -> vault.read(mom.id(), item.id()))

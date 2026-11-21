@@ -19,6 +19,10 @@ import type { MemoryCapture } from "@/lib/memory-capture-api";
 import type { MemoryUse } from "@/lib/memory-use-api";
 import { visibleTurns } from "./visible-turns";
 import { isSteerTurn } from "./steer";
+import type { ReplyTarget } from "@/lib/reply";
+import { jumpToMessage } from "./use-reply-target";
+import { GeneratedImages } from "./artifact/generated-images";
+import { unboundLiveImages, withLiveImages } from "./artifact/live-images";
 
 type Props = {
   turns: Turn[];
@@ -56,8 +60,12 @@ type Props = {
   memoryUses?: MemoryUse[];
   /** `delegation` 사건으로 받은 맡긴 줄이다. 이력의 줄과 합쳐 그 실행의 답 아래에 그린다 */
   liveDelegations?: DelegationLine[];
+  /** 답이 끝나기 전에 받은 그림 경로다. 흐르는 답이나 기다림 줄에 그린다 */
+  liveImages?: string[];
   /** 지금 도는 turn 의 실행 번호다. 아직 저장되지 않은 답과 기다림 줄이 이 번호의 맡긴 줄을 그린다 */
   liveExecutionId?: number | null;
+  /** 메시지나 그림을 집어 입력창 위에 둔다(스펙 chat-reference REQ1) */
+  onReply?(target: ReplyTarget): void;
 };
 export function MessageList({
   turns,
@@ -85,7 +93,9 @@ export function MessageList({
   onMemoryCapturesChanged,
   memoryUses = [],
   liveDelegations = [],
+  liveImages = [],
   liveExecutionId = null,
+  onReply,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -120,7 +130,8 @@ export function MessageList({
   const usesVersion = memoryUses
     .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}:${liveDelegations.map((line) => `${line.executionId}:${line.status}`).join("|")}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}:${liveDelegations.map((line) => `${line.executionId}:${line.status}`).join("|")}:${liveImages.length}`;
+  const pendingImages = unboundLiveImages(liveImages, turns);
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
@@ -161,6 +172,11 @@ export function MessageList({
     observer.observe(element);
     return () => observer.disconnect();
   }, [loading, sending, streamedAnswer]);
+  // 답장 상자를 누르면 원래 메시지로 간다(스펙 chat-reference REQ6, DECISION19).
+  const jumpTo = (messageId: number) =>
+    jumpToMessage(messageId, turns, onVersionChange, contentRef.current, () => {
+      shouldFollow.current = false;
+    });
   const scrollToBottom = () => {
     const element = scrollRef.current;
     if (!element) return;
@@ -272,6 +288,13 @@ export function MessageList({
                               )
                             : undefined
                         }
+                        onReply={onReply}
+                        onJump={jumpTo}
+                        liveImages={
+                          pendingAssistant && sending
+                            ? pendingImages
+                            : undefined
+                        }
                         liveActivity={
                           pendingAssistant && hasLiveActivity
                             ? liveActivityBlock
@@ -319,6 +342,11 @@ export function MessageList({
                   className="animate-message-assistant"
                 >
                   {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
+                  <GeneratedImages
+                    images={withLiveImages([], pendingImages)}
+                    conversationId={conversationId}
+                    messageId="live-images"
+                  />
                   <DelegationLines
                     lines={mergeDelegations(
                       [],

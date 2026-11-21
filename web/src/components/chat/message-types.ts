@@ -7,6 +7,7 @@ import type {
   SteerInfo,
 } from "@/lib/chat-event";
 import type { AnswerReveal } from "./answer-reveal";
+import type { ReplyView } from "@/lib/reply";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -41,6 +42,8 @@ export type MessageArtifact = {
   title?: string | null;
   /** 그림을 만들 때 참고한 링크 주소다. 쓴 순서다. 그림이 아니거나 없으면 빈 배열이고 옛 서버 응답에는 없다 */
   sourceLinks?: string[];
+  /** `sourceLinks` 가운데 비서가 웹에서 찾은 주소다. 같은 순서다. 화면이 「비서가 찾음」 을 붙인다. 옛 서버 응답에는 없다 */
+  foundSourceLinks?: string[];
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */
@@ -94,4 +97,6 @@ export type Turn = {
   delegatedTo?: MentionDelegation | null;
   /** 도는 실행에 끼워 넣은 사용자 글이면 그 말풍선의 상태다. 보통 질문은 없다(ADR-20261116 / run-steer) */
   steer?: SteerInfo | null;
+  /** 답장으로 보낸 내 메시지면 집은 것의 상자다(스펙 chat-reference REQ6). 옛 서버 응답에는 없다 */
+  reply?: ReplyView | null;
 };

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { escapeOnlyClosedTooltip } from "@/components/ui/tooltip-button";
 import { readEventStream } from "@/lib/stream";
-import { openConversationEvents } from "@/lib/chat-api";
+import { fetchLiveImages, openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
+import { parseLiveImages } from "./artifact/live-images";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -18,6 +19,7 @@ type Context = Pick<
   | "pending"
   | "setApprovalRefresh"
   | "setLiveDelegations"
+  | "setLiveImages"
   | "panelTarget"
   | "setPanelTarget"
   | "sending"
@@ -36,6 +38,7 @@ export function useConversationEffects({
   pending,
   setApprovalRefresh,
   setLiveDelegations,
+  setLiveImages,
   panelTarget,
   setPanelTarget,
   sending,
@@ -48,6 +51,25 @@ export function useConversationEffects({
   applyConversationEvent,
   stop,
 }: Context) {
+  const liveImageRequest = useRef(0);
+
+  /**
+   * 아직 답에 묶이지 않은 그림 목록을 저장한 순서대로 다시 읽는다. 늦게 온 앞 요청의 응답은 버린다.
+   * 읽지 못하면 그대로 두고, 다음 사건이나 끝난 뒤의 이력이 맞춘다.
+   */
+  async function reloadLiveImages(id: string) {
+    const request = ++liveImageRequest.current;
+    try {
+      const response = await fetchLiveImages(id);
+      if (!response.ok) return;
+      const paths = parseLiveImages(await response.json());
+      if (paths !== null && request === liveImageRequest.current)
+        setLiveImages(paths);
+    } catch {
+      // 위와 같다.
+    }
+  }
+
   /**
    * 대화가 열려 있는 동안 대화 단위 SSE 를 받는다. 위임 결과로 열린 자동 turn 이 여기로 온다.
    *
@@ -67,6 +89,8 @@ export function useConversationEffects({
       try {
         const response = await openConversationEvents(id, controller.signal);
         if (response.ok) {
+          // 연결하기 전과 다시 붙는 동안 저장된 그림은 사건을 못 받았을 수 있어 연결 뒤에 맞춘다.
+          void reloadLiveImages(id);
           // 최초 연결 직전과 다시 붙는 동안 바뀐 대기 줄은 사건을 못 받을 수 있어 연결 뒤에 맞춘다.
           void pending.reload();
           if (reconnected) {
@@ -83,6 +107,12 @@ export function useConversationEffects({
             // steer 말풍선도 보류하지 않는다. 이 창이 보낸 turn 이 도는 중에 끼운 글이라 그 답 위에 바로 보여야 한다.
             if (event.type === "steer") {
               setTurns((previous) => applySteerEvent(previous, event));
+              return;
+            }
+            // 만든 그림도 보류하지 않는다. 보낸 turn 이 도는 중에 저장되고, 답이 끝나기 전에 보여야 한다.
+            // 사건은 순서가 뒤바뀔 수 있어 저장한 순서의 목록을 다시 읽는다.
+            if (event.type === "image") {
+              void reloadLiveImages(id);
               return;
             }
             // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.
@@ -117,6 +147,11 @@ export function useConversationEffects({
       window.clearTimeout(timer);
     };
   }, [conversationId]);
+
+  // turn 이 시작하거나 끝나면 묶이지 않은 그림을 다시 읽는다. 끝난 답에 묶인 그림은 목록에서 빠진다.
+  useEffect(() => {
+    if (conversationId !== null) void reloadLiveImages(conversationId);
+  }, [conversationId, sending]);
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {

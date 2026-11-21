@@ -104,6 +104,7 @@ class FoundLinkEndpointTest {
         assertThat(found.statusCode()).isEqualTo(200);
         assertThat(found.body()).isEqualTo(png);
         assertThat(found.headers().firstValue("x-image-source-link")).contains("https://shop.example.com/goods/1");
+        assertThat(found.headers().firstValue("x-image-source-found")).as("비서가 찾은 주소로 받았다").contains("1");
         web.reset();
         for (String link : List.of("https://shop.example.com/goods/2", "https://shop.example.com/goods/1?x=secret", "https://img.example.com/p.png")) {
             HttpResponse<byte[]> response = source(root, "link:" + link);

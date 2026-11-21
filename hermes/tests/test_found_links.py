@@ -198,6 +198,14 @@ class ReportTest(FoundLinksFixture):
         os.environ["FOS_CTX_POLICY_URL"] = "http://127.0.0.1:1/internal/hermes/connector-policy"
         self.assertIsNone(self.result("web_search", SEARCH))
 
+    def test_failures_are_logged_as_warnings(self):
+        """알리지 못하면 기본 로그 수준에서 보이게 경고로 남긴다. 주소는 로그에 없다."""
+        self.status = 500
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.result("web_search", SEARCH)
+        self.assertIn("찾은 주소를 알리지 못했다: HTTP 500", "\n".join(logs.output))
+        self.assertNotIn("http", "\n".join(logs.output).replace("HTTP", ""))
+
     def test_does_not_report_without_call_context_or_links(self):
         """`tool_call_id` 나 session 이 없는 호출(코드 실행 안의 호출), 뽑을 주소가 없는 결과, 토큰이 없는 profile 은 알리지 않는다."""
         self.assertIsNone(self.result("web_search", SEARCH, call=""))

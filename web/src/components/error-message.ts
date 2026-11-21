@@ -32,6 +32,9 @@ const MESSAGES: Record<string, string> = {
     "대화를 찾지 못했어요. 대화 목록으로 돌아가 다시 골라 주세요.",
   MESSAGE_NOT_LATEST: "그사이 대화가 바뀌었어요. 최신 대화를 다시 불러왔어요.",
   CONVERSATION_BUSY: "아직 답을 만들고 있어요. 답이 끝난 뒤 다시 눌러 주세요.",
+  // 답장으로 집은 메시지나 그림을 쓸 수 없다(스펙 chat-reference REQ9, REQ14).
+  MESSAGE_NOT_FOUND: "원래 메시지를 찾을 수 없어요. 다시 집어 주세요.",
+  REPLY_SOURCE_UNAVAILABLE: "원래 메시지를 찾을 수 없어요. 다시 집어 주세요.",
   USER_BUSY:
     "진행 중인 작업이 많아요. 진행 중인 작업이 끝난 뒤 다시 보내 주세요.",
   PENDING_QUEUE_FULL:

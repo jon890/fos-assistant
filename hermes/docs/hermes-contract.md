@@ -2685,6 +2685,10 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | OpenAI 내장 검색 | `search_backend` 가 `openai-native` 이고 요청이 ChatGPT 구독 경로(Codex backend)로 갈 때, 모델에 주는 `web_search` 함수를 OpenAI 서버가 실행하는 내장 검색 도구로 바꿔 보낸다. 검색만 맡고 본문 읽기는 다른 서비스가 맡는다 | `agent/transports/codex.py`, `plugins/web/openai_native/provider.py` |
 | 내장 검색의 사건 | 서버에서 돈 검색은 응답의 `web_search_call` 항목으로 오고 Hermes 는 이것을 도구 호출로 다루지 않는다. `tool.started` 와 `tool.completed` 가 오지 않아 Control Plane 의 실행 사건에 검색이 남지 않는다. 답의 출처 주석도 읽지 않아 출처는 모델이 답 글에 쓴 링크로만 남는다 | `agent/codex_responses_adapter.py` |
 | 내장 검색과 다른 경로 | 내장 검색을 고른 채 ChatGPT 구독 경로가 아닌 모델로 돌면 `web_search` 가 오류를 돌려준다. 다른 서비스로 넘어가지 않는다 | `plugins/web/openai_native/provider.py` |
+| key 가 있는 서비스의 순서 | 고른 값이 없으면 `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, `EXA_API_KEY`, `PARALLEL_API_KEY`, `KEENABLE_API_KEY`, `FIRECRAWL_API_KEY` 순으로 key 가 있는 첫 서비스를 쓰고, 없으면 key 없는 무료 서비스 묶음을 돌아가며 쓴다 | `tools/web_tools.py` 의 `_autodetect_backend`, `_keyless_backend` (2026-11-21 확인) |
+| key 를 읽는 곳 | profile 마다 실행 범위가 따로라 Hermes 프로세스의 환경 변수는 보이지 않는다. 그 profile 의 `.env` 나, 모든 profile 에 덮어 적용되는 관리용(managed scope) `.env` 에 있어야 한다 | `agent/secret_scope.py` 의 `get_secret`, `build_profile_secret_scope` (2026-11-21 확인) |
+| key 가 있는 호출이 실패했을 때 | `web.keyless_rescue`(기본 켜짐)이면 그 호출 하나만 key 없는 무료 서비스로 다시 해 본다. 다음 호출은 다시 key 가 있는 서비스로 간다. 실패한 응답은 캐시하지 않는다 | `tools/web_tools_rescue.py`, `tools/web_tools.py` 의 `_memoized_search` (2026-11-21 확인) |
+| 본문 읽기 제한 시간 | `web.extract_timeout` 초(기본 120)가 지나면 그 호출에 담긴 주소 모두를 시간 초과 실패로 돌려준다. 한 호출 안의 주소는 같은 제한 시간을 나눠 쓴다. 제한은 첫 서비스에만 걸린다. key 가 있는 서비스가 시간 초과되면 무료 등급으로 다시 해 보는 쪽에는 제한이 없다. key 가 없으면 첫 서비스가 무료 등급이고 다시 해 보지 않아 호출 전체가 제한 안에 든다 | `tools/web_tools_extract.py` 의 `_extract_timeout_seconds` (2026-11-21 확인) |
 | 날짜 | 시스템 프롬프트에 대화를 시작한 날짜와, 문맥을 마지막으로 다시 만든 때의 오늘 날짜가 든다. turn 마다 갱신되지 않는다. 그래서 Control Plane 이 대화 turn 마다 날짜 줄을 따로 넣는다 | `agent/system_prompt.py` |
 
 #### 웹 도구의 결과
