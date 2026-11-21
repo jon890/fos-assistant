@@ -17,6 +17,7 @@ MAX_HTML_CHARS = 2_000_000
 MAX_IMAGE_AREA = 10_000_000_000
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 _SRCSET_URL = re.compile(r"[\s,]*([^\s,]\S*)")
+_DENSITY = re.compile(r"[0-9]{0,5}(?:\.[0-9]{1,5})?x")
 _LAYOUT_TAGS = frozenset({"header", "nav", "footer", "aside"})
 SCHEMA = {
     "name": TOOL,
@@ -35,18 +36,29 @@ def _size(text):
 
 
 def _srcset(value):
-    """주소 안의 쉼표는 보존한다. 크기 표기 뒤의 쉼표에서 다음 후보로 넘어간다."""
+    """주소 안의 쉼표는 보존하고, 표기 뒤의 쉼표에서 다음 후보로 넘어간다."""
     offset = 0
     while match := _SRCSET_URL.match(value, offset):
         url, offset = match.group(1), match.end()
         if url.endswith(","):
+            yield url.rstrip(","), ""
             continue
         end = value.find(",", offset)
         end = len(value) if end < 0 else end
-        descriptor = value[offset:end].strip()
-        if descriptor.endswith("w") and (width := _size(descriptor[:-1])):
-            yield url, width
+        yield url, value[offset:end].strip()
         offset = end
+
+
+def _srcset_size(descriptor, width, height):
+    area = width * height or max(width, height)**2
+    if not descriptor:
+        return area
+    if descriptor.endswith("w") and (candidate_width := _size(descriptor[:-1])):
+        pixels = candidate_width**2
+        return pixels * height // width if width and height else pixels
+    if descriptor != "x" and _DENSITY.fullmatch(descriptor):
+        return int(area * float(descriptor[:-1])**2)
+    return None
 
 
 def _nodes(value):
@@ -123,9 +135,10 @@ class _Photos(HTMLParser):
     def _body_image(self, tag, fields):
         width, height = _size(fields.get("width")), _size(fields.get("height"))
         for key in ("data-srcset", "srcset"):
-            for url, candidate_width in _srcset(fields.get(key) or ""):
-                self.add("body", url, candidate_width * candidate_width * height // width
-                         if width and height else candidate_width**2)
+            for url, descriptor in _srcset(fields.get(key) or ""):
+                area = _srcset_size(descriptor, width, height)
+                if area is not None:
+                    self.add("body", url, area)
         if tag == "img":
             for key in ("data-src", "src"):
                 self.add("body", fields.get(key), width * height or max(width, height)**2)

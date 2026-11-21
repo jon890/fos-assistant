@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 
 from .context import _read_token, build_context, logger
-from .product_page import MAX_IMAGES, TOOL as PRODUCT_PAGE_TOOL
+from .product_page import TOOL as PRODUCT_PAGE_TOOL
 from .tool_guard import guard_url
 
 SEARCH_TOOL = "web_search"
@@ -40,7 +40,6 @@ SEARCH_FIELDS = ("url", "title", "description")
 _ABSOLUTE = re.compile(r"https?://[^\s<>\"'\\]+", re.IGNORECASE)
 # 마크다운 링크와 사진의 대상이다. `<` `>` 로 감싼 대상은 벗긴다.
 _MARKDOWN_TARGET = re.compile(r"\]\(\s*<?([^)\s>]+)")
-_MARKDOWN_IMAGE = re.compile(r"!\[[^\]\n]*\]\(\s*<?([^)\s>]+)")
 _ATTRIBUTE = re.compile(r"(?:src|href)\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", re.IGNORECASE)
 _TRAILING = ".,;:!?*"
 # 주소에 쓸 수 있는 ASCII 문자(RFC 3986 의 unreserved, reserved 와 `%`)다. Control Plane 의 `LinkTarget.URL_CHARACTERS` 와 같다.
@@ -135,13 +134,7 @@ def _extract_pages(parsed) -> list:
             # 기준 주소가 상한을 넘으면 Control Plane 이 본문 전체를 거절한다. 그 항목만 건너뛴다.
             continue
         # 항목의 `url` 은 비서가 적어 넣은 주소라 후보가 아니다. 상대 주소를 푸는 기준으로만 보낸다.
-        page = {"base": url, "links": absolute_links(content) + relative_links(content)}
-        images = list(dict.fromkeys(_MARKDOWN_IMAGE.findall(content)))
-        images = [image for image in images if 0 < len(image) <= MAX_LINK_CHARS
-                  and not image.lower().startswith(_SKIPPED_PREFIXES)]
-        if images:
-            page["images"] = [{"url": image, "kind": "body", "size": 0} for image in images[:MAX_IMAGES]]
-        found.append(page)
+        found.append({"base": url, "links": absolute_links(content) + relative_links(content)})
     return found
 
 
@@ -189,10 +182,7 @@ def pages(tool_name, result, args=None) -> list:
             links.append(link)
             total += 1
         if links:
-            entry = {"base": page["base"], "links": links}
-            if "images" in page:
-                entry["images"] = [image for image in page["images"] if image["url"] in seen]
-            kept.append(entry)
+            kept.append({"base": page["base"], "links": links})
     return kept
 
 

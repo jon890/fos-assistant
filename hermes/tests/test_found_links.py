@@ -104,7 +104,7 @@ class PagesTest(FoundLinksFixture):
             "//cdn.example.com/c.webp",
             "detail?x=1&amp;y=2",
         ])
-        self.assertEqual(found[0]["images"], [{"kind": "body", "url": "/img/front.jpg", "size": 0}])
+        self.assertNotIn("images", found[0], "일반 페이지 읽기는 상품 사진 선택을 설정하지 않는다")
 
     def test_page_url_alone_is_not_a_candidate(self):
         """본문에 주소가 없으면 읽은 페이지의 주소만으로는 아무것도 알리지 않는다."""
@@ -223,6 +223,14 @@ class ReportTest(FoundLinksFixture):
         ])
         self.assertEqual(page["images"][3],
                          {"kind": "body", "url": "https://cdn.example.com/boots/large.jpg", "size": 1_080_000})
+        self.assertEqual({image["url"]: image["size"] for image in page["images"] if image["kind"] == "body"}, {
+            "https://cdn.example.com/boots/large.jpg": 1_080_000,
+            "/boots/retina.jpg": 240_000,
+            "/boots/preview.jpg": 120_000,
+            "/boots/responsive.jpg": 60_000,
+            "/boots/medium.jpg": 60_000,
+            "/boots/small.jpg": 9_600,
+        })
 
     def test_product_reader_does_not_report_failed_page(self):
         """읽기 서비스가 상품 페이지를 읽지 못하면 후보를 남기지 않는다."""
