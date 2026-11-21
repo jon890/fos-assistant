@@ -546,7 +546,7 @@ PR3 의 `POST /internal/hermes/image-source` 에 오류 코드를 더한다. 200
 ### 사건
 
 - `GeneratedImageService.save` 가 새 그림 행을 만들면 `GeneratedImageStored(대화 번호, 경로)` 를 Spring 사건으로 낸다. 되풀이 요청이 처음 저장한 결과를 돌려줄 때는 내지 않는다
-- `chat.turn` 의 `GeneratedImageLineNotifier` 가 받아 그 대화의 공개 식별자를 찾고 대화 단위 SSE(`ConversationEventHub`)로 `image` 사건을 보낸다. 사건은 `conversationId` 와, `detail` 칸에 결과물 폴더 안의 경로(`generated/<제목>.<확장자>`) 하나만 넣는다. 제목은 경로에서 화면이 뗀다
+- `chat.nextturn` 의 `GeneratedImageLineNotifier` 가 받아 그 대화의 공개 식별자를 찾고 대화 단위 SSE(`ConversationEventHub`)로 `image` 사건을 보낸다. 사건은 `conversationId` 와, `detail` 칸에 결과물 폴더 안의 경로(`generated/<제목>.<확장자>`) 하나만 넣는다. 제목은 경로에서 화면이 뗀다
 - 보내다 실패해도 올리기는 성공한다. 화면은 답이 끝나 이력을 다시 읽을 때 그림을 본다
 - 사건을 turn 의 스트림에는 넣지 않는다. 그림은 올리기 요청의 스레드에서 저장되고, 위임 자식처럼 turn 밖에서도 온다. turn 스트림에 넣으려면 도는 turn 의 연결을 찾는 등록부가 새로 필요하다. 화면은 대화를 연 동안 대화 단위 SSE 를 늘 받으므로 보낸 turn 과 자동 turn 이 같은 길로 받는다(`delegation`, `steer` 와 같다)
 

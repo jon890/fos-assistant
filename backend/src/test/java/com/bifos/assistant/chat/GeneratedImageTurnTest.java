@@ -22,6 +22,8 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.turn.application.ConversationEventHub;
+import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -35,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -93,6 +96,9 @@ class GeneratedImageTurnTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ConversationEventHub hub;
+
     private final List<Long> folders = new ArrayList<>();
     private AppUser owner;
     private Conversation conversation;
@@ -135,6 +141,28 @@ class GeneratedImageTurnTest {
         Map<Long, GeneratedImageDetail> details = details(answer);
         assertThat(details.get(bound.getFirst().id()).prompt()).isEqualTo(PROMPT);
         assertThat(details.get(bound.getFirst().id()).vaultItemId()).as("아직 보관본이 없다").isNull();
+    }
+
+
+    @Test
+    @DisplayName("새로 저장한 그림은 답이 끝나기 전에 대화 단위 SSE 로 경로를 알리고 되풀이한 올리기는 다시 알리지 않는다")
+    void publishesImageEventWhenStored() {
+        List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
+        try {
+            save("call_1", "수채화 고양이", png(1));
+            save("call_1", "수채화 고양이", png(1));
+            save("call_2", "수채화 고양이", png(2));
+        } finally {
+            unsubscribe.run();
+        }
+
+        assertThat(received).extracting(ChatEvent::type).containsExactly("image", "image");
+        assertThat(received).extracting(ChatEvent::detail)
+            .containsExactly("generated/수채화 고양이.png", "generated/수채화 고양이 2.png");
+        assertThat(received).extracting(ChatEvent::conversationId).containsOnly(conversation.publicId());
+        assertThat(rows.findAll().stream().filter(row -> conversation.id().equals(row.conversationId())))
+            .allSatisfy(row -> assertThat(row.messageId()).isNull());
     }
 
 

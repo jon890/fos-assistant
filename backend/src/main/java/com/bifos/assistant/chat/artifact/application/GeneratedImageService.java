@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageMention;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSource;
+import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageStored;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.GeneratedImageTitle;
@@ -28,13 +29,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
  * 비서가 만든 그림 하나를 대화의 결과물 폴더에 쓰고 결과물 행으로 남긴다(ADR-20261119 / generated-image).
  *
  * <p>누구의 어느 대화인지는 부르는 쪽({@code mcp})이 origin 실행에서 정해 넘긴다. 이 서비스는 요청 본문에서 그것을 읽지 않는다.
- * 답에 묶는 일은 turn 이 끝날 때 {@link ArtifactService#recordTurn} 이 한다.
+ * 답에 묶는 일은 turn 이 끝날 때 {@link ArtifactService#recordTurn} 이 한다. 새로 저장하면 {@link GeneratedImageStored} 를 내 화면이
+ * 답이 끝나기 전에 그림을 그리게 한다.
  *
  * <p>이름 정하기부터 행 만들기까지 대화마다 한 번에 하나만 돈다. 겹침을 그 대화의 그림 행으로 보므로, 둘이 함께 돌면 같은 이름을 고른다.
  * Control Plane 을 한 대만 띄운다는 전제다.
@@ -50,16 +53,23 @@ public class GeneratedImageService {
     private final ChatArtifactRepository artifacts;
     private final TextCipher cipher;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final long maxBytes;
     private final ReentrantLock[] locks = new ReentrantLock[LOCK_COUNT];
 
 
     public GeneratedImageService(
-        ArtifactStore store, ChatArtifactRepository artifacts, TextCipher cipher, Clock clock, ArtifactProperties properties) {
+        ArtifactStore store,
+        ChatArtifactRepository artifacts,
+        TextCipher cipher,
+        Clock clock,
+        ArtifactProperties properties,
+        ApplicationEventPublisher events) {
         this.store = store;
         this.artifacts = artifacts;
         this.cipher = cipher;
         this.clock = clock;
+        this.events = events;
         this.maxBytes = properties.generatedImageMaxBytes();
         for (int index = 0; index < LOCK_COUNT; index++) {
             locks[index] = new ReentrantLock();
@@ -89,6 +99,8 @@ public class GeneratedImageService {
     public GeneratedImageSaved save(
         Long conversationId, Long ownerUserId, String callKey, String title, String prompt, List<String> sourceLinks, byte[] image) {
         String extension = extensionOf(image);
+        String path;
+        String name;
         ReentrantLock lock = locks[Math.floorMod(conversationId.hashCode(), LOCK_COUNT)];
         lock.lock();
         try {
@@ -96,8 +108,8 @@ public class GeneratedImageService {
             if (existing.isPresent()) {
                 return new GeneratedImageSaved(GeneratedImageTitle.ofPath(existing.get().path()));
             }
-            String name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()), extension);
-            String path = FOLDER + name + "." + extension;
+            name = uniqueName(conversationId, GeneratedImageTitle.clean(title, clock.instant()), extension);
+            path = FOLDER + name + "." + extension;
             long byteSize = store.write(conversationId, path, image);
             try {
                 SealedText sealed = seal(ownerUserId, aad(ownerUserId, callKey), prompt == null ? "" : prompt);
@@ -110,10 +122,12 @@ public class GeneratedImageService {
                 removeQuietly(conversationId, path);
                 throw ex;
             }
-            return new GeneratedImageSaved(name);
         } finally {
             lock.unlock();
         }
+        // 잠금을 푼 뒤 알린다. 받는 쪽이 SSE 로 보내는 동안 같은 대화의 다음 그림 저장을 막지 않는다.
+        events.publishEvent(new GeneratedImageStored(conversationId, path));
+        return new GeneratedImageSaved(name);
     }
 
 
