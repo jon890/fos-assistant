@@ -78,9 +78,11 @@ GONE_GENERATED = alternative("지웠거나 보관 기간이 지나 쓸 수 없�
                              "앞 그림을 참고하지 못했다고 답에 적는다. 그런 장면이 아니면 사용자에게 바로 알린다")
 # 링크 사진을 받지 못했을 때 다른 사진으로 다시 시도하게 한다(fos-assistant 스펙 agent-found-image REQ6, DECISION13, DECISION23).
 # 몇 장째인지는 세지 않는다. 호출마다 따로 도는 hook 이 그림 한 장의 시도를 묶을 길이 없어, 그림 규칙의 상한을 모델이 지킨다.
-LINK_RETRY = ("검색·읽기 결과에 나온 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 image_generate 를 다시 부른다. "
-              "그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 검색해 찾은 사진으로 시도하고 "
-              "보낸 링크 대신 찾은 사진을 썼다고 답에 적는다. 쓸 사진이 더 없으면 " + NO_DRAW + "사진을 찾지 못한 것과 " + ASK_PHOTO)
+# 실존 인물의 얼굴, 로고, 캐릭터 자체는 찾지 않는다(스펙 agent-found-image REQ7). 사용자가 보낸 링크가 열리지 않아도 같다.
+LINK_RETRY = ("상품, 사물, 장소처럼 찾을 수 있는 대상이면 검색·읽기 결과에 나온 다른 사진(다른 판매처의 같은 상품)으로 "
+              "link: 를 바꿔 image_generate 를 다시 부른다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 "
+              "검색해 찾은 사진으로 시도하고 보낸 링크 대신 찾은 사진을 썼다고 답에 적는다. 실존 인물의 얼굴, 로고, 캐릭터 자체를 "
+              "참고하려던 것이면 찾지 않는다. 그런 대상이거나 쓸 사진이 더 없으면 " + NO_DRAW + "사진을 찾지 못한 것과 " + ASK_PHOTO)
 LINK_REASONS = {
     "IMAGE_SOURCE_LINK_BLOCKED": alternative("열 수 없는 주소다", LINK_RETRY),
     "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", LINK_RETRY),

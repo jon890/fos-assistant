@@ -211,7 +211,7 @@ class LinkTest(ImageSourceFixture):
         self.assertEqual(decision["action"], "block")
         for line in ("link:a.example.com/1: 열 수 없는 주소다",
                      "link:a.example.com/2: 이 링크에서 쓸 수 있는 사진을 찾지 못했다. 같은 인물의 다음 장면을",
-                     "  다음 방법: 검색·읽기 결과에 나온 다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 image_generate 를 다시 부른다",
+                     "  다음 방법: 상품, 사물, 장소처럼 찾을 수 있는 대상이면 검색·읽기 결과에 나온 다른 사진",
                      "link:a.example.com/3: 사진이 너무 크다",
                      "link:a.example.com/4: 링크를 열지 못했다",
                      "link:a.example.com/5: 이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"):
@@ -228,6 +228,7 @@ class LinkTest(ImageSourceFixture):
             for part in ("다른 사진(다른 판매처의 같은 상품)으로 link: 를 바꿔 image_generate 를 다시 부른다",
                          "그림 한 장에 다른 사진 3장까지다",
                          "보낸 링크 대신 찾은 사진을 썼다고 답에 적는다",
+                         "실존 인물의 얼굴, 로고, 캐릭터 자체를 참고하려던 것이면 찾지 않는다",
                          "설명만으로 비슷하게 그려 넣지 말고"):
                 self.assertIn(part, message, code)
 

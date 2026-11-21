@@ -7,11 +7,14 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
@@ -104,6 +107,12 @@ class GeneratedImageEndpointTest {
     ArtifactStore store;
 
     @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -182,7 +191,18 @@ class GeneratedImageEndpointTest {
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
         ChatArtifact row = rows.findAll().stream().filter(it -> it.conversationId().equals(conversation.id())).findFirst().orElseThrow();
         assertThat(row.generationFoundLinkFlags()).isEqualTo("01");
-        assertThat(images.details(owner.id(), conversation.id(), List.of(List.of(row))).get(row.id()).foundSourceLinks())
+
+        ChatMessage answer = messages.save(ChatMessage.fromAssistant(conversation.id(), "그렸어요", null, NOW));
+        artifactService.recordTurn(conversation.id(), answer.id(), NOW);
+        HttpResponse<String> listed = get("/api/v1/chat/conversations/" + conversation.publicId() + "/messages", owner);
+        assertThat(listed.statusCode()).as("응답: %s", listed.body()).isEqualTo(200);
+        var image = json.readTree(listed.body()).findParents("foundSourceLinks").stream()
+            .filter(node -> "IMAGE".equals(node.path("kind").asString()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(image.path("sourceLinks").values()).extracting(node -> node.asString()).containsExactlyElementsOf(LINKS);
+        assertThat(image.path("foundSourceLinks").values()).as("메시지 응답에는 찾은 주소만 든다")
+            .extracting(node -> node.asString())
             .containsExactly(LINKS.get(1));
     }
 
