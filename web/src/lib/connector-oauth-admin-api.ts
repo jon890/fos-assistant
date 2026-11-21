@@ -90,23 +90,28 @@ export function regenerateOAuthSigning(): Promise<Response> {
   });
 }
 
-/** 서명 비밀을 새로 만들기 전 확인 창의 설명이다. 옛 표식이 바로 거절된다는 것을 알린다. */
-export function signingConfirmText(connectionCount: number): string {
+/**
+ * 서명 비밀을 새로 만들기 전 확인 창의 설명이다. 옛 표식이 바로 거절된다는 것을 알린다.
+ * 단추 연결이 없으면 다시 쓸 주소가 없어 null 이고, 화면은 확인 창 없이 만든다.
+ */
+export function signingConfirmText(connectionCount: number): string | null {
+  if (connectionCount === 0) return null;
   return `단추 연결 ${connectionCount}개의 토큰 통로 주소를 다시 써요. 지금 실행 중인 플러그인은 다음 실행 때까지 토큰을 받지 못하고, 진행 중인 단추 연결은 다시 시도해야 해요.`;
 }
 
-/** 새로 만들기 결과를 관리자에게 보일 문장들이다. */
-export function rewriteSummary(rewrite: {
-  total: number;
-  failed: number;
-}): string[] {
-  if (rewrite.total === 0) return ["새 서명 비밀을 만들었어요."];
-  const lines = [
-    `단추 연결 ${rewrite.total - rewrite.failed}개의 통로 주소를 다시 썼어요.`,
-  ];
+/** 새로 만들기 결과를 관리자에게 보일 문장들이다. 다시 쓰지 못한 연결이 있으면 `warn` 이 참이다. */
+export function rewriteSummary(rewrite: { total: number; failed: number }): {
+  lines: string[];
+  warn: boolean;
+} {
+  if (rewrite.total === 0)
+    return { lines: ["새 서명 비밀을 만들었어요."], warn: false };
+  const done = rewrite.total - rewrite.failed;
+  const lines =
+    done > 0 ? [`단추 연결 ${done}개의 통로 주소를 다시 썼어요.`] : [];
   if (rewrite.failed > 0)
     lines.push(
       `${rewrite.failed}개는 다시 쓰지 못했어요. 새로 만들기를 다시 누르거나 그 연결을 다시 연결해 주세요.`,
     );
-  return lines;
+  return { lines, warn: rewrite.failed > 0 };
 }

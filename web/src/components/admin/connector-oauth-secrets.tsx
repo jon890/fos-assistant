@@ -120,7 +120,10 @@ export function ConnectorOAuthSecrets() {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<string[] | null>(null);
+  const [result, setResult] = useState<{
+    lines: string[];
+    warn: boolean;
+  } | null>(null);
 
   function apply(next: Loaded) {
     if (next.apps) setApps(next.apps);
@@ -155,7 +158,7 @@ export function ConnectorOAuthSecrets() {
   const save = (connectorId: string, input: OAuthAppInput) =>
     run(
       () => saveOAuthApp(connectorId, input),
-      async () => setResult(["앱 설정을 저장했어요."]),
+      async () => setResult({ lines: ["앱 설정을 저장했어요."], warn: false }),
     );
 
   const regenerate = () =>
@@ -194,7 +197,12 @@ export function ConnectorOAuthSecrets() {
         <SigningRow
           signing={signing}
           busy={busy}
-          onRegenerate={() => setConfirming(true)}
+          onRegenerate={() =>
+            // 다시 쓸 단추 연결이 없으면 영향이 없어 확인 창 없이 만든다.
+            signingConfirmText(signing.connectionCount) === null
+              ? void regenerate()
+              : setConfirming(true)
+          }
         />
       ) : null}
       {loadFailed ? (
@@ -203,8 +211,8 @@ export function ConnectorOAuthSecrets() {
         </Notice>
       ) : null}
       {result ? (
-        <Notice variant="info" role="status">
-          {result.map((line) => (
+        <Notice variant={result.warn ? "warning" : "info"} role="status">
+          {result.lines.map((line) => (
             <p key={line}>{line}</p>
           ))}
         </Notice>
@@ -217,7 +225,7 @@ export function ConnectorOAuthSecrets() {
       {confirming && signing ? (
         <SecretConfirmDialog
           title="단추 연결 서명 비밀을 새로 만들까요?"
-          description={signingConfirmText(signing.connectionCount)}
+          description={signingConfirmText(signing.connectionCount) ?? ""}
           confirmLabel="새로 만들기"
           busyLabel="만드는 중…"
           destructive={false}

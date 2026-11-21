@@ -233,7 +233,6 @@ export function AdminSecretList() {
             }
             onDelete={() => changeVapid(deleteVapid)}
           />
-          <ConnectorOAuthSecrets />
         </div>
       )}
       {result ? (
@@ -247,6 +246,12 @@ export function AdminSecretList() {
         <Notice variant="error" role="alert" className="mt-3">
           {error}
         </Notice>
+      ) : null}
+      {overview ? (
+        // 위 줄들의 결과와 오류 안내가 그 줄 바로 아래 남도록 단추 연결 구역은 안내 뒤에 둔다.
+        <div className="mt-3">
+          <ConnectorOAuthSecrets />
+        </div>
       ) : null}
       {confirming === "regenerate" && gateway ? (
         <SecretConfirmDialog

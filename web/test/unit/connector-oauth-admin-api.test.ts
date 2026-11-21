@@ -16,13 +16,21 @@ test("OAuth 앱 줄의 제목은 플러그인마다인 앱에만 플러그인 �
   assert.equal(needsAppSlug("google"), false);
 });
 
-test("서명 비밀 새로 만들기는 다시 쓸 연결 수와 결과를 알린다", () => {
-  assert.match(signingConfirmText(3), /^단추 연결 3개의 토큰 통로 주소를 다시 써요/);
-  assert.deepEqual(rewriteSummary({ total: 0, failed: 0 }), ["새 서명 비밀을 만들었어요."]);
-  assert.deepEqual(rewriteSummary({ total: 3, failed: 1 }), [
-    "단추 연결 2개의 통로 주소를 다시 썼어요.",
-    "1개는 다시 쓰지 못했어요. 새로 만들기를 다시 누르거나 그 연결을 다시 연결해 주세요.",
-  ]);
+test("서명 비밀 새로 만들기는 다시 쓸 연결 수와 결과를 알리고, 연결이 없으면 확인 창을 두지 않는다", () => {
+  assert.match(signingConfirmText(3) ?? "", /^단추 연결 3개의 토큰 통로 주소를 다시 써요/);
+  assert.equal(signingConfirmText(0), null);
+  assert.deepEqual(rewriteSummary({ total: 0, failed: 0 }), { lines: ["새 서명 비밀을 만들었어요."], warn: false });
+  assert.deepEqual(rewriteSummary({ total: 3, failed: 1 }), {
+    lines: [
+      "단추 연결 2개의 통로 주소를 다시 썼어요.",
+      "1개는 다시 쓰지 못했어요. 새로 만들기를 다시 누르거나 그 연결을 다시 연결해 주세요.",
+    ],
+    warn: true,
+  });
+  assert.deepEqual(rewriteSummary({ total: 2, failed: 2 }), {
+    lines: ["2개는 다시 쓰지 못했어요. 새로 만들기를 다시 누르거나 그 연결을 다시 연결해 주세요."],
+    warn: true,
+  });
 });
 
 test("앱 거절 알림은 서버 비밀값 화면으로, 다시 연결 알림은 외부 서비스 연결로 간다", () => {
