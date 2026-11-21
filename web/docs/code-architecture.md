@@ -38,7 +38,8 @@
 | `/tasks/new` | 예약 작업 만들기 |
 | `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
 | `/notifications` | 전의 알림 화면 주소. 「알림」 탭이 열린 `/now?tab=notifications` 로 넘긴다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」) |
-| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)) |
+| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)). 평가 전용 사용자는 두 카드의 합계에서 빠지고 사용량 카드에 「평가」 한 줄로 따로 보인다 |
+| `/admin/quality` | 품질. 첫 칸은 배포 뒤 확인 기록이다. 시각, 계기, 결과, 걸린 시간을 한 줄로, 펼치면 기능별 결과와 까닭을 보인다. 실패 기능은 남겨 둔 평가 대화의 실행 트리(`/admin/quality/executions/{id}`)로 잇는다. 「확인 시작」, 「다시 확인」. 평가 사용자가 없거나 덜 준비됐으면 「평가 사용자 준비」 칸을 보인다([`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md)) |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |
 | `/admin/agents/{code}` | 에이전트 하나의 관리. 일반 상세의 절에 「모델」, 「기억 영역」, 「관리」 절이 더해진다 |

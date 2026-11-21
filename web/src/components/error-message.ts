@@ -143,6 +143,10 @@ const ADMIN_MESSAGES: Record<string, string> = {
   HERMES_UNAVAILABLE:
     "Hermes 런타임에 연결하지 못했어요. 연결 상태를 확인해 주세요.",
   SECRET_STORE_UNAVAILABLE: "KEK 가 없어 저장할 수 없습니다",
+  EVALUATION_USER_MISSING:
+    "평가 사용자가 없어 확인을 시작하지 못했어요. 먼저 평가 사용자를 준비해 주세요.",
+  QUALITY_CHECK_NOT_FOUND:
+    "그 확인 기록을 찾지 못했어요. 화면을 새로 읽어 주세요.",
   VAPID_STATE_CHANGED:
     "그사이 VAPID 키가 바뀌었어요. 화면을 새로 읽었으니 다시 확인해 주세요.",
 };
