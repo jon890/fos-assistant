@@ -13,7 +13,11 @@ export type NotificationKind =
 
 /** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다. `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_QUALITY` 는 목록 화면이라 `targetId` 가 없다 */
 export type NotificationTargetType =
-  "CONVERSATION" | "TASK" | "ADMIN_CONNECTIONS" | "CONNECTIONS" | "ADMIN_QUALITY";
+  | "CONVERSATION"
+  | "TASK"
+  | "ADMIN_CONNECTIONS"
+  | "CONNECTIONS"
+  | "ADMIN_QUALITY";
 
 export type NotificationView = {
   id: string;
