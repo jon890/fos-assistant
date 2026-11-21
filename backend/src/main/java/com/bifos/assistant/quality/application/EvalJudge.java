@@ -35,10 +35,12 @@ final class EvalJudge {
     static final String CARD_STATUS = "CARD_STATUS";
 
     private static final String TOOL_PREFIX = "mcp__fos_assistant__";
-    private static final Pattern MARKDOWN_TARGET = Pattern.compile("\\]\\(\\s*([^)\\s]+)\\s*\\)");
+    /** JavaScript 의 {@code \\s} 와 같은 공백이다. Java 의 {@code \\s} 는 줄바꿈 없는 공백과 전각 공백을 잡지 않는다. */
+    private static final String SPACE = "\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
+    private static final Pattern MARKDOWN_TARGET = Pattern.compile("\\]\\([" + SPACE + "]*([^)" + SPACE + "]+)[" + SPACE + "]*\\)");
     /** 앞이 글자나 슬래시가 아닌 곳에서 시작하는 서비스 안 주소다. */
-    private static final Pattern BARE_PATH = Pattern.compile("(?<![\\w/.:-])(/[A-Za-z][^\\s)\\]」』\"'`<>,]*)");
-    private static final Pattern ABSOLUTE = Pattern.compile("^https?://[^/\\s]+(/\\S*)?$");
+    private static final Pattern BARE_PATH = Pattern.compile("(?<![\\w/.:-])(/[A-Za-z][^" + SPACE + ")\\]」』\"'`<>,]*)");
+    private static final Pattern ABSOLUTE = Pattern.compile("^https?://[^/" + SPACE + "]+(/[^" + SPACE + "]*)?$");
     private static final Pattern TASK_LINK = Pattern.compile("^/tasks/([0-9a-fA-F-]{36})$");
     private static final Pattern TRAILING_DOTS = Pattern.compile("[.。]+$");
 

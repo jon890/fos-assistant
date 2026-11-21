@@ -22,7 +22,7 @@ public record QualityProperties(
     @DefaultValue("1s") Duration pollInterval,
     @DefaultValue("30d") Duration linkRetention,
     @DefaultValue("0 15 5 * * *") String cleanupCron,
-    @DefaultValue("classpath:quality/bundles/") String bundleLocation,
+    @DefaultValue("classpath*:quality/bundles/") String bundleLocation,
     Duration evalTimeoutOverride) {
 
     /** 마감과 간격이 0 이하면 기동을 멈춘다. 0 이면 모든 기능이 바로 시간 초과로 끝나는데 기동은 성공해 알아채지 못한다. */

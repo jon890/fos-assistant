@@ -46,6 +46,13 @@ class EvalJudgeTest {
 
 
     @Test
+    @DisplayName("줄바꿈 없는 공백과 전각 공백은 옛 판정처럼 주소를 끊는다")
+    void unicodeSpacesEndBarePaths() {
+        assertThat(EvalJudge.answerLinks("주소는 /memory\u00A0입니다. 파일은 /files\u3000에 있어요")).containsExactly("/memory", "/files");
+    }
+
+
+    @Test
     @DisplayName("날짜나 분수 같은 슬래시는 링크로 읽지 않는다")
     void slashesInDatesAreNotLinks() {
         assertThat(EvalJudge.answerLinks("11/20 에 3/4 만큼 했다. and/or")).isEmpty();

@@ -86,6 +86,22 @@ class DeployCheckCleanerTest {
 
 
     @Test
+    @DisplayName("한 대화에서 만든 뒤 고친 기억도 지운다")
+    void forgetsMemoryCreatedThenUpdatedInTheSameConversation() {
+        Memory created = memoryService.create(EVALUATION, MemoryScope.USER, "강아지 이름", "초코", false);
+        int first = memories.findById(created.id()).orElseThrow().revision();
+        capture(created, CHECK_CONVERSATION, MemoryCaptureKind.CREATED, first);
+        memoryService.update(EVALUATION, created.id(), "강아지 이름은 콩이", false, null);
+        capture(created, CHECK_CONVERSATION, MemoryCaptureKind.UPDATED, first);
+
+        boolean all = cleaner.forgetCaptured(EVALUATION, CHECK_CONVERSATION);
+
+        assertThat(all).isTrue();
+        assertThat(memories.findById(created.id())).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("하루 정리는 보관 기간이 지난 실패한 평가 줄을 배포 뒤 확인으로 읽지 않는다")
     void sweepIgnoresEvalRows() {
         QualityRun eval = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, null, 1, EvalResult.started("MEDIUM", List.of("service-concepts")),
