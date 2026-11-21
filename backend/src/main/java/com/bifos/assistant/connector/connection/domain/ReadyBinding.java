@@ -1,5 +1,7 @@
 package com.bifos.assistant.connector.connection.domain;
 
+import java.time.Instant;
+
 /**
  * 정의 어긋남 점검이 설치 상태를 읽고 잠글 {@code READY} 바인딩이다(ADR-20261009 / connector-install-drift).
  *
@@ -11,6 +13,7 @@ package com.bifos.assistant.connector.connection.domain;
  * @param userId 바인딩의 연결 사용자 번호. 붙이기 규칙으로 에이전트 주인과 같다
  * @param profile 에이전트의 Hermes profile
  * @param connectorId 연결의 커넥터 id
+ * @param updatedAt 읽은 때의 바인딩 변경 시각. 설치 상태를 읽는 동안 다른 경로가 바인딩을 바꿨는지 잠근 뒤 대조한다
  */
-public record ReadyBinding(Long bindingId, Long agentId, Long userId, String profile, String connectorId) {
+public record ReadyBinding(Long bindingId, Long agentId, Long userId, String profile, String connectorId, Instant updatedAt) {
 }

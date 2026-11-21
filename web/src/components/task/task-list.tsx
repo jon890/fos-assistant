@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { describeFailure } from "@/components/error-message";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Notice } from "@/components/ui/notice";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { agentLabel } from "@/lib/format";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { fetchTasks } from "@/lib/task-api";
 import { describeSchedule, type TaskView } from "@/lib/task";
 
@@ -22,52 +23,54 @@ export function formatDateTime(value: string): string {
   });
 }
 
+/** 목록을 읽는다. 읽지 못하면 화면에 보일 문장을 돌려준다. */
+async function readTasks(): Promise<TaskView[] | string> {
+  try {
+    const response = await fetchTasks();
+    if (!response.ok) return await describeFailure(response);
+    return (await response.json()) as TaskView[];
+  } catch {
+    return "예약 작업을 읽지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+  }
+}
+
 /** 내 예약 작업 목록이다. 목록은 화면이 열린 뒤 브라우저가 읽는다. */
 export function TaskList() {
   const [tasks, setTasks] = useState<TaskView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetchTasks();
-        if (cancelled) return;
-        if (!response.ok) {
-          setError(await describeFailure(response));
-          return;
-        }
-        setTasks((await response.json()) as TaskView[]);
-      } catch {
-        if (!cancelled)
-          setError("예약 작업을 읽지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+  const load = useCallback(() => {
+    void readTasks().then((result) => {
+      if (typeof result === "string") setError(result);
+      else {
+        setTasks(result);
+        setError(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
+  useEffect(load, [load]);
+
+  /** 다시 읽는 동안 뼈대를 보여 눌린 것이 보이게 한다. */
+  function retry() {
+    setError(null);
+    setTasks(null);
+    load();
+  }
+
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">예약 작업</h1>
+    <PageFrame
+      {...PAGE_HEADS.tasks}
+      action={
         <Link href="/tasks/new" className={buttonVariants({ size: "sm" })}>
           새 작업
         </Link>
-      </div>
+      }
+    >
       {error ? (
-        <Notice variant="error" role="alert" className="mb-4">
-          {error}
-        </Notice>
-      ) : null}
-      {tasks === null ? (
-        error ? null : (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-16" />
-            <Skeleton className="h-16" />
-          </div>
-        )
+        <LoadFailure message={error} onRetry={retry} />
+      ) : tasks === null ? (
+        <ListSkeleton />
       ) : tasks.length === 0 ? (
         <EmptyState
           title="아직 예약 작업이 없어요."
@@ -106,6 +109,6 @@ export function TaskList() {
           ))}
         </ul>
       )}
-    </div>
+    </PageFrame>
   );
 }

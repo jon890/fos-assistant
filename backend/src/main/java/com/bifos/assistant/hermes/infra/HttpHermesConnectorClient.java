@@ -354,7 +354,10 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                     policyHook,
                     mode,
                     HttpHermesConnectorGuard.supportState(item.get("execution_guard")),
-                    toolGuard);
+                    toolGuard,
+                    item.has("skipped_skills")
+                        ? ConnectorSkippedSkillsDecoder.read(item.get("skipped_skills"), connectorId)
+                        : null);
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
