@@ -119,26 +119,24 @@ function PreviewBody({ item, name }: { item: VaultItem; name: string }) {
 /**
  * 「내 파일」 의 파일 하나를 미리 본다(스펙 workspace REQ14). 화면 폭과 상관없이 목록 위를 덮는 시트다.
  * 휴대폰은 전체 폭이고, 넓은 화면은 바깥을 눌러 닫을 수 있게 왼쪽에 목록이 조금 남는다(app-shell spec DECISION26).
+ * 포커스가 HTML 미리보기 iframe 안에 있으면 Esc 가 이 창까지 오지 않아 「닫기」 단추로 닫는다.
  *
  * <p>그림은 그대로, HTML 은 스크립트 없이, CSV·TSV 는 표로, MD·TXT·CSS 는 원문 그대로 보인다. 나머지는 내려받기만 된다.
  */
 export function MyFilePreview({
   item,
+  opener,
   onClose,
   onDelete,
 }: {
   item: VaultItem;
+  /** 시트를 연 단추다. 시트에 trigger 가 없어 Radix 가 포커스를 돌려줄 곳을 모르므로 닫은 뒤 여기로 돌려준다. 대화의 링크로 열었으면 null 이다. */
+  opener: HTMLElement | null;
   onClose(): void;
   onDelete(): void;
 }) {
   const name = displayName(item.path, item.title);
   const [open, setOpen] = useState(true);
-  // 시트를 연 줄의 단추다. 시트에 trigger 가 없어 Radix 가 포커스를 돌려줄 곳을 모른다.
-  const [opener] = useState(() =>
-    typeof document === "undefined"
-      ? null
-      : (document.activeElement as HTMLElement | null),
-  );
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       {/* 닫기 단추는 머리의 「닫기」 하나만 둔다. */}

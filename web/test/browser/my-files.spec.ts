@@ -279,4 +279,12 @@ test("넓은 화면에서도 미리보기는 목록을 덮는 창이고 Esc 와 
   await expect(sheet).toBeVisible();
   await page.mouse.click(8, 450);
   await expect(sheet).toHaveCount(0);
+
+  // Safari 는 눌러도 단추에 포커스를 주지 않는다. 포커스를 옮기지 않는 click 으로 열어도 닫은 뒤 그 단추로 돌아온다.
+  await page.locator("body").focus();
+  await open.dispatchEvent("click");
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("button", { name: "닫기" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(open).toBeFocused();
 });

@@ -46,7 +46,8 @@ export function MyFileRow({
   item: VaultItem;
   now: Date;
   selected: boolean;
-  onOpen(): void;
+  /** 누른 단추를 넘긴다. 시트를 닫은 뒤 그 단추로 포커스를 돌려준다. */
+  onOpen(opener: HTMLElement): void;
   onConversation(id: string, title: string): void;
   onDelete(): void;
 }) {
@@ -61,7 +62,7 @@ export function MyFileRow({
     >
       <button
         type="button"
-        onClick={onOpen}
+        onClick={(event) => onOpen(event.currentTarget)}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
         aria-label={`${name} 미리보기`}
       >
