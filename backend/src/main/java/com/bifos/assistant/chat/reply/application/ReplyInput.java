@@ -73,10 +73,10 @@ public class ReplyInput {
         }
         for (ChatArtifact image : pickedImages(message, reply)) {
             String name = "그림 「" + GeneratedImageTitle.ofPath(image.path()) + "」(generated:" + GeneratedImageTitle.ofPath(image.path()) + ")";
-            Optional<byte[]> bytes = generatedImages.readLive(image);
-            if (bytes.isPresent()) {
+            if (generatedImages.isLive(image)) {
                 labels.add("집은 그림 " + (extras.size() + 1));
-                extras.add(ExtraImage.ofBytes(bytes.get()));
+                // 원본은 줄일 차례가 올 때 한 장씩 읽는다
+                extras.add(ExtraImage.ofOriginal(() -> generatedImages.readLive(image)));
                 lines.add("- " + name + ": 입력 이미지 「" + labels.getLast() + "」");
             } else {
                 lines.add("- " + name + ": 보관 기간이 지났거나 지워져 쓸 수 없다");

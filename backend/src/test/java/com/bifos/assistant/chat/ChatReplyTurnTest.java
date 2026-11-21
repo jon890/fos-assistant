@@ -26,6 +26,7 @@ import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.ReplyRef;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.domain.type.SteerState;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
@@ -256,6 +257,26 @@ class ChatReplyTurnTest {
         assertCode(() -> send(new ReplyPick(notice.id(), null, null)), ErrorCode.MESSAGE_NOT_FOUND);
         assertCode(() -> send(new ReplyPick(answer.id(), null, "generated/없는 그림.png")), ErrorCode.MESSAGE_NOT_FOUND);
         assertThat(userMessages()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("다른 메시지에 묶인 사진 번호와 끼워 넣은 글은 404, 보관 기간이 지난 사진은 409 이고 저장하지 않는다")
+    void photoAndSteerTargets() throws IOException {
+        byte[] red = png(Color.RED);
+        ChatAttachment photo = attachments.upload(dad, conversationId, "신발.png", "image/png", red.length, resource(red));
+        chat.stream(dad, conversationId, "신발 사진이야", null, List.of(photo.id()), null, null, event -> {
+        });
+        ChatMessage mine = lastUser();
+        ChatMessage steer = messages.save(ChatMessage.fromSteer(
+            conversationId, dad.id(), "끼운 글", null, SteerState.DELIVERED, null, NOW));
+        int before = userMessages().size();
+
+        assertCode(() -> send(new ReplyPick(answer.id(), photo.id(), null)), ErrorCode.MESSAGE_NOT_FOUND);
+        assertCode(() -> send(new ReplyPick(steer.id(), null, null)), ErrorCode.MESSAGE_NOT_FOUND);
+        jdbc.update("update chat_attachment set expires_at = ? where id = ?", Timestamp.from(NOW.minusSeconds(60)), photo.id());
+        assertCode(() -> send(new ReplyPick(mine.id(), photo.id(), null)), ErrorCode.REPLY_SOURCE_UNAVAILABLE);
+        assertThat(userMessages()).hasSize(before);
     }
 
 

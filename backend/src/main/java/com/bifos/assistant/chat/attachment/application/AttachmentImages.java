@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -206,14 +207,17 @@ public class AttachmentImages {
     }
 
 
-    /** 원본을 사본 크기로 줄인다. 디코딩 차례를 얻지 못했거나 줄이지 못하면 null 이다. 파일로 남기지 않는다. */
-    private byte[] shrinkOriginal(byte[] original, long deadlineNanos) {
+    /**
+     * 원본을 사본 크기로 줄인다. 디코딩 차례를 얻은 뒤에 원본을 읽고, 줄인 뒤에는 원본을 놓는다. 차례를 얻지 못했거나 읽거나 줄이지
+     * 못하면 null 이다. 파일로 남기지 않는다.
+     */
+    private byte[] shrinkOriginal(Supplier<Optional<byte[]>> original, long deadlineNanos) {
         try {
             if (!decoding.tryAcquire(sendWaitNanos(deadlineNanos, System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 return null;
             }
             try {
-                return AgentImageResizer.toJpeg(original).orElse(null);
+                return original.get().flatMap(AgentImageResizer::toJpeg).orElse(null);
             } finally {
                 decoding.release();
             }
