@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.chat.conversation.application.FoundLinks;
+import com.bifos.assistant.chat.conversation.application.dto.FoundImage;
 import com.bifos.assistant.chat.conversation.application.dto.FoundPage;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
@@ -9,6 +10,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,8 @@ public class FoundLinkService {
     static final int MAX_TYPED = 50;
     /** 기준 주소와 적어 넣은 주소 하나의 길이 상한이다. */
     static final int MAX_LINK_CHARS = 2_048;
+    private static final int MAX_IMAGES = 24;
+    private static final long MAX_IMAGE_AREA = 10_000_000_000L;
 
     private final McpCallerResolver callers;
     private final FoundLinks links;
@@ -85,9 +89,51 @@ public class FoundLinkService {
                 }
                 values.add(link.asString());
             }
-            pages.add(new FoundPage(base == null || base.isNull() ? null : base.asString(), values));
+            pages.add(new FoundPage(
+                base == null || base.isNull() ? null : base.asString(),
+                values,
+                requested(page.get("requested")),
+                images(page.get("images"))));
         }
         return pages;
+    }
+
+
+    private static String requested(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isString() || node.asString().length() > MAX_LINK_CHARS) {
+            throw invalid("requested must be a URL within the limit");
+        }
+        return node.asString();
+    }
+
+
+    private static List<FoundImage> images(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isArray() || node.size() > MAX_IMAGES) {
+            throw invalid("images must be an array within the limit");
+        }
+        List<FoundImage> values = new ArrayList<>();
+        for (JsonNode image : node) {
+            JsonNode url = image.get("url");
+            JsonNode kind = image.get("kind");
+            JsonNode size = image.get("size");
+            if (url == null || !url.isString() || url.asString().length() > MAX_LINK_CHARS
+                || kind == null || !kind.isString() || size == null || !size.isIntegralNumber() || !size.canConvertToLong()
+                || size.asLong() < 0 || size.asLong() > MAX_IMAGE_AREA) {
+                throw invalid("invalid image candidate");
+            }
+            try {
+                values.add(new FoundImage(url.asString(), FoundImage.Kind.valueOf(kind.asString().toUpperCase(Locale.ROOT)), size.asLong()));
+            } catch (IllegalArgumentException ex) {
+                throw invalid("unknown image candidate kind");
+            }
+        }
+        return values;
     }
 
 

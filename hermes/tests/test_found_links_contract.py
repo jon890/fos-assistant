@@ -26,10 +26,28 @@ class PluginValuesTest(unittest.TestCase):
         """plugin 이 주소를 뽑는 도구가 계약의 두 웹 도구이고 Hermes 내장 도구 목록에 있다."""
         plugin = load_plugin("fos_ctx_found_links_contract", ROOT / "plugins/fos-ctx/__init__.py", self.addCleanup)
         found_links = __import__("sys").modules[plugin.__name__ + ".found_links"]
-        self.assertEqual(found_links.TOOLS, frozenset(contract.WEB_RESULT_TOOLS))
+        self.assertEqual(found_links.WEB_TOOLS, frozenset(contract.WEB_RESULT_TOOLS))
         for tool in contract.WEB_RESULT_TOOLS:
             self.assertIn(tool, contract.HERMES_BUILTIN_TOOLS)
         self.assertEqual(found_links.SEARCH_FIELDS, contract.WEB_SEARCH_ITEM_FIELDS)
+
+    def test_product_reader_is_registered_as_an_async_web_tool(self):
+        """상품 페이지 읽기를 기존 web toolset에서 실행하고 내장 도구는 바꾸지 않는다."""
+        plugin = load_plugin("fos_ctx_product_page_registration", ROOT / "plugins/fos-ctx/__init__.py", self.addCleanup)
+        registered = {}
+
+        class Context:
+            def register_tool(self, **tool):
+                registered[tool["name"]] = tool
+
+            def register_hook(self, *args):
+                pass
+
+        plugin.register(Context())
+        product = registered["product_page_read"]
+        self.assertEqual(product["toolset"], "web")
+        self.assertIs(product["is_async"], True)
+        self.assertFalse(product.get("override", False))
 
 
 class HermesWebResultTest(unittest.TestCase):
@@ -68,3 +86,19 @@ class HermesWebResultTest(unittest.TestCase):
         model_tools = self.source("model_tools.py")
         self.assertIn('invoke_hook("transform_tool_result", tool_name=function_name, args=function_args,', model_tools)
         self.assertIn("result=result, **ids.hook_kwargs()", model_tools)
+
+    def test_product_reader_uses_hermes_web_url_guards_and_free_scrape_transport(self):
+        """상품 전용 읽기는 원래 페이지와 이동한 주소를 확인하고 무료 스크레이프의 형식을 지정한다."""
+        extract = self.source("tools/web_tools_extract.py")
+        self.assertIn("def _validate_extract_urls(", extract)
+        self.assertIn("async def async_is_safe_url(", self.source("tools/url_safety.py"))
+        self.assertIn("def check_website_access(", self.source("tools/website_policy.py"))
+        firecrawl = self.source("plugins/web/firecrawl/provider.py")
+        for contract_part in ("_FIRECRAWL_CLOUD_API_URL", "class _KeylessFirecrawlClient:",
+                              'return self._post("/v2/scrape", payload)', "def _extract_scrape_payload(",
+                              "def _final_url("):
+            self.assertIn(contract_part, firecrawl)
+        self.assertIn("def keyless_enabled(", self.source("plugins/web/keyless_mcp.py"))
+        self.assertIn("def provider_tier(", self.source("plugins/web/keyless_mcp.py"))
+        self.assertIn("is_async: bool", self.source("hermes_cli/plugins_context.py"))
+        self.assertIn("registry.get_tool_names_for_toolset(name)", self.source("toolsets.py"))
