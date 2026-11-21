@@ -146,7 +146,7 @@ def _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id):
         logger.warning("fos-ctx: 이름 대응 파일을 읽지 못했다: %s", type(exc).__name__)
         return _block(POLICY_BLOCK_MESSAGE) if guarded else event_guard(tool_name, args, session_id, tool_call_id)
     if tool_name == INSPECT_TOOL:
-        return authorize_inspect(args, session_id or "", tool_call_id or "", isolated)
+        return authorize_inspect(args, session_id or "", tool_call_id or "", servers is not None and isolated)
     if servers is None:
         # 플러그인을 설치한 profile 이 아니다. Control Plane MCP 도구는 서명을 붙이고 나머지는 도구 판정에 묻는다.
         if control_plane:
