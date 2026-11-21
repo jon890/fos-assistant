@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,6 +99,24 @@ public class GeneratedImageService {
      */
     public GeneratedImageSaved save(
         Long conversationId, Long ownerUserId, String callKey, String title, String prompt, List<String> sourceLinks, byte[] image) {
+        return save(conversationId, ownerUserId, callKey, title, prompt, sourceLinks, List.of(), image);
+    }
+
+
+    /**
+     * 참고한 링크와 그 가운데 비서가 찾은 주소를 함께 저장한다(ADR-20261121 / found-link-image-source).
+     *
+     * @param foundLinks {@code sourceLinks} 가운데 비서가 그 대화에서 찾은 주소. 없으면 빈 목록이다
+     */
+    public GeneratedImageSaved save(
+        Long conversationId,
+        Long ownerUserId,
+        String callKey,
+        String title,
+        String prompt,
+        List<String> sourceLinks,
+        List<String> foundLinks,
+        byte[] image) {
         String extension = extensionOf(image);
         String path;
         String name;
@@ -117,7 +136,8 @@ public class GeneratedImageService {
                     ? new SealedText(null, null)
                     : seal(ownerUserId, linksAad(ownerUserId, callKey), String.join("\n", sourceLinks));
                 artifacts.save(ChatArtifact.generatedImage(
-                    conversationId, path, byteSize, sealed.content(), sealed.keyId(), links.content(), links.keyId(), callKey));
+                    conversationId, path, byteSize, sealed.content(), sealed.keyId(), links.content(), links.keyId(),
+                    foundFlags(sourceLinks, foundLinks), callKey));
             } catch (RuntimeException ex) {
                 removeQuietly(conversationId, path);
                 throw ex;
@@ -166,8 +186,10 @@ public class GeneratedImageService {
         }
         Map<Long, GeneratedImageDetail> details = new HashMap<>();
         for (ChatArtifact image : images) {
+            List<String> links = sourceLinksOf(image, ownerUserId);
             details.put(image.id(), new GeneratedImageDetail(
-                promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()), sourceLinksOf(image, ownerUserId)));
+                promptOf(image, ownerUserId).orElse(null), vaultIds.get(image.path()), links,
+                foundOf(links, image.generationFoundLinkFlags())));
         }
         return details;
     }
@@ -270,6 +292,34 @@ public class GeneratedImageService {
             : cipher.open(
                 artifact.generationSourceLinksKeyId(), ownerUserId, linksAad(ownerUserId, artifact.generationCallKey()), stored);
         return opened.map(text -> text.lines().filter(line -> !line.isBlank()).toList()).orElse(List.of());
+    }
+
+
+    /** 링크마다 찾은 주소면 {@code 1}, 아니면 {@code 0} 을 이은 글이다. 찾은 주소가 없으면 null 이다. */
+    static String foundFlags(List<String> sourceLinks, List<String> foundLinks) {
+        if (foundLinks.isEmpty()) {
+            return null;
+        }
+        StringBuilder flags = new StringBuilder(sourceLinks.size());
+        for (String link : sourceLinks) {
+            flags.append(foundLinks.contains(link) ? '1' : '0');
+        }
+        return flags.indexOf("1") < 0 ? null : flags.toString();
+    }
+
+
+    /** 표시와 링크의 수가 다르면 표시가 틀리게 붙지 않게 모두 없는 것으로 읽는다. */
+    static List<String> foundOf(List<String> sourceLinks, String flags) {
+        if (flags == null || flags.length() != sourceLinks.size()) {
+            return List.of();
+        }
+        List<String> found = new ArrayList<>();
+        for (int i = 0; i < flags.length(); i++) {
+            if (flags.charAt(i) == '1') {
+                found.add(sourceLinks.get(i));
+            }
+        }
+        return List.copyOf(found);
     }
 
 
