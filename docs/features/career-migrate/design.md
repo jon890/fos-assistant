@@ -100,7 +100,19 @@ flowchart LR
 - **파일이 없거나 깨짐**: 파일이 없으면 만든다. 열기나 `PRAGMA integrity_check` 가 실패하면 덮어쓰지 않고 `CAREER_STORE_CORRUPT` 로 끝낸다(스펙 DECISION17). 고치는 방법은 사용자가 작업 폴더에서 파일을 지우고 다시 쌓는 것이다(스펙 DECISION11).
 - **시각**: Backend 는 프로세스 시간대를 UTC 로 고정했다. 저장 모듈도 시각을 UTC ISO 문자열로 저장하고 하루 경계만 서울 날짜로 계산한다.
 - **배포 순서([rule-66](../../code-rules/rule-66.md))**: 허용 목록에서 이름을 먼저 빼면 그 이름을 가진 운영 정책 전체가 틀린 것이 돼 모든 실행 공간이 꺼진다(`_sandbox_env_ok`). 그래서 순서를 지킨다. (1) fos-agents 선언이 Backend env 를 요구하지 않는다 → (2) 운영 정책에서 그 env 를 지운다 → (3) fos-assistant 가 허용 목록에서 뺀다. 단계 5 의 fos-assistant PR 은 운영 정책에서 지운 것을 확인한 뒤 머지한다.
-- **단계 사이**: 단계 1 이 배포되면 공고와 공부 추천은 새 SQLite 를 쓰고 Backend 의 그 데이터는 더 읽지 않는다(스펙 DECISION4). 면접과 맥락 문서는 단계 2 전까지 Backend 를 쓴다. 단계마다 운영에서 쓸 수 있다.
+- **단계 사이**에서 공고와 공부 추천의 실행기는 단계 1 부터 새 SQLite 를 쓴다. 면접과 맥락 문서는 단계 2 전까지 Backend 를 쓴다. 단계 2 에서 Backend 를 부르는 대화용 MCP 도구(공부 후보·추천의 저장과 목록 조회, 공고 제외 판정과 조사 제약 조회)와 대화용 `study-topic-recommender` 를 지운다. 단계 1 배포 뒤부터 단계 2 배포 전까지는 대화에서 이 도구로 공부 추천을 저장하거나 제외 규칙을 수정하지 않는다.
+
+## 운영 단계 순서
+
+1. 단계 1 배포 직후, 첫 공고 수집 전에 Backend 의 기준을 읽어 커리어 에이전트의 새 작업 폴더 SQLite 에 넣는다(스펙 DECISION4). 분석 정책이 없으면 수집이 `POLICY_NOT_CONFIGURED` 로 멈춘다. 운영이 각 GET 으로 읽은 값을 단계 1 PR 에서 만든 실행기 명령에 넘긴다. 실제 실행 절차는 운영 저장소가 갖는다.
+
+   | 기준 | Backend API | 실행기 명령 |
+   | --- | --- | --- |
+   | 분석 정책 | `GET /api/positions/v1/analysis-policy` | `position configure-policy` |
+   | 회사 선호 | `GET /api/positions/v1/company-preferences` | `position configure-companies` |
+   | 공고 제외 규칙 | `GET /api/positions/v1/exclusions` | `exclusions put` |
+
+2. 기준을 넣은 뒤 공고 추천과 공부 추천을 운영에서 한 번씩 확인한다. 그 결과를 확인한 뒤 단계 2 를 시작한다.
 
 ## 검증 전략
 
@@ -128,6 +140,7 @@ flowchart LR
 | DECISION9 | 스킬 원본 | `agent-skills/` 가 원본이다. `agent-skills.ts` 는 Claude Code 전용 표현(`HOST_ONLY_PATTERNS`)을 찾는 검사만 한다 | 작성자 | 사본의 원본인 `plugin/skills/` 를 지운다(스펙 DECISION2) |
 | DECISION10 | 면접 저장 | 기존 JSON 파일 저장소를 지우고 SQLite 하나로 둔다. `CAREER_STORE` env 는 쓰지 않는다 | 작성자 | 저장소가 하나면 백업 없는 데이터의 복구 단위도 파일 하나다. `CAREER_STORE` 는 실행 공간 허용 목록에 없다 |
 | DECISION11 | 실행 폴더 | 작업 폴더 `runs/` | 작성자 | 실행 공간 `/tmp` 가 작다 |
+| DECISION12 | 전환 중 대화용 도구 | 단계 2 에서 Backend MCP 도구와 대화용 `study-topic-recommender` 를 지운다. 그전에는 「단계 사이」 규칙을 따른다 | 사용자 2026-11-21 | 사용자 확인 2026-11-21(fos-agents R8). 공고와 공부 추천의 실행기는 단계 1 부터 새 SQLite 를 쓴다 |
 
 ## 결정 기록 연결
 
