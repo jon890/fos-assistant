@@ -43,6 +43,7 @@ public class GeneratedImageUploadService {
             throw new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
         }
         return images.save(
-            origin.conversationId(), origin.userId(), request.callKey(), request.title(), request.prompt(), request.sourceLinks(), image);
+            origin.conversationId(), origin.userId(), request.callKey(), request.title(), request.prompt(), request.sourceLinks(),
+            request.foundLinks(), image);
     }
 }

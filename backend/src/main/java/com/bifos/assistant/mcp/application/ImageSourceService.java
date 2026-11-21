@@ -81,24 +81,37 @@ public class ImageSourceService {
         try {
             if (ref.attachmentId() != null) {
                 return new ImageSourceResult(
-                    attachments.inspectOverview(caller.user(), origin.conversationId(), ref.attachmentId()), null);
+                    attachments.inspectOverview(caller.user(), origin.conversationId(), ref.attachmentId()), null, false);
             }
             access.requireOwn(caller.user(), origin.conversationId());
             if (ref.link() != null) {
-                URI link = links.findSentLink(caller.user(), origin.conversationId(), ref.link())
-                    .or(() -> foundLinks.find(origin.conversationId(), ref.link()))
-                    .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "this link is not in the conversation"));
-                if (link.toASCIIString().length() > GeneratedImageRequest.MAX_LINK_CHARS) {
-                    // 받은 주소는 그림 올리기의 source_links 로 돌아온다. 그 상한을 넘으면 받아도 그림을 남기지 못하므로 받기 전에 막는다.
-                    throw new ApiException(ErrorCode.IMAGE_SOURCE_LINK_BLOCKED, "this link is too long");
-                }
-                return new ImageSourceResult(linkImages.read(link), link.toASCIIString());
+                return readLink(caller, origin.conversationId(), ref.link());
             }
             GeneratedImageSource image = images.readByTitle(origin.conversationId(), ref.title());
-            return new ImageSourceResult(new InspectedImage(image.contentType(), image.bytes()), null);
+            return new ImageSourceResult(new InspectedImage(image.contentType(), image.bytes()), null, false);
         } catch (ApiException ex) {
             throw translate(ex);
         }
+    }
+
+
+    /**
+     * 사용자가 보낸 링크를 먼저 보고, 아니면 비서가 찾은 주소를 본다. 사용자가 보낸 주소를 비서가 다시 찾았어도 사용자가 보낸 링크다.
+     * 찾은 주소로 받은 것만 「비서가 찾음」 이다(설계 agent-found-image 의 「「비서가 찾음」 표시(PR2)」).
+     */
+    private ImageSourceResult readLink(McpCaller caller, Long conversationId, String pointed) {
+        boolean found = false;
+        URI link = links.findSentLink(caller.user(), conversationId, pointed).orElse(null);
+        if (link == null) {
+            link = foundLinks.find(conversationId, pointed)
+                .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_SOURCE_UNKNOWN, "this link is not in the conversation"));
+            found = true;
+        }
+        if (link.toASCIIString().length() > GeneratedImageRequest.MAX_LINK_CHARS) {
+            // 받은 주소는 그림 올리기의 source_links 로 돌아온다. 그 상한을 넘으면 받아도 그림을 남기지 못하므로 받기 전에 막는다.
+            throw new ApiException(ErrorCode.IMAGE_SOURCE_LINK_BLOCKED, "this link is too long");
+        }
+        return new ImageSourceResult(linkImages.read(link), link.toASCIIString(), found);
     }
 
 

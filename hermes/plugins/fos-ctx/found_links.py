@@ -182,6 +182,7 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
     """웹 도구의 결과에서 뽑은 주소를 Control Plane 에 알린다. 알릴 것이 없거나 맥락이 없으면 아무것도 하지 않는다.
 
     주소와 결과 글은 로그에 남기지 않는다. 옛 Control Plane 은 이 경로를 몰라 거절로 답하고, 그때도 넘어간다.
+    알리지 못하면 그 결과의 주소로 그림을 그리지 못하므로 경고로 남긴다. 운영에서 원인을 찾으려면 기본 로그 수준에 보여야 한다.
     """
     if not session_id or not tool_call_id:
         return
@@ -193,6 +194,7 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
     token = _read_token()
     ctx = build_context(CTX_TOOL, session_id, tool_call_id)
     if not url or not token or not ctx:
+        logger.warning("fos-ctx: 찾은 주소를 알릴 주소나 토큰, 맥락이 없다")
         return
     payload = {"_fos_ctx": ctx, "pages": found}
     typed = typed_urls(tool_name, args)
@@ -208,6 +210,6 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
             response.read()
     except urllib.error.HTTPError as exc:
         exc.close()
-        logger.debug("fos-ctx: 찾은 주소를 알리지 못했다: HTTP %d", exc.code)
+        logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: HTTP %d", exc.code)
     except OSError as exc:
-        logger.debug("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)
+        logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)
