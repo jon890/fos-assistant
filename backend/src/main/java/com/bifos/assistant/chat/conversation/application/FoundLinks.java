@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 비서가 웹 검색과 페이지 읽기로 찾은 주소를 대화마다 해시로 남기고, 모델이 가리킨 주소가 그 안에 있는지 답한다
  * (ADR-20261121 / found-link-image-source, 스펙 agent-found-image REQ2).
  *
- * <p>데이터베이스에는 해시와 페이지를 읽었다는 표시만 둔다. {@code conversation.found_link_hashes} 에 32자씩 이어 붙이고,
+ * <p>데이터베이스에는 해시와 읽은 페이지·고른 사진의 표시만 둔다. {@code conversation.found_link_hashes} 에 32자씩 이어 붙이고,
  * 더하기는 {@code UPDATE} 한 문장이라 한 실행의 도구 결과 여럿이 동시에 알려도 서로를 덮지 않는다. 상한을 넘으면 오래된 것부터 밀려난다.
  *
  * <p>같은 주소로 보는 규칙은 {@link LinkTarget} 이 갖는다. 거기에 결과만으로 정해지는 변환(엔티티 풀기, {@code //}, 상대 주소)을 더한다
@@ -125,6 +125,11 @@ public class FoundLinks {
     }
 
 
+    private static String photoMarker(String address) {
+        return "i" + address.substring(1);
+    }
+
+
     /**
      * @param link 모델이 {@code link:} 뒤에 적은 주소
      * @return 비서가 그 대화에서 찾은 주소면 받을 주소. 가리킨 글에 엔티티가 있으면 푼 주소다. 아니면 빈 값이다
@@ -161,15 +166,17 @@ public class FoundLinks {
                     continue;
                 }
                 String marker = readMarker(hash);
-                if (chooseImage && contains(stored, marker)) {
+                String directMarker = photoMarker(hash);
+                boolean directPhoto = chooseImage && contains(stored, directMarker);
+                if (chooseImage && !directPhoto && contains(stored, marker)) {
                     Optional<FoundPageImages.Candidate> photo = pageImages.choose(conversationId, hash, image -> contains(stored, image));
-                    String photoHash = photo.map(FoundPageImages.Candidate::hash).orElse("");
-                    conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHash, MAX_HASHES * HASH_CHARS);
+                    String photoHashes = photo.map(image -> image.hash() + photoMarker(image.hash())).orElse("");
+                    conversations.appendFoundLinkHashes(conversationId, hash + marker + photoHashes, MAX_HASHES * HASH_CHARS);
                     return Optional.of(new FoundImageLink(photo.map(FoundPageImages.Candidate::uri).orElse(null), true));
                 }
                 // 쓴 주소를 뒤로 옮겨, 뒤에 읽은 페이지들에 밀려나 다음 장면에서 빠지는 일을 줄인다.
-                conversations.appendFoundLinkHashes(conversationId, hash, MAX_HASHES * HASH_CHARS);
-                return target.get().fetchUri().map(uri -> new FoundImageLink(uri, false));
+                conversations.appendFoundLinkHashes(conversationId, directPhoto ? hash + directMarker : hash, MAX_HASHES * HASH_CHARS);
+                return target.get().fetchUri().map(uri -> new FoundImageLink(uri, directPhoto));
             }
         }
         return Optional.empty();

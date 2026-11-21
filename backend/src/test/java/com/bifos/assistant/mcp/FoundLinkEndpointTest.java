@@ -144,6 +144,10 @@ class FoundLinkEndpointTest {
         String nextRoot = McpCallSigner.newRoot();
         run(user, conversation, nextRoot);
         assertThat(source(nextRoot, "link:https://cdn.example.com/item/403.png").body()).isEqualTo(png(403));
+        web.html("https://cdn.example.com/item/403.png", "<meta property=\"og:image\" content=\"https://cdn.example.com/changed.png\">");
+        web.image("https://cdn.example.com/changed.png", "image/png", png(1));
+        assertThat(code(source(nextRoot, "link:https://cdn.example.com/item/403.png"))).isEqualTo("IMAGE_SOURCE_LINK_NO_IMAGE");
+        assertThat(web.requested()).doesNotContain("cdn.example.com/changed.png");
     }
 
 
@@ -164,6 +168,7 @@ class FoundLinkEndpointTest {
             new Photo("/assets/all_og_store.jpg", "og", 0), new Photo(shared, "og", 0),
             new Photo("/small.jpg", "body", 2_000), new Photo(largest, "body", 500_000));
         reportPhotos(third, third, new Photo(shared, "og", 0));
+        assertThat(report(root, page(first, "/item/from-ordinary-read.png")).statusCode()).isEqualTo(204);
 
         assertThat(source(root, "link:" + first).body()).isEqualTo(png(9));
         assertThat(source(root, "link:" + second).body()).isEqualTo(png(10));
