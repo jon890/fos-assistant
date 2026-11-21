@@ -16,8 +16,10 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.domain.AppUser;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -47,28 +49,38 @@ class DeployCheckCleaner {
     private final Clock clock;
 
 
-    /** 그 평가 대화와, 그 대화에서 파일 공간에 넣은 보관본을 지운다. 첨부와 결과물은 대화 정리가 함께 지운다. */
-    void dropConversation(CurrentUser evaluation, Long conversationId) {
+    /**
+     * 그 평가 대화와, 그 대화에서 파일 공간에 넣은 보관본을 지운다. 첨부와 결과물은 대화 정리가 함께 지운다.
+     *
+     * @return 지웠으면 참. 실패하면 경고 로그만 남기고 거짓이다
+     */
+    boolean dropConversation(CurrentUser evaluation, Long conversationId) {
         try {
             for (Long id : vaultFinder.putIdsOf(evaluation.id(), conversationId)) {
                 vault.delete(evaluation.id(), id);
             }
             chat.delete(evaluation, conversationId);
+            return true;
         } catch (RuntimeException ex) {
             log.warn("배포 뒤 확인의 평가 대화를 지우지 못했다 conversationId={}", conversationId, ex);
+            return false;
         }
     }
 
 
-    /** 공개 식별자로 평가 대화를 찾아 지운다. 이미 지웠으면 아무것도 하지 않는다. */
-    void dropConversation(CurrentUser evaluation, UUID conversationPublicId) {
+    /**
+     * 공개 식별자로 평가 대화를 찾아 지운다.
+     *
+     * @return 지웠거나 이미 없으면 참
+     */
+    boolean dropConversation(CurrentUser evaluation, UUID conversationPublicId) {
         Long conversationId;
         try {
             conversationId = chat.conversationOf(evaluation, conversationPublicId).id();
         } catch (ApiException ignored) {
-            return;
+            return true;
         }
-        dropConversation(evaluation, conversationId);
+        return dropConversation(evaluation, conversationId);
     }
 
 
@@ -109,11 +121,15 @@ class DeployCheckCleaner {
                 continue;
             }
             Optional<AppUser> evaluation = evaluationUsers.find(run.groupId());
+            Set<UUID> removed = new HashSet<>();
             if (evaluation.isPresent()) {
                 CurrentUser user = EvaluationUserService.asCurrentUser(evaluation.get());
-                conversations.forEach(publicId -> dropConversation(user, publicId));
+                conversations.stream().filter(publicId -> dropConversation(user, publicId)).forEach(removed::add);
+            } else {
+                // 평가 사용자를 지울 때 그 대화도 함께 지워졌다.
+                removed.addAll(conversations);
             }
-            runWrites.dropLinks(run.id());
+            runWrites.dropLinks(run.id(), removed);
         }
     }
 }

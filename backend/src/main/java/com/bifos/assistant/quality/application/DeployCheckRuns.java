@@ -26,6 +26,7 @@ import java.time.Clock;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,10 +86,10 @@ public class DeployCheckRuns {
     }
 
 
-    /** 보관 기간이 지나 대화를 지운 줄의 대화·실행 링크를 비운다. */
+    /** 보관 기간이 지나 대화를 지운 기능의 대화·실행 링크를 비운다. 지우지 못한 대화의 링크는 남긴다. */
     @Transactional
-    public void dropLinks(Long runId) {
-        runs.findById(runId).ifPresent(QualityRun::dropLinks);
+    public void dropLinks(Long runId, Set<UUID> removed) {
+        runs.findById(runId).ifPresent(run -> run.dropLinks(removed));
     }
 
 
