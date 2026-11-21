@@ -381,6 +381,10 @@ public enum ErrorCode {
     EVALUATION_USER_MISSING(HttpStatus.CONFLICT),
     /** 그 배포 뒤 확인이 없거나 다른 그룹의 것이다. */
     QUALITY_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 그 평가가 없거나 다른 그룹의 것이다. */
+    QUALITY_EVAL_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 평가를 시작하며 고른 묶음 가운데 묶음 파일에 없는 것이 있다. */
+    QUALITY_EVAL_BUNDLE_UNKNOWN(HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 
