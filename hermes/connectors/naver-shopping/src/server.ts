@@ -11,7 +11,7 @@ import {
   searchProducts,
   type ToolDeps,
 } from "./tools.ts";
-import { URL_MAX } from "./urls.ts";
+import { SEARCH_SORTS, URL_MAX } from "./urls.ts";
 import { takeApproval } from "./approval.ts";
 import {
   CHECKOUT_TOOL,
@@ -40,7 +40,7 @@ export function createServer(env: Env = process.env, deps?: ServerDeps) {
   const authority = takeApproval(env);
   const server = new McpServer({
     name: "fos-naver-shopping",
-    version: "1.0.0",
+    version: "1.1.0",
   });
   server.registerTool(
     "check_shopping_login",
@@ -55,10 +55,13 @@ export function createServer(env: Env = process.env, deps?: ServerDeps) {
     "search_products",
     {
       description: manifest.tools.search_products.description,
-      inputSchema: { query: z.string().max(QUERY_MAX * 2) },
+      inputSchema: {
+        query: z.string().max(QUERY_MAX * 2),
+        sort: z.enum(SEARCH_SORTS).optional(),
+      },
       annotations: { readOnlyHint: true },
     },
-    ({ query }) => guard(() => searchProducts(env, query, deps)),
+    ({ query, sort }) => guard(() => searchProducts(env, query, deps, sort)),
   );
   server.registerTool(
     "get_product_detail",
