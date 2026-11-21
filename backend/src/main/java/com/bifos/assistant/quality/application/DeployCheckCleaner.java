@@ -6,7 +6,9 @@ import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;
+import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.quality.config.QualityProperties;
 import com.bifos.assistant.quality.domain.FeatureResult;
 import com.bifos.assistant.quality.domain.QualityRun;
@@ -20,9 +22,9 @@ import com.bifos.assistant.user.domain.AppUser;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -91,8 +93,13 @@ class DeployCheckCleaner {
 
 
     /**
-     * 그 대화에서 기억 도구로 남긴 것을 되돌린다. 그 대화가 만들거나 제안한 기억은 지우고, 고치기만 한 기억은 늦게 고친 것부터 고치기 전으로 돌린다. 준비 때 넣은
-     * 기억을 문항이 고쳤어도 되돌아온다. 만든 뒤 고친 기억은 되돌리기가 판 충돌로 막히므로 되돌리지 않고 바로 지운다.
+     * 그 대화에서 기억 도구로 남긴 것을 되돌린다. 준비 때 넣은 기억을 문항이 고쳤어도 되돌아온다.
+     *
+     * <ul>
+     * <li>고치기만 한 기억은 그 대화가 고친 기록을 한 번에 되돌려 가장 먼저 고치기 전의 판으로 돌린다. 하나씩 되돌리면 판이 맞지 않아 막힌다.
+     * <li>남긴 제안은 지운다.
+     * <li>새로 만든 기억은 지운다. 다른 대화의 제안을 받아들여 만든 것이면 지우지 않고 제안으로 돌린다. 같은 대화가 그 뒤에 고쳤으면 판이 맞지 않아 지운다.
+     * </ul>
      *
      * <p>시각이 아니라 대화로 찾는다. 함께 도는 다른 확인이나 평가가 만든 기억을 지우지 않는다.
      *
@@ -101,39 +108,47 @@ class DeployCheckCleaner {
     boolean forgetCaptured(CurrentUser evaluation, Long conversationId) {
         List<CapturedMemory> captured;
         try {
-            captured = new ArrayList<>(captures.capturesOf(evaluation, conversationId));
+            captured = captures.capturesOf(evaluation, conversationId);
         } catch (RuntimeException ex) {
             log.warn("평가 대화의 기억 기록을 읽지 못했다 conversationId={}", conversationId, ex);
             return false;
         }
-        Set<Long> made = new LinkedHashSet<>();
+        Map<Long, List<CapturedMemory>> byMemory = new LinkedHashMap<>();
         for (CapturedMemory row : captured) {
-            if (row.capture().kind() != MemoryCaptureKind.UPDATED) {
-                made.add(row.memory().id());
-            }
+            byMemory.computeIfAbsent(row.memory().id(), id -> new ArrayList<>()).add(row);
         }
         boolean all = true;
-        for (Long memoryId : made) {
+        for (Map.Entry<Long, List<CapturedMemory>> entry : byMemory.entrySet()) {
             try {
-                memories.delete(evaluation, memoryId);
+                forget(evaluation, entry.getKey(), entry.getValue());
             } catch (RuntimeException ex) {
                 all = false;
-                log.warn("평가 대화가 만든 기억을 지우지 못했다 memoryId={}", memoryId, ex);
-            }
-        }
-        Collections.reverse(captured);
-        for (CapturedMemory row : captured) {
-            if (row.capture().kind() != MemoryCaptureKind.UPDATED || made.contains(row.memory().id())) {
-                continue;
-            }
-            try {
-                captures.undo(evaluation, row.capture().id());
-            } catch (RuntimeException ex) {
-                all = false;
-                log.warn("평가 대화가 고친 기억을 되돌리지 못했다 captureId={}", row.capture().id(), ex);
+                log.warn("평가 대화가 남긴 기억을 되돌리지 못했다 memoryId={}", entry.getKey(), ex);
             }
         }
         return all;
+    }
+
+
+    private void forget(CurrentUser evaluation, Long memoryId, List<CapturedMemory> rows) {
+        List<Long> updates = rows.stream()
+            .filter(row -> row.capture().kind() == MemoryCaptureKind.UPDATED)
+            .map(row -> row.capture().id())
+            .toList();
+        Optional<CapturedMemory> made = rows.stream()
+            .filter(row -> row.capture().kind() != MemoryCaptureKind.UPDATED)
+            .findFirst();
+        if (made.isEmpty()) {
+            captures.undoUpdates(evaluation, memoryId, updates);
+            return;
+        }
+        MemoryCapture first = made.get().capture();
+        boolean acceptedProposal = first.kind() == MemoryCaptureKind.CREATED && first.previousStatus() == MemoryStatus.PROPOSED;
+        if (acceptedProposal && updates.isEmpty()) {
+            captures.undo(evaluation, first.id());
+            return;
+        }
+        memories.delete(evaluation, memoryId);
     }
 
 

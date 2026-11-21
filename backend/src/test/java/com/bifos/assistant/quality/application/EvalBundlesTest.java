@@ -37,12 +37,20 @@ class EvalBundlesTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"duplicate-question", "unknown-slot", "empty-turns", "zero-timeout", "answer-quality"})
+    @ValueSource(strings = {"duplicate-question", "unknown-slot", "empty-turns", "zero-timeout", "answer-quality", "empty-expect", "blank-value",
+        "no-tag", "bad-card-status", "missing-attachment"})
     @DisplayName("틀린 묶음 파일은 파일 이름을 담은 예외로 읽기를 멈춘다")
     void rejectsInvalidBundles(String name) {
         assertThatThrownBy(() -> load("classpath:quality/bad-bundles/" + name + "/"))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining(name + ".json");
+    }
+
+
+    @Test
+    @DisplayName("묶음 파일이 하나도 없으면 읽기를 멈춘다")
+    void rejectsEmptyFolder() {
+        assertThatThrownBy(() -> load("classpath*:quality/no-such-folder/")).isInstanceOf(IllegalStateException.class).hasMessageContaining("no eval bundles");
     }
 
 

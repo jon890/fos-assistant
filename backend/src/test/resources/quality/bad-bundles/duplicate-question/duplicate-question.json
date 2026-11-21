@@ -1,1 +1,1 @@
-{"id":"duplicate-question","title":"t","questions":[{"id":"a","turns":[{"text":"x"}]},{"id":"a","turns":[{"text":"y"}]}]}
+{"id":"duplicate-question","title":"t","questions":[{"id":"a","tag":"x","expect":{"includes":["y"]},"turns":[{"text":"x"}]},{"id":"a","tag":"x","expect":{"includes":["y"]},"turns":[{"text":"y"}]}]}

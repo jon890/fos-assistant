@@ -7,6 +7,7 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -98,6 +99,40 @@ class DeployCheckCleanerTest {
 
         assertThat(all).isTrue();
         assertThat(memories.findById(created.id())).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("같은 대화가 기존 기억을 두 번 고쳤으면 처음 고치기 전으로 돌린다")
+    void restoresMemoryUpdatedTwiceInTheSameConversation() {
+        Memory prepared = memoryService.create(EVALUATION, MemoryScope.USER, "평가 사용자가 좋아하는 색", "평가 사용자가 좋아하는 색은 청록이다.", false);
+        int first = memories.findById(prepared.id()).orElseThrow().revision();
+        memoryService.update(EVALUATION, prepared.id(), "평가 사용자가 좋아하는 색은 빨강이다.", false, null);
+        capture(prepared, CHECK_CONVERSATION, MemoryCaptureKind.UPDATED, first);
+        int second = memories.findById(prepared.id()).orElseThrow().revision();
+        memoryService.update(EVALUATION, prepared.id(), "평가 사용자가 좋아하는 색은 노랑이다.", false, null);
+        capture(prepared, CHECK_CONVERSATION, MemoryCaptureKind.UPDATED, second);
+
+        boolean all = cleaner.forgetCaptured(EVALUATION, CHECK_CONVERSATION);
+
+        assertThat(all).isTrue();
+        assertThat(memories.findById(prepared.id()).orElseThrow().content()).isEqualTo("평가 사용자가 좋아하는 색은 청록이다.");
+        assertThat(captures.findAll()).allMatch(MemoryCapture::undone);
+    }
+
+
+    @Test
+    @DisplayName("다른 대화의 제안을 받아들여 만든 기억은 지우지 않고 제안으로 돌린다")
+    void returnsAcceptedProposalToProposal() {
+        Memory proposal = memoryService.proposeUser(EVALUATION, "산책 시간", "산책은 아침에 한다", null);
+        Memory accepted = memoryService.accept(EVALUATION, proposal.id());
+        captures.save(MemoryCapture.of(accepted.id(), EVALUATION.id(), CHECK_CONVERSATION, 501L, MemoryCaptureKind.CREATED,
+            memories.findById(accepted.id()).orElseThrow().revision(), MemoryStatus.PROPOSED, false));
+
+        boolean all = cleaner.forgetCaptured(EVALUATION, CHECK_CONVERSATION);
+
+        assertThat(all).isTrue();
+        assertThat(memories.findById(accepted.id()).orElseThrow().status()).isEqualTo(MemoryStatus.PROPOSED);
     }
 
 
