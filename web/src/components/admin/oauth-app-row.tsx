@@ -137,7 +137,7 @@ export function OAuthAppRow({
             type="button"
             size="sm"
             variant="destructive"
-            disabled={busy}
+            disabled={busy || !storeAvailable}
             onClick={() => setConfirming(true)}
           >
             지우기
