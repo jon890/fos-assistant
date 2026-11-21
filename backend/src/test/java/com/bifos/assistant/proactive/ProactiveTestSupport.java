@@ -17,7 +17,7 @@ import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;

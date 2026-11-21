@@ -2,9 +2,9 @@ package com.bifos.assistant.hermes.infra;
 
 import com.bifos.assistant.hermes.application.dto.HermesSkillName;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.domain.ToolDetailRedactor;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.BufferedReader;
@@ -97,7 +97,7 @@ public class HermesRunEventStream {
     }
 
 
-    public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
+    public void open(String apiBaseUrl, String profileName, String runId, Consumer<HermesRunEvent> onEvent) {
         open(apiBaseUrl, profileName, runId, onEvent, stream -> {
         });
     }
@@ -107,7 +107,7 @@ public class HermesRunEventStream {
         String apiBaseUrl,
         String profileName,
         String runId,
-        Consumer<RunEvent> onEvent,
+        Consumer<HermesRunEvent> onEvent,
         Consumer<Closeable> onOpened) {
         open(apiBaseUrl, profileName, runId, onEvent, onOpened, ToolDetailScope.NONE);
     }
@@ -118,7 +118,7 @@ public class HermesRunEventStream {
         String apiBaseUrl,
         String profileName,
         String runId,
-        Consumer<RunEvent> onEvent,
+        Consumer<HermesRunEvent> onEvent,
         Consumer<Closeable> onOpened,
         ToolDetailScope scope) {
         String apiKey = keyStore.resolve(profileName);
@@ -142,7 +142,7 @@ public class HermesRunEventStream {
     }
 
 
-    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope,
+    private void readEvents(InputStream body, Consumer<HermesRunEvent> onEvent, ToolDetailScope scope,
         Consumer<HermesRunTerminal> onTerminal) throws IOException {
         DetailState state = new DetailState(clock);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
@@ -168,7 +168,7 @@ public class HermesRunEventStream {
     }
 
 
-    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state,
+    private void emit(StringBuilder data, Consumer<HermesRunEvent> onEvent, ToolDetailScope scope, DetailState state,
         Consumer<HermesRunTerminal> onTerminal) throws IOException {
         if (data.isEmpty()) {
             return;
@@ -192,22 +192,22 @@ public class HermesRunEventStream {
 
 
     /**
-     * 사건 하나의 JSON 을 {@link RunEvent} 로 옮긴다.
+     * 사건 하나의 JSON 을 {@link HermesRunEvent} 로 옮긴다.
      *
      * <p>Hermes 는 사건 이름을 {@code event} 로 보낸다. 실측으로 확인했다. {@code type} 을 함께 보는
      * 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
      */
-    static RunEvent toRunEvent(JsonNode root) {
+    static HermesRunEvent toRunEvent(JsonNode root) {
         return toRunEvent(root, ToolDetailScope.NONE);
     }
 
 
-    static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
+    static HermesRunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
         return toRunEvent(root, scope, new DetailState(Clock.systemUTC()));
     }
 
 
-    private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, DetailState state) {
+    private static HermesRunEvent toRunEvent(JsonNode root, ToolDetailScope scope, DetailState state) {
         JsonNode payload = root.path("data");
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
@@ -280,7 +280,7 @@ public class HermesRunEventStream {
             goal = ToolDetailRedactor.redact(goal, null, scope, state.identifiers, afterConnector);
             detail = ToolDetailRedactor.redact(detail, null, scope, state.identifiers, afterConnector);
         }
-        return new RunEvent(
+        return new HermesRunEvent(
             type,
             memorySearch ? null : text,
             toolName,

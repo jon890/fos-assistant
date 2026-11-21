@@ -45,10 +45,10 @@ import com.bifos.assistant.chat.turn.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -396,7 +396,7 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "봐 줘", null, List.of(real.id(), broken.id()));
 
         HermesRunCommand command = stub().received().getFirst();
-        assertThat(command.images()).extracting(HermesImage::label).containsExactly("1번째 사진");
+        assertThat(command.images()).extracting(RunImage::label).containsExactly("1번째 사진");
         assertThat(command.images().getFirst().dataUrl()).startsWith("data:image/jpeg;base64,");
         assertThat(command.input())
             .contains(
@@ -430,7 +430,7 @@ class ChatAttachmentTurnTest {
         for (int i = 1; i <= 30; i++) {
             expectedLabels.add(i + "번째 사진");
         }
-        assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(command.images()).extracting(RunImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.input().lines().filter(line -> line.startsWith("- ") && line.endsWith(".small.jpg")))
             .isEmpty();
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
@@ -461,7 +461,7 @@ class ChatAttachmentTurnTest {
             .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (int i = 0; i < photos.size(); i++) {
-            HermesImage image = command.images().get(i);
+            RunImage image = command.images().get(i);
             assertThat(image.label()).isEqualTo((i + 1) + "번째 사진");
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1600, 1200));
             assertThat(Base64.getDecoder()
@@ -495,13 +495,13 @@ class ChatAttachmentTurnTest {
         // 잡음 사본 다섯 장은 1600 단계에서 약 9.7MB 라 넘치고, 1280 단계에서 약 4.9MB 라 든다.
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images())
-            .extracting(HermesImage::label)
+            .extracting(RunImage::label)
             .containsExactly("1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진");
         assertThat(command.images().stream()
             .mapToLong(image -> image.dataUrl().length())
             .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
-        for (HermesImage image : command.images()) {
+        for (RunImage image : command.images()) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(1280);
         }
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
@@ -532,12 +532,12 @@ class ChatAttachmentTurnTest {
         for (int i = 1; i <= properties.maxFiles(); i++) {
             expectedLabels.add(i + "번째 사진");
         }
-        assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(command.images()).extracting(RunImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.images().stream()
             .mapToLong(image -> image.dataUrl().length())
             .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
-        for (HermesImage image : command.images()) {
+        for (RunImage image : command.images()) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
@@ -568,12 +568,12 @@ class ChatAttachmentTurnTest {
         for (int i = 1; i <= properties.maxFiles(); i++) {
             expectedLabels.add(i + "번째 사진");
         }
-        assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(command.images()).extracting(RunImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.images().stream()
             .mapToLong(image -> image.dataUrl().length())
             .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
-        for (HermesImage image : command.images()) {
+        for (RunImage image : command.images()) {
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(768, 768));
         }
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
@@ -601,15 +601,15 @@ class ChatAttachmentTurnTest {
         // 잡음 한 장의 768 단계 주소는 품질 0.85 에서 약 342KB 라 스물네 장이 7MB 를 넘고, 품질 0.6 에서 약 200KB 라
         // 스물다섯 장이 모두 든다.
         HermesRunCommand command = stub().received().getFirst();
-        List<HermesImage> images = command.images();
+        List<RunImage> images = command.images();
         List<String> expectedLabels = new ArrayList<>();
         for (int i = 1; i <= 25; i++) {
             expectedLabels.add(i + "번째 사진");
         }
-        assertThat(images).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(images).extracting(RunImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(images.stream().mapToLong(image -> image.dataUrl().length()).sum())
             .isLessThanOrEqualTo(7L * 1024 * 1024);
-        for (HermesImage image : images.subList(0, 24)) {
+        for (RunImage image : images.subList(0, 24)) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
         assertThat(imageSize(images.get(24))).as("작은 사진은 키우지 않는다").isEqualTo(new Dimension(8, 6));
@@ -648,7 +648,7 @@ class ChatAttachmentTurnTest {
 
         assertThat(small).isRegularFile();
         assertThat(stub().received().getFirst().images())
-            .extracting(HermesImage::label)
+            .extracting(RunImage::label)
             .containsExactly("1번째 사진");
     }
 
@@ -961,7 +961,7 @@ class ChatAttachmentTurnTest {
 
 
     /** 실린 주소를 디코딩한 사진의 가로와 세로다. */
-    private static Dimension imageSize(HermesImage image) throws IOException {
+    private static Dimension imageSize(RunImage image) throws IOException {
         String dataUrl = image.dataUrl();
         byte[] jpeg = Base64.getDecoder().decode(dataUrl.substring(dataUrl.indexOf(',') + 1));
         BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(jpeg));
@@ -969,7 +969,7 @@ class ChatAttachmentTurnTest {
     }
 
 
-    private static int longSide(HermesImage image) throws IOException {
+    private static int longSide(RunImage image) throws IOException {
         Dimension size = imageSize(image);
         return Math.max(size.width, size.height);
     }

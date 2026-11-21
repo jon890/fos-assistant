@@ -1,6 +1,6 @@
 package com.bifos.assistant.hermes.infra;
 
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 
 /**
  * 끝난 실행의 상태와 결과 값이다.

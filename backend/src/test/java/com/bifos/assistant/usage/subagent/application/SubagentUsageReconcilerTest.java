@@ -20,7 +20,7 @@ import com.bifos.assistant.hermes.infra.ProfileModelDefaultsClient;
 import com.bifos.assistant.hermes.infra.SubagentProviderClient;
 import com.bifos.assistant.hermes.application.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.application.dto.SubagentProviderLookup;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.pricing.domain.CatalogPrice;

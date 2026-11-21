@@ -9,9 +9,9 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -176,7 +176,7 @@ class ChatRunEvents {
 
 
     /** 스트림으로 온 사건을 화면으로 중계하면서 우리 이름으로도 옮겨 적는다. */
-    void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
+    void forward(PendingTurn pending, HermesRunEvent event, Consumer<ChatEvent> onEvent) {
         append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
         CheckTurn check = pending.intent() instanceof TurnIntent.ProactiveCheck proactive ? proactive.check() : null;
@@ -238,7 +238,7 @@ class ChatRunEvents {
 
 
     /** 도는 하위 에이전트의 수를 센다. steer 말풍선이 자식 안내를 붙일지 정하는 데 쓴다(ADR-20261116 / run-steer). */
-    private void countSubagent(TurnHandle handle, RunEvent event) {
+    private void countSubagent(TurnHandle handle, HermesRunEvent event) {
         String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
         if ("subagent.start".equals(type)) {
             turns.subagentStarted(handle);
@@ -253,7 +253,7 @@ class ChatRunEvents {
     }
 
 
-    void append(PendingTurn pending, RunEvent event) {
+    void append(PendingTurn pending, HermesRunEvent event) {
         store(pending, sequence -> eventRecorder.record(pending.execution(), event, sequence));
     }
 

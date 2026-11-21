@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.domain;
+package com.bifos.assistant.runtime.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

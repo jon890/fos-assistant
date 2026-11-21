@@ -33,10 +33,10 @@ import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -130,7 +130,7 @@ class ToolDetailStreamTest {
             var parser = new HermesRunEventStream(
                 keys, new HermesProperties(null, null, null, null, null, null, null, null), json);
             for (UserRole role : List.of(UserRole.ADMIN, UserRole.MEMBER)) {
-                var parsed = new ArrayList<RunEvent>();
+                var parsed = new ArrayList<HermesRunEvent>();
                 parser.open(
                     "http://127.0.0.1:" + server.getAddress().getPort(),
                     "test-profile",
@@ -148,7 +148,7 @@ class ToolDetailStreamTest {
                     assertThat(event.toString()).doesNotContain(marker);
                     assertThat(json.writeValueAsString(event)).doesNotContain(marker);
                 });
-                hermesStreams(parsed.toArray(RunEvent[]::new));
+                hermesStreams(parsed.toArray(HermesRunEvent[]::new));
                 var current = signedIn("observation-stream-" + role, role);
                 var emitted = sent(current);
                 assertThat(json.writeValueAsString(emitted)).doesNotContain(marker);
@@ -255,9 +255,9 @@ class ToolDetailStreamTest {
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         hermesStreams(
-            new RunEvent("tool.started", null, "terminal", COMMAND, null, null),
-            new RunEvent("tool.started", null, "web_search", QUERY, null, null),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("tool.started", null, "terminal", COMMAND, null, null),
+            new HermesRunEvent("tool.started", null, "web_search", QUERY, null, null),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
     }
 
 
@@ -395,7 +395,7 @@ class ToolDetailStreamTest {
     /** Hermes 가 모델과 토큰을 실은 하위 에이전트의 시작과 완료를 보낸 것처럼 만든다. */
     private void hermesStreamsSubagent() {
         hermesStreams(
-            new RunEvent(
+            new HermesRunEvent(
                 "subagent.start",
                 null,
                 "researcher",
@@ -410,7 +410,7 @@ class ToolDetailStreamTest {
                 null,
                 null,
                 null),
-            new RunEvent(
+            new HermesRunEvent(
                 "subagent.complete",
                 null,
                 "researcher",
@@ -425,7 +425,7 @@ class ToolDetailStreamTest {
                 9L,
                 "completed",
                 null),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("run.completed", null, null, null, null, null));
     }
 
 
@@ -437,10 +437,10 @@ class ToolDetailStreamTest {
 
 
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
-    private void hermesStreams(RunEvent... events) {
+    private void hermesStreams(HermesRunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
+            for (HermesRunEvent event : events) {
                 onEvent.accept(event);
             }
             return null;

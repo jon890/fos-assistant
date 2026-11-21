@@ -31,7 +31,7 @@ import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;

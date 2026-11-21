@@ -47,11 +47,11 @@ import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -213,8 +213,8 @@ class ChatServiceTest {
 
 
     /** 사건 스트림이 {@code skill_view} 시작 사건에 가리기 전 미리보기에서 꺼낸 이름을 실어 보낸 것처럼 만든다. */
-    private static RunEvent skillViewStarted(String detail, String skillName) {
-        return new RunEvent(
+    private static HermesRunEvent skillViewStarted(String detail, String skillName) {
+        return new HermesRunEvent(
             "tool.started",
             null,
             "skill_view",
@@ -233,10 +233,10 @@ class ChatServiceTest {
 
 
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
-    private void hermesStreams(RunEvent... events) {
+    private void hermesStreams(HermesRunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
+            for (HermesRunEvent event : events) {
                 onEvent.accept(event);
             }
             return null;
@@ -595,7 +595,7 @@ class ChatServiceTest {
         ConnectorConnection connection = connections.save(ConnectorConnection.pending(dad.id(), "demo-notes", Instant.now()));
         bindings.save(ConnectorBinding.pending(agent, connection, "demo", Instant.now()));
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
+        hermesStreams(new HermesRunEvent("run.completed", null, null, null, null, null));
 
         chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {
         });
@@ -621,10 +621,10 @@ class ChatServiceTest {
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         // 사건 스트림이 붙은 서버의 도구 내용을 이미 가린 채로 넘기는 모양이다. 가리는 판정은 스트림 쪽 시험이 본다.
         hermesStreams(
-            new RunEvent("message.delta", "조각", null, null, null, null),
-            new RunEvent("tool.started", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", null, null),
-            new RunEvent("tool.completed", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", 50L, false),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("message.delta", "조각", null, null, null, null),
+            new HermesRunEvent("tool.started", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", null, null),
+            new HermesRunEvent("tool.completed", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", 50L, false),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
 
         ChatTurn turn = chat.send(dad, null, "메모 찾아 줘", "dad");
 
@@ -963,10 +963,10 @@ class ChatServiceTest {
             HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
         hermesStreams(
             skillViewStarted("shopping", "shopping"),
-            new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
+            new HermesRunEvent("tool.completed", null, "skill_view", null, 50L, false),
             skillViewStarted("shopping → references/list.md", "shopping"),
-            new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("tool.completed", null, "skill_view", null, 50L, false),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "장보기 스킬을 써 줘", "dad", relayed::add);
@@ -995,12 +995,12 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
-            new RunEvent("message.delta", "조각", null, null, null, null),
-            new RunEvent("tool.started", null, "web_search", "started", null, null),
-            new RunEvent("tool.completed", null, "web_search", null, 1500L, false),
-            new RunEvent("subagent.start", null, "researcher", "찾는다", null, null),
-            new RunEvent("subagent.complete", null, "researcher", "찾았다", 2000L, false),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("message.delta", "조각", null, null, null, null),
+            new HermesRunEvent("tool.started", null, "web_search", "started", null, null),
+            new HermesRunEvent("tool.completed", null, "web_search", null, 1500L, false),
+            new HermesRunEvent("subagent.start", null, "researcher", "찾는다", null, null),
+            new HermesRunEvent("subagent.complete", null, "researcher", "찾았다", 2000L, false),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "도구를 써 줘", "dad", relayed::add);
@@ -1044,7 +1044,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
             "run-1", "sess-1", "completed", "사진을 판독하지 못했다", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("tool.completed", null, "attachment_inspect", "원본 조회 실패", 500L, true));
+        hermesStreams(new HermesRunEvent("tool.completed", null, "attachment_inspect", "원본 조회 실패", 500L, true));
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "사진의 작은 글자는?", "dad", relayed::add);
         assertThat(relayed.stream().filter(event -> "tool".equals(event.type())).toList())
@@ -1087,8 +1087,8 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
-            new RunEvent("tool.started", null, "web_search", "started", null, null),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("tool.started", null, "web_search", "started", null, null),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "안녕", "dad", relayed::add);
@@ -1105,8 +1105,8 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
-            new RunEvent("message.delta", "조각 하나", null, null, null, null),
-            new RunEvent("message.delta", "조각 둘", null, null, null, null));
+            new HermesRunEvent("message.delta", "조각 하나", null, null, null, null),
+            new HermesRunEvent("message.delta", "조각 둘", null, null, null, null));
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "안녕", "dad", relayed::add);
@@ -1123,7 +1123,7 @@ class ChatServiceTest {
         CurrentUser user = member("observer@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
-            new RunEvent(
+            new HermesRunEvent(
                 "subagent.start",
                 null,
                 null,
@@ -1138,7 +1138,7 @@ class ChatServiceTest {
                 null,
                 null,
                 null),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("run.completed", null, null, null, null, null));
         doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
             .when(executionEvents)
             .save(argThat(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
@@ -1161,8 +1161,8 @@ class ChatServiceTest {
         stub().willReturn(HermesRunResult.of(
             "run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
         hermesStreams(
-            new RunEvent("message.delta", "저녁은 ", null, null, null, null),
-            new RunEvent("tool.started", null, "web_search", "started", null, null));
+            new HermesRunEvent("message.delta", "저녁은 ", null, null, null, null),
+            new HermesRunEvent("tool.started", null, "web_search", "started", null, null));
         doThrow(new DataIntegrityViolationException("사건을 저장할 수 없다"))
             .when(executionEvents)
             .save(any(ExecutionEvent.class));
@@ -1186,7 +1186,7 @@ class ChatServiceTest {
     void keepsObservationGapWhenStreamClosesBeforeTerminalEvent() {
         CurrentUser user = member("eof@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("message.delta", "네", null, null, null, null));
+        hermesStreams(new HermesRunEvent("message.delta", "네", null, null, null, null));
 
         ChatTurn turn = chat.send(user, null, "안녕", "dad");
 
@@ -1202,7 +1202,7 @@ class ChatServiceTest {
     void interruptedTerminalEventCompletesObservation() {
         CurrentUser user = member("interrupted@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("run.interrupted", null, null, null, null, null));
+        hermesStreams(new HermesRunEvent("run.interrupted", null, null, null, null, null));
 
         ChatTurn turn = chat.send(user, null, "안녕", "dad");
 
@@ -1216,7 +1216,7 @@ class ChatServiceTest {
     void nonStreamPathWithoutToolCallsLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
+        hermesStreams(new HermesRunEvent("run.completed", null, null, null, null, null));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 

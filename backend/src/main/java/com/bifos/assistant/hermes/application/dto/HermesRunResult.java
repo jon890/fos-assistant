@@ -1,6 +1,8 @@
 package com.bifos.assistant.hermes.application.dto;
 
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+
+import com.bifos.assistant.runtime.domain.TokenUsage;
 
 /**
  * 끝난 실행 하나를 {@code GET /v1/runs/{run_id}} 에서 읽은 것이다.

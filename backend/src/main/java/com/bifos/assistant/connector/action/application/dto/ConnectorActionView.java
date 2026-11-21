@@ -4,7 +4,7 @@ import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
-import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
+import com.bifos.assistant.runtime.domain.ToolDetailRedactor;
 import com.bifos.assistant.hermes.application.dto.ConnectorArgumentLabels;
 import java.time.Instant;
 import java.util.Optional;

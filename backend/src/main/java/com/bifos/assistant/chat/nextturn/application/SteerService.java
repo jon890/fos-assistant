@@ -8,7 +8,7 @@ import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.turn.application.TurnRunRef;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
-import com.bifos.assistant.hermes.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.RunningDelegationQueries;

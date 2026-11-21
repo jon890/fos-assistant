@@ -9,10 +9,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -99,7 +99,7 @@ class HermesRunRequestTest {
     void sendsListInputWithTextLabelAndImageWhenImagesGiven() {
         String dataUrl = "data:image/jpeg;base64,AAAA";
         client.submit(new HermesRunCommand(
-            "dad", baseUrl, "안녕", null, null, null, null, null, List.of(new HermesImage("1번째 사진", dataUrl))));
+            "dad", baseUrl, "안녕", null, null, null, null, null, List.of(new RunImage("1번째 사진", dataUrl))));
 
         JsonNode input = submittedBody().path("input");
         assertThat(input.isArray()).as("input: %s", input).isTrue();
@@ -121,7 +121,7 @@ class HermesRunRequestTest {
     @DisplayName("사진의 문자열 표현은 이름표와 data 주소 길이만 담고 본문은 담지 않는다")
     void imageToStringHidesDataUrlBody() {
         String body = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=";
-        HermesImage image = new HermesImage("1번째 사진", "data:image/jpeg;base64," + body);
+        RunImage image = new RunImage("1번째 사진", "data:image/jpeg;base64," + body);
 
         assertThat(image.toString())
             .contains("1번째 사진", String.valueOf(image.dataUrl().length()))

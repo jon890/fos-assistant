@@ -23,7 +23,7 @@ import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.context.application.dto.AssembledContext;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
@@ -79,7 +79,7 @@ class ChatTurnLifecycle {
         CurrentUser user,
         Routed routed,
         String text,
-        List<HermesImage> images,
+        List<RunImage> images,
         AssembledContext context,
         ExecutionContextSnapshot snapshot,
         ModelChoice choice,

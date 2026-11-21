@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.domain;
+package com.bifos.assistant.runtime.domain;
 
 /** 종료한 자식 session의 최종 사용량이다. 종료는 성공을 뜻하지 않는다. */
 public record SubagentSessionUsage(

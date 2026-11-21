@@ -1,6 +1,6 @@
 package com.bifos.assistant.usage.execution.application;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
@@ -62,7 +62,7 @@ public class ExecutionEventRecorder {
      * <p>옮길 수 없는 사건은 저장하지 않고 {@code null} 을 낸다. 버린 이름은 {@code debug} 로 남긴다.
      * 모르는 사건이 자주 오면 로그가 그것으로 차므로 {@code warn} 으로 올리지 않는다.
      */
-    public ExecutionEvent record(AgentExecution execution, RunEvent event, int sequence) {
+    public ExecutionEvent record(AgentExecution execution, HermesRunEvent event, int sequence) {
         String hermesName = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
         ExecutionEventType type = OUR_NAMES.get(hermesName);
         if (type == null) {
@@ -93,7 +93,7 @@ public class ExecutionEventRecorder {
     }
 
 
-    private static String subagentName(RunEvent event) {
+    private static String subagentName(HermesRunEvent event) {
         String name = event.toolName();
         if (name == null || name.isBlank()) {
             name = event.subagentId();

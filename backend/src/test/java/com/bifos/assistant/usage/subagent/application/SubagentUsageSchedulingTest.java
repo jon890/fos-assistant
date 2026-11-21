@@ -20,7 +20,7 @@ import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.infra.ProfileModelDefaultsClient;
 import com.bifos.assistant.hermes.infra.SubagentProviderClient;
 import com.bifos.assistant.hermes.application.dto.SubagentProviderLookup;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;

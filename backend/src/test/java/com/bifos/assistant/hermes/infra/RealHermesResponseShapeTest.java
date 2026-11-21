@@ -2,7 +2,7 @@ package com.bifos.assistant.hermes.infra;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

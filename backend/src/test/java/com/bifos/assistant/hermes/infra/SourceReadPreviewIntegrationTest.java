@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -38,8 +38,8 @@ class SourceReadPreviewIntegrationTest {
     void keepsOnlyRequestedUrlFromRedactedTruncatedPreview() throws Exception {
         String full = result("https://example.com/hidden", "example ".repeat(125));
         String preview = full.substring(0, 497) + "...";
-        RunEvent started = HermesRunEventStream.toRunEvent(started("https://example.com/hidden"));
-        RunEvent runEvent = HermesRunEventStream.toRunEvent(event(preview));
+        HermesRunEvent started = HermesRunEventStream.toRunEvent(started("https://example.com/hidden"));
+        HermesRunEvent runEvent = HermesRunEventStream.toRunEvent(event(preview));
         List<ExecutionEvent> saved = records(started, runEvent);
 
         assertThat(preview).hasSize(500).endsWith("...");
@@ -54,7 +54,7 @@ class SourceReadPreviewIntegrationTest {
     @Test
     @DisplayName("온전한 원문 미리보기는 같은 저장 경로에서 공개 URL을 보낸다")
     void exposesUrlFromCompletePreview() throws Exception {
-        RunEvent runEvent = HermesRunEventStream.toRunEvent(event(result("https://example.com/visible", "short content")));
+        HermesRunEvent runEvent = HermesRunEventStream.toRunEvent(event(result("https://example.com/visible", "short content")));
         List<ExecutionEvent> saved = records(HermesRunEventStream.toRunEvent(started("https://example.com/visible")), runEvent);
 
         assertThat(saved.get(1).failed()).isFalse();
@@ -83,7 +83,7 @@ class SourceReadPreviewIntegrationTest {
     }
 
 
-    private static List<ExecutionEvent> records(RunEvent... events) throws Exception {
+    private static List<ExecutionEvent> records(HermesRunEvent... events) throws Exception {
         ExecutionEventRecorder recorder = new ExecutionEventRecorder(mock(SkillUseRecorder.class), CLOCK);
         AgentExecution execution = execution();
         return IntStream.range(0, events.length)
