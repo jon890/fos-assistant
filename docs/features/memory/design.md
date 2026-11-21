@@ -65,7 +65,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 항상 층 → 요약 구역(MEMORY_FACTS) → 질문 관련 구역(MEMORY_SEARCH) → 색인(MEMORY_INDEX)
 ```
 
-- 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 지금처럼 `MEMORY_FACTS` 줄을 읽는다
+- 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 `MEMORY_FACTS` 줄을 읽지 않고 `memory_read` 로 읽은 `MEMORY_READ` 줄만 보인다(스펙 DECISION31). `MEMORY_FACTS` 줄은 실행 기록에 그대로 남는다
 - 요약 구역에 든 기억도 질문 관련 구역의 후보다. `MemorySearchSection.place` 에 「색인에 다시 놓지 않을 번호」(요약 구역에 든 번호)를 넘긴다. 요약 구역에 든 기억이 색인에 두 번 오르지 않게 한다
 - 요약 구역의 고른 규칙 이름은 `facts-recent-v2` 로 올린다(`ContextSelection` 의 「규칙을 바꾸면 버전을 올린다」)
 - 예산은 `MemoryContextSettings.budgetFor(groupId)` 의 `summaryMaxChars` 와 `maxChars` 다. `assistant.context.max-chars`, `facts-max-chars`, `facts-item-max-chars` 설정은 지운다. 그룹이 없는 사용자는 기본값이다
