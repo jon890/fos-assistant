@@ -68,7 +68,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | 도구 | 위험도 | `attended_only` | 인자 | 결과 |
 | --- | --- | --- | --- | --- |
 | `check_shopping_login` | `READ` | 참 | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED` |
-| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄) | `{query, count, products: [...]}` |
+| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄), 선택 `sort`(값은 [기능 문서](../naver-shopping.md#도구와-정책)) | `{query, count, products: [...]}` |
 | `get_product_detail` | `READ` | 참 | `url`(검색 결과의 상품 주소, 2,048자까지) | 종류별 결과(아래) |
 
 확인 도구도 `attended_only` 다. 에이전트에게도 MCP 도구로 보여 예약 작업이 부르면 꺼진 브라우저를 켠다. 연결 확인은 도구 판정을 거치지 않는 대시보드 직접 호출이라 칸이 있어도 막히지 않는다.

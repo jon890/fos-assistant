@@ -26,7 +26,7 @@
       "attended_only": true,
       "title": "네이버 쇼핑 상품 찾기",
       "summary": "검색어 하나로 네이버 쇼핑 검색 결과 첫 페이지의 상품을 40개까지 읽어요. 읽는 동안 내 브라우저에 새 탭이 잠깐 열려요.",
-      "description": "Search Naver shopping products by keyword. 검색어 하나로 네이버 쇼핑 검색 결과 첫 페이지를 읽어 상품마다 rank, title, price_krw, store, url, kind, naver_pay, ad를 돌려줍니다. 사용자가 요청할 때 한 번만 부르고 다음 페이지는 읽지 않습니다. 처음 실린 상품만 40개까지 돌려주므로 더 적을 수 있습니다. kind가 store이면 네이버페이로 바로 살 수 있는 스마트스토어·브랜드스토어 상품, catalog이면 여러 판매처를 묶은 가격비교 상품, external이면 다른 쇼핑몰 상품이라 링크만 보입니다. naver_pay가 unknown이면 get_product_detail로 확인합니다. 로그인, 캡차, 기기 인증, 예상 밖 화면을 만나면 아무것도 누르지 않고 그 탭을 남긴 채 status가 HUMAN_ACTION_REQUIRED인 결과(handoff 칸)로 끝나며, 사용자에게 내 브라우저에서 마쳐 달라고 안내하고 마쳤다고 하기 전에는 다시 부르지 않습니다. 장바구니에 담거나 주문하지 않습니다."
+      "description": "Search Naver shopping products by keyword. 검색어 하나로 네이버 쇼핑 검색 결과 첫 페이지를 읽어 상품마다 rank, title, price_krw, store, url, kind, naver_pay, ad를 돌려줍니다. sort는 선택입니다. 생략하면 네이버 랭킹순이고, LOW_PRICE는 낮은 가격순, HIGH_PRICE는 높은 가격순, REVIEW는 리뷰 많은 순입니다. 다음 페이지는 읽지 않습니다. 처음 실린 상품만 40개까지 돌려주므로 더 적을 수 있습니다. kind가 store이면 네이버페이로 바로 살 수 있는 스마트스토어·브랜드스토어 상품, catalog이면 여러 판매처를 묶은 가격비교 상품, external이면 다른 쇼핑몰 상품이라 링크만 보입니다. naver_pay가 unknown이면 get_product_detail로 확인합니다. 로그인, 캡차, 기기 인증, 예상 밖 화면을 만나면 아무것도 누르지 않고 그 탭을 남긴 채 status가 HUMAN_ACTION_REQUIRED인 결과(handoff 칸)로 끝나며, 사용자에게 내 브라우저에서 마쳐 달라고 안내하고 마쳤다고 하기 전에는 다시 부르지 않습니다. 장바구니에 담거나 주문하지 않습니다."
     },
     "get_product_detail": {
       "risk": "READ",

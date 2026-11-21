@@ -303,7 +303,18 @@ test("상품 정보 읽기의 누르기는 옵션이 있는데 비었을 때만 
   expect(clicks.map((line) => line.source)).toEqual([OPEN_OPTION_LISTS]);
 });
 
-test("표준옵션 상품의 준비는 드롭다운을 누르지 않고 묶음마다 값 하나로 맞추며 추가 금액을 0 으로 계산한다", async () => {
+test("고른 사이즈 재고를 읽지 못해도 준비는 표시된 가격과 배송비로 예상 합계를 낸다", async () => {
+  const detail = await call(
+    { product: STANDARD_PRODUCT },
+    "get_product_detail",
+    { url: PRODUCT_URL },
+  );
+  expect(detail.isError).toBe(false);
+  expect(detail.body.options[1]).toMatchObject({
+    name: "사이즈",
+    values: expect.arrayContaining([{ label: "L", extra_krw: null, sold_out: null }]),
+  });
+  shop!.stop();
   const { isError, body } = await prepare(
     { product: STANDARD_PRODUCT },
     { url: PRODUCT_URL, options: ["흰색", "L"], quantity: 2 },
