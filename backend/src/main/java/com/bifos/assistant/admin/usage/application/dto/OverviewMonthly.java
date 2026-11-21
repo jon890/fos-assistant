@@ -19,7 +19,11 @@ public record OverviewMonthly(
     boolean incomplete,
     Evaluation evaluation) {
 
-    /** 배포 뒤 확인과 평가가 쓴 실행 수와 예상 추가 사용 요금이다(docs/features/agent-quality/spec.md 의 REQ2). */
-    public record Evaluation(long executions, long actualCostMicros) {
+    /**
+     * 배포 뒤 확인과 평가가 쓴 실행 수와 예상 추가 사용 요금이다(docs/features/agent-quality/spec.md 의 REQ2).
+     *
+     * @param incomplete 그룹 합계의 같은 칸과 같은 뜻이다. 평가 실행만 센다
+     */
+    public record Evaluation(long executions, long actualCostMicros, boolean incomplete) {
     }
 }

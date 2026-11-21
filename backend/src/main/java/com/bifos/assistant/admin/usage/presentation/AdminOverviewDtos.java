@@ -61,7 +61,10 @@ public final class AdminOverviewDtos {
                 monthly.incomplete(),
                 monthly.evaluation() == null
                     ? null
-                    : new EvaluationView(monthly.evaluation().executions(), monthly.evaluation().actualCostMicros()));
+                    : new EvaluationView(
+                        monthly.evaluation().executions(),
+                        monthly.evaluation().actualCostMicros(),
+                        monthly.evaluation().incomplete()));
         }
     }
 
@@ -69,7 +72,8 @@ public final class AdminOverviewDtos {
      * 평가 전용 사용자의 이번 달 합계다. 그룹 합계에서 빠져 「평가」 한 줄로 보인다.
      *
      * @param actualCostMicros 예상 추가 사용 요금. 통화 단위의 100만분의 1
+     * @param incomplete 금액을 확인하지 못한 평가 실행이 있어 금액이 실제보다 적을 수 있으면 참
      */
-    public record EvaluationView(long executions, long actualCostMicros) {
+    public record EvaluationView(long executions, long actualCostMicros, boolean incomplete) {
     }
 }

@@ -57,7 +57,7 @@ public class AdminOverviewService {
 
     /** 서울 날짜로 오늘을 포함한 7일 동안 그룹에서 실패한 루트 실행 수와 최근 세 건이다. */
     public OverviewFailures failures(CurrentUser admin) {
-        Map<Long, String> names = members(admin);
+        Map<Long, String> names = members(admin, evaluationUsers.idIn(admin.groupId()));
         Instant since = LocalDate.now(clock.withZone(HOUSEHOLD_ZONE))
             .minusDays(FAILURE_DAYS - 1L)
             .atStartOfDay(HOUSEHOLD_ZONE)
@@ -83,32 +83,37 @@ public class AdminOverviewService {
         YearMonth month = YearMonth.now(clock.withZone(HOUSEHOLD_ZONE));
         Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
-        MonthlyUsageSummary sum = summaries.monthly(members(admin).keySet(), from, to);
-        OverviewMonthly.Evaluation evaluation = evaluationUsers.idIn(admin.groupId())
+        Optional<Long> evaluationId = evaluationUsers.idIn(admin.groupId());
+        MonthlyUsageSummary sum = summaries.monthly(members(admin, evaluationId).keySet(), from, to);
+        OverviewMonthly.Evaluation evaluation = evaluationId
             .map(id -> summaries.monthly(Set.of(id), from, to))
             .map(found -> new OverviewMonthly.Evaluation(
-                found.pricedExecutions() + found.unpricedExecutions(), found.actualMicros()))
+                found.pricedExecutions() + found.unpricedExecutions(), found.actualMicros(), incomplete(found)))
             .orElse(null);
-        long missing = sum.unpricedExecutions()
-            + sum.pendingSubagents()
-            + sum.unconfirmedSubagents()
-            + sum.unpricedSubagents()
-            + sum.observationIncompleteExecutions();
         return new OverviewMonthly(
             month.toString(),
             sum.pricedExecutions() + sum.unpricedExecutions(),
             sum.subscriptionExecutions(),
             sum.actualMicros(),
-            missing > 0,
+            incomplete(sum),
             evaluation);
     }
 
 
+    /** 금액이 실제보다 적을 수 있는가. 「사용량과 비용」 요약 탭이 따로 알리는 경우 가운데 하나라도 있으면 참이다. */
+    private static boolean incomplete(MonthlyUsageSummary sum) {
+        return sum.unpricedExecutions()
+            + sum.pendingSubagents()
+            + sum.unconfirmedSubagents()
+            + sum.unpricedSubagents()
+            + sum.observationIncompleteExecutions() > 0;
+    }
+
+
     /** 그룹 사용자의 이름이다. 평가 전용 사용자는 뺀다. */
-    private Map<Long, String> members(CurrentUser admin) {
+    private Map<Long, String> members(CurrentUser admin, Optional<Long> evaluationId) {
         Map<Long, String> names = new HashMap<>(userNames.namesInGroup(admin.groupId()));
-        Optional<Long> evaluation = evaluationUsers.idIn(admin.groupId());
-        evaluation.ifPresent(names::remove);
+        evaluationId.ifPresent(names::remove);
         return names;
     }
 }
