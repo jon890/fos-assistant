@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.conversation.application;
 import com.bifos.assistant.chat.conversation.application.dto.FoundImage;
 import com.bifos.assistant.chat.conversation.application.dto.FoundImageLink;
 import com.bifos.assistant.chat.conversation.application.dto.FoundPage;
+import com.bifos.assistant.chat.conversation.application.dto.FoundPhotoCandidate;
 import com.bifos.assistant.chat.conversation.application.dto.LinkTarget;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import java.net.URI;

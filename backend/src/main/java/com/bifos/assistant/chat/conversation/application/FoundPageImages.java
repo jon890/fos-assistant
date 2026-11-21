@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.conversation.application;
 
 import com.bifos.assistant.chat.conversation.application.dto.FoundImage.Kind;
+import com.bifos.assistant.chat.conversation.application.dto.FoundPhotoCandidate;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Comparator;
