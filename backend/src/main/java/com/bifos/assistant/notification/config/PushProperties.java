@@ -23,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 public record PushProperties(
     @DefaultValue( {
         "fcm.googleapis.com",
+        "jmt17.google.com",
         "updates.push.services.mozilla.com",
         "web.push.apple.com",
         ".notify.windows.com"}) List<String> allowedEndpointHosts,

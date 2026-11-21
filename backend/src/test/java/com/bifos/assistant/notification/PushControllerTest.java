@@ -39,7 +39,7 @@ import tools.jackson.databind.json.JsonMapper;
 @BackendIntegrationTest
 class PushControllerTest {
 
-    private static final String ENDPOINT = "https://fcm.googleapis.com/fcm/send/controller-device";
+    private static final String ENDPOINT = "https://jmt17.google.com/fcm/send/controller-device";
     private static final TestSubscriptionKeys KEYS = TestSubscriptionKeys.create();
     private static final String P256DH = KEYS.p256dh();
     private static final String AUTH = KEYS.auth();
