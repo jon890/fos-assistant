@@ -40,6 +40,7 @@ from .sandbox import (
 )
 from .sandbox_approvals import _with_sandbox_approvals
 from .image_service import IMAGE_TOOLSET, _with_image_service
+from .product_page_toolset import PRODUCT_PAGE_TOOLSET, _product_page_rejection, _with_product_page_known
 
 
 # 올린 스킬의 버전 디렉터리 이름이다. `.` 과 `..` 은 첫 글자 규칙에서 걸린다.
@@ -256,14 +257,20 @@ async def _check_config_update(request):
             allowed = platform["api_server"]
             # profile 에만 설치한 plugin 의 toolset 도 그 profile 범위에서 읽는다.
             with _config_profile_scope(profile):
-                known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP}
+                # 상품 페이지 toolset 은 fos-ctx 가 없는 profile 에서도 받는다. Hermes 는 목록의 모르는 이름을 무시한다.
+                known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP, PRODUCT_PAGE_TOOLSET}
             if set(allowed) - known:
                 return _rejected("모르는 도구 이름이 있다")
+            product_page = _product_page_rejection(allowed)
+            if product_page is not None:
+                return _rejected(product_page)
             if set(_bound_servers(get_profile_dir(profile))) - set(allowed):
                 return _rejected("연결된 플러그인의 도구 이름이 빠졌다", 409)
             if CONTROL_PLANE_MCP not in mcp_names and not (set(allowed) & builtins):
                 return _rejected("내장 도구가 하나 이상 필요하다")
             updated["platform_toolsets"] = {**(saved.get("platform_toolsets") or {}), **platform}
+            # 알려진 이름으로 적어 두어야 목록에 없을 때 꺼진다. 없으면 Hermes 가 plugin toolset 을 기본으로 켠다.
+            updated = _with_product_page_known(updated)
         if sandbox is not None:
             # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
             try:
@@ -302,11 +309,13 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
-        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal, approvals, image_gen 은 plugin 이 먼저 쓴다.
+        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal, approvals, image_gen,
+        # known_plugin_toolsets 는 plugin 이 먼저 쓴다.
         # terminal 이 그대로여도 approvals 만 바뀌면 쓴다. 이미 docker 인 profile 을 다시 저장해 승인 값을 넣는다.
         if (updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal")
                 or updated.get("approvals") != saved.get("approvals")
-                or updated.get("image_gen") != saved.get("image_gen")):
+                or updated.get("image_gen") != saved.get("image_gen")
+                or updated.get("known_plugin_toolsets") != saved.get("known_plugin_toolsets")):
             request.state.fos_checked_config = (config_path, original, updated)
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")
