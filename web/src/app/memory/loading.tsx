@@ -1,5 +1,11 @@
-import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton } from "@/components/ui/page-state";
+import { PAGE_HEADS } from "@/lib/page-head";
 
 export default function Loading() {
-  return <PageSkeleton shape="list" width="4xl" title description="memory" form="memory" />;
+  return (
+    <PageFrame {...PAGE_HEADS.memory} busy>
+      <ListSkeleton rows={5} />
+    </PageFrame>
+  );
 }

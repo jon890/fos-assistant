@@ -1,5 +1,6 @@
 package com.bifos.assistant.notification.infra;
 
+import com.bifos.assistant.notification.domain.VapidKeyPair;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -33,19 +34,17 @@ public class VapidSigner {
 
     /** {@code vapid t=<JWT>, k=<공개 키>} 를 돌려준다. 키가 꺼졌으면 {@link IllegalStateException} 이다. */
     public String authorization(String endpoint, Instant now) {
-        if (!keys.enabled()) {
-            throw new IllegalStateException("web push is not configured");
-        }
+        VapidKeyPair pair = keys.current().orElseThrow(() -> new IllegalStateException("web push is not configured"));
         URI uri = URI.create(endpoint);
         String audience = (uri.getScheme() + "://" + uri.getHost()).toLowerCase(Locale.ROOT);
-        Claims claims = new Claims(audience, now.plus(LIFETIME).getEpochSecond(), keys.subject());
+        Claims claims = new Claims(audience, now.plus(LIFETIME).getEpochSecond(), pair.subject());
         String unsigned = HEADER + "." + B64.encodeToString(JSON.writeValueAsBytes(claims));
         try {
             Signature signer = Signature.getInstance("SHA256withECDSAinP1363Format");
-            signer.initSign(keys.privateKey());
+            signer.initSign(pair.privateKey());
             signer.update(unsigned.getBytes(StandardCharsets.US_ASCII));
             String token = unsigned + "." + B64.encodeToString(signer.sign());
-            return "vapid t=" + token + ", k=" + keys.publicKeyBase64Url();
+            return "vapid t=" + token + ", k=" + pair.publicKeyBase64Url();
         } catch (GeneralSecurityException ex) {
             throw new IllegalStateException("VAPID signing failed", ex);
         }

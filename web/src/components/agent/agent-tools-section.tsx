@@ -228,7 +228,7 @@ export function AgentToolsSection({
   return (
     <section
       aria-label="도구"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <h2 className="font-semibold">도구</h2>
       <p className="mt-1 text-sm text-muted-foreground">

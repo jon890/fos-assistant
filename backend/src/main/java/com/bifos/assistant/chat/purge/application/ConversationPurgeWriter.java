@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationR
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.application.FoundLinks;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
@@ -34,6 +35,7 @@ class ConversationPurgeWriter {
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
     private final PendingMessageStore pendingMessages;
+    private final FoundLinks foundLinks;
     private final ChatAttachmentRepository attachments;
     private final ChatArtifactRepository artifacts;
     private final ConversationExecutionPurge executions;
@@ -59,6 +61,8 @@ class ConversationPurgeWriter {
             return false;
         }
         pendingMessages.clear(conversationId);
+        // 사용자 정리처럼 대화 지우기를 거치지 않고 온 대화도 여기서 비운다(스펙 agent-found-image DECISION16).
+        foundLinks.clear(conversationId);
         creationRequests.findByConversationIdOrderByIdAsc(conversationId).forEach(ContentDraftCreationRequest::markGone);
         creationRequests.flush();
         revisions.deleteForConversation(conversationId);

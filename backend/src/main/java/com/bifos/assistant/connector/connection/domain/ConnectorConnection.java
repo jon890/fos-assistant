@@ -166,6 +166,16 @@ public class ConnectorConnection extends CreatedAtEntity {
     }
 
 
+    /**
+     * 다시 연결 필요였던 단추 연결이 새 토큰을 받았다. 표시만 지운다. 쓸 수 있는지는 이어지는 확인 도구가 정하므로 상태와 revision 은
+     * 그대로 둔다.
+     */
+    public void reconnectResolved() {
+        this.fields = new ConnectionFields(
+            fields.values(), fields.secretPrefixes(), new ConnectionAuth(fields.auth().provider(), false));
+    }
+
+
     public void recordUndeclaredTools(int count) {
         this.undeclaredTools = count;
     }

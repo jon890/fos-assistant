@@ -143,6 +143,8 @@ const ADMIN_MESSAGES: Record<string, string> = {
   HERMES_UNAVAILABLE:
     "Hermes 런타임에 연결하지 못했어요. 연결 상태를 확인해 주세요.",
   SECRET_STORE_UNAVAILABLE: "KEK 가 없어 저장할 수 없습니다",
+  VAPID_STATE_CHANGED:
+    "그사이 VAPID 키가 바뀌었어요. 화면을 새로 읽었으니 다시 확인해 주세요.",
 };
 
 export function describeAdminError(code: string, fallback: string): string {

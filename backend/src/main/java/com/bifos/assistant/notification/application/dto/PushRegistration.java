@@ -8,8 +8,9 @@ package com.bifos.assistant.notification.application.dto;
  * @param auth 브라우저의 인증 값(base64url)
  * @param name 화면이 브라우저와 OS 로 만든 기기 이름
  * @param timeZone 브라우저 시간대
+ * @param publicKey 이 구독을 만들 때 쓴 VAPID 공개 키(base64url). 서버의 지금 키와 다르면 거절한다
  */
-public record PushRegistration(String endpoint, String p256dh, String auth, String name, String timeZone) {
+public record PushRegistration(String endpoint, String p256dh, String auth, String name, String timeZone, String publicKey) {
 
     @Override
     public String toString() {

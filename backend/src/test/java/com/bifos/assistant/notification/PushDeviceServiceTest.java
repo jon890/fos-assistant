@@ -250,18 +250,33 @@ class PushDeviceServiceTest {
 
 
     @Test
+    @DisplayName("지금 키와 다른 공개 키로 만든 구독이나 공개 키가 없는 구독은 PUSH_KEY_CHANGED 로 받지 않는다")
+    void registerRejectsOtherPublicKey() {
+        PushRegistration other = new PushRegistration(
+            ENDPOINT, KEYS.p256dh(), KEYS.auth(), "PC", "Asia/Seoul", VapidKeys.generate("mailto:other@example.invalid").publicKey());
+        PushRegistration missing = new PushRegistration(ENDPOINT, KEYS.p256dh(), KEYS.auth(), "PC", "Asia/Seoul", null);
+
+        assertThatThrownBy(() -> service.register(alice, other))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PUSH_KEY_CHANGED));
+        assertThatThrownBy(() -> service.register(alice, missing))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PUSH_KEY_CHANGED));
+        assertThat(service.list(alice)).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("허용하지 않은 주소와 모르는 시간대는 받지 않는다")
     void registerValidates() {
         assertThatThrownBy(() -> service.register(alice, registration("https://internal.example/x", "PC")))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> service.register(alice,
-            new PushRegistration(ENDPOINT, KEYS.p256dh(), KEYS.auth(), "PC", "Mars/Olympus")))
+            new PushRegistration(ENDPOINT, KEYS.p256dh(), KEYS.auth(), "PC", "Mars/Olympus", keys.publicKeyBase64Url())))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> service.register(alice,
-            new PushRegistration(ENDPOINT, "BPublicKeyOfBrowser", KEYS.auth(), "PC", "Asia/Seoul")))
+            new PushRegistration(ENDPOINT, "BPublicKeyOfBrowser", KEYS.auth(), "PC", "Asia/Seoul", keys.publicKeyBase64Url())))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> service.register(alice,
-            new PushRegistration(ENDPOINT, KEYS.p256dh(), "c2hvcnQ", "PC", "Asia/Seoul")))
+            new PushRegistration(ENDPOINT, KEYS.p256dh(), "c2hvcnQ", "PC", "Asia/Seoul", keys.publicKeyBase64Url())))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(service.list(alice)).isEmpty();
     }
@@ -305,8 +320,8 @@ class PushDeviceServiceTest {
     }
 
 
-    private static PushRegistration registration(String endpoint, String name) {
-        return new PushRegistration(endpoint, KEYS.p256dh(), KEYS.auth(), name, "Asia/Seoul");
+    private PushRegistration registration(String endpoint, String name) {
+        return new PushRegistration(endpoint, KEYS.p256dh(), KEYS.auth(), name, "Asia/Seoul", keys.publicKeyBase64Url());
     }
 
 

@@ -28,6 +28,8 @@ public interface HermesConnectorClient {
      * @param mode 설치 방식. {@link #MODE_BIND} 여야 한다
      * @param toolGuard 그 profile 의 {@code fos-ctx} 가 사건 실행의 도구 판정을 하는 묶음과 같은가(ADR-20261105 / event-watch). 대시보드가
      * 참이라고 답했을 때만 참이다. 옛 대시보드는 이 칸을 내지 않는다
+     * @param skippedSkills 지금 profile 기준으로 설치되지 않은 에이전트용 스킬과 까닭. 대시보드가 칸을 내지 않았으면 null 이다.
+     * 빈 목록은 빠진 스킬이 없다는 뜻이라 null 과 구분한다
      */
     record ConnectorState(
         String profile,
@@ -37,7 +39,28 @@ public interface HermesConnectorClient {
         boolean policyHook,
         String mode,
         JsonNode executionGuard,
-        boolean toolGuard) {
+        boolean toolGuard,
+        List<SkippedSkill> skippedSkills) {
+
+        public ConnectorState {
+            skippedSkills = skippedSkills == null ? null : List.copyOf(skippedSkills);
+        }
+
+
+        /** 빠진 스킬을 모르는 상태다. {@code skippedSkills} 는 null 이다. */
+        public ConnectorState(
+            String profile,
+            boolean enabled,
+            boolean configured,
+            boolean restartRequired,
+            boolean policyHook,
+            String mode,
+            JsonNode executionGuard,
+            boolean toolGuard) {
+            this(profile, enabled, configured, restartRequired, policyHook, mode, executionGuard, toolGuard, null);
+        }
+
+
         /** 도구 판정을 모르는 상태다. {@code toolGuard} 는 거짓이다. */
         public ConnectorState(
             String profile,
