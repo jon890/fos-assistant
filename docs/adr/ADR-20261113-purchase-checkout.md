@@ -64,3 +64,5 @@
   - 주문서 화면의 칸 위치는 아직 재지 않았다. 읽지 못하면 결과 불명으로 끝난다
   - 옵션 드롭다운 열기는 네이버 계정에 남는 기록이 아니지만 읽기 도구의 첫 누르기다. 상수 식 하나와 검사로 범위를 묶는다
 - **확인 방법**: 사람 기다림과 이어 가기는 `CheckoutApprovalTest` 와 플러그인 `checkout.test.ts` 가 본다. `ToolPolicyDecisionTest`, `AttendedOnlyPrepareTest`, `PurchaseLimitSettingsTest`, `PurchaseLimitControllerTest`, 대시보드 선언 검사(`hermes/tests/test_connector_manifest.py`, `hermes/tests/test_connectors_contract.py`), 웹 `test/node/purchase-limits-route.test.ts`. 주문서 종류와 상한 판정, 결과 판정은 `CheckoutApprovalTest`, `ConnectorCheckoutSnapshotTest`, `hermes/tests/test_connector_checkout_validation.py`(Java 와 같은 사례 표 `test/resources/checkout-snapshot-v1.json`)가 본다. 플러그인 도구의 검사는 그 구현 PR 이 더한다
+
+위 테스트 이름은 상한을 적용하던 당시의 확인 항목이다. 한도 제거 뒤 전용 설정과 API 테스트는 삭제했다.
