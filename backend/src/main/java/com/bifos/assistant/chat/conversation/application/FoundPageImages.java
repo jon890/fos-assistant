@@ -21,6 +21,8 @@ class FoundPageImages {
     private static final Pattern SHARED_IMAGE = Pattern.compile(
         "(?i)(?:^|[/_.-])(?:all[_-]og|og[_-]default|og[_-]image|default|logo|placeholder|favicon|social[_-]share)(?:$|[/_.-])"
             + "|/(?:common|branding|social|site-assets)/");
+    /** 본문 사진은 200×200 이상으로 크기가 알려진 것만 고른다. 작거나 크기를 모르는 본문 그림은 배지나 아이콘일 수 있다. */
+    private static final long MIN_BODY_AREA = 200L * 200L;
     private static final Comparator<FoundPhotoCandidate> PREFERENCE = Comparator.comparing(FoundPhotoCandidate::kind)
         .thenComparing(Comparator.comparingLong(FoundPhotoCandidate::size).reversed());
 
@@ -51,6 +53,7 @@ class FoundPageImages {
             .toList();
         return page.images().stream()
             .filter(image -> image.kind() == Kind.PRODUCT || !sharedPath(image.uri()) && !commonOg.contains(image.hash()))
+            .filter(image -> image.kind() != Kind.BODY || image.size() >= MIN_BODY_AREA)
             .filter(image -> recorded.test(image.hash()))
             .sorted(PREFERENCE)
             .findFirst();
