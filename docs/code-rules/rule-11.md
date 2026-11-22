@@ -1,6 +1,6 @@
 # rule-11
 
-mcp는 Hermes 호출 타입을 직접 쓰지 않는다.
+mcp는 Hermes 호출 타입과 런타임 실행 port를 직접 쓰지 않는다.
 
 검사: [MCP_DOES_NOT_CALL_HERMES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java)
 
@@ -10,7 +10,7 @@ MCP는 실행 권한을 판정하고 실제 Hermes 호출은 실행 흐름에 �
 
 ## 예외와 검토 범위
 
-HermesProfileName 같은 이름 규칙 값은 허용한다.
+HermesProfileName 같은 이름 규칙 값과 `runtime` 의 값 타입은 허용한다.
 Client 접미사와 호출 타입 선택은 검사 코드가 갖는다.
 
 ## 이 저장소의 사례

@@ -1,5 +1,7 @@
 package com.bifos.assistant.hermes.infra;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.runtime.application.dto.RunLookup;
@@ -7,14 +9,11 @@ import com.bifos.assistant.runtime.application.dto.RunOutcome;
 import com.bifos.assistant.runtime.application.dto.RunResult;
 
 /** Hermes 의 끝난 실행과 조회 답을 런타임에 묶이지 않는 결과로 옮긴다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesRunOutcomes {
 
     /** 실행을 부르는 쪽이 취소로 보던 Hermes 상태다. 옮기기 전에는 부르는 쪽이 이 글자와 직접 비교했다. */
     private static final String CANCELLED = "cancelled";
-
-
-    private HermesRunOutcomes() {
-    }
 
 
     /** 상태 글자는 받은 그대로 넘긴다. 실행 기록의 오류 코드가 그 글자로 남는다. */

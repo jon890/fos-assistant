@@ -1,5 +1,7 @@
 package com.bifos.assistant.testsupport;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -19,11 +21,8 @@ import org.mockito.Mockito;
  * <p>가짜 Hermes 호출을 실제 Hermes 어댑터로 감싸, 테스트가 Hermes 의 사건 이름과 상태 문자열로 준비한 값이 운영과 같은 길로
  * 중립 타입으로 옮겨지게 한다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TestAgentRuntimes {
-
-    private TestAgentRuntimes() {
-    }
-
 
     public static AgentRuntimes hermes(HermesRunsClient client, HermesRunEventStream stream) {
         return new AgentRuntimes(List.of(new HermesAgentRuntime(client, stream)));

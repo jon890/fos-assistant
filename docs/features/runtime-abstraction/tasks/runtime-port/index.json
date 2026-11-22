@@ -4,6 +4,11 @@
   "pr_scope": "실행 port 와 그 타입을 새 최상위 패키지 runtime 으로 옮기는 일괄 이동이며 Hermes 의 동작과 데이터베이스는 바꾸지 않는다.",
   "deferred": [
     {
+      "what": "runtime 으로 옮긴 타입(TokenUsage, SubagentSessionUsage, ToolDetailScope, ToolDetailRedactor, SessionRuntime, SteerOutcome, RunImage)의 Javadoc 에서 Hermes 에만 맞는 서술을 중립 서술로 고치고 HermesRunsClient 의 Javadoc 에 내부 경계임을 적는다",
+      "why": "3단계 커밋 뒤 운영 코드가 상한의 80% 를 넘었다. 동작이 없는 주석 정리라 미뤄도 이 PR 의 인수 조건에 닿지 않는다",
+      "after": "이 PR 이 머지된 뒤. PR2 의 첫 커밋으로 넣어도 된다"
+    },
+    {
       "what": "ACP 구현과 OpenClaw 의 대화 실행, 관리자만 바꾸는 런타임 설정(스펙 PR2)",
       "why": "구독 로그인, 지침 넣기, Control Plane 도구 붙이기, 웹 검색이 ACP 로 되는지 실제로 띄워 확인한 뒤 설계한다",
       "after": "이 PR 이 머지되고 실제 확인 결과가 설계에 반영된 뒤"

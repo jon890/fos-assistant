@@ -1,5 +1,7 @@
 package com.bifos.assistant.hermes.infra;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.runtime.application.dto.RunEvent;
 import com.bifos.assistant.runtime.application.dto.RunEventKind;
@@ -7,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Hermes 가 {@code event} 로 보내는 사건 이름을 런타임에 묶이지 않는 종류로 옮긴다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesRunEventKinds {
 
     private static final Map<String, RunEventKind> KINDS = Map.of(
@@ -20,10 +23,6 @@ public final class HermesRunEventKinds {
         "run.failed", RunEventKind.RUN_FAILED,
         "run.cancelled", RunEventKind.RUN_CANCELLED,
         "run.interrupted", RunEventKind.RUN_INTERRUPTED);
-
-
-    private HermesRunEventKinds() {
-    }
 
 
     /** 모르는 이름과 null 은 {@code OTHER} 다. 대소문자는 가리지 않는다. */

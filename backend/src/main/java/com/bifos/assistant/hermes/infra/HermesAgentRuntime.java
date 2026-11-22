@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes.infra;
 
+import lombok.RequiredArgsConstructor;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.runtime.application.dto.RunCommand;
@@ -25,16 +26,11 @@ import org.springframework.stereotype.Component;
  * 명령·결과·사건을 런타임에 묶이지 않는 타입과 서로 옮기기만 한다.
  */
 @Component
+@RequiredArgsConstructor
 public class HermesAgentRuntime implements AgentRuntime {
 
     private final HermesRunsClient client;
     private final HermesRunEventStream eventStream;
-
-
-    public HermesAgentRuntime(HermesRunsClient client, HermesRunEventStream eventStream) {
-        this.client = client;
-        this.eventStream = eventStream;
-    }
 
 
     @Override

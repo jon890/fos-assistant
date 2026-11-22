@@ -2,7 +2,7 @@
 
 Control Plane 이 Hermes 를 부르는 실행 경계를 port 로 모으고, 다른 Agent Runtime 을 붙여 비교하는 기능이다.
 
-아직 들어온 동작이 없다. 요구와 결정은 스펙 [`runtime-abstraction/spec.md`](runtime-abstraction/spec.md) 가 갖는다.
+실행 port 가 `runtime` 패키지의 중립 계약(`AgentRuntime`)으로 옮겨졌고 구현은 Hermes 하나(`HermesAgentRuntime`)다. 실행을 부르는 곳은 `AgentRuntimes` 로 대상의 런타임 구현을 골라 부른다. 다른 런타임은 아직 붙지 않았다. 요구와 결정은 스펙 [`runtime-abstraction/spec.md`](runtime-abstraction/spec.md) 가 갖는다.
 지금 실행이 Hermes 로 가는 흐름은 [실행 기록과 한도](execution.md)와 [Hermes 계약](../../hermes/docs/hermes-contract.md)이 갖는다.
 
 이 파일의 「조사」 와 「하네스 설계 원칙 비교」 는 스펙을 정하려고 읽은 것을 남긴 기록이다. 비교 결과(평가 숫자와 왕복 확인)는 구현 PR 이 이 파일에 추가한다.
@@ -13,7 +13,7 @@ port 가 무엇을 감싸야 하는지 정하려고 지금 기대는 곳을 모�
 
 | 묶음 | 지금 하는 일 | 부르는 port |
 | --- | --- | --- |
-| 실행 | turn 제출, 사건 스트림, 끝난 결과, 중지, 글 끼워 넣기, 실행 조회, 잃은 실행 해제, session 삭제, 실제로 돈 모델 읽기 | `HermesRunsClient` |
+| 실행 | turn 제출, 사건 스트림, 끝난 결과, 중지, 글 끼워 넣기, 실행 조회, 잃은 실행 해제, session 삭제, 실제로 돈 모델 읽기 | `AgentRuntime`. Hermes 구현은 `HermesAgentRuntime` 이고 그 안에서 `HermesRunsClient` 를 부른다 |
 | 지침과 기억 | 실행마다 `instructions` 에 공통 답변 지침과 요청자가 볼 수 있는 Memory 를 넣는다 | `HermesRunCommand` |
 | Control Plane 도구 | Hermes 가 Control Plane MCP 서버를 부르고, `fos-ctx` plugin 이 실행 맥락을 서명해 요청자를 정한다([MCP 와 토큰](mcp.md)) | `hermes/plugins/fos-ctx/` |
 | 플러그인과 승인 | 플러그인 설치와 바인딩, 보관 파일, 도구 호출 판정과 승인 카드 | `HermesConnectorClient`, `fos-ctx` hook |

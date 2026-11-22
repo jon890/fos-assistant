@@ -2,7 +2,6 @@ package com.bifos.assistant.usage;
 
 import com.bifos.assistant.runtime.domain.RuntimeKind;
 import com.bifos.assistant.runtime.domain.RuntimeTarget;
-import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;

@@ -40,7 +40,9 @@ phase 03 에서 호출자를 다음 PR 로 미뤘으면 그 클래스의 위반�
 
 `MCP_DOES_NOT_CALL_HERMES` 의 `dependOnClassesThat(...)` 조건에 「`com.bifos.assistant.runtime..` 의 `AgentRuntime` 또는 `AgentRuntimes`」 를 `or` 로 더한다. `docs/code-rules/rule-11.md` 의 첫 문장을 「mcp는 Hermes 호출 타입과 런타임 실행 port 를 직접 쓰지 않는다.」 로 고치고 「예외와 검토 범위」 에 「`runtime` 의 값 타입(`TokenUsage` 등)은 허용한다」 를 더한다.
 
-### 3. 주석
+### 3. 주석(다음 PR 로 미룸)
+
+**이 항목은 이 PR 에서 하지 않는다.** 3단계 커밋 뒤 운영 코드가 상한의 80% 를 넘어, 운영 코드를 건드리는 주석 정리만 `index.json` 의 `deferred` 로 미뤘다. 아래는 미룬 일의 내용이다.
 
 `runtime` 으로 옮긴 타입(`TokenUsage`, `SubagentSessionUsage`, `ToolDetailScope`, `ToolDetailRedactor`, `SessionRuntime`, `SteerOutcome`, `RunImage`)의 Javadoc 에서 Hermes 에만 맞는 서술(`POST /v1/runs/{run_id}/steer`, 「Hermes 가 …」)을 「런타임 구현이 …」 로 바꾸고, Hermes 의 구체 서술이 필요하면 `HermesAgentRuntime` 이나 `HermesRunsClient` 의 Javadoc 으로 옮긴다. `HermesRunsClient` 의 클래스 Javadoc 첫 문단에 「`hermes` 안의 내부 경계다. 밖에서는 `AgentRuntime` 을 쓴다」 를 더한다.
 
@@ -67,8 +69,13 @@ scripts/dev/check-local.sh --fast
 | `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRulesTest.java` | 수정 |
 | `backend/config/archunit/store/*` | 신규·수정 |
 | `docs/code-rules/*.md` | 신규·수정 |
-| `backend/src/main/java/com/bifos/assistant/runtime/**/*.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/hermes/application/port/HermesRunsClient.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesAgentRuntime.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesAgentRuntime.java` | 수정 (코드 규칙: 생성자를 Lombok 으로) |
+| `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunEventKinds.java` | 수정 (코드 규칙: private 생성자를 Lombok 으로) |
+| `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunOutcomes.java` | 수정 (코드 규칙: private 생성자를 Lombok 으로) |
+| `backend/src/test/java/com/bifos/assistant/testsupport/TestAgentRuntimes.java` | 수정 (코드 규칙) |
+| `backend/src/test/java/com/bifos/assistant/usage/LostRunReleaseTest.java` | 수정 (안 쓰는 import) |
+| `backend/AGENTS.md` | 수정 (규칙 표에 새 규칙) |
+| `docs/features/agent-skill.md` | 수정 |
+| `docs/features/execution.md` | 수정 |
 | `docs/features/runtime-abstraction.md` | 수정 |
 | `backend/docs/code-architecture.md` | 수정 |

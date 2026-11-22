@@ -457,6 +457,20 @@ class ArchitectureRulesTest {
 
 
     @Test
+    @DisplayName("runtime 이 hermes 를 쓰지 않는다")
+    void runtimeDoesNotKnowHermes() {
+        FreezingArchRule.freeze(ArchitectureRules.RUNTIME_DOES_NOT_KNOW_HERMES).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("hermes 밖이 Hermes 의 실행 port 와 실행 타입을 쓰지 않는다")
+    void onlyHermesUsesHermesRunTypes() {
+        FreezingArchRule.freeze(ArchitectureRules.ONLY_HERMES_USES_HERMES_RUN_TYPES).check(MAIN);
+    }
+
+
+    @Test
     @DisplayName("mcp 가 Hermes 를 부르는 타입을 쓰지 않는다")
     void mcpDoesNotCallHermes() {
         FreezingArchRule.freeze(ArchitectureRules.MCP_DOES_NOT_CALL_HERMES).check(MAIN);
