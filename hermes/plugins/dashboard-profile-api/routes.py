@@ -101,16 +101,14 @@ from .sandbox import (
     _sandbox_validate_attachment_snapshot,
 )
 
-from .session import (
-    _session_provider_response,
-)
+from .session import _session_provider_response
+from .product_page_toolset import _keep_api_toolsets
 
 from .toolconfig import (
     _check_config_update,
     _restore_config,
     _write_checked_config,
 )
-
 
 
 # 토큰으로 인증할 요청이다. 여기 없는 것은 모두 쿠키 검사로 넘어간다.
@@ -265,6 +263,8 @@ def _install_gate() -> bool:
             raise
         if written is not None and response.status_code >= 400:
             _restore_config(checked[0], checked[1], written)
+        if response.status_code < 400 and getattr(request.state, "fos_api_toolsets", None) is not None:
+            await asyncio.to_thread(_keep_api_toolsets, *request.state.fos_api_toolsets)
         if request.url.path == "/api/skills" and response.status_code == 200:
             return await _with_skill_owners(request.query_params.getlist("profile")[0], response)
         if request.url.path == "/api/env" and response.status_code < 400:

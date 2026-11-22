@@ -309,6 +309,18 @@ public class FollowUpService {
     }
 
 
+    /**
+     * 그 사용자의 한 대화에서 생긴 할 일을 지운다. 평가 전용 사용자의 평가 문항이 만든 것을 지울 때 쓴다(docs/features/agent-quality/design.md 의
+     * 「비우기」). 다른 대화와 다른 사용자의 줄은 건드리지 않는다.
+     *
+     * @return 지운 줄 수
+     */
+    @Transactional
+    public int deleteForConversation(CurrentUser user, Long conversationId) {
+        return followUps.deleteByUserIdAndConversationId(user.id(), conversationId);
+    }
+
+
     /** 제안을 거절한다. {@code PROPOSED} 만 받는다. */
     public FollowUpSnapshot reject(CurrentUser user, UUID id) {
         return transition(user, id, "rejected", FollowUpStatus.PROPOSED, FollowUp::reject, FeedbackEventType.REJECTED);

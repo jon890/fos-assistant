@@ -3,6 +3,7 @@ package com.bifos.assistant.admin.quality.presentation;
 import com.bifos.assistant.quality.application.dto.EvaluationUserStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -29,5 +30,14 @@ public final class QualityAdminDtos {
         static EvaluationUserView of(EvaluationUserStatus status) {
             return new EvaluationUserView(status.ready(), status.hermesProfile(), status.missing());
         }
+    }
+
+    /**
+     * 평가를 시작하는 요청이다.
+     *
+     * @param bundles 고를 묶음 id. 비거나 없으면 전체
+     * @param tier 모델 단계. 없으면 평가 사용자에게 걸리는 기본 단계다. 모르는 값이면 400
+     */
+    public record StartEvalRequest(List<String> bundles, ModelTier tier) {
     }
 }

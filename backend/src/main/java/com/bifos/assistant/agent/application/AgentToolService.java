@@ -150,7 +150,7 @@ public class AgentToolService {
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
             .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
-            .filter(name -> !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
+            .filter(name -> !AgentToolPolicy.isInternal(name))
             .filter(name -> !connectorServers.contains(name))
             .toList();
         List<String> controlledApplied = applied.stream()
@@ -253,7 +253,7 @@ public class AgentToolService {
         boolean adminView) {
         List<String> unclassified = enabled.stream()
             .filter(name -> !AgentToolPolicy.isKnown(name))
-            .filter(name -> !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
+            .filter(name -> !AgentToolPolicy.isInternal(name))
             .filter(name -> !AgentToolPolicy.MEMORY.equals(name))
             .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
             .filter(name -> !connectorServers.contains(name))

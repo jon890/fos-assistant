@@ -56,6 +56,22 @@ class AgentToolPolicyTest {
 
 
     @Test
+    @DisplayName("상품 페이지 toolset 은 요청에서 받지 않는다. 화면이 읽은 목록을 그대로 돌려보내도 거절하지 않는다")
+    void productPageIsDerivedNotRequested() {
+        List<String> result = AgentToolPolicy.requestedForWrite(
+            OWNER,
+            agent(AgentVisibility.PRIVATE),
+            List.of(AgentToolPolicy.PRODUCT_PAGE),
+            List.of("web", AgentToolPolicy.PRODUCT_PAGE),
+            Set.of());
+
+        assertThat(result).containsExactly(AgentToolPolicy.CONTROL_PLANE_MCP);
+        assertThat(AgentToolPolicy.isKnown(AgentToolPolicy.PRODUCT_PAGE)).isFalse();
+        assertThat(AgentToolPolicy.isInternal(AgentToolPolicy.PRODUCT_PAGE)).isTrue();
+    }
+
+
+    @Test
     @DisplayName("주인은 관리자 등급을 새로 켤 수 없다")
     void ownerCannotNewlyEnableAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(

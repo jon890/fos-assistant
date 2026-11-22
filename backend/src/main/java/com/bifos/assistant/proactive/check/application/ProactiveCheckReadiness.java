@@ -94,6 +94,10 @@ public class ProactiveCheckReadiness {
         if (AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name)) {
             return true;
         }
+        // 상품 페이지 도구는 웹 검색을 켠 profile 에만 켜지고 웹 페이지를 읽기만 한다. 웹 검색과 같게 본다.
+        if (AgentToolPolicy.PRODUCT_PAGE.equals(name)) {
+            return allowed("web", writesAllowed);
+        }
         if (!writesAllowed) {
             return ALLOWED_TOOLSETS.contains(name);
         }
