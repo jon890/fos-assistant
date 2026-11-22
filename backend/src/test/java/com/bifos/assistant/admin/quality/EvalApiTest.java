@@ -2,6 +2,12 @@ package com.bifos.assistant.admin.quality;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.quality.domain.EvalResult;
 import com.bifos.assistant.quality.domain.QualityRun;
 import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
@@ -36,7 +42,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 묶음 평가 관리자 API 의 권한, 응답 모양과 시작 규칙을 본다.
  *
- * <p>평가 사용자에게 에이전트를 만들지 않는다. 그래서 실행기는 Hermes 를 부르지 않고 바로 실패로 끝난다. 문항을 돌리는 흐름은 가짜 Hermes e2e 가 본다.
+ * <p>문항은 검사 설정의 대역 답을 받아 대부분 규칙 미달로 끝나고 평가는 실패로 끝난다. 문항을 돌리는 흐름과 도중에 멈춘
+ * 평가({@code NOT_RUN})는 {@code EvalRunnerTest} 와 가짜 Hermes e2e 가 본다.
  */
 @BackendIntegrationTest
 class EvalApiTest {
@@ -55,6 +62,9 @@ class EvalApiTest {
     QualityRunRepository runs;
 
     @Autowired
+    AgentRepository agents;
+
+    @Autowired
     TrackingBackgroundTasks backgroundTasks;
 
     @Autowired
@@ -70,6 +80,7 @@ class EvalApiTest {
     @BeforeEach
     void setUp() {
         runs.deleteAll();
+        agents.deleteAll();
         users.deleteAll();
         admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN));
         member = users.save(AppUser.of("member@example.com", "사용자", 1L, UserRole.MEMBER));
@@ -104,13 +115,18 @@ class EvalApiTest {
 
 
     @Test
-    @DisplayName("평가 사용자가 없으면 409, 모르는 묶음과 모르는 단계는 400 이다")
+    @DisplayName("평가 사용자가 없거나 준비가 덜 되면 409, 모르는 묶음과 모르는 단계는 400 이다")
     void rejectsBadStarts() throws Exception {
         HttpResponse<String> missing = api("POST", EVALS, admin, "{}");
         assertThat(missing.statusCode()).isEqualTo(409);
         assertThat(missing.body()).contains("EVALUATION_USER_MISSING");
 
-        evaluationUser();
+        AppUser evaluation = evaluationUser();
+        HttpResponse<String> notReady = api("POST", EVALS, admin, "{}");
+        assertThat(notReady.statusCode()).isEqualTo(409);
+        assertThat(notReady.body()).contains("EVALUATION_USER_NOT_READY");
+
+        primaryAgentOf(evaluation);
         HttpResponse<String> unknown = api("POST", EVALS, admin, "{\"bundles\":[\"no-such-bundle\"]}");
         assertThat(unknown.statusCode()).isEqualTo(400);
         assertThat(unknown.body()).contains("QUALITY_EVAL_BUNDLE_UNKNOWN");
@@ -120,25 +136,22 @@ class EvalApiTest {
 
 
     @Test
-    @DisplayName("묶음을 비우면 전체를 고르고, 고른 단계가 줄에 적히며, 끝난 평가가 목록과 조회에 보인다")
+    @DisplayName("묶음을 비우면 전체를 고르고 고른 단계가 줄에 적히며, 끝난 평가는 모든 문항의 결과를 남긴다")
     void startsAllBundlesWithChosenTier() throws Exception {
-        evaluationUser();
+        primaryAgentOf(evaluationUser());
 
         HttpResponse<String> started = api("POST", EVALS, admin, "{\"tier\":\"HIGH\"}");
-        backgroundTasks.awaitIdle(Duration.ofSeconds(30));
 
         assertThat(started.statusCode()).isEqualTo(202);
         JsonNode body = json.readTree(started.body());
         assertThat(body.path("tier").asString()).isEqualTo("HIGH");
         assertThat(body.path("bundles").toString()).contains("service-concepts", "answer-quality");
         String publicId = body.path("publicId").asString();
+        backgroundTasks.awaitIdle(Duration.ofSeconds(120));
         JsonNode read = json.readTree(api("GET", EVALS + "/" + publicId, admin, null).body());
-        assertThat(read.path("status").asString()).isEqualTo("FAILED");
-        for (JsonNode bundle : read.path("bundles")) {
-            // 답변 품질 묶음은 밖에서 채점해 EXTERNAL, 서비스 개념 묶음은 에이전트가 없어 FAILED 다.
-            String expected = "answer-quality".equals(bundle.path("id").asString()) ? "EXTERNAL" : "FAILED";
-            assertThat(bundle.path("status").asString()).as(bundle.path("id").asString()).isEqualTo(expected);
-        }
+        assertThat(read.path("status").asString()).as("검사 대역의 답으로는 묶음 기준을 넘지 못한다").isEqualTo("FAILED");
+        assertThat(read.path("items").size()).as("모든 문항의 결과가 남는다").isEqualTo(read.path("itemCount").asInt());
+        assertThat(read.path("items").toString()).doesNotContain("RUNNING");
         assertThat(read.path("items").toString()).doesNotContain("conversationId\"");
         JsonNode listed = json.readTree(api("GET", EVALS, admin, null).body());
         assertThat(listed.path("items").get(0).path("publicId").asString()).isEqualTo(publicId);
@@ -148,7 +161,7 @@ class EvalApiTest {
     @Test
     @DisplayName("도는 평가가 있으면 새로 만들지 않고 200 과 그 줄을 돌려준다")
     void runningEvalIsReused() throws Exception {
-        evaluationUser();
+        primaryAgentOf(evaluationUser());
         QualityRun running = runs.save(QualityRun.startEval(1L, QualityRunTrigger.ADMIN, admin.id(), 1,
             EvalResult.started("MEDIUM", List.of("service-concepts")), Instant.now()));
 
@@ -171,7 +184,16 @@ class EvalApiTest {
     }
 
 
-    /** 에이전트 없는 평가 사용자 행이다. 실행기는 바로 실패한다. */
+    /** 평가 사용자의 기본 에이전트다. 평가 시작의 준비 확인이 본다. */
+    private void primaryAgentOf(AppUser evaluation) {
+        String code = "eval-" + UUID.randomUUID().toString().substring(0, 8);
+        Agent agent = Agent.of(code, AgentIntroduction.PRIMARY_NAME, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, evaluation.id());
+        agents.save(agent);
+    }
+
+
+    /** 에이전트 없는 평가 사용자 행이다. */
     private AppUser evaluationUser() {
         AppUser saved = users.save(AppUser.of("evaluation@quality.invalid", "평가 사용자", 1L, UserRole.MEMBER));
         transactions.executeWithoutResult(status -> users.markEvaluation(saved.id(), Instant.now()));

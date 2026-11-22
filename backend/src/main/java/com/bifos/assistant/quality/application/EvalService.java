@@ -61,13 +61,18 @@ public class EvalService {
      *
      * @param bundleIds 고른 묶음. 비면 전체
      * @param tier 고른 모델 단계. 없으면 평가 사용자에게 걸리는 기본 단계(사용자 기본, 없으면 그룹 기본)를 풀어 결과에 적는다
-     * @throws ApiException 평가 사용자가 없으면 {@code EVALUATION_USER_MISSING}, 모르는 묶음이면 {@code QUALITY_EVAL_BUNDLE_UNKNOWN}
+     * @throws ApiException 평가 사용자가 없으면 {@code EVALUATION_USER_MISSING}, 기본 에이전트가 없으면 {@code EVALUATION_USER_NOT_READY}, 모르는 묶음이면
+     * {@code QUALITY_EVAL_BUNDLE_UNKNOWN}
      */
     public StartedEval start(CurrentUser admin, List<String> bundleIds, ModelTier tier) {
         AppUser evaluation = evaluationUsers.find(admin.groupId())
             .orElseThrow(() -> new ApiException(ErrorCode.EVALUATION_USER_MISSING, "prepare the evaluation user first"));
         List<EvalBundle> chosen = chosen(bundleIds);
         CurrentUser user = EvaluationUserService.asCurrentUser(evaluation);
+        if (evaluationUsers.primaryAgent(user).isEmpty()) {
+            // 기본 에이전트가 없으면 문항을 하나도 보내지 못한다. 줄을 만들지 않고 준비부터 하게 한다.
+            throw new ApiException(ErrorCode.EVALUATION_USER_NOT_READY, "finish preparing the evaluation user first");
+        }
         String usedTier = tier != null ? tier.name() : defaultTier(user);
         int itemCount = chosen.stream().mapToInt(bundle -> bundle.questions().size()).sum();
         OpenedEval opened = runs.open(evaluation.id(), chosen.stream().map(EvalBundle::id).toList(), usedTier, itemCount, admin.id());

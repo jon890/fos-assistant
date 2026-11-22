@@ -70,6 +70,8 @@ class EvalRunner {
     static final String TIMED_OUT = "TIMED_OUT";
     static final String CARD_FAILED = "CARD_FAILED";
     static final String RULES = "RULES";
+    /** 평가가 도중에 멈춰 보내지 못한 문항이다. */
+    static final String NOT_RUN = "NOT_RUN";
 
     /** 카드를 누른 뒤 에이전트가 다시 도는 turn 이 시작되기를 기다리는 상한이다. 결과만 대화에 들어가고 turn 이 없을 수도 있다. */
     static final Duration CARD_FOLLOW_UP_GRACE = Duration.ofSeconds(10);
@@ -103,6 +105,7 @@ class EvalRunner {
     /** 묶음을 차례로 돌리고 줄을 끝낸다. 도중의 예외는 남은 문항을 돌리지 않고 줄을 끝낸다. */
     void run(Long runId, Long evaluationUserId, List<EvalBundle> bundles, ModelTier tier) {
         boolean cleanedAll = true;
+        boolean stopped = false;
         try {
             cleaner.recleanFinished();
             CurrentUser evaluation = EvaluationUserService.asCurrentUser(users.findById(evaluationUserId).orElseThrow());
@@ -118,22 +121,37 @@ class EvalRunner {
             }
         } catch (RuntimeException ex) {
             cleanedAll = false;
+            stopped = true;
             log.error("평가가 도중에 멈췄다 runId={}", runId, ex);
         } finally {
-            finish(runId, bundles, cleanedAll);
+            finish(runId, bundles, cleanedAll, stopped);
         }
     }
 
 
-    private void finish(Long runId, List<EvalBundle> bundles, boolean cleanedAll) {
+    /**
+     * 묶음 결과로 줄을 끝낸다. 돌지 못한 문항은 실패(까닭 {@code NOT_RUN})로 적어 묶음 결과의 분모와 오류에 넣는다. 적지 않으면 멈춘 평가가 앞 문항만으로
+     * 통과로 끝난다. 도중에 멈췄으면 묶음 결과와 상관없이 줄을 실패로 끝낸다.
+     */
+    private void finish(Long runId, List<EvalBundle> bundles, boolean cleanedAll, boolean stopped) {
         try {
             QualityRun run = rows.findById(runId).orElseThrow();
-            List<ItemResult> items = run.evalResult().items();
+            for (EvalBundle bundle : bundles) {
+                for (EvalQuestion question : bundle.questions()) {
+                    boolean recorded = run.evalResult().items().stream()
+                        .anyMatch(item -> item.bundle().equals(bundle.id()) && item.question().equals(question.id()));
+                    if (!recorded) {
+                        runs.record(runId, new ItemResult(bundle.id(), question.id(), EvalItemStatus.FAILED, NOT_RUN, List.of(), 0, null, null, null,
+                            List.of(), question.keepConversation()), 0);
+                    }
+                }
+            }
+            List<ItemResult> items = rows.findById(runId).orElseThrow().evalResult().items();
             List<BundleResult> results = bundles.stream()
                 .map(bundle -> EvalJudge.bundleResult(bundle.id(), bundle.pass(),
                     items.stream().filter(item -> item.bundle().equals(bundle.id())).toList()))
                 .toList();
-            runs.finish(runId, results);
+            runs.finish(runId, results, stopped);
         } catch (RuntimeException ex) {
             log.error("평가 줄을 끝내지 못했다 runId={}", runId, ex);
         }
@@ -239,8 +257,13 @@ class EvalRunner {
      */
     private boolean settleAndClean(CurrentUser evaluation, Long conversationId, Instant startedAt) {
         int rootsBefore = observer.roots(conversationId).size();
+        boolean pending = !connectorActions.findByConversationIdAndUserIdAndStatusOrderByIdAsc(
+            conversationId, evaluation.id(), ActionStatus.PENDING).isEmpty();
         boolean rejected = cleaner.rejectPending(evaluation, conversationId);
-        driver.waitUntil(clock.instant().plus(CARD_FOLLOW_UP_GRACE), () -> observer.roots(conversationId).size() > rootsBefore);
+        if (pending) {
+            // 거절한 줄이 있을 때만 다시 도는 turn 을 기다린다. 없으면 루트가 늘지 않아 기다림이 헛돈다.
+            driver.waitUntil(clock.instant().plus(CARD_FOLLOW_UP_GRACE), () -> observer.roots(conversationId).size() > rootsBefore);
+        }
         boolean settled = driver.waitUntil(clock.instant().plus(TurnDriver.STOP_GRACE),
             () -> !driver.running(conversationId) && observer.delegationSettled(conversationId));
         if (!settled) {

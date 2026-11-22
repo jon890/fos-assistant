@@ -34,7 +34,10 @@ import com.bifos.assistant.quality.domain.EvalBundle.EvalExpect;
 import com.bifos.assistant.quality.domain.EvalBundle.EvalQuestion;
 import com.bifos.assistant.quality.domain.EvalBundle.EvalTurn;
 import com.bifos.assistant.quality.domain.EvalBundle.PassRule;
+import com.bifos.assistant.quality.domain.EvalResult;
 import com.bifos.assistant.quality.domain.EvalResult.ItemResult;
+import com.bifos.assistant.quality.domain.QualityRun;
+import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
 import com.bifos.assistant.quality.domain.type.CardAction;
 import com.bifos.assistant.quality.domain.type.EvalItemStatus;
 import com.bifos.assistant.quality.infra.QualityRunRepository;
@@ -47,6 +50,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,6 +132,36 @@ class EvalRunnerTest {
         assertThat(result.conversationPublicId()).isNull();
         verify(conversations).dropConversation(any(CurrentUser.class), eq(CONVERSATION));
         verify(runs).markCleaned(RUN);
+    }
+
+
+    @Test
+    @DisplayName("실행기가 도중에 멈추면 돌지 못한 문항을 NOT_RUN 으로 적고 줄을 실패로 끝낸다")
+    void stoppedRunRecordsUnrunQuestionsAndFails() {
+        when(evaluationUsers.primaryAgent(any())).thenReturn(Optional.empty());
+        QualityRun row = QualityRun.startEval(1L, QualityRunTrigger.ADMIN, null, 1, EvalResult.started(null, List.of("answer-quality")),
+            Instant.now());
+        when(rows.findById(RUN)).thenReturn(Optional.of(row));
+        EvalQuestion question = new EvalQuestion("shop-vacuum", "쇼핑", List.of(new EvalTurn("청소기 추천해 줘", null, null)), EvalExpect.NONE, true);
+
+        runner.run(RUN, 7L, List.of(new EvalBundle("answer-quality", "답변 품질", 15, new PassRule(PassRule.EXTERNAL, null), List.of(question))),
+            null);
+
+        ItemResult result = lastItem();
+        assertThat(result.status()).isEqualTo(EvalItemStatus.FAILED);
+        assertThat(result.reasonCode()).isEqualTo("NOT_RUN");
+        verify(runs).finish(eq(RUN), any(), eq(true));
+        verify(runs, never()).markCleaned(RUN);
+    }
+
+
+    @Test
+    @DisplayName("거절할 카드가 없으면 다시 도는 turn 을 기다리지 않는다")
+    void doesNotWaitWithoutPendingCards() {
+        runner.run(RUN, 7L, List.of(bundle(null, null)), null);
+
+        // 두 차례마다의 끝남 기다림 둘과 비우기 전 정착 기다림 하나다. 카드가 없으니 다시 도는 turn 기다림이 더 불리지 않는다.
+        verify(driver, times(3)).waitUntil(any(), any());
     }
 
 

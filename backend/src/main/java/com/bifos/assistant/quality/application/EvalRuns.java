@@ -68,9 +68,13 @@ class EvalRuns {
     }
 
 
-    /** 묶음 결과를 적고 줄을 끝낸다. 고른 묶음이 모두 통과해야 {@code PASSED} 다. */
+    /**
+     * 묶음 결과를 적고 줄을 끝낸다. 고른 묶음이 모두 통과해야 {@code PASSED} 다.
+     *
+     * @param stopped 실행기가 도중에 멈췄으면 참. 묶음 결과와 상관없이 {@code FAILED} 다
+     */
     @Transactional
-    public QualityRun finish(Long runId, List<BundleResult> bundles) {
+    public QualityRun finish(Long runId, List<BundleResult> bundles, boolean stopped) {
         QualityRun run = runs.findById(runId).orElseThrow();
         if (!run.running()) {
             return run;
@@ -82,7 +86,7 @@ class EvalRuns {
             : item);
         run.recordEval(closed.withBundles(bundles), 0);
         // 밖의 채점기가 판정하는 묶음은 평가 전체의 통과·실패에 넣지 않는다. 그 묶음은 답을 모두 받았으면 통과로 본다.
-        boolean passed = !bundles.isEmpty() && bundles.stream().allMatch(bundle -> "PASSED".equals(bundle.status())
+        boolean passed = !stopped && !bundles.isEmpty() && bundles.stream().allMatch(bundle -> "PASSED".equals(bundle.status())
             || (EvalJudge.EXTERNAL.equals(bundle.status()) && bundle.errors() == 0 && bundle.passed() == bundle.ran()));
         run.finish(passed ? QualityRunStatus.PASSED : QualityRunStatus.FAILED, clock.instant());
         return run;
