@@ -253,6 +253,18 @@ class ReportTest(FoundLinksFixture):
             {"kind": "body", "url": "https://cdn.example.com/p/classic-short-side.jpg", "size": 0},
         ])
 
+    def test_product_reader_keeps_large_photo_named_like_logo_and_skips_broken_address(self):
+        """크기가 큰 상품 사진은 이름에 logo 가 있어도 남고, 깨진 주소의 그림이 있어도 다른 후보를 읽는다."""
+        product_page = sys.modules[self.plugin.__name__ + ".product_page"]
+        html = ('<meta property="og:image" content="https://cdn.example.com/p/shirt-og.jpg">'
+                '<img src="http://[broken/badge.png">'
+                '<img width="800" height="800" alt="Embroidered Logo T-Shirt" src="https://cdn.example.com/p/shirt.jpg">')
+
+        self.assertEqual(product_page.photos(html), [
+            {"kind": "og", "url": "https://cdn.example.com/p/shirt-og.jpg", "size": 0},
+            {"kind": "body", "url": "https://cdn.example.com/p/shirt.jpg", "size": 640_000},
+        ])
+
     def test_product_reader_does_not_report_failed_page(self):
         """읽기 서비스가 상품 페이지를 읽지 못하면 후보를 남기지 않는다."""
         product_page = sys.modules[self.plugin.__name__ + ".product_page"]

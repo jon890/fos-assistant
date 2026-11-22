@@ -24,7 +24,7 @@ _DENSITY = re.compile(r"[0-9]{0,5}(?:\.[0-9]{1,5})?x")
 _LAYOUT_TAGS = frozenset({"header", "nav", "footer", "aside"})
 # 한 변이 이보다 작다고 알려진 본문 그림은 배지나 아이콘이라 상품 사진 후보에 넣지 않는다.
 MIN_PHOTO_SIDE = 200
-# 파일 이름이나 alt 가 배지, 아이콘, 로고, 스프라이트인 그림은 크기를 몰라도 상품 사진이 아니다.
+# 크기를 모르는 그림의 파일 이름이나 alt 가 배지, 아이콘, 로고, 스프라이트면 상품 사진이 아니다.
 _DECORATION = re.compile(r"(?i)(?:^|[^a-z])(?:badges?|icons?|favicon|logos?|sprites?)(?:[^a-z]|$)")
 SCHEMA = {
     "name": TOOL,
@@ -76,8 +76,12 @@ def _small(width, height):
     return any(0 < side < MIN_PHOTO_SIDE for side in (width, height))
 
 
-def _decoration(url, alt):
-    name = urlsplit(url).path.rsplit("/", 1)[-1] if isinstance(url, str) else ""
+def _decoration(url, alt, width, height):
+    """크기를 모르는 그림만 이름과 alt 로 본다. 크기가 알려진 큰 그림은 상품명에 logo 가 들어가도 남긴다."""
+    if width or height or not isinstance(url, str):
+        return False
+    # 깨진 주소에서도 예외 없이 파일 이름만 꺼낸다. 후보 하나 때문에 페이지 전체를 놓치지 않는다.
+    name = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
     return bool(_DECORATION.search(name) or _DECORATION.search(alt))
 
 
@@ -162,11 +166,11 @@ class _Photos(HTMLParser):
         for key in ("data-srcset", "srcset"):
             for url, descriptor in _srcset(fields.get(key) or ""):
                 sides = _srcset_sides(descriptor, width, height)
-                if sides is not None and not _small(*sides) and not _decoration(url, alt):
+                if sides is not None and not _small(*sides) and not _decoration(url, alt, *sides):
                     self.add("body", url, _area(*sides))
         if tag == "img":
             for key in ("data-src", "src"):
-                if not _decoration(fields.get(key), alt):
+                if not _decoration(fields.get(key), alt, width, height):
                     self.add("body", fields.get(key), _area(width, height))
 
 
