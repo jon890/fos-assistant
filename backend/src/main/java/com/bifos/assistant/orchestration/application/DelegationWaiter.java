@@ -64,6 +64,11 @@ public class DelegationWaiter {
         if (max.isZero()) {
             return NOT_WAITED;
         }
+        if (sameProfile(origin, executionId)) {
+            // Hermes 는 profile 마다 Control Plane 도구 호출을 하나씩 보낸다. 맡은 실행이 같은 profile 이면 그 실행의 도구 호출이
+            // 이 기다림 뒤에 서서 끝날 수 없다(hermes/plugins/fos-ctx/README.md 「호출은 profile 마다 하나씩 나간다」)
+            return NOT_WAITED;
+        }
         Long rootId = origin.treeRootId();
         Duration remaining = remaining(rootId, max);
         RunningDelegation delegation = delegations.running(executionId);
@@ -78,6 +83,13 @@ public class DelegationWaiter {
         AgentExecution execution = executions.findById(executionId).orElse(null);
         boolean ended = execution != null && execution.status() != ExecutionStatus.RUNNING;
         return new DelegationWait(execution, ended && !turns.isCancelled(rootId), true);
+    }
+
+
+    private boolean sameProfile(AgentExecution origin, Long executionId) {
+        return executions.findById(executionId)
+            .map(child -> child.profileName() != null && child.profileName().equals(origin.profileName()))
+            .orElse(false);
     }
 
 

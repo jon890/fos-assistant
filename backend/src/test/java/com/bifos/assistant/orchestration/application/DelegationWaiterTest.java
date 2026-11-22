@@ -113,6 +113,24 @@ class DelegationWaiterTest {
 
 
     @Test
+    @DisplayName("맡은 실행이 비서와 같은 profile 이면 그 도구 호출이 기다림 뒤에 서므로 기다리지 않는다")
+    void doesNotWaitForSameProfileChild() {
+        RunningDelegation running = new RunningDelegation("http://hermes", "assistant");
+        when(delegations.running(CHILD_ID)).thenReturn(running);
+        AgentExecution child = child(ExecutionStatus.RUNNING);
+        when(child.profileName()).thenReturn("assistant");
+        AgentExecution origin = root();
+        when(origin.profileName()).thenReturn("assistant");
+
+        long started = System.nanoTime();
+        DelegationWait waited = waiter.await(origin, CHILD_ID);
+
+        assertThat(waited.waited()).isFalse();
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(500));
+    }
+
+
+    @Test
     @DisplayName("루트 turn 에 중지 표시가 서면 곧 풀리고, 끝난 결과도 전하지 않는다")
     void releasesAndDoesNotDeliverWhenRootStopped() {
         RunningDelegation running = new RunningDelegation("http://hermes", "child");

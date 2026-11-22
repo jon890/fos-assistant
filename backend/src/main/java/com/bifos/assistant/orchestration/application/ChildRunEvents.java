@@ -93,7 +93,7 @@ public class ChildRunEvents {
         AgentExecution ended;
         synchronized (recording) {
             if (recording.stream != null && !recording.streamEnded) {
-                executions.finishEventObservation(recording.execution, false);
+                executions.finishEventObservation(recording.execution, recording.terminalSeen);
             }
             ended = finish.get();
             if (!recording.closed) {
@@ -162,6 +162,7 @@ public class ChildRunEvents {
             }
             if (TERMINAL_EVENTS.contains(type)) {
                 terminalSeen[0] = true;
+                recording.terminalSeen = true;
             }
             store(recording, sequence -> eventRecorder.record(recording.execution, event, sequence));
         }

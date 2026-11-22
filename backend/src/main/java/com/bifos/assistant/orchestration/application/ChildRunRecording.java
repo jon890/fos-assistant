@@ -9,6 +9,8 @@ final class ChildRunRecording {
     int next = 1;
     boolean closed;
     boolean streamEnded;
+    /** 스트림이 끝 사건을 받았다. 실행이 먼저 끝나 스트림을 닫아도 다 받았으면 관측 완료로 본다 */
+    boolean terminalSeen;
     Closeable stream;
 
 

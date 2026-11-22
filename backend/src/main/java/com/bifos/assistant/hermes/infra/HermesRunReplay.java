@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  * 끝난 실행의 사건 보관분을 한 번 읽어 끝 사건만 꺼낸다.
  *
  * <p>Hermes 는 끝난 run 에 처음 연결하면 보관한 사건을 보내고 스트림을 닫는다. 보관은 끝나고 5분 동안이다. 사건 스트림을 열지 않은
- * 호출자(위임, 흐름, 방 요약, 추천 질문, 재기동 정리)도 v0.23.2 에서 실행 조회가 주지 않는 {@code error} 와 {@code pending_steer} 를
+ * 호출자(흐름, 방 요약, 추천 질문, 재기동 정리)와 스트림이 끝 사건 전에 끊긴 맡긴 실행도 v0.23.2 에서 실행 조회가 주지 않는 {@code error} 와 {@code pending_steer} 를
  * 얻으려고 쓴다(docs/features/hermes-upgrade/design.md 의 「결과 칸 채우기」). 사건을 화면이나 실행 기록에 넘기지 않는다.
  */
 @Component

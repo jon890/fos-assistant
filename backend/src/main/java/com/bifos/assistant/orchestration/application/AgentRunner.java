@@ -162,9 +162,11 @@ public class AgentRunner {
             choice.reasoningEffort());
 
         String runId = null;
-        executions.markSubmitted(execution);
-        ChildRunRecording recording = childRunEvents.start(execution);
+        // 제출 표시 저장이 실패해도 실행 줄을 FAILED 로 닫도록 기록은 관측 없이 먼저 만든다
+        ChildRunRecording recording = childRunEvents.unobserved(execution);
         try {
+            executions.markSubmitted(execution);
+            recording = childRunEvents.start(execution);
             lostRunRelease.beforeSubmit(command);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);

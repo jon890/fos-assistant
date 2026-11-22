@@ -268,7 +268,8 @@ public class McpToolService {
 
 
     /**
-     * 다른 에이전트의 실행을 시작하고 번호를 JSON 글로 돌려준다. 제출까지만 기다린다.
+     * 다른 에이전트의 실행을 시작하고 번호를 JSON 글로 돌려준다. 대화 turn 의 루트가 맡기면 {@link DelegationWaiter} 가 상한까지 결과를
+     * 기다려 끝난 결과를 함께 돌려준다(ADR-20261121 / delegate-wait).
      * <p>부모는 요청자를 정한 origin 실행이다. 같은 호출을 알아보는 키는 그 실행의 profile 과 서명한 {@code _fos_ctx} 의 세
      * 값으로 만든다(ADR-032 「{@code delegation_key}」). 거절하면 정해 둔 코드와 한국어 한 줄만 싣는다.
      */
