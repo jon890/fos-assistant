@@ -8,7 +8,7 @@
 | --- | --- |
 | REQ1 | `HttpHermesRunsClient` 가 `queued` 를 지금처럼 「아직 돈다」 로 읽고, `unknown` 은 REQ2 의 해제로 넘긴다. 상태 문자열은 어댑터 밖으로 새로 나가지 않는다 |
 | REQ2 | 어댑터가 `unknown` 을 보면 같은 조회 응답의 `admission_id`, `execution_generation` 으로 `resolve-unknown` 을 보낸다. 그 뒤 `lookupRun` 은 기존 `NOT_FOUND`(재기동 정리가 `REMOTE_RUN_LOST` 로 적는 신호)를 돌려주고, `awaitCompletion` 은 새 `ErrorCode.REMOTE_RUN_LOST` 로 실패한다. 중지가 409 `unknown_execution` 을 받으면 같은 해제를 하고 중지를 끝낸 것으로 본다. 아무도 그 run 을 다시 묻지 않는 경우를 막으려고, 새 실행을 보내기 전에 같은 profile 의 최근 연결 실패·시간 초과 실행을 어댑터에 넘겨 잃은 것이면 해제한다(「잃은 실행 미리 풀기」). Hermes 가 정상 종료로 끊은 실행은 조회에서 `cancelled` 로 와도 어댑터가 `interrupted` 로 옮겨 실패로 적히게 한다 |
-| REQ3 | `HermesRunEventStream` 이 받은 종료 사건을 infra 안의 `HermesRunTerminals` 에 남기고, `toResult` 가 조회 응답에 빠진 칸을 거기서 채운다. 사건 스트림을 열지 않은 호출자(위임, 흐름, 방 요약, 추천 질문, 재기동 정리)는 어댑터가 끝난 실행의 사건 스트림을 한 번 다시 읽어 보관분에서 종료 사건을 얻는다. 받지 못했으면 결과에 「`pending_steer` 를 모른다」 를 표시하고, `ChatTurnRunner`·`RecoveredRunRecorder` 가 그 표시로 `SteerSettlement.unknown()` 을 고른다 |
+| REQ3 | `HermesRunEventStream` 이 받은 종료 사건을 infra 안의 `HermesRunTerminals` 에 남기고, `toResult` 가 조회 응답에 빠진 칸을 거기서 채운다. 사건 스트림을 열지 않은 호출자(흐름, 방 요약, 추천 질문, 재기동 정리)는 어댑터가 끝난 실행의 사건 스트림을 한 번 다시 읽어 보관분에서 종료 사건을 얻는다. 받지 못했으면 결과에 「`pending_steer` 를 모른다」 를 표시하고, `ChatTurnRunner`·`RecoveredRunRecorder` 가 그 표시로 `SteerSettlement.unknown()` 을 고른다 |
 | REQ4 | 사건 파서(`HermesRunEventStream`)가 `tool_call_id` 를 무시하고, `tool.completed` 의 `duration` 0 을 걸린 시간 없음(`null`)으로 읽는다. `run.queued` 는 아는 사건 목록 밖이라 지금처럼 버린다. 오지 않는 사건은 고칠 것이 없다(DECISION2) |
 | REQ5 | fos-ctx `pre_tool_call` 이 `terminal` 의 위험 명령(`detect_dangerous_command`), 승인이 필요한 파일 쓰기(`write_approval_key`), `computer_use` 호출을 막는다 |
 | REQ6 | fos-ctx `tool_guard` 가 `session_id` 는 있고 `tool_call_id` 가 없는 호출에 판정 요청용 번호를 만들어 Control Plane 에 묻는다 |

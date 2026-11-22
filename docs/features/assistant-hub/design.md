@@ -64,6 +64,7 @@
 - 기다리는 동안 사용자가 중지하면 지금 중지가 루트 turn 에 붙은 자식을 멈춘다(`docs/features/chat.md` 「중지」). `awaitEnded` 는 자식이 끝나면 풀리고, 결과는 `CANCELLED` 로 돌아간다. turn 은 중지로 끝난다.
 - 자식이 끝난 순간 `DelegationFinished` 로 깨우기가 돌아도, 부모 turn 이 대화 잠금을 쥐고 있어 열지 않고 turn 이 닫힐 때 다시 본다. 그 전에 도구가 `markResultDelivered` 를 적으므로 같은 결과로 자동 답이 생기지 않는다. 도구가 적기 전에 서버가 내려가면 기동 훑기가 지금처럼 자동 답을 연다. 결과를 잃지 않는다.
 - 기다리는 동안 MCP 요청 스레드 하나를 쥔다. Hermes 의 MCP 도구 호출 제한은 기본 300초이고 우리 profile 틀은 바꾸지 않는다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 「제한 시간은 우리가 정하지만 상한은 있다」). 2분은 그 안이다. 동시 기다림의 수는 루트당 동시 위임 한도와 전체 한도가 묶는다.
+- **같은 profile 의 호출이 멈춘다.** Hermes 는 profile 마다 Control Plane MCP 연결 하나를 잠금(`_rpc_lock`)으로 묶어 호출을 하나씩 보낸다. 기다리는 동안 같은 사용자의 비서로 도는 다른 실행의 Control Plane 도구 호출이 멈추고, 기다림이 줄을 서면 뒤 호출이 300초 제한에 걸릴 수 있다. 사용자가 이 위험을 받아들였다(스펙 DECISION28). 맡은 실행이 같은 profile 이면 그 실행이 끝날 수 없으므로 `DelegationWaiter` 가 기다리지 않는다.
 - 사건 스트림이 끊기거나 늦게 와도 자식의 끝은 `awaitCompletion` 이 정한다. 끝난 뒤 온 사건은 버린다(ADR-090 과 같다).
 - 배포 순서: PR1 은 Control Plane 과 웹만 바꾼다. 웹이 먼저 떠도 `delegation_activity` 를 받지 않을 뿐이고, Control Plane 이 먼저 떠도 웹이 모르는 사건을 버린다.
 
@@ -71,7 +72,7 @@
 
 | ID | 경계 | 환경 |
 | --- | --- | --- |
-| REQ1, REQ2 | `AgentDelegationService` 기다리기와 예산의 단위 테스트(가짜 시계, 끝남·실패·마감·두 맡김), MCP 도구 결과와 전달 표시의 통합 테스트, 자동 답이 생기지 않는 e2e | backend 테스트, `test/e2e/` 가짜 Hermes |
+| REQ1, REQ2 | `DelegationWaiter` 의 기다림과 예산 단위 테스트(가짜 시계, 끝남·실패·마감·중지·같은 profile), 실제 `/mcp` 경계에서 결과와 전달 표시를 보는 `McpDelegateWaitTest`, 전한 결과로 자동 답을 열지 않는 기존 `DelegationWakeServiceTest`. e2e 는 상한 0 으로 돌아 기다림 사례가 없다 | backend 테스트 |
 | REQ2 | 상한 0 이면 지금과 같은 결과 | backend 테스트 |
 | REQ3 | 자식 실행에 도구 사건이 저장되고 트리 API 에 보이는 e2e, `delegation_activity` 의 가리기 단위 테스트, 도는 답의 블록에 도우미 아래 도구 줄이 보이는 브라우저 테스트 | `test/e2e/`, `web/test/browser/` |
 | REQ1-REQ3 | 배포 뒤 왕복(스펙 「배포 뒤 왕복 확인」) | 운영, 평가 계정 |

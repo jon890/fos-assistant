@@ -465,7 +465,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 같은 profile 의 MCP 연결 하나가 `_rpc_lock` 으로 호출을 직렬로 보낸다(`tools/mcp_tool.py`).
 한 run 의 도구 호출이 오래 걸리면 같은 profile 의 다른 run 이 기다린다.
-그래서 `agent_delegate` 는 제출까지만 기다리고, `agent_status` 는 저장된 값만 읽는다.
+그래서 `agent_status` 는 저장된 값만 읽는다. `agent_delegate` 는 대화 turn 의 루트가 맡기면 `assistant.delegation.delegate-wait-max`(기본 2분)까지 결과를 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 사용자가 이 위험을 받아들였다([ADR-20261121 / delegate-wait](../../../backend/docs/adr/ADR-20261121-delegate-wait.md)). 맡은 실행이 같은 profile 이면 기다리지 않는다.
 예외는 먼저 살펴보기 트리의 `agent_status` 다. `wait_seconds` 를 주면 `assistant.delegation.status-wait-max`(기본 20초)까지 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 살펴보기 트리가 아닌 호출은 `wait_seconds` 를 받아도 기다리지 않는다([`docs/features/agent-skill.md`](../../../docs/features/agent-skill.md)).
 
 ##### 재시도와 `tool_call_id`
