@@ -265,21 +265,32 @@ class ChatStopTest {
 
 
     @Test
-    @DisplayName("중지한 결과의 output이 비면 스트림 조각을 답으로 남긴다")
-    void usesStreamChunksAsReplyWhenStoppedOutputIsEmpty() {
+    @DisplayName("중지한 답은 스트림 조각으로 남고 후속 질문은 같은 session으로 보낸다")
+    void keepsStreamChunksAndReusesSessionAfterStop() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(HermesRunResult.of(
-            "run-stop", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
+        stub().willAnswer(command -> HermesRunResult.of(
+            "run-stop", command.sessionId(), "cancelled", "", "model", "provider", TokenUsage.empty()));
         hermesStreams(new HermesRunEvent("message.delta", "앞부분", null, null, null, null));
         stub().beforeAwait(() -> chat.stop(dad, latestExecution(dad).id()));
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "멈춰 줘", "dad", relayed::add);
 
-        assertThat(messages.findByConversationIdOrderByIdAsc(
-            access.requireOwnId(dad, relayed.getLast().conversationId())))
-                .last()
-                .satisfies(message -> assertThat(message.content()).isEqualTo("앞부분"));
+        Long conversationId = access.requireOwnId(dad, relayed.getLast().conversationId());
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+            .last()
+            .satisfies(message -> assertThat(message.content()).isEqualTo("앞부분"));
+
+        stub().beforeAwait(() -> {
+        });
+        stub().willAnswer(command -> HermesRunResult.of(
+            "run-next", command.sessionId(), "completed", "이어서 답함", "model", "provider", TokenUsage.empty()));
+        chat.send(dad, conversationId, "앞부분에 이어서 답해 줘", "dad");
+
+        assertThat(stub().received()).hasSize(2);
+        String firstSession = stub().received().getFirst().sessionId();
+        assertThat(firstSession).startsWith("fos-");
+        assertThat(stub().received().getLast().sessionId()).isEqualTo(firstSession);
     }
 
 

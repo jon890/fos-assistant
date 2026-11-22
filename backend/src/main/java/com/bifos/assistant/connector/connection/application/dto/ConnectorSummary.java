@@ -33,10 +33,21 @@ public record ConnectorSummary(
     String ownerBrowserLoginUrl,
     boolean standardPlugin,
     boolean singleBinding,
-    boolean ownerBrowser) {
+    boolean ownerBrowser,
+    ConnectorOAuthSummary oauth) {
 
     public ConnectorSummary {
         bindings = List.copyOf(bindings);
+    }
+
+
+    /** 단추 연결을 선언하지 않은 항목이다. */
+    public ConnectorSummary(
+        String id, String title, String description, ConnectorAppearance appearance, List<ConnectorFieldSummary> fields,
+        List<ConnectorToolSummary> tools, ConnectionStatus myStatus, boolean available, List<BoundAgentSummary> bindings,
+        String ownerBrowserLoginUrl, boolean standardPlugin, boolean singleBinding, boolean ownerBrowser) {
+        this(id, title, description, appearance, fields, tools, myStatus, available, bindings, ownerBrowserLoginUrl,
+            standardPlugin, singleBinding, ownerBrowser, null);
     }
 
 

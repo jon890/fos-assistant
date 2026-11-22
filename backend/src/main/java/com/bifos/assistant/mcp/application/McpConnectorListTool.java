@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
+import com.bifos.assistant.shared.util.ToolFailureText;
 
 /**
  * 사용자가 외부 서비스 연결을 부탁했을 때 플러그인 목록과 연결 화면 링크를 주는 읽기 도구다(스펙 service-concepts REQ5).
@@ -20,17 +21,19 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class McpConnectorListTool {
     public static final String NAME = "connector_list";
-    static final String FAILED = "플러그인 목록을 읽지 못했다. 연결했다고 말하지 않고 /connections 링크로 외부 서비스 연결 화면을 안내한다.";
+    static final ToolFailureText FAILED = ToolFailureText.alternative(
+        "플러그인 목록을 읽지 못했다. 연결했다고 말하지 않는다.",
+        "다른 방법이 없으니 /connections 링크로 외부 서비스 연결 화면을 안내하고 잠시 뒤 다시 해 달라고 알린다");
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final ConnectorListing listing;
 
 
     public Map<String, Object> list(McpCaller caller) {
         try {
-            return McpToolService.result(JSON.writeValueAsString(listing.list(caller.user(), caller.originExecution().agentId())), false);
+            return McpToolService.success(JSON.writeValueAsString(listing.list(caller.user(), caller.originExecution().agentId())));
         } catch (RuntimeException ex) {
             log.warn("connector list failed executionId={} reason={}", caller.executionId(), ex.getClass().getSimpleName());
-            return McpToolService.result(FAILED, true);
+            return McpToolService.failure(FAILED);
         }
     }
 

@@ -5,6 +5,8 @@ import com.bifos.assistant.chat.turn.application.dto.CarriedResults;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
+import com.bifos.assistant.chat.reply.application.ReplyInput;
+import com.bifos.assistant.chat.reply.application.dto.ReplySection;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
@@ -66,6 +68,7 @@ class ChatTurnRunner {
     private final ConversationNotices notices;
     private final TurnSteerLedger steerLedger;
     private final ChatDeliveryInput deliveryInput;
+    private final ReplyInput replyInput;
 
 
     /**
@@ -104,13 +107,16 @@ class ChatTurnRunner {
             // 중지한 답이 맡긴 하위 작업처럼 자동 turn 을 열지 않은 결과를 사용자가 보낸 turn 입력 앞에 넣는다(스펙 agent-team DECISION34)
             CarriedResults carried = deliveryInput.carriedInput(conversation.id(), intent);
             lead = carried.prependTo(lead);
-            Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
+            Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, routed.reply(), intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
-            AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked);
+            // 답장으로 집은 것은 사진 참조 뒤, 질문 앞에 넣고 이미지를 이번 사진과 한 예산으로 함께 넣는다(스펙 chat-reference REQ7)
+            ReplySection reply = replyInput.section(conversation.id(), routed.reply());
+            AgentInput agentInput = attachments.agentInput(
+                conversation.id(), routed.attached(), reply.text() + asked, reply.extras(), reply.labels());
             // 셸·파일 도구가 실행 공간에서 돌면 넣을 파일을 /workspace/ 에 만들게 한다. 결과물 폴더는 실행 공간에 붙어 있지 않다
             boolean sandboxed = agentTools.runsInSandbox(routed.agent());
             String input = artifacts.agentPreamble(conversation, sandboxed) + lead + agentInput.text();

@@ -121,6 +121,12 @@ public class EvaluationUserService {
     }
 
 
+    /** 그룹의 평가 전용 사용자 번호다. 관리자 집계가 이 사용자를 사용자 줄에서 빼고 「평가」 로 따로 센다. */
+    public Optional<Long> idIn(Long groupId) {
+        return find(groupId).map(AppUser::id);
+    }
+
+
     /** 평가 전용 사용자의 행이다. 실행기가 이 사용자로 돈다. */
     public Optional<AppUser> find(Long groupId) {
         return users.findFirstByGroupIdAndEvaluationTrueOrderByIdAsc(groupId);
@@ -176,7 +182,7 @@ public class EvaluationUserService {
 
 
     /** 첫 에이전트다. 첫 로그인이 만든 기본 비서이고 그 code 는 profile 이름이다. */
-    private Optional<Agent> primaryAgent(CurrentUser evaluation) {
+    Optional<Agent> primaryAgent(CurrentUser evaluation) {
         return owned(evaluation).stream()
             .filter(agent -> AgentIntroduction.PRIMARY_NAME.equals(agent.name()))
             .filter(agent -> agent.code().equals(agent.hermesProfile()))
@@ -184,7 +190,7 @@ public class EvaluationUserService {
     }
 
 
-    private Optional<Agent> delegateAgent(CurrentUser evaluation) {
+    Optional<Agent> delegateAgent(CurrentUser evaluation) {
         return owned(evaluation).stream().filter(agent -> DELEGATE_AGENT_NAME.equals(agent.name())).findFirst();
     }
 
@@ -202,7 +208,7 @@ public class EvaluationUserService {
     }
 
 
-    private static CurrentUser asCurrentUser(AppUser user) {
+    static CurrentUser asCurrentUser(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 }

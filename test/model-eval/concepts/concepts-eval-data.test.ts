@@ -43,5 +43,5 @@ test("꼭 있어야 할 문항이 있다: 없는 에이전트, 없는 서비스,
   assert.ok(byConcept("agent_pick").some((question) => question.expect.noLinkPrefixes?.includes("/new?agent=")), "없는 에이전트 문항");
   assert.ok(byConcept("connection").some((question) => question.expect.links?.includes("/connections") && question.expect.includes), "없는 서비스 문항");
   assert.ok(byConcept("connection").every((question) => question.expect.absent?.some((word) => word.startsWith("연결했"))), "연결했다고 말하지 않기");
-  assert.ok(byConcept("model_tier").every((question) => question.expect.includes && question.expect.absent), "모델 단계 안내와 바꿨다고 말하지 않기");
+  assert.equal(byConcept("model_tier").length, 0, "모델 단계는 대화로 평가하지 않는다(사용자 결정 2026-11-21)");
 });

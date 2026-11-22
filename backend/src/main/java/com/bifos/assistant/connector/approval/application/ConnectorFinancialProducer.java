@@ -6,8 +6,6 @@ import com.bifos.assistant.connector.financial.application.ConnectorFinancialCon
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
 import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.financial.application.FinancialLimitExceeded;
-import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
-import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
@@ -51,6 +49,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -85,11 +84,11 @@ class ConnectorFinancialProducer {
         + "아직 주문을 보내지 않았다. 사용자에게 승인 카드에서 내용을 확인하고 승인해 달라고 알린다. "
         + "승인하면 준비한 내용 그대로 한 번 실행된다. 같은 요청을 다시 부르지 않는다.";
     /** 대화 없는 실행이 만든 승인 줄의 답이다. 카드와 알림이 없으므로 승인 대기 표시를 붙이지 않는다. */
-    static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 주문은 사용자의 승인이 필요하다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 "
-        + "실행되지 않는다. 같은 요청을 다시 부르지 않는다.";
+    static final ToolFailureText APPROVAL_WITHOUT_CONVERSATION_MESSAGE = ToolFailureText.askUser("이 주문은 사용자의 승인이 필요하다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 "
+        + "실행되지 않는다. 같은 요청을 다시 부르지 않는다.");
     /** 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났을 때의 답이다. 실행 여부를 단정하지 않는다. */
-    static final String APPROVAL_SETTLED_MESSAGE = "이 요청의 승인 카드는 이미 처리됐다. 승인 대기가 아니다. "
-        + "같은 요청을 다시 부르지 말고 사용자에게 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내한다.";
+    static final ToolFailureText APPROVAL_SETTLED_MESSAGE = ToolFailureText.askUser("이 요청의 승인 카드는 이미 처리됐다. 승인 대기가 아니다. "
+        + "같은 요청을 다시 부르지 말고 사용자에게 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내한다.");
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final SessionOwnerResolver owners;
     private final ConnectorBindingRepository bindings;
@@ -101,7 +100,6 @@ class ConnectorFinancialProducer {
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
-    private final PurchaseLimits purchases;
     private final FinancialDigest digest;
     private final TextCipher cipher;
     private final ConnectorActionBodies bodies;
@@ -141,7 +139,7 @@ class ConnectorFinancialProducer {
         verified(hermes, manifest, before.profile(), before.binding(), before.connection(), before.connectionRevision());
         Map<String, String> scope = new LinkedHashMap<>();
         contract.scopeFields().forEach(field -> scope.put(field.arg(), before.fields().get(field.field())));
-        // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다. 주문서 준비는 계좌가 없고 구매 상한이 대신한다(ADR-20261113 / purchase-checkout).
+        // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다.
         if (!contract.checkout()) {
             at(FinancialPrepareStage.ACCOUNTS, () -> gate.requireAccounts(before.user(), scope.values()));
         }
@@ -178,7 +176,9 @@ class ConnectorFinancialProducer {
                 throw new FinancialPrepareRejected(conflictStage(blocking.get(), origin.conversationId()));
             }
             at(FinancialPrepareStage.GATE, gate::requireOpen);
-            at(FinancialPrepareStage.LIMITS, () -> requireWithinLimits(before.user(), snapshot, executionArgs));
+            if (!contract.checkout()) {
+                at(FinancialPrepareStage.LIMITS, () -> gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant()));
+            }
             var binding = bindings.findById(before.binding()).orElseThrow(() -> new FinancialPrepareRejected(FinancialPrepareStage.BINDING));
             Instant now = clock.instant();
             var action = ConnectorAction.decided(binding.connection(), before.agent(), origin, hermesTool, toolName,
@@ -206,17 +206,6 @@ class ConnectorFinancialProducer {
             return action;
         });
         return answer(saved);
-    }
-
-
-    /** 주문서 준비는 구매 상한으로, 금융 주문은 금융 상한으로 카드를 만들 때 본다. 부르는 쪽이 사용자 행을 잠갔다. */
-    private void requireWithinLimits(Long userId, ConnectorExecutionSnapshot snapshot, String executionArgs) {
-        var expected = snapshot.expectedTotalKrw();
-        if (expected.isPresent()) {
-            purchases.requireWithin(userId, null, expected.getAsLong(), clock.instant());
-        } else {
-            gate.requireWithinLimits(userId, null, executionArgs, clock.instant());
-        }
     }
 
 
@@ -299,7 +288,7 @@ class ConnectorFinancialProducer {
     private static <T> T at(FinancialPrepareStage stage, Supplier<T> step) {
         try {
             return step.get();
-        } catch (FinancialLimitExceeded | PurchaseLimitExceeded | FinancialPrepareRejected ex) {
+        } catch (FinancialLimitExceeded | FinancialPrepareRejected ex) {
             throw ex;
         } catch (RuntimeException ex) {
             // 원래 예외의 메시지에는 원격 응답과 인자가 섞일 수 있어 cause 로도 싣지 않는다.
@@ -322,8 +311,8 @@ class ConnectorFinancialProducer {
 
 
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
-        String pending = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_PENDING_MESSAGE;
-        String message = action.status() == ActionStatus.PENDING ? pending : APPROVAL_SETTLED_MESSAGE;
+        String pending = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE.text() : APPROVAL_PENDING_MESSAGE;
+        String message = action.status() == ActionStatus.PENDING ? pending : APPROVAL_SETTLED_MESSAGE.text();
         return new ConnectorPolicyAnswer(false, message, action.publicId());
     }
 

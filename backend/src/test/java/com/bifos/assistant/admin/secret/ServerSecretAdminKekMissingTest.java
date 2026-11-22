@@ -13,6 +13,7 @@ import com.bifos.assistant.admin.secret.presentation.ServerSecretAdminController
 import com.bifos.assistant.browser.application.GatewaySecretService;
 import com.bifos.assistant.connector.connection.application.ConnectorBrowserBindings;
 import com.bifos.assistant.crypto.application.ServerSecretService;
+import com.bifos.assistant.notification.application.VapidKeyService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -40,7 +41,7 @@ class ServerSecretAdminKekMissingTest {
 
     private final GatewaySecretService gateway = mock(GatewaySecretService.class);
     private final ConnectorBrowserBindings bindings = mock(ConnectorBrowserBindings.class);
-    private final ServerSecretAdminService service = new ServerSecretAdminService(mock(ServerSecretService.class), gateway, bindings);
+    private final ServerSecretAdminService service = new ServerSecretAdminService(mock(ServerSecretService.class), gateway, bindings, mock(VapidKeyService.class));
     private final MockMvc mvc = MockMvcBuilders
         .standaloneSetup(new ServerSecretAdminController(service, mock(UserDisplayNameService.class), new CurrentUserProvider()))
         .setControllerAdvice(new GlobalExceptionHandler())

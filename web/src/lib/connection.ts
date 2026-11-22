@@ -1,17 +1,24 @@
+import type {
+  ConnectionAuth,
+  ConnectionOAuthRevoke,
+  ConnectorOAuth,
+} from "@/lib/connection-oauth";
+
 export type ConnectionStatus = "DISCONNECTED" | "PENDING" | "READY";
 
 /**
  * 에이전트에 붙인 연결의 상태다. 붙인 직후는 반영이 확인될 때까지 `PENDING` 이다.
- * 재시작이 필요 없으면 Control Plane 이 스스로 확인하고, 재시작 대기면 관리자 반영 완료가 `READY` 로 만든다.
+ * 반영은 Control Plane 이 스스로 확인한다. 관리자 「다시 확인」 은 자동 반영이 실패했을 때만 쓴다.
  */
 export type BindingStatus = "PENDING" | "READY";
 
-/** 연결이 붙은 에이전트 하나다. `restartRequired` 면 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 눌러야 한다. */
+/** 연결이 붙은 에이전트 하나다. `restartRequired` 면 공유 gateway 재시작을 기다리고, `applyFailed` 면 자동 반영이 실패했다. */
 export type BoundAgent = {
   agentCode: string;
   agentName: string;
   status: BindingStatus;
   restartRequired: boolean;
+  applyFailed: boolean;
 };
 
 /** 플러그인 manifest 의 칸 한 개다. 입력 칸은 이 목록으로 그린다. */
@@ -71,6 +78,8 @@ export type ConnectorSummary = {
   singleBinding?: boolean;
   /** 사용자 브라우저를 쓰는 플러그인인가. 대화의 「에이전트 화면 보기」 단추가 쓴다. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
   ownerBrowser?: boolean;
+  /** 단추 연결(OAuth)을 선언한 플러그인만 있다. 옛 Control Plane 과 선언하지 않은 플러그인은 null 이다. */
+  oauth?: ConnectorOAuth | null;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -90,11 +99,14 @@ export type ConnectorConnection = {
   listedTools: number | null;
   /** 그 가운데 서버가 읽기만 한다고 표시한 도구 수다. 한 번 승인한 뒤 계속 허락할 수 있다. */
   readOnlyTools: number | null;
+  auth?: ConnectionAuth;
+  oauthRevoke?: ConnectionOAuthRevoke | null;
 };
 
 /**
- * 관리자가 반영 완료를 누를 수 있는 같은 그룹 사용자의 바인딩 한 줄이다.
- * `restartRequiredSince` 는 반영 완료 요청에 그대로 돌려보낸다.
+ * 관리자가 보는 같은 그룹 사용자의 바인딩 한 줄이다.
+ * `restartRequiredSince` 는 다시 확인 요청에 그대로 돌려보낸다. `recheckable` 은 「다시 확인」 단추를 보일 줄이고
+ * Control Plane 이 정한다(자동 반영이 실패했거나 대기가 24시간을 넘었다).
  */
 export type AdminConnection = {
   connectorId: string;
@@ -105,6 +117,9 @@ export type AdminConnection = {
   restartRequired: boolean;
   restartRequiredSince: string | null;
   undeclaredTools: number;
+  applyFailed: boolean;
+  waitingSince: string | null;
+  recheckable: boolean;
 };
 
 export const CONNECTOR_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -121,6 +136,8 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_ACTION_EXECUTING:
     "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
   CONNECTOR_NOT_CONNECTED: "서비스 연결에서 연결을 확인해 주세요.",
+  CONNECTOR_OAUTH_NOT_CONFIGURED:
+    "관리자가 아직 단추 연결을 설정하지 않았어요. 값을 직접 입력해 연결해 주세요.",
   CONNECTOR_PROFILE_NOT_READY:
     "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
   CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
@@ -243,7 +260,7 @@ export const disconnectConnection = (id: string) =>
 export const readAdminConnections = () =>
   connectionCall<AdminConnection[]>("/api/admin/connections");
 
-/** 관리자 반영 완료다. 목록에서 받은 재시작 대기 시작 시각을 그대로 돌려보낸다. */
+/** 관리자 다시 확인이다. 목록에서 받은 재시작 대기 시작 시각을 그대로 돌려보낸다. */
 export const confirmAdminConnection = (connection: AdminConnection) =>
   connectionCall<unknown>(
     `/api/admin/agents/${connection.agentCode}/connections/${connection.connectorId}/confirm`,
@@ -253,15 +270,24 @@ export const confirmAdminConnection = (connection: AdminConnection) =>
     },
   );
 
-/** 연결 상태를 화면에 보이는 말로 바꾼다. 재시작 대기는 상태보다 앞선다. */
-export function connectionStatusLabel(
-  status: ConnectionStatus,
-  restartRequired = false,
-): string {
-  if (restartRequired) return "관리자 반영을 기다려요";
+/** 연결 상태를 화면에 보이는 말로 바꾼다. 바인딩의 반영 상태는 `bindingStateLabel` 이 맡는다. */
+export function connectionStatusLabel(status: ConnectionStatus): string {
   return { DISCONNECTED: "연결 안 됨", PENDING: "준비 중", READY: "연결됨" }[
     status
   ];
+}
+
+/**
+ * 붙인 바인딩의 상태 배지 글이다. 자동 반영이 실패한 줄만 「반영 실패」 이고, 재시작 대기를 포함해 반영 중인 줄은
+ * 「붙이는 중」 이다. 반영 중의 자세한 안내는 `boundReadiness` 가 맡는다.
+ */
+export function bindingStateLabel(view: {
+  status: BindingStatus | null;
+  restartRequired: boolean;
+  applyFailed?: boolean;
+}): string {
+  if (view.status === "READY" && !view.restartRequired) return "붙음";
+  return view.applyFailed ? "반영 실패" : "붙이는 중";
 }
 
 const TOOL_RISK_LABELS: Record<ToolRisk, string> = {

@@ -24,10 +24,13 @@ public class McpToolCatalog {
     private final McpFileSpaceTools fileSpace;
     private final McpConnectorListTool connectorList;
     private final McpTaskTools taskTools;
+    private final McpFollowUpTools followUpTools;
+    private final McpMemoryForgetTool memoryForget;
+    private final McpConnectorAttachTool connectorAttach;
 
 
     public List<Map<String, Object>> tools() {
-        return Stream.concat(List.<Map<String, Object>>of(
+        return Stream.of(List.<Map<String, Object>>of(
             Map.of(
                 "name",
                 "memory_read",
@@ -82,7 +85,7 @@ public class McpToolCatalog {
                 "name",
                 "agent_delegate",
                 "description",
-                "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
+                "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 구매를 맡길 때 결제 금액처럼 승인 전에 확인할 수 없는 값은 준비를 시작하는 조건으로 붙이지 않는다. 사용자가 정한 예산은 카드와 주문서를 확인할 때 알려 주고, 최종 가격 판단과 결제는 사용자가 한다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -132,7 +135,12 @@ public class McpToolCatalog {
                 "name",
                 "follow_up_propose",
                 "description",
-                "사용자가 나중에 해야 하거나 끝나기를 기다리는 일을 할 일로 제안한다. 사용자가 받아들여야 챙긴다. 대화에서 분명히 나온 후속 작업만 제안하고, 같은 대화에서 거절한 것은 다시 제안하지 않는다. due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.",
+                "사용자가 나중에 해야 하거나 끝나기를 기다리는 일을 할 일로 남긴다. 사용자가 이번 메시지에서 적어 달라고 직접 시켰거나"
+                    + "(「할 일로 적어 둬」, 「챙겨 줘」) 예약 작업의 지시문이 적어 두라고 시킨 할 일이면 requested 를 true 로 준다. 그러면 바로 챙기는 "
+                    + "할 일이 된다. 시키지 않았는데 스스로 판단한 후속 작업은 requested 없이 부른다. 그러면 제안으로 남고 사용자가 받아들여야 챙긴다. "
+                    + "결과 글이 바로 챙기는지 제안인지 알려 주므로 그대로 알리고 답에 /now 링크를 붙인다. 대화에서 분명히 나온 일만 남기고, "
+                    + "같은 대화에서 거절한 것은 다시 제안하지 않는다. due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다. "
+                    + "isError 면 남기지 못한 것이다. 남겼다고 말하지 않는다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -152,6 +160,8 @@ public class McpToolCatalog {
                         "due_at",
                         Map.of("type", "string"),
                         "waiting",
+                        Map.of("type", "boolean"),
+                        "requested",
                         Map.of("type", "boolean")),
                     "required",
                     List.of("title"))),
@@ -187,8 +197,9 @@ public class McpToolCatalog {
                             "default", 10),
                         "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
-                    List.of("query"))))
-            .stream(), taskTools.definitions().stream())
+                    List.of("query")))),
+            taskTools.definitions(), followUpTools.definitions(), List.of(memoryForget.definition(), connectorAttach.definition()))
+            .flatMap(List::stream)
             .map(McpToolCatalog::allowRuntimeContext).toList();
     }
 

@@ -2,6 +2,8 @@
 
 사용자가 대화에 보낸 링크는 `link:<주소>` 로 가리키고, Control Plane 이 대화에 있는 주소인지 확인한 뒤 받는다
 (fos-assistant `docs/adr/ADR-20261120-link-image-source.md`). 받은 주소는 그림 올리기의 `source_links` 로 남긴다.
+비서가 웹 검색과 페이지 읽기로 찾은 주소도 같은 `link:` 로 가리킨다. Control Plane 이 `found_links.py` 가 알린 주소인지 확인한다
+(fos-assistant `docs/adr/ADR-20261121-found-link-image-source.md`).
 
 계약의 정본은 fos-assistant `docs/adr/ADR-20261120-image-source.md` 와 `hermes/plugins/fos-ctx/README.md` 의
 「그림을 고칠 사진을 받는다」 다. 모델은 `image_url` 과 `reference_image_urls` 에 `attachment:<첨부 번호>` 나
@@ -22,6 +24,7 @@ import urllib.request
 
 from .context import _read_token, build_context, logger
 from .tool_guard import guard_url
+from .next_step import alternative, ask_user
 
 TOOL = "image_generate"
 SOURCE_PATH = "image-source"
@@ -31,6 +34,9 @@ GENERATED_PREFIX = "generated:"
 LINK_PREFIX = "link:"
 # 받기 경로가 링크 가리킴의 받은 주소를 돌려주는 응답 머리다. Control Plane 의 `ImageSourceController.LINK_HEADER` 와 같다.
 LINK_HEADER = "X-Image-Source-Link"
+# 그 링크를 비서가 그 대화에서 찾은 주소로 받았을 때 Control Plane 이 붙이는 머리다. `ImageSourceController.FOUND_HEADER` 와 같다.
+# 이 머리가 있는 링크만 그림 올리기의 `found_links` 로 보낸다. 옛 Control Plane 은 이 머리를 내지 않는다.
+FOUND_HEADER = "X-Image-Source-Found"
 # Hermes 의 openai-codex 이미지 plugin 이 받는 입력 장수(`_MAX_REFERENCE_IMAGES`)다. 넘는 것을 Hermes 는 말없이 버린다.
 # 이 저장소가 정한 값이 아니다. `hermes/tests/test_generated_image_contract.py` 가 Hermes 를 올릴 때 다시 본다.
 MAX_SOURCES = 16
@@ -48,32 +54,54 @@ MAX_CALLS = 256
 MAX_ECHO_CHARS = 80
 EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
-NOT_REFERENCE = ("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, link:<사용자가 보낸 주소> 만 쓴다. "
-                 "파일 경로와 맨 주소는 쓰지 않는다")
-TOO_MANY = "한 번에 쓸 수 있는 사진은 %d장까지다. 사용자에게 줄여 달라고 한다" % MAX_SOURCES
-UNKNOWN = "이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다"
-GONE = "지웠거나 보관 기간이 지나 쓸 수 없다"
+# 문제 줄마다 끝 줄(`next_step.py`)이 붙는다. 글 전체는 마지막 문제의 끝 줄로 끝난다.
+# 참고 사진을 쓰지 못하면 설명만으로 비슷하게 그려 넣지 않고 먼저 알린다(fos-assistant 스펙 tool-fallback REQ7).
+NO_DRAW = "설명만으로 비슷하게 그려 넣지 말고, "
+ASK_PHOTO = "사용자가 사진을 올리거나 링크를 보내면 된다는 것을 먼저 알린다"
+NOT_REFERENCE = alternative("바탕과 참고 사진에는 attachment:<첨부 번호>, generated:<그림 제목>, "
+                            "link:<사용자가 보낸 주소나 검색·읽기 결과에 나온 주소> 만 쓴다. "
+                            "파일 경로와 맨 주소는 쓰지 않는다",
+                            "사용자가 이 대화에 보낸 주소나 검색·읽기 결과에 나온 주소면 link: 로 고쳐 다시 부른다. 넘길 수 없으면 " + NO_DRAW
+                            + "그 사진을 넘길 수 없다는 것과 " + ASK_PHOTO)
+# 어느 사진을 뺄지는 사용자가 정한다(fos-assistant 스펙 generated-image DECISION25, DECISION32).
+TOO_MANY = ask_user("한 번에 쓸 수 있는 사진은 %d장까지다. 어느 사진을 뺄지 사용자에게 묻는다" % MAX_SOURCES)
+UNKNOWN = alternative("이 대화에 보낸 사진, 링크나 이 대화에서 만든 그림이 아니다. 링크라면 검색이나 페이지 읽기 결과에 나온 주소도 아니다",
+                      "이 대화의 첨부, 사용자가 보낸 링크, 검색·읽기 결과에 글자 그대로 나온 주소, 만든 그림 가운데 맞는 가리킴을 찾아 다시 부른다. "
+                      "스스로 적은 상품 페이지 주소나 execute_code 안에서 얻은 주소였으면 web_search 나 web_extract 를 직접 불러 "
+                      "그 상품 페이지를 읽고, 결과 본문에 나온 사진 주소로 다시 부른다. "
+                      "없으면 " + NO_DRAW
+                      + "그 사진을 쓸 수 없다는 것과 " + ASK_PHOTO)
+GONE = ask_user("지웠거나 보관 기간이 지나 쓸 수 없다")
 # 만든 그림이 지워졌을 때다. 같은 인물의 다음 장면이면 이 그림을 빼고 인물 줄만으로 다시 그리게 한다(fos-assistant 스펙 generated-image REQ25).
-GONE_GENERATED = (GONE + ". 같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
-                  "앞 그림을 참고하지 못했다고 답에 적는다")
+GONE_GENERATED = alternative("지웠거나 보관 기간이 지나 쓸 수 없다",
+                             "같은 인물의 다음 장면을 그리던 중이면 이 그림을 빼고 인물 줄만으로 image_generate 를 다시 부르고, "
+                             "앞 그림을 참고하지 못했다고 답에 적는다. 그런 장면이 아니면 사용자에게 바로 알린다")
+# 링크 사진을 받지 못했을 때 다른 사진으로 다시 시도하게 한다(fos-assistant 스펙 agent-found-image REQ6, DECISION13, DECISION23).
+# 몇 장째인지는 세지 않는다. 호출마다 따로 도는 hook 이 그림 한 장의 시도를 묶을 길이 없어, 그림 규칙의 상한을 모델이 지킨다.
+# 실존 인물의 얼굴, 로고, 캐릭터 자체는 찾지 않는다(스펙 agent-found-image REQ7). 사용자가 보낸 링크가 열리지 않아도 같다.
+LINK_RETRY = ("상품, 사물, 장소처럼 찾을 수 있는 대상이면 검색·읽기 결과에 나온 다른 사진(다른 판매처의 같은 상품)으로 "
+              "link: 를 바꿔 image_generate 를 다시 부른다. 그림 한 장에 다른 사진 3장까지다. 사용자가 보낸 링크였으면 그 대상을 "
+              "검색해 찾은 사진으로 시도하고 보낸 링크 대신 찾은 사진을 썼다고 답에 적는다. 실존 인물의 얼굴, 로고, 캐릭터 자체를 "
+              "참고하려던 것이면 찾지 않는다. 그런 대상이거나 쓸 사진이 더 없으면 " + NO_DRAW + "사진을 찾지 못한 것과 " + ASK_PHOTO)
 LINK_REASONS = {
-    "IMAGE_SOURCE_LINK_BLOCKED": "열 수 없는 주소다",
-    "IMAGE_SOURCE_LINK_NO_IMAGE": "이 링크에서 쓸 수 있는 사진을 찾지 못했다. 사진을 직접 올려 달라고 한다",
-    "IMAGE_SOURCE_LINK_TOO_LARGE": "사진이 너무 크다",
-    "IMAGE_SOURCE_LINK_FAILED": "링크를 열지 못했다. 쇼핑몰이 막았을 수 있으니 사진을 직접 올려 달라고 한다",
+    "IMAGE_SOURCE_LINK_BLOCKED": alternative("열 수 없는 주소다", LINK_RETRY),
+    "IMAGE_SOURCE_LINK_NO_IMAGE": alternative("이 링크에서 쓸 수 있는 사진을 찾지 못했다", LINK_RETRY),
+    "IMAGE_SOURCE_LINK_TOO_LARGE": alternative("사진이 너무 크다", LINK_RETRY),
+    "IMAGE_SOURCE_LINK_FAILED": alternative("링크를 열지 못했다. 쇼핑몰이 막았을 수 있다", LINK_RETRY),
 }
-FAILED = "사진을 받지 못했다. 잠시 뒤 다시 부탁하라고 안내한다"
-# 링크를 쓰지 못했을 때 덧붙인다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
+FAILED = alternative("사진을 받지 못했다", NO_DRAW + "잠시 뒤 다시 해 달라고 알린다")
+# 링크를 쓰지 못했을 때 그 줄의 끝 줄 앞에 넣는다. 같은 인물의 다음 장면은 앞 그림만으로 다시 그린다(fos-assistant 스펙 generated-image DECISION52).
 LINK_NEXT_SCENE = ("같은 인물의 다음 장면을 그리던 중이고 앞 그림(generated:)은 쓸 수 있으면 이 링크를 빼고 앞 그림만 참고로 "
-                   "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다")
-OLD_SERVER = "이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다"
-NO_CONTEXT = "이 호출에서는 사진을 받을 수 없다. 대화에서 직접 image_generate 를 부른다"
-HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없다."
-TAIL = "그림을 만들지 않았다. 사용자에게 어느 사진을 왜 쓸 수 없는지 알린다."
+                   "image_generate 를 다시 부르고, 링크 사진을 쓰지 못했다고 답에 적는다. 그런 장면이 아니면 아래 줄을 따른다")
+OLD_SERVER = ask_user("이 서버는 아직 사진을 바탕으로 그림을 고칠 수 없다")
+NO_CONTEXT = alternative("이 호출에서는 사진을 받을 수 없다", "대화에서 직접 image_generate 를 부른다")
+HEAD = "fos-ctx: 바탕이나 참고로 가리킨 사진을 쓸 수 없어 그림을 만들지 않았다. 줄마다의 다음 방법이나 바로 알림을 따른다."
 
 _copies: dict = {}
 # 호출마다 받은 링크 주소다. 사본과 같은 키로 기억하고 함께 잊는다.
 _links: dict = {}
+# 호출마다 받은 링크 가운데 비서가 찾은 주소다. `_links` 와 같은 키로 기억하고 함께 잊는다.
+_found: dict = {}
 _copies_lock = threading.Lock()
 
 
@@ -84,9 +112,16 @@ def wants_sources(args) -> bool:
     return any(args.get(key) not in (None, "", []) for key in ("image_url", "reference_image_urls"))
 
 
+def with_next_scene(problem: str) -> str:
+    """링크 문제 글의 끝 줄 앞에 다음 장면 안내를 넣는다. 글은 여전히 끝 줄로 끝난다."""
+    body, end = problem.rsplit("\n", 1)
+    return body + ". " + LINK_NEXT_SCENE + "\n" + end
+
+
 def message(problems) -> str:
     """막을 때 모델이 받는 글이다. 문제마다 한 줄이다."""
-    return "\n".join([HEAD, *("- " + line for line in problems), TAIL])
+    # 끝 줄이 붙어 여러 줄인 문제 글은 둘째 줄부터 들여 쓴다
+    return "\n".join([HEAD, *("- " + line.replace("\n", "\n  ") for line in problems)])
 
 
 def _echo(value) -> str:
@@ -151,13 +186,15 @@ def _sweep(folder: pathlib.Path) -> None:
 
 
 def _fetch(url: str, token: str, ctx: dict, source: str, deadline: float):
-    """가리킴 하나를 받는다. `(바이트, 형식, 문제, 받은 링크)` 이고 받았으면 문제가 None 이다. 404 면 문제가 `OLD_SERVER` 다.
+    """가리킴 하나를 받는다. `(바이트, 형식, 문제, 받은 링크, 찾은 주소인가)` 이고 받았으면 문제가 None 이다.
+    404 면 문제가 `OLD_SERVER` 다.
 
     받은 링크는 링크 가리킴일 때 Control Plane 이 응답 머리로 돌려준 주소다. 그 밖에는 None 이다.
+    찾은 주소인가는 그 링크에 `FOUND_HEADER` 가 `1` 로 붙었을 때만 참이다.
     """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
-        return None, None, FAILED, None
+        return None, None, FAILED, None, False
     body = json.dumps({"_fos_ctx": ctx, "source": source}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url, data=body, method="POST",
@@ -167,6 +204,7 @@ def _fetch(url: str, token: str, ctx: dict, source: str, deadline: float):
         with urllib.request.urlopen(request, timeout=remaining) as response:
             content_type = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             link = response.headers.get(LINK_HEADER)
+            found = response.headers.get(FOUND_HEADER) == "1"
             raw = response.read(MAX_BYTES + 1)
     except urllib.error.HTTPError as exc:
         try:
@@ -174,37 +212,41 @@ def _fetch(url: str, token: str, ctx: dict, source: str, deadline: float):
         finally:
             exc.close()
         if status == 404:
-            return None, None, OLD_SERVER, None
+            return None, None, OLD_SERVER, None, False
         try:
             code = json.loads(answer.decode("utf-8")).get("code")
         except (ValueError, AttributeError):
             code = None
         if code == "IMAGE_SOURCE_UNKNOWN":
-            return None, None, UNKNOWN, None
+            return None, None, UNKNOWN, None, False
         if code == "IMAGE_SOURCE_GONE":
-            return None, None, GONE_GENERATED if source.startswith(GENERATED_PREFIX) else GONE, None
+            return None, None, GONE_GENERATED if source.startswith(GENERATED_PREFIX) else GONE, None, False
         if code in LINK_REASONS:
-            return None, None, LINK_REASONS[code], None
+            return None, None, LINK_REASONS[code], None, False
         logger.warning("fos-ctx: 그림 바탕 사진을 받지 못했다: HTTP %d", status)
-        return None, None, FAILED, None
+        return None, None, FAILED, None, False
     if content_type not in EXTENSIONS or not raw or len(raw) > MAX_BYTES:
         logger.warning("fos-ctx: 그림 바탕 사진의 답이 쓸 수 없는 모양이다")
-        return None, None, FAILED, None
+        return None, None, FAILED, None, False
     if source.startswith(LINK_PREFIX) and not (isinstance(link, str) and link.startswith("https://")):
         logger.warning("fos-ctx: 링크 사진의 답에 받은 주소가 없다")
-        return None, None, FAILED, None
-    return raw, content_type, None, (link if source.startswith(LINK_PREFIX) else None)
+        return None, None, FAILED, None, False
+    is_link = source.startswith(LINK_PREFIX)
+    return raw, content_type, None, (link if is_link else None), (found and is_link)
 
 
-def _remember(session_id: str, tool_call_id: str, paths, links=()) -> None:
+def _remember(session_id: str, tool_call_id: str, paths, links=(), found=()) -> None:
     with _copies_lock:
         while len(_copies) >= MAX_CALLS:
             oldest = next(iter(_copies))
             _copies.pop(oldest)
             _links.pop(oldest, None)
+            _found.pop(oldest, None)
         _copies[(session_id, tool_call_id)] = list(paths)
         if links:
             _links[(session_id, tool_call_id)] = list(links)
+        if found:
+            _found[(session_id, tool_call_id)] = list(found)
 
 
 def _remove(paths) -> None:
@@ -220,6 +262,7 @@ def release(session_id, tool_call_id) -> None:
     with _copies_lock:
         paths = _copies.pop((session_id or "", tool_call_id or ""), [])
         _links.pop((session_id or "", tool_call_id or ""), None)
+        _found.pop((session_id or "", tool_call_id or ""), None)
     _remove(paths)
 
 
@@ -227,6 +270,12 @@ def links_for(session_id, tool_call_id) -> list:
     """그 호출이 받은 링크 주소를 쓴 순서대로 돌려준다. 결과 hook 이 사본을 지우기 전에 읽는다. 없으면 빈 목록이다."""
     with _copies_lock:
         return list(_links.get((session_id or "", tool_call_id or ""), []))
+
+
+def found_links_for(session_id, tool_call_id) -> list:
+    """그 호출이 받은 링크 가운데 비서가 찾은 주소를 `links_for` 의 순서대로 돌려준다. 없으면 빈 목록이다."""
+    with _copies_lock:
+        return list(_found.get((session_id or "", tool_call_id or ""), []))
 
 
 def prepare(args, session_id: str, tool_call_id: str):
@@ -251,9 +300,9 @@ def prepare(args, session_id: str, tool_call_id: str):
     folder.mkdir(mode=0o700, parents=True, exist_ok=True)
     _sweep(folder)
     deadline = time.monotonic() + FETCH_BUDGET
-    copies, written, links = {}, [], []
+    copies, written, links, found = {}, [], [], []
     try:
-        problems = _fetch_all(url, token, ctx, ([base] if base else []) + refs, folder, deadline, copies, written, links)
+        problems = _fetch_all(url, token, ctx, ([base] if base else []) + refs, folder, deadline, copies, written, links, found)
     except BaseException:
         # 쓰기가 실패해도 이미 쓴 사본을 남기지 않는다. 막는 글은 부르는 쪽이 만든다.
         _remove(written)
@@ -264,7 +313,7 @@ def prepare(args, session_id: str, tool_call_id: str):
     if problems:
         _remove(written)
         return message(problems)
-    _remember(session_id, tool_call_id, written, links)
+    _remember(session_id, tool_call_id, written, links, found)
     changed = {"reference_image_urls": [copies[value.strip()] for value in refs]}
     if base:
         changed["image_url"] = copies[base.strip()]
@@ -273,21 +322,21 @@ def prepare(args, session_id: str, tool_call_id: str):
     return changed
 
 
-def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written, links):
+def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written, links, found):
     """가리킴을 차례로 받아 사본을 쓴다. 문제 목록을 돌려주고, 옛 Control Plane 이면 `OLD_SERVER` 를 돌려준다.
 
-    링크 가리킴의 받은 주소는 `links` 에 쓴 순서대로 더한다.
+    링크 가리킴의 받은 주소는 `links` 에 쓴 순서대로 더하고, 그 가운데 찾은 주소는 `found` 에도 더한다.
     """
     problems = []
     for source in sources:
         key = source.strip()
         if key in copies:
             continue
-        raw, content_type, problem, link = _fetch(url, token, ctx, key, deadline)
+        raw, content_type, problem, link, is_found = _fetch(url, token, ctx, key, deadline)
         if problem == OLD_SERVER:
             return OLD_SERVER
         if problem:
-            problems.append(key + ": " + problem + (". " + LINK_NEXT_SCENE if key.startswith(LINK_PREFIX) else ""))
+            problems.append(key + ": " + (with_next_scene(problem) if key.startswith(LINK_PREFIX) else problem))
             copies[key] = None
             continue
         path = folder / (secrets.token_hex(16) + EXTENSIONS[content_type])
@@ -296,4 +345,6 @@ def _fetch_all(url, token, ctx, sources, folder, deadline, copies, written, link
         copies[key] = str(path)
         if link:
             links.append(link)
+            if is_found and link not in found:
+                found.append(link)
     return problems

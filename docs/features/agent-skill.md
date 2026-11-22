@@ -48,7 +48,7 @@ sequenceDiagram
 2. **붙인 플러그인의 도구 정의 때문에 입력이 크게 늘면 나눈다.** 도구 정의는 그 에이전트의 모든 turn 에 실린다. 에이전트 상세의 연결 목록이 보이는 도구 수를 기준으로 삼는다
 3. **그룹에 공개할 에이전트는 따로 둔다.** 연결은 비공개 에이전트에만 붙고, 연결이 붙은 에이전트는 그룹에 공개하지 못한다
 4. **성격, Memory, 대화 맥락을 따로 두고 싶을 때 나눈다**
-5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 실행 공간을 적용하지 않은 profile 의 터미널 도구는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 비밀값을 셸에서 떼어 놓는 것은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간이고, 운영 정책에 등록한 뒤 셸 도구를 다시 저장했거나 운영 일괄 반영을 거친 profile 에만 적용된다
+5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 실행 공간을 적용하지 않은 profile 의 터미널 도구는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 비밀값을 셸에서 떼어 놓는 것은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간이고, 운영 정책이 그 profile 에 적용된 뒤(`default` 가 아닌 named profile 이고, 목록에 있거나 `isolate_unlisted` 가 켜져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) 셸 도구를 다시 저장했거나 운영 일괄 반영을 거친 profile 에만 적용된다
 
 ## 에이전트 화면
 
@@ -152,7 +152,7 @@ sequenceDiagram
 | 요청한 내장 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 목록을 다시 읽고 관리자에게 알리라고 안내한다 |
 | Hermes 가 쓰기 없이 미분류 도구를 켰거나 미분류 도구만 더 켜졌다 | 적용 실패로 세지 않고 성공 응답에 그 이름을 따로 싣는다. 화면은 관리자에게 알리라고 경고한다 |
 | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸는데 운영의 실행 공간 정책이 없거나 잘못됐다 | plugin 의 409 `sandbox_unavailable` 이고 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 아무것도 바뀌지 않는다 |
-| 정책은 유효한데 이 profile 이 등록되지 않았다 | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸면 409 `AGENT_SANDBOX_UNAVAILABLE` 이다. 사진 플러그인 설치도 409 다. local 로 켜지 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이면 그 도구를 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
+| 정책은 유효한데 이 profile 에 적용되지 않는다(`default` profile 이거나, 목록에 없고 `isolate_unlisted` 가 꺼져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) | 실행 공간 도구를 켜거나 켠 채 다른 도구를 바꾸면 409 `AGENT_SANDBOX_UNAVAILABLE` 이다. 사진 플러그인 설치도 409 다. local 로 켜지 않는다. Control Plane 은 기동할 때 실행 공간 도구가 켜진 에이전트를 다시 저장하고, 정책 밖이면 그 도구를 끈다([ADR-20261120 / no-local-shell](../adr/ADR-20261120-no-local-shell.md)) |
 | `image_gen` 을 켜거나 켠 채 다른 도구를 바꾼다 | 같은 쓰기에서 plugin 이 그 profile 에 이미지 서비스 설정을 넣는다. 이미 있는 설정은 그대로 둔다. 설정을 쓰지 못하거나 plugin 이 옛 버전이면 저장이 실패하고 아무것도 바뀌지 않는다. 화면은 저장 실패를 알린다([ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md)) |
 | 관리자가 기본 비서의 `image_gen` 을 끈다 | Control Plane 이 그 비서를 다시 켜지 않는다. 켜지기를 기다리던 비서를 사람이 켜도 더 기다리지 않는다 |
 | 실행 공간 도구가 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 격리한 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 정책 밖 profile 의 에이전트도 같다. 그런 에이전트의 셸은 기동 작업이 끈다. 셸·파일·사진 계열만 켜졌거나 주인이 그대로인 접근 변경은 막지 않는다 |
@@ -374,8 +374,9 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 - 앞머리에 비밀 요청 칸을 두지 못한다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))
 - `new` 는 새 스킬 화면 경로라 이름으로 쓸 수 없다
 
-일반 경로는 관리자 역할로 요청해도 올린 스킬(`UPLOADED`)만 준다. Hermes 번들과 플러그인이 설치한 스킬은 관리자 영역의 경로에서만 다룬다. 목록은 그 에이전트를 쓸 수 있는 사람이 보지만, 호출 합계(`usage`)와 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 하고 아니면 `FORBIDDEN` 이다.
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」). Hermes 는 올린 스킬과 모델이 만든 로컬 스킬을 모두 출처 `agent` 로 주므로 그 칸을 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
+일반 경로는 올린 스킬(`UPLOADED`)과 플러그인이 실제 설치한 스킬(`CONNECTOR`)을 준다. 플러그인 항목에는 `connectorTitle`을 추가한다. 설정에서는 읽기 전용으로 보인다. Hermes 기본 스킬(`HERMES`)은 관리자 영역의 경로가 준다.
+목록은 그 에이전트를 쓸 수 있는 사람이 본다. 호출 합계(`usage`)와 올린 스킬의 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 할 수 있다.
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」). Hermes 는 올린 스킬과 모델이 만든 로컬 스킬을 모두 출처 `agent` 로 주므로 그 칸을 쓰지 않는다. 올린 스킬 이름이 `UPLOADED` 다. 그 밖에는 플러그인 출처(`connector_id`)가 있는 스킬이 `CONNECTOR`, 나머지가 `HERMES` 다. 이름이 겹치면 `UPLOADED` 를 우선한다.
 올린 스킬 이름은 지금 버전과, 그보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 Hermes 가 이미 가리키고 있을 수 있어서, 그 이름도 올린 스킬로 보이고 다시 저장하거나 지울 수 있다.
 지금 버전에 있는데 대시보드 목록에 없는 스킬도 올린 것으로 넣고 켜진 것으로 보인다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬도 화면에서 지울 수 있어야 하기 때문이다.
 
@@ -385,7 +386,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 - 메시지가 `/이름` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 모양은 `SkillCommand` 가 갖는다. 새 요청 칸은 없다
 - 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 「이 스킬을 `skill_view` 로 읽고 그 절차대로 하라」 는 글로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다. 이름에 `.` 이나 `_` 가 든 Hermes 기본 스킬은 커맨드로 부르지 못하고 글 그대로 보낸다
-- 입력창의 `/` 목록은 켜진 업로드 스킬만 보여 준다. 기본·플러그인 스킬도 이름 규칙에 맞고 켜져 있으면 직접 입력해 부를 수 있다
+- 입력창의 `/` 목록은 스킬 도구가 켜져 있을 때, 이름 규칙에 맞는 켜진 업로드·플러그인 스킬을 보여 준다. 기본 스킬도 이름 규칙에 맞고 켜져 있으면 직접 입력해 부를 수 있다
 - 켜진 스킬 목록은 `SkillCommandCatalog` 가 에이전트마다 잠시 캐시하고, 스킬 저장, 지우기, 켜고 끄기가 반영되면 `SkillsChanged` 로 비운다. `skills` toolset 변경은 캐시를 비우지 않아 캐시가 끝난 뒤에 반영된다
 - 이름은 대화를 만들기 전에 확인한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다. 목록을 읽다 Hermes 가 실패하면 그 오류로 거절하고 캐시에 두지 않는다
 
@@ -430,7 +431,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 ### 스크립트와 실행 공간
 
 `scripts/` 가 든 스킬은 스크립트를 사용자별 docker 실행 공간에서 돌릴 수 있는 에이전트에만 올라간다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
-조건은 셋이다. API 도구에 `terminal` 이 켜져 있고(Control Plane 이 저장 전에 본다), profile 이 실행 공간 정책에 등록돼 있고, 정책에 `skill_root` 가 있어야 한다(둘은 plugin 이 본다). 어기면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다.
+조건은 셋이다. API 도구에 `terminal` 이 켜져 있고(Control Plane 이 저장 전에 본다), 실행 공간 정책이 그 profile 에 적용되고(`default` 가 아닌 named profile 이고, 목록에 있거나 `isolate_unlisted` 가 켜져 있다. [ADR-20261121 / sandbox-default-policy](../../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)), 정책에 `skill_root` 가 있어야 한다(둘은 plugin 이 본다). 어기면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다.
 `scripts/` 아래 파일은 755, 나머지는 644 로 쓴다. 올리는 쪽이 준 실행 비트는 보지 않는다.
 
 plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 루트 경로 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다.
@@ -474,6 +475,11 @@ plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 
 | zip 이 크기 상한을 넘는다 | 바이트를 읽지 않고 권한만 본다. 미리보기는 `ZIP_TOO_LARGE` 하나만 든 결과를, 올리기는 `SKILL_PACKAGE_INVALID` 를 준다 |
 
 저장 직전에 앞머리 규칙을 한 번 더 본다. 묶음 검사를 거치지 않은 호출자가 생겨도 비밀 요청 칸이 빠지지 않게 하려는 것이다. 정상 흐름과 문제 표시는 `web/test/browser/skill-package.spec.ts` 가 확인하고, 거절 문구는 화면 컴포넌트의 오류 문구가 갖는다.
+
+### 옮겨 온 스킬 묶음
+
+[`hermes/skill-packages/`](../../hermes/skill-packages/README.md) 는 화면의 스킬 묶음 올리기로 넣는 스킬의 원본이다. 2026-11-21 에 fos-agents 의 건강 스킬과 외주 스킬을 옮겼다(사용자 결정). 플러그인의 `agent_skills` 는 MCP 서버가 있는 플러그인을 붙일 때만 설치되고 `scripts/` 를 복사하지 않아 쓰지 않았다.
+**사용자가 부를 때만 돈다.** 건강 체크인, 주간 진료 요약, 외주 공고 리포트 모두 예약 작업을 두지 않는다(운영의 예약 작업은 옮길 때 모두 보관 상태였다). 개인 값과 의료 정보는 사본에 두지 않고 스킬이 기억에서 읽는다. 진단 부위가 드러나는 이름은 일반 이름으로 바꿨다. 개인 값으로 만든 파일을 셸 작업 폴더에 남기는 외주 공고 리포트는 비공개 에이전트에만 올린다(그룹 공개 에이전트는 셸 작업 공간을 함께 쓴다).
 
 ### 스킬 커맨드로 보낼 때
 

@@ -42,6 +42,7 @@ const USAGE = `사용법:
 선택: FOS_EVAL_TIER (--tier 가 없을 때), FOS_EVAL_TURN_TIMEOUT_MS
 전제: 평가 계정은 평가만 쓴다. 평가 에이전트는 평가 계정이 주인인 비공개 에이전트다. 다른 에이전트는 그 계정이 쓸 수 있고, 플러그인은 그 계정이 연결하지 않은 것이다
 score 는 통과한 대화를 지운다. --keep 은 모두 남긴다. send 를 시작한 뒤 만든 예약 작업은 --keep 이어도 지운다.
+주의: send 와 score 는 같은 커밋에서 실행한다. 문항을 바꾼 커밋 앞에서 보낸 결과는 지워진 문항 id 때문에 score 가 멈추니 바꾸기 전에 채점한다
 종료 코드: 0 통과, 1 기준 미달, 2 사용법 오류나 보내기·읽기 오류`;
 
 class UsageError extends Error {}

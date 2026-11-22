@@ -6,9 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import { SecretConfirmDialog } from "@/components/admin/secret-confirm-dialog";
+import { VapidSecretRow } from "@/components/admin/vapid-secret-row";
+import { ConnectorOAuthSecrets } from "@/components/admin/connector-oauth-secrets";
 import { formatWhen } from "@/lib/format";
 import {
   deleteGatewaySecret,
+  deleteVapid,
+  regenerateVapid,
   fetchServerSecrets,
   regenerateConfirmText,
   regenerateGatewaySecret,
@@ -161,6 +165,20 @@ export function AdminSecretList() {
     setConfirming(null);
   }
 
+  async function changeVapid(call: () => Promise<Response>) {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const response = await call();
+      if (!response.ok) setError(await failureOf(response));
+    } catch {
+      setError("요청을 보내지 못했어요. 잠시 뒤 다시 해 주세요.");
+    }
+    apply(await readOverview());
+    setBusy(false);
+  }
+
   async function remove() {
     setBusy(true);
     setError(null);
@@ -204,6 +222,17 @@ export function AdminSecretList() {
             }
             onDelete={() => setConfirming("delete")}
           />
+          <VapidSecretRow
+            vapid={overview.vapid}
+            storeAvailable={overview.storeAvailable}
+            busy={busy}
+            onRegenerate={(subject) =>
+              changeVapid(() =>
+                regenerateVapid(subject, overview.vapid.publicKey),
+              )
+            }
+            onDelete={() => changeVapid(deleteVapid)}
+          />
         </div>
       )}
       {result ? (
@@ -217,6 +246,12 @@ export function AdminSecretList() {
         <Notice variant="error" role="alert" className="mt-3">
           {error}
         </Notice>
+      ) : null}
+      {overview ? (
+        // 위 줄들의 결과와 오류 안내가 그 줄 바로 아래 남도록 단추 연결 구역은 안내 뒤에 둔다.
+        <div className="mt-3">
+          <ConnectorOAuthSecrets />
+        </div>
       ) : null}
       {confirming === "regenerate" && gateway ? (
         <SecretConfirmDialog

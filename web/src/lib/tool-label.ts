@@ -27,6 +27,10 @@ const LABELS: Record<string, Label> = {
     running: "웹 페이지를 읽고 있어요",
     done: "웹 페이지를 읽었어요",
   },
+  product_page_read: {
+    running: "상품 페이지를 읽고 있어요",
+    done: "상품 페이지를 읽었어요",
+  },
   artifact_write: {
     running: "결과물을 저장하고 있어요",
     done: "결과물을 저장했어요",
@@ -46,9 +50,24 @@ const LABELS: Record<string, Label> = {
     running: "기억을 서로 잇고 있어요",
     done: "기억을 서로 이었어요",
   },
+  // 사용자가 시킨 것은 바로 적고 스스로 판단한 것은 제안한다. 둘 다 맞게 읽히도록 쓴다.
   follow_up_propose: {
-    running: "할 일을 제안하고 있어요",
-    done: "할 일을 제안했어요",
+    running: "할 일을 남기고 있어요",
+    done: "할 일을 남겼어요",
+  },
+  follow_up_list: {
+    running: "할 일을 보고 있어요",
+    done: "할 일을 봤어요",
+  },
+  // 대상이 여럿이거나 사람이 시키지 않은 실행이면 끝내지 않는다. 끝낸 것처럼 읽히지 않게 쓴다.
+  follow_up_done: {
+    running: "끝낼 할 일을 찾고 있어요",
+    done: "끝낼 할 일을 확인했어요",
+  },
+  // 지우기는 승인 카드만 만든다. 지운 것처럼 읽히지 않게 쓴다.
+  memory_forget: {
+    running: "기억 삭제 승인을 요청하고 있어요",
+    done: "기억 삭제 승인을 요청했어요",
   },
   content_draft_preview: {
     running: "원고 미리보기를 만들고 있어요",
@@ -211,6 +230,11 @@ const LABELS: Record<string, Label> = {
   connector_list: {
     running: "연결한 서비스를 확인하고 있어요",
     done: "연결한 서비스를 확인했어요",
+  },
+  // 붙이기는 승인 카드만 만든다. 붙인 것처럼 읽히지 않게 쓴다.
+  connector_attach: {
+    running: "붙이기 승인을 요청하고 있어요",
+    done: "붙이기 승인을 요청했어요",
   },
   tool_search: {
     running: "쓸 도구를 찾고 있어요",

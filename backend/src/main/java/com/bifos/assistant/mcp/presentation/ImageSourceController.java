@@ -27,6 +27,8 @@ import tools.jackson.databind.JsonNode;
 public class ImageSourceController {
     /** 링크 가리킴으로 받은 주소를 fos-ctx 에 돌려주는 응답 머리다. */
     public static final String LINK_HEADER = "X-Image-Source-Link";
+    /** 그 링크를 비서가 그 대화에서 찾은 주소로 받았음을 알리는 응답 머리다. 값은 {@code 1} 이고 사용자가 보낸 링크에는 없다. */
+    public static final String FOUND_HEADER = "X-Image-Source-Found";
 
     private final ImageSourceService sources;
 
@@ -42,6 +44,10 @@ public class ImageSourceController {
         if (result.link() != null) {
             // 받은 링크의 정해진 꼴이다. fos-ctx 가 그림 올리기의 source_links 로 남긴다(ADR-20261120 / link-image-source).
             response.header(LINK_HEADER, result.link());
+        }
+        if (result.found()) {
+            // fos-ctx 가 그림 올리기의 found_links 로 남긴다. 화면의 「비서가 찾음」 이 된다(ADR-20261121 / found-link-image-source).
+            response.header(FOUND_HEADER, "1");
         }
         return response
             .contentType(MediaType.parseMediaType(image.contentType()))

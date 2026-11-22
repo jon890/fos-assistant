@@ -32,12 +32,13 @@ export const EXCEPTIONS: Record<string, string> = {
   "docs/self-hosting.md": "구현 전인 계획서가 이 파일의 환경 변수 표를 고친다. 그 계획이 끝나면 README 와 설정 파일 주석으로 옮긴다",
 };
 
-/** `docs/` 밖에서 둘 수 있는 Markdown 이다. 입구와 규칙, 코드 옆 README, 스킬과 플러그인이 읽는 파일이다. */
+/** `docs/` 밖에서 둘 수 있는 Markdown 이다. 입구와 규칙, 코드 옆 README, 스킬과 플러그인이 읽는 파일이다. 스킬 묶음 사본은 참고 파일까지 스킬이 읽는다. */
 const OUTSIDE_DOCS = [
   /^(?:.+\/)?README\.md$/,
   /^README\.ko\.md$/,
   /^(?:.+\/)?(?:AGENTS|CLAUDE)\.md$/,
   /\/skills\/(?:.+\/)?SKILL\.md$/,
+  /^hermes\/skill-packages\/[a-z0-9-]+\/(?:SKILL\.md|(?:references|templates)\/[^/]+\.md)$/,
   /^hermes\/connectors\/[^/]+\/ICON-SOURCE\.md$/,
   /^tasks\//,
   /^\.claude\/spec-overlay\.md$/,
@@ -165,7 +166,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
 });
 
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
-  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
+  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "hermes/skill-packages/x/SKILL.md", "hermes/skill-packages/x/references/y.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
 });

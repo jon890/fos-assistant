@@ -376,7 +376,7 @@ class McpMemoryRememberToolTest {
             .isEqualTo(PROPOSED);
         JsonNode tooLong = call(remember("다른 사람 셋", "다른 사람은 홍길동이다", null).put("summary", "가".repeat(201)));
         assertThat(tooLong.path("isError").asBoolean()).isTrue();
-        assertThat(text(tooLong)).isEqualTo("summary 는 200자까지다.");
+        assertThat(text(tooLong)).isEqualTo("summary 는 200자까지다.\n다음 방법: 길이에 맞게 고쳐 다시 부른다");
     }
 
 
@@ -477,6 +477,28 @@ class McpMemoryRememberToolTest {
             .containsExactlyInAnyOrder(
                 tuple(MemoryCaptureKind.CREATED, false),
                 tuple(MemoryCaptureKind.PROPOSED, true));
+    }
+
+
+    @Test
+    @DisplayName("기억 찾기만 부른 대화는 바깥 글을 읽지 않은 것이라 바로 저장하고 요약이 요약 구역에 들어간다")
+    void remembersAfterMemorySearchOnly() throws Exception {
+        // 운영 확인에서 기억 찾기만 세 번 부른 대화의 기억이 「바깥 글」 표시를 단 제안이 되었고, 받아들인 뒤에도 요약이 없어 memory_read 를 불렀다
+        askedInThisTurn();
+        toolStarted("mcp__fos_assistant__memory_search");
+        toolStarted("mcp__fos_assistant__memory_search");
+        toolStarted("mcp__fos_assistant__memory_search");
+
+        assertThat(text(call(remember("자전거 이름", "자전거 이름은 파랑돌이다", null).put("summary", "자전거 이름 파랑돌"))))
+            .startsWith(REMEMBERED);
+
+        Memory saved = onlyMemory();
+        assertThat(saved.status()).isEqualTo(MemoryStatus.ACCEPTED);
+        assertThat(capturesOfDad())
+            .extracting(MemoryCapture::externalRead)
+            .containsExactly(false);
+        assertThat(assembler.assemble(currentDad(), dadRun.agentId()).instructions())
+            .contains("- [" + saved.id() + "] 자전거 이름: 자전거 이름 파랑돌");
     }
 
 
@@ -713,7 +735,7 @@ class McpMemoryRememberToolTest {
 
         assertThat(again.path("isError").asBoolean()).isTrue();
         assertThat(text(again)).startsWith("같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다.");
-        assertThat(text(updated)).isEqualTo("고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.");
+        assertThat(text(updated)).isEqualTo("고칠 기억을 찾지 못했다.\n다음 방법: memory_id 없이 새로 남기고, 고치지 못해 새로 남겼다고 답에 한 줄 알린다");
         assertThat(memories.findById(old).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
     }
 
@@ -759,7 +781,7 @@ class McpMemoryRememberToolTest {
         JsonNode result = call(arguments);
 
         assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).isEqualTo("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.");
+        assertThat(text(result)).isEqualTo("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.\n사용자에게 바로 알린다.");
         assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
     }
 
@@ -774,7 +796,7 @@ class McpMemoryRememberToolTest {
         JsonNode fourth = call(remember("사실 3", "본문 3", null));
 
         assertThat(fourth.path("isError").asBoolean()).isTrue();
-        assertThat(text(fourth)).isEqualTo("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.");
+        assertThat(text(fourth)).isEqualTo("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.\n사용자에게 바로 알린다.");
         assertThat(memoriesOfDad()).hasSize(3);
     }
 

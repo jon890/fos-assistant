@@ -6,7 +6,7 @@ import { describeFailure } from "@/components/error-message";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -34,7 +34,7 @@ function formatCreatedAt(createdAt: string): string {
   });
 }
 
-/** 내 알림 목록이다. 첫 쪽은 화면이 열린 뒤 브라우저가 읽는다. */
+/** 내 알림 목록이다. 「지금 볼 것」 의 「알림」 탭 안에 그린다. 첫 쪽은 탭이 열린 뒤 브라우저가 읽는다. */
 export function NotificationList() {
   const router = useRouter();
   const { unreadCount, refresh } = useUnreadNotifications();
@@ -43,6 +43,8 @@ export function NotificationList() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 읽음 표시의 실패다. 불러오기 실패와 따로 두어 빈 목록 안내와 다시 읽기를 가리지 않는다. */
+  const [actionError, setActionError] = useState<string | null>(null);
   /**
    * 첫 쪽을 읽기 시작한 차례다. 더 나중에 시작한 첫 쪽 읽기가 있으면 이전 응답은 버린다.
    * 그보다 먼저 시작한 다음 쪽 읽기의 응답도 버린다
@@ -138,6 +140,7 @@ export function NotificationList() {
   const open = useCallback(
     async (item: NotificationView) => {
       const href = notificationHref(item);
+      setActionError(null);
       if (item.readAt === null) {
         try {
           const response = await markNotificationRead(item.id);
@@ -147,11 +150,13 @@ export function NotificationList() {
               current.map((entry) => (entry.id === read.id ? read : entry)),
             );
           } else {
-            setError(await describeFailure(response));
+            setActionError(await describeFailure(response));
             return;
           }
         } catch {
-          setError("알림을 읽음으로 표시하지 못했어요. 다시 시도해 주세요.");
+          setActionError(
+            "알림을 읽음으로 표시하지 못했어요. 다시 시도해 주세요.",
+          );
           return;
         }
         refresh();
@@ -162,10 +167,11 @@ export function NotificationList() {
   );
 
   const readAll = useCallback(async () => {
+    setActionError(null);
     try {
       const response = await markAllNotificationsRead();
       if (!response.ok) {
-        setError(await describeFailure(response));
+        setActionError(await describeFailure(response));
         return;
       }
       const now = new Date().toISOString();
@@ -174,7 +180,7 @@ export function NotificationList() {
       );
       refresh();
     } catch {
-      setError("알림을 읽음으로 표시하지 못했어요. 다시 시도해 주세요.");
+      setActionError("알림을 읽음으로 표시하지 못했어요. 다시 시도해 주세요.");
     }
   }, [refresh]);
 
@@ -182,9 +188,8 @@ export function NotificationList() {
     unreadCount > 0 || items.some((item) => item.readAt === null);
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">알림</h1>
+    <div className="w-full">
+      <div className="mb-4 flex items-center justify-end gap-3">
         <Button
           variant="outline"
           size="sm"
@@ -194,21 +199,24 @@ export function NotificationList() {
           모두 읽음
         </Button>
       </div>
-      {error ? (
+      {/* 목록을 하나도 읽지 못했으면 다시 읽기를 준다. 읽음 표시의 실패와 목록이 있는 채의 실패(다음 쪽)는 목록 위에 알리고 빈 목록 안내를 가리지 않는다. */}
+      {actionError || (error && items.length > 0) ? (
         <Notice variant="error" className="mb-4">
-          {error}
+          {actionError ?? error}
         </Notice>
       ) : null}
       {loading ? (
-        <div
-          className="flex flex-col gap-2"
-          data-testid="notification-skeleton"
-        >
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-        </div>
-      ) : items.length === 0 && !error ? (
+        <ListSkeleton data-testid="notification-skeleton" />
+      ) : error && items.length === 0 ? (
+        <LoadFailure
+          message={error}
+          onRetry={() => {
+            setError(null);
+            setLoading(true);
+            loadFirstPage();
+          }}
+        />
+      ) : items.length === 0 ? (
         <EmptyState
           title="아직 알림이 없어요."
           description="승인이 필요한 요청이 생기면 여기에 알려 드려요."

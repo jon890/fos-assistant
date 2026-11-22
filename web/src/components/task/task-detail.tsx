@@ -15,7 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/ui/page-frame";
+import { ListSkeleton } from "@/components/ui/page-state";
 import {
   deleteTask,
   fetchTask,
@@ -29,6 +30,7 @@ import {
   type TaskRunView,
   type TaskView,
 } from "@/lib/task";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { formatDateTime } from "./task-list";
 import { TaskForm } from "./task-form";
 
@@ -124,12 +126,11 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">
-          {task?.title ?? "예약 작업"}
-        </h1>
-        {task ? (
+    <PageFrame
+      title={task?.title ?? "예약 작업"}
+      back={{ href: "/tasks", label: PAGE_HEADS.tasks.title }}
+      action={
+        task ? (
           <>
             <Badge variant={task.state === "ACTIVE" ? "success" : "outline"}>
               {task.state === "ACTIVE" ? "켜짐" : "멈춤"}
@@ -151,8 +152,9 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               지우기
             </Button>
           </>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       {error ? (
         <Notice variant="error" role="alert" className="mb-4">
           {error}
@@ -211,11 +213,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           </section>
         </>
       ) : error ? null : (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-          <Skeleton className="h-24" />
-        </div>
+        <ListSkeleton />
       )}
       <AlertDialog
         open={confirmingDelete}
@@ -245,6 +243,6 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageFrame>
   );
 }

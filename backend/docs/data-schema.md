@@ -209,8 +209,9 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 대화와 실행 기록과 스킬 호출 이력, 예약 작업은 남고 「지운 에이전트」 로 보인다. 무엇을 지우고 무엇을 기다리는지는 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
-같은 트랜잭션에서 두 가지를 함께 지운다.
+같은 트랜잭션에서 아래를 함께 지운다.
 아직 보내지 않은 대기 메시지(`conversation.pending_messages`)는 지운 대화에 보낼 곳이 없어 비운다.
+비서가 찾은 주소의 해시(`conversation.found_link_hashes`)도 비운다. 사용자 정리처럼 이 길을 거치지 않고 지운 대화는 정리 작업이 비운다.
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다. 「참고한 기억」 단추 사건은 그 대화의 것만 지우고 넓히지 않는다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행의 답 본문과 질문 메시지 번호, 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
@@ -227,7 +228,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 줄은 지우지 않는다. 실행 기록과 함께 남고, 내장 위임 결과의 맡긴 일과 결과 글과 그 key(`goal_preview`, `result_text`, `result_key_id`)만 비운다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다. 에이전트가 청한 기억 지우기는 카드에 보인 제목과 본문 앞부분이 승인 줄(`connector_action.args_json`)에도 남고 그 대화를 정리할 때 지워진다.
 그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
@@ -265,7 +266,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
-사용자 물리 삭제는 사용자 정리(ADR-20261101 / user-purge)가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
+사용자 물리 삭제는 사용자 정리([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md))가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
 접근 해제만으로는 사용자와 개인 데이터를 지우지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
@@ -315,18 +316,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 **이 컬럼은 전용 `UPDATE` 로만 바꾼다.** `AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼므로, 먼저 읽어 둔 사용자를 나중에 저장해도 상한을 옛 값으로 덮지 않는다. 읽기도 엔티티를 거치지 않는 전용 쿼리로 한다.
 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 전용 금융 UPDATE는 `limit_updated_at`과 일반 감사 `updated_at`을 함께 적는다. 두 칸의 의미를 합치지 않는다.
-
-#### 구매 상한 컬럼
-
-`purchase_limit_` 로 시작하는 컬럼은 사용자가 정한 구매 상한이다. 근거는 [ADR-20261113 / purchase-checkout](../../docs/adr/ADR-20261113-purchase-checkout.md)가 갖는다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `purchase_limit_order_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 한 건 상한. 상품 금액과 기본 배송비를 더한 예상 합계와 견준다 |
-| `purchase_limit_daily_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 KST 하루 상한. 그날 승인한 `PURCHASE` 승인 줄의 예상 합계 합과 견준다 |
-
-운영 최대치가 없어 이 값이 곧 적용 상한이다. 0 이면 주문서 준비를 받지 않으며, 칸을 더할 때 모든 사용자가 0 으로 채워져 닫힌 채 시작한다. 화면 API 는 0 이상 1조 미만의 정수만 받는다.
-주문 상한 컬럼처럼 엔티티의 넣기와 고치기에서 빼고 `PurchaseLimitRepository` 의 전용 쿼리로만 읽고 쓴다. 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
 
 #### 결과물 자동 보관 컬럼
 
@@ -436,6 +425,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
 - `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `CUSTOM` 이 쓰던 `model_provider`, `model`, `reasoning_effort` 세 컬럼은 운영에서 모든 줄이 비어 있음을 확인한 뒤 `V20261102025856` 이 지웠다
+- `found_link_hashes` 는 비서가 그 대화에서 웹 검색과 페이지 읽기로 찾은 주소의 해시다([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 정해진 꼴로 바꾼 주소의 SHA-256 앞 16바이트를 16진수 32자로 적어 구분 문자 없이 이어 붙인다. 상품 사진을 읽은 페이지와 고른 사진에는 주소 해시의 첫 글자를 각각 `p`, `i`로 바꾼 표시도 둔다([비서가 찾은 사진 기술 설계](../../docs/features/agent-found-image/design.md)의 「상품 페이지에서 대표 사진 고르기」). 주소 원문은 두지 않는다. 엔티티가 매핑하지 않고 `ConversationRepository` 의 전용 질의로만 읽고 쓴다. 더하기는 뒤에 붙이고 뒤에서 640,000자만 남기는 `UPDATE` 한 문장이다. 테스트 스키마에는 `conversation-found-link-hashes-column.sql` 이 이 칸을 만든다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 `title_key_id`, 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `title_key_id` 가 비어 있으면 `title` 은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `conversation:<id>:title:user:<user_id>` 다. 외래 키를 두지 않는다. 칸은 암호문이 들어가도록 `VARCHAR(1024)` 이고 글자 수 상한(200자)은 평문에 대해 요청 검사가 지킨다. 읽는 곳은 `Conversation.title()` 이고 풀지 못하면 읽을 수 없다는 글을 받는다. 제목을 질의로 직접 쓰는 곳(`fillTitleIfBlank`, `renameIfActive`, `markPurged`)은 암호문과 key 번호를 함께 적는다. 사이드바의 대화 검색은 브라우저가 받은 평문 제목으로 목록을 좁히므로 서버가 이 칸을 비교하지 않는다
@@ -453,6 +443,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `content_key_id` 가 비어 있으면 `content` 는 평문이다. 외래 키를 두지 않는다
 - `sender_user_id` 는 `ASSISTANT` 와 `SYSTEM` 에서, `execution_id` 는 `USER` 와 `SYSTEM` 에서 비어 있다
 - `steer_state`, `steer_execution_id`, `steer_child` 는 답이 도는 중 도는 실행에 끼워 넣은 사용자 글(steer 말풍선)에만 찬다. 상태는 `DELIVERED`(받아 둠), `CARRIED_OVER`(돌아와 다음 turn 으로 감), `UNCONFIRMED`(들어갔는지 모름), `NOT_DELIVERED`(중지한 결과가 돌려줘 들어가지 않음)이고 `steer_execution_id` 는 끼워 넣은 turn 의 루트 실행이다. `execution_id` 가 `USER` 행에서 비어 있다는 규칙을 지키려고 칸을 따로 둔다. 답 줄로 읽는 질의가 `execution_id` 로 답을 고르기 때문이다. 흐름과 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다
+- `reply_message_id`, `reply_attachment_id`, `reply_artifact_id` 는 사용자가 메시지나 그림을 집어 보낸 답장의 사용자 줄에만 찬다. 집은 메시지 줄과, 사진이나 그림 한 장을 집었으면 그 첨부나 그림 행이다. 둘 다 비면 메시지 전체를 집은 것이다. 외래 키를 두지 않는다. 다시 만들기는 질문 줄의 이 칸을 다시 읽는다. 흐름은 [`docs/features/chat-reference.md`](../../docs/features/chat-reference.md) 가 갖는다. 칸은 `V20261105074442__chat_message_reply.sql` 이 갖는다
 - `content` 를 `LONGTEXT` 로 못 박는다. 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다
 
 **본문은 저장할 때 암호화한다.** KEK 설정이 있으면 새 메시지를 빈 글로 넣고 같은 트랜잭션에서 암호문으로 고친다.
@@ -573,9 +564,10 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `generation_prompt_key_id` | 지시문을 암호화한 `user_data_key.id`. 비어 있으면 평문이다 |
 | `generation_source_links` | 그림을 만들 때 참고한 링크 주소를 줄바꿈으로 이은 글([ADR-20261120 / link-image-source](../../docs/adr/ADR-20261120-link-image-source.md)). `generation_source_links_key_id` 가 있으면 대화 요청자의 데이터 key 로 암호화한 글이다. 링크를 쓰지 않은 그림은 비어 있다. 대화를 정리할 때 행과 함께 지운다 |
 | `generation_source_links_key_id` | 참고한 링크를 암호화한 `user_data_key.id`. 지시문의 key 와 따로 둔다. 비어 있으면 평문이다 |
+| `generation_found_link_flags` | `generation_source_links` 의 링크마다 비서가 그 대화에서 찾은 것이면 `1`, 사용자가 보낸 것이면 `0` 을 같은 순서로 이은 글([ADR-20261121 / found-link-image-source](../../docs/adr/ADR-20261121-found-link-image-source.md)). 화면의 「비서가 찾음」 이 된다. 찾은 링크가 없으면 비어 있다. 링크 수와 길이가 다르면 표시가 없는 것으로 읽는다. 링크 상한(16개)과 길이가 묶여 있다 |
 | `generation_call_key` | 올린 호출의 session, `tool_call_id`, 그림 SHA-256 을 묶은 SHA-256 16진수. 유일 제약이 있어 같은 올리기가 다시 와도 한 행이다. 값이 있는 행이 만든 그림 행이다 |
 
-그림 행의 `path` 는 `generated/<제목>.<확장자>` 다. 제목이 파일 이름이라 보관 사본과 내려받기가 같은 제목을 쓴다. 칸은 `V20261105074416__chat_artifact_generated_image.sql` 이 갖고, 참고한 링크의 두 칸(`generation_source_links`, `generation_source_links_key_id`)은 `V20261105074423__chat_artifact_source_links.sql` 이 갖는다.
+그림 행의 `path` 는 `generated/<제목>.<확장자>` 다. 제목이 파일 이름이라 보관 사본과 내려받기가 같은 제목을 쓴다. 칸은 `V20261105074416__chat_artifact_generated_image.sql` 이 갖고, 참고한 링크의 두 칸(`generation_source_links`, `generation_source_links_key_id`)은 `V20261105074423__chat_artifact_source_links.sql` 이 갖는다. 찾은 링크 표시(`generation_found_link_flags`)는 `V20261105074441__chat_artifact_found_link_flags.sql` 이 갖는다.
 
 **「내 파일」 에 넣은 파일의 제목과 들어온 길, 내준 답도 같은 표의 컬럼이다**([ADR-20261119 / file-space-put](../../docs/adr/ADR-20261119-file-space-put.md)). 새 표를 두지 않는다.
 
@@ -831,6 +823,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `base_revision` 은 `CREATED` 면 저장한 때의 판 번호, `UPDATED` 면 고치기 전의 판 번호이고 `PROPOSED` 면 비어 있다
 - `previous_status` 는 기존 제안을 받아들인 `CREATED` 만 `PROPOSED` 이고 나머지는 비어 있다
 - `external_read` 는 기록을 남길 때 그 대화의 어느 실행이 바깥 글을 읽었는지다(「바로 저장 판정」 의 조건 4). 승인 카드가 이 값을 보인다. 이 컬럼이 생기기 전의 줄은 거짓이다
+- `replaced_memory_ids` 는 합치기에서 새 항목이 대신한 옛 항목 번호의 JSON 배열이다. 바로 저장은 실제로 대신한 번호, 제안은 받아들일 때 대신할 번호이고 받아들이면 실제로 대신한 번호로 고친다. 합치기가 아니면 `NULL` 이다. 옛 항목이 지워질 수 있어 외래 키를 걸지 않는다
 
 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다.
 `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이라 되돌리지 않는다.
@@ -842,7 +835,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id` 한 칸에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 동작은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억의 대체」 가 갖는다.
 
 - 칸이 차 있으면 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 빠진다. 「대체됨」 을 `memory` 의 상태로 두지 않는다. 사람이 보는 목록에는 남는다
-- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
+- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 `memory_remember` 의 합치기 하나이고 조건부 네이티브 UPDATE(`MemoryRepository.supersede`, `supersedeWithin`)로 쓴다. 그 전에는 `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
 - 대신한 새 항목을 지우거나 승인을 벗어나게 하면 그 항목이 대신한 옛 항목의 칸을 저장소 쿼리(`MemoryRepository.clearSupersededBy`)가 같은 트랜잭션에서 비운다. 외래 키가 없어 서비스가 비운다
 - `idx_memory_superseded_by` 는 새 항목을 지울 때 그 항목이 대신한 줄을 찾는 색인이다
 
@@ -853,6 +846,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 사용자마다 플러그인 하나에 연결 하나를 둔다. 상태가 바뀌는 조건과 API 는 [플러그인 연결](../../docs/features/connector.md) 이 갖는다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). `(user_id, connector_id)` 가 유일하다.
 
 - `fields` 는 JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}` 다. 비밀 칸의 원문과 해시는 넣지 않는다. 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
+- 단추 연결의 `fields.auth` 에는 `method: "oauth"`, `provider`, `reconnectRequired` 를 저장할 수 있다. 수동 연결은 `auth` 가 없거나 `method: "manual"` 이다. 수동 연결을 다시 쓰면 이전 JSON 모양을 유지해 열의 길이 한도에 찬 행도 다시 쓸 수 있다. 토큰은 이 열에 두지 않는다
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
@@ -871,9 +865,10 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치의 결과 트랜잭션 시각이다. 재시작 감지가 공유 gateway 기동 시각과 비교해 그 뒤에 뜬 gateway 면 반영 맞추기를 돌리고, 관리자가 목록을 본 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하는 데도 쓴다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
 - `cycle_phase` 와 `cycle_at` 은 그 서버만 껐다 켜는 단계와 그 시작 시각이다. `IDLE_WAIT` 는 주인의 실행이 비기를 기다리는 단계이고 `cycle_at` 은 기다림 상한의 기준이다. `OFF` 는 끈 뒤 다시 켜기를 기다리는 단계이고 `cycle_at` 은 꺼졌다는 답을 처음 받은 설치 시도의 시작 시각이다. 껐다 켜기 중이 아니면 둘 다 비어 있다. 진행과 전이는 [연결 반영 자동화 설계](../../docs/features/connector/design.md) 가 갖는다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
-- `apply_failed_at` 은 자동 경로(반영 예정 확인, 껐다 켜기, 재시작 감지, 정의 어긋남 점검)가 실패한 시각이다. 있으면 자동 경로가 그 바인딩을 다시 집지 않는다. `READY` 와 사람이 시작한 설치(등록, 연결 확인, 관리자 반영 완료)가 실제로 나갈 때 비운다. 껐다 켜기 단계에서는 연결 확인이 설치를 보내지 않으므로 관리자 반영 완료가 비운다
+- `apply_failed_at` 은 자동 경로(반영 예정 확인, 껐다 켜기, 재시작 감지, 정의 어긋남 점검)가 실패한 시각이다. 있으면 자동 경로가 그 바인딩을 다시 집지 않는다. `READY` 와 사람이 시작한 설치(등록, 연결 확인, 관리자 반영 완료)가 실제로 나갈 때 비운다. 껐다 켜기 단계에서는 연결 확인이 설치를 보내지 않으므로 관리자 다시 확인이 비운다
+- `waiting_since` 는 자동 대기(재시작 대기, 껐다 켜기 단계, 반영 예정, 자동 반영 실패)가 시작된 시각이다. 비어 있을 때만 적고 단계가 바뀌어도 그대로 둔다. `admin_notified_at` 은 지금 대기에 그룹 관리자 알림을 보낸 시각이다. 알림 단계가 실패 표시가 있거나 `waiting_since` 에서 24시간이 지났고 이 칸이 빈 `PENDING` 바인딩에 한 번 알린다. `READY` 와 사람이 시작한 설치가 두 칸을 함께 비운다([ADR-20261120 / connector-auto-apply](../../docs/adr/ADR-20261120-connector-auto-apply.md))
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
-- `skipped_skills` 는 마지막으로 성공한 설치가 답한 빠진 에이전트용 스킬의 JSON 글(`TEXT`)이다. 칸은 스킬 이름과 까닭 낱말 목록이고 없으면 NULL 이다. 설치 응답을 받을 때마다 덮어쓰고, 설치가 실패하면 옛 값을 둔다. 까닭 낱말은 대시보드가 정해 enum 으로 묶지 않는다([에이전트용 스킬 스펙](../../docs/features/agent-skill/spec.md) 의 REQ8). `event_watch_state` 와 같은 까닭으로 `JSON` 이 아니라 `TEXT` 다
+- `skipped_skills` 는 마지막으로 성공한 설치가 답한 빠진 에이전트용 스킬의 JSON 글(`TEXT`)이다. 칸은 스킬 이름과 까닭 낱말 목록이고 없으면 NULL 이다. 설치 응답을 받을 때마다 덮어쓰고, 설치가 실패하면 옛 값을 둔다. 설치가 반영된 `READY` 바인딩은 정의 어긋남 점검이 설치 상태 조회의 `skipped_skills` 로도 맞춘다(조회 응답에 칸이 없으면 두고 빈 목록이면 비운다). 까닭 낱말은 대시보드가 정해 enum 으로 묶지 않는다([에이전트용 스킬 스펙](../../docs/features/agent-skill/spec.md) 의 REQ8). `event_watch_state` 와 같은 까닭으로 `JSON` 이 아니라 `TEXT` 다
 - `event_watch_enabled` 와 `event_watch_state` 는 사건 감지의 켜짐과 상태다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)). 같은 연결에서는 바인딩 하나만 켠다. 상태는 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`TEXT`)이고 끄면 비운다. 칸은 시간대, 확인 지점(결과를 다 쓴 마지막 조회를 시작한 Control Plane 시각), 겹침 구간에서 이미 본 식별자와 처음 본 시각, 마지막 확인 시각과 결과(`EventWatchResult`), 새 항목 수, 연결 문제의 연속 실패 수, 하루 실행 수와 그 날짜, 이번 연속 실패에 다시 연결 알림을 냈는지, 조용한 시간에 미룬 알림(실행 수, 새 항목 수, 알릴 수, 마지막 점검 대화 번호, 원천 이름과 항목 이름)이다. 항목의 제목과 본문은 없다. 뒤에 더한 칸이 없는 옛 글은 기본값으로 읽는다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 `ConnectorEventWatches` 의 조건부 update 만 쓴다. `updated_at` 은 바꾸지 않는다. H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 `TEXT` 로 둔다
 
 ### connector_action
@@ -888,9 +883,8 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `dedupe_key` 는 `v1-connector`, profile, 루트 session, session, `tool_call_id` 를 줄바꿈으로 이어 SHA-256 한 값이고 유일하다. 같은 호출이 다시 와도 줄이 하나다
 - `result_text` 의 `FAILED` 줄은 플러그인이 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
 - `result_text` 의 `UNKNOWN` 줄은 플러그인이 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
-- 위험도 `PURCHASE` 줄(주문서 채우기)은 결과 판정이 끝낸다. 결제 화면을 넘긴 `SUCCEEDED` 줄의 `result_text` 는 Control Plane 이 정한 `{"status": "PAYMENT_HANDOFF", "message", "finalAmountKrw", "expectedTotalKrw"}` 이고 플러그인 글을 싣지 않는다. 넘기지 못한 `FAILED` 줄의 `error_code` 는 `purchase_limit`(승인 순간이나 결제 직전의 구매 상한), `purchase_amount_changed`(최종 금액이 예상 합계보다 큼), `human_action_required`(구매하기 전에 사람이 해야 하는 화면) 가운데 하나이고, `result_text` 는 위 오류 계약 꼴로 금액과 상한을 정수 세부로 싣는다. 판정 표는 `docs/features/naver-shopping/design.md` 의 「결과 판정」 이 갖는다
-- 하루 구매 합계는 그 사용자가 KST 그날(`decided_at`) 승인한 `PURCHASE` 줄 가운데 `EXECUTING`, `SUCCEEDED`, `UNKNOWN`, `WAITING` 인 줄의 실행 원문 `expectedTotalKrw` 합이다. `FAILED` 는 세지 않는다
-- `status` 가 `WAITING` 이면 승인한 주문서 채우기가 「구매하기」 전에 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고, 이어 가면 `EXECUTING`, 표식이 끝나면 `FAILED`(`resume_ended` 나 `purchase_limit`)다. `waiting_since` 는 처음 멈춘 시각이고 다시 멈춰도 바꾸지 않는다. `resume_step` 은 플러그인이 낸 이어 갈 단계이고 Control Plane 은 뜻을 모른다. `resumed_at` 은 마지막으로 이어 간 시각이고, 오래 남은 `EXECUTING` 줄의 정리는 이 칸이 있으면 `decided_at` 대신 이 칸으로 본다. `WAITING` 동안 `expires_at` 은 `waiting_since` 뒤 30분, 표식이 끝나는 시각이고 이어 갈 탭은 `handoff_tab` 이다. 멈춘 적 없는 줄은 세 칸이 비어 있다([browser-cowork 설계](../../docs/features/browser-cowork/design.md) 「PR4 이어 가기」)
+- 위험도 `PURCHASE` 줄(주문서 채우기)은 결과 판정이 끝낸다. 결제 화면을 넘긴 `SUCCEEDED` 줄의 `result_text` 는 Control Plane 이 정한 `{"status": "PAYMENT_HANDOFF", "message", "finalAmountKrw", "expectedTotalKrw"}` 이고 Control Plane 이 고정한 값만 담는다. 넘기지 못한 `FAILED` 줄의 `error_code` 는 `purchase_amount_changed`(최종 금액이 예상 합계보다 큼), `human_action_required`(구매하기 전에 사람이 해야 하는 화면) 가운데 하나이고, `result_text` 는 위 오류 계약 꼴로 금액을 정수 세부에 넣는다. 판정 표는 `docs/features/naver-shopping/design.md` 의 「결과 판정」 이 갖는다
+- `status` 가 `WAITING` 이면 승인한 주문서 채우기가 「구매하기」 전에 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고, 이어 가면 `EXECUTING`, 표식이 끝나면 `FAILED`(`resume_ended`)다. `waiting_since` 는 처음 멈춘 시각이고 다시 멈춰도 바꾸지 않는다. `resume_step` 은 플러그인이 낸 이어 갈 단계이고 Control Plane 은 뜻을 모른다. `resumed_at` 은 마지막으로 이어 간 시각이고, 오래 남은 `EXECUTING` 줄의 정리는 이 칸이 있으면 `decided_at` 대신 이 칸으로 본다. `WAITING` 동안 `expires_at` 은 `waiting_since` 뒤 30분, 표식이 끝나는 시각이고 이어 갈 탭은 `handoff_tab` 이다. 멈춘 적 없는 줄은 세 칸이 비어 있다([browser-cowork 설계](../../docs/features/browser-cowork/design.md) 「PR4 이어 가기」)
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
@@ -1025,7 +1019,7 @@ action을 지우면 실행 내용도 지운다.
 알림 하나다([ADR-070](../../docs/adr/ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md)).
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
-`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 와 `CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
+`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS`, `CONNECTIONS`, `ADMIN_SECRETS`(관리자 「서버 비밀값」), `PUSH_SETTINGS`, `ADMIN_QUALITY`(관리자 「품질」, 배포 뒤 확인 실패 알림)만 `target_type` 을 채우고 `target_public_id` 를 비운다.
 `source_public_id` 는 알림을 만든 원인(승인 줄, 화면 넘기기를 적은 판정 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 
@@ -1092,7 +1086,8 @@ action을 지우면 실행 내용도 지운다.
 **테이블을 늘리지 않는다는 결정(2026-11-01)의 예외로 사용자가 승인했다(2026-11-20).** 확인 한 번은 예약 작업과 수명과 뜻이 다르다(위 「테이블을 추가하는 기준」 의 「본체와 수명이 다를 때」). `task_run` 은 예약 작업 줄과 예정 시각의 유일 제약에 매여 있고, `decision_feedback_event` 는 보관 기간이 지나면 지워진다. 정기 평가와 문항 후보도 이 표와 `result_json` 으로 받아 이 기능의 새 표는 이것 하나다.
 
 - `status` 는 `RUNNING`, `PASSED`, `FAILED` 이고 끝난 줄은 다시 바뀌지 않는다
-- `result_json` 은 기능·문항별 결과 배열이다. 고정 까닭 코드, 숫자, 대화의 공개 식별자와 실행 번호만 담고 질문과 답 본문, 도구 인자를 담지 않는다. 실패한 기능의 대화와 실행 번호는 30일 뒤 비운다
+- `kind` 는 `DEPLOY_CHECK`(배포 뒤 확인)와 `EVAL`(묶음 평가)이다. 마이그레이션의 칸 주석은 `DEPLOY_CHECK` 만 적었지만 이미 적용된 파일이라 고치지 않는다
+- `result_json` 의 모양은 `kind` 마다 다르다. `DEPLOY_CHECK` 는 기능별 결과 배열, `EVAL` 은 단계와 묶음 결과, 문항 결과를 담은 객체다. 고정 까닭 코드, 숫자, 대화의 공개 식별자와 실행 번호만 담고 질문과 답 본문, 도구 인자를 담지 않는다. 실패한 기능·문항의 대화와 실행 번호는 30일 뒤 비운다
 - 줄은 지우지 않는다. `requested_by_user_id` 는 사용자를 지우면 비운다(`ON DELETE SET NULL`)
 
 ## 판단 피드백 표
@@ -1148,7 +1143,7 @@ action을 지우면 실행 내용도 지운다.
 서버 비밀값이다. 이름마다 한 줄이고 값은 KEK 로 바로 감싼 암호문이다. 데이터 key 층을 두지 않는다.
 결정과 옮기는 값, 남기는 값은 [ADR-20261120 / server-secret](../../docs/adr/ADR-20261120-server-secret.md), 읽고 쓰는 코드는 `crypto.domain.ServerSecrets` 와 그 구현 `DatabaseServerSecrets` 가 갖는다.
 
-- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀)다. 뒤 단계의 이름(VAPID, profile key, provider key)은 그 단계가 더한다
+- `name` 이 기본 키다. 지금 쓰는 이름은 `browser_gateway`(브라우저 중계 서명 비밀), `vapid`(웹 푸시 VAPID 키), 플러그인 OAuth 의 `oauth_app:*`, `connector_oauth_signing` 이다. `vapid` 의 값은 비밀 키와 공개 키, 연락처를 담은 JSON 이고 `meta_json` 에는 공개 키와 연락처만 둔다. OAuth 줄의 이름과 값은 [플러그인 OAuth 연결 설계](../../docs/features/connector-oauth/design.md) 의 「서버 비밀값 줄」 이 갖는다. 뒤 단계의 이름(profile key, provider key)은 그 단계가 더한다
 - 감쌀 때 AAD 는 `server_secret:<name>` 이다. 암호문을 다른 이름의 줄로 옮기면 풀리지 않는다
 - `kek_id`, `sealed_value`, `prefix` 가 NULL 이면 값이 비었다. 지운 값도 줄은 남긴다. 줄이 있다는 것이 「옛 설정 가져오기를 이미 했다」 는 표지다
 - `prefix` 는 화면에 보일 앞부분이다. 값이 16자 이상일 때만 앞 4자를 둔다(`SecretPrefix`)

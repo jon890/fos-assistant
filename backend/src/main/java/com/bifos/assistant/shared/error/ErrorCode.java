@@ -32,6 +32,10 @@ public enum ErrorCode {
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
     PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
+    /** 답장으로 집은 메시지가 이 대화에 없다. 다른 대화와 남의 메시지도 같은 응답으로 숨긴다(스펙 chat-reference REQ14). */
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 답장으로 집은 사진이나 그림의 파일이 지워졌거나 보관 기간이 지났다(스펙 chat-reference REQ9). */
+    REPLY_SOURCE_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 그 대화의 전달 묶음이 아니거나 없는 묶음이다. 남의 대화의 묶음도 같은 응답으로 숨긴다(ADR-075). */
     DELIVERY_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 묶음이 {@code DELIVERING} 이나 {@code DELIVERED} 이거나, 넘길 결과가 남지 않았거나, 대화에 흐름이 붙었다(ADR-075). */
@@ -286,6 +290,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 붙이려는 연결이 값이 확인돼 쓸 수 있는 상태가 아니거나 보관 파일에 값이 없다(ADR-083). */
     CONNECTOR_NOT_CONNECTED(HttpStatus.CONFLICT),
+    /** 그 플러그인의 OAuth 앱 값이나 토큰 통로 주소가 없어 단추 연결을 시작할 수 없다(ADR-20261120 / connector-oauth). */
+    CONNECTOR_OAUTH_NOT_CONFIGURED(HttpStatus.CONFLICT),
     /** 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌해 붙이기를 거절했다. 아무것도 바뀌지 않았다. */
     CONNECTOR_BIND_CONFLICT(HttpStatus.CONFLICT),
     /** 커넥터가 연결 하나를 에이전트 하나에만 붙이라고 선언했고 그 연결이 이미 다른 에이전트에 붙어 있다. 먼저 뗀다. */
@@ -365,8 +371,16 @@ public enum ErrorCode {
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     /** 서버에 웹 푸시 VAPID 키가 없어 기기를 등록받지 않는다(ADR-20261120 / web-push). */
     PUSH_NOT_CONFIGURED(HttpStatus.CONFLICT),
+    /** 등록 요청의 구독이 서버의 지금 VAPID 공개 키와 다른 키로 만들어졌다. 화면이 해지하고 다시 구독해야 한다(서버 비밀값 스펙 REQ7). */
+    PUSH_KEY_CHANGED(HttpStatus.CONFLICT),
+    /** 관리자 화면이 읽은 VAPID 키가 그새 바뀌었다. 화면을 새로 읽어 확인 창을 거쳐야 한다(서버 비밀값 스펙 REQ6). */
+    VAPID_STATE_CHANGED(HttpStatus.CONFLICT),
     /** KEK 가 설정되지 않아 서버 비밀값을 저장할 수 없다. 원문으로 두는 길은 없다(ADR-20261120 / server-secret). */
     SECRET_STORE_UNAVAILABLE(HttpStatus.CONFLICT),
+    /** 그룹에 평가 전용 사용자가 없어 배포 뒤 확인을 시작하지 못한다. 관리자가 품질 화면에서 먼저 준비한다. */
+    EVALUATION_USER_MISSING(HttpStatus.CONFLICT),
+    /** 그 배포 뒤 확인이 없거나 다른 그룹의 것이다. */
+    QUALITY_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
 

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
+  asksForPhoto,
+  drewImage,
   collectAnswers,
   exitCode,
   failedQuestion,
@@ -13,6 +15,7 @@ import {
   scoreSet,
   sourceLinks,
   toolCounts,
+  toolRounds,
   type Comparison,
   type LinkState,
   type Question,
@@ -114,6 +117,42 @@ test("도구 수는 실행 트리 전체의 끝 사건만 세어 시작 사건�
   );
 
   assert.deepEqual(toolCounts(root), { search: 2, searchFailed: 1, extract: 1, extractFailed: 1 });
+});
+
+test("도구 차례를 센 문항만 합계에 넣고 센 문항 수를 함께 낸다", () => {
+  const scores = fullSet(17);
+  scores[0] = { ...scores[0], rounds: { calls: 6, rounds: 2 } };
+  const set = scoreSet(scores, []);
+  const report = markdown("", "", scores, set, []);
+
+  assert.equal(set.roundsChecked, 1);
+  assert.equal(set.toolCalls, 6);
+  assert.match(report, /도구 차례를 센 문항 1개에서 도구 6번을 2차례에 불렀다\(차례당 3\.00개\)/);
+});
+
+test("함께 부른 도구는 한 차례로, 하나씩 부른 도구는 각각 한 차례로 센다", () => {
+  const started = (toolName: string) => ({ eventType: "TOOL_STARTED", toolName, failed: null });
+  const completed = (toolName: string) => ({ eventType: "TOOL_COMPLETED", toolName, failed: false });
+  const child = node([started("web_extract"), completed("web_extract")]);
+  const root = node(
+    [
+      { eventType: "RUN_STARTED", toolName: null, failed: null },
+      started("web_search"),
+      started("web_search"),
+      started("web_search"),
+      completed("web_search"),
+      completed("web_search"),
+      completed("web_search"),
+      started("web_extract"),
+      completed("web_extract"),
+      started("web_search"),
+      { eventType: "SUBAGENT_STARTED", toolName: null, failed: null },
+      completed("web_search"),
+    ],
+    [child],
+  );
+
+  assert.deepEqual(toolRounds(root), { calls: 6, rounds: 4 });
 });
 
 test("링크 상태는 2xx 와 3xx 가 열림이고 403 과 429 는 확인 못 함이다", () => {
@@ -230,6 +269,9 @@ test("보고서는 문항 표와 사람 비교 표를 내고 적은 값을 옮�
   const report = markdown("exa", "MEDIUM", scores, scoreSet(scores, given), given);
 
   assert.match(report, /이름표: exa, 모델 칸: MEDIUM/);
+  assert.match(report, /속도 참고\(통과 기준 아님\): 평균 걸린 시간 /);
+  assert.match(report, /\| 도구 차례\(호출\) \|/);
+  assert.match(report, /도구 차례 미집계/);
   assert.match(report, /자동 기준 통과, 사람 비교 대기/);
   assert.match(report, /\| s0 \| 모자라다 \| 가격이 \/ 다르다 \|/);
   assert.match(report, /\| s7 \|  \|  \|/);
@@ -321,4 +363,31 @@ test("형식 참고 칸은 세트 통과를 바꾸지 않고 칸이 없는 옛 �
   assert.match(report, /형식 참고\(통과 기준 아님\): 어긴 문항 1\/1/);
   assert.match(report, /\| q2 \| 어김 \| 1 \| 0 \| 0 \|/);
   assert.match(report, /\| q1 \| - \| - \| - \| - \|/);
+});
+
+test("사진을 찾아 그려 달라는 문항은 그림을 만들었거나 사진이나 링크를 보내 달라고 하면 통과하고, 둘 다 아니면 세트 사유에 든다", () => {
+  assert.equal(asksForPhoto("찾은 사진은 그림 도구에 넘길 수 없어요. 상품 사진을 올려 주시거나 링크를 보내 주시면 그걸로 그릴게요."), true);
+  assert.equal(asksForPhoto("양말을 신고 뛰노는 아이 그림을 그렸어요."), false);
+  assert.equal(asksForPhoto("찾은 사진 링크를 공유합니다."), false);
+  assert.equal(asksForPhoto("사진을 보내 주실 필요는 없어요. 설명만으로 그림을 그렸어요."), false);
+  assert.equal(asksForPhoto("사진을 보내 주지 않아도 돼요."), false);
+  assert.equal(asksForPhoto("상품 사진을 올려 주세요."), true);
+  const links = new Map<string, LinkState>();
+  const asked = scoreQuestion(question("p1", "photo-request"), ["사진을 직접 올려 주세요."], NOON, links, null);
+  const done = (toolName: string, failed: boolean) => ({ eventType: "TOOL_COMPLETED", toolName, failed }) as ExecutionNode["events"][number];
+  const found = node([done("web_search", false)], [node([done("image_generate", false)])]);
+  const failed = node([done("web_search", false), done("image_generate", true)]);
+  assert.equal(drewImage(found), true);
+  assert.equal(drewImage(failed), false);
+  assert.equal(drewImage(null), false);
+  const drawn = scoreQuestion(question("p1", "photo-request"), ["찾은 사진을 참고해 그렸어요."], NOON, links, found);
+  const drew = scoreQuestion(question("p1", "photo-request"), ["비슷하게 그려 봤어요."], NOON, links, failed);
+  assert.equal(asked.passed, true);
+  assert.equal(drawn.passed, true, "비서가 찾은 사진으로 그림을 만들었으면 통과다");
+  assert.equal(drew.passed, false, "그림 도구가 끝나지 않았는데 그렸다고만 한 답은 통과가 아니다");
+  const scores = fullSet(15);
+  scores.push(drew);
+  const set = scoreSet(scores, comparisons(6));
+  assert.equal(set.outcome, "FAIL");
+  assert.ok(set.reasons.some((reason) => reason.includes("사진이나 링크를 보내 달라고 하지도 않았다")), set.reasons.join(", "));
 });

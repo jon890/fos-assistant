@@ -92,6 +92,6 @@ class ConnectorListingsTest {
 
 
     private static BoundAgentSummary bound(String code, BindingStatus status, boolean restartRequired) {
-        return new BoundAgentSummary(code, code, status, restartRequired);
+        return new BoundAgentSummary(code, code, status, restartRequired, false);
     }
 }

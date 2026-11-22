@@ -27,6 +27,9 @@ import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuthDeclaration.AppScope;
 import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
@@ -39,7 +42,10 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -49,6 +55,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class HttpHermesConnectorClientTest {
     private static final String BASE = "https://dashboard.example.test";
     private static final String DEMO = "demo-notes";
@@ -116,6 +123,43 @@ class HttpHermesConnectorClientTest {
         assertThat(tools).extracting(ConnectorTool::argLabels)
             .containsExactly(Map.of("to", "받는 사람"), Map.of(), Map.of(), Map.of());
         assertThat(tools).extracting(ConnectorTool::risk).containsOnly("WRITE");
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("정상 OAuth 선언은 읽고 어긋난 선언만 비워 수동 입력 칸을 유지한다")
+    void readsOAuthAndKeepsManualFieldsForMalformedDeclarations(CapturedOutput output) {
+        String oauth = """
+            "oauth":{"provider":"github","app_scope":"plugin","fields":["token"],
+            "settings_url":"https://accounts.example.test/settings","install_settings_url":"https://accounts.example.test/installations"}
+            """.strip();
+        String item = CATALOG.strip().substring(1, CATALOG.strip().length() - 1);
+        String withOAuth = item.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\"," + oauth);
+        String brokenFields = withOAuth.replace("\"fields\":[\"token\"]", "\"fields\":[\"scope\"]");
+        String brokenProvider = withOAuth.replace("\"github\"", "\"provider-test-value\"");
+        String brokenScope = withOAuth.replace("\"app_scope\":\"plugin\"", "\"app_scope\":\"shared\"");
+        String brokenUrl = withOAuth.replace("https://accounts.example.test/settings", "javascript:alert(1)");
+        String standard = withOAuth.replace("\"mcp_server\":\"demo\"", "\"mcp_server\":\"demo\",\"schema\":3");
+        String raw = "[" + String.join(",", List.of(withOAuth, brokenFields, brokenProvider, brokenScope, brokenUrl, standard, item)) + "]";
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+
+        List<ConnectorManifest> catalog = client.readCatalog();
+        assertThat(catalog.getFirst().oauth()).isEqualTo(new ConnectorOAuthDeclaration(
+            "github", AppScope.PLUGIN, List.of("token"),
+            "https://accounts.example.test/settings", "https://accounts.example.test/installations"));
+        assertThat(catalog.subList(1, catalog.size())).allSatisfy(manifest -> {
+            assertThat(manifest.oauth()).isNull();
+            assertThat(manifest.fields()).extracting(ConnectorField::key).containsExactly("token", "scope");
+        });
+        assertThat(output.getAll()).contains(
+            "connector demo-notes OAuth 선언을 읽지 못했다: 지원하지 않는 제공자다",
+            "제공자의 앱 범위와 app_scope 가 맞지 않는다",
+            "fields 는 겹치지 않는 비밀 칸 목록이어야 한다",
+            "설정 주소는 올바른 HTTPS 주소여야 한다",
+            "표준 플러그인은 단추 연결을 선언할 수 없다")
+            .doesNotContain("provider-test-value", "javascript:alert(1)");
         server.verify();
     }
 
@@ -1030,6 +1074,29 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("설치 목록 항목의 skipped_skills 는 있으면 읽고 칸이 없으면 모름(null)으로 둔다")
+    @Test
+    void readsSkippedSkillsOfInstalledConnector() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        server.expect(requestTo(url))
+            .andRespond(withSuccess(
+                "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,"
+                    + "\"configured\":true,\"mode\":\"bind\","
+                    + "\"skipped_skills\":[{\"name\":\"demo-runner\",\"reasons\":[\"name_taken\"]}]}]}",
+                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+            .andRespond(withSuccess(
+                "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,"
+                    + "\"configured\":true,\"mode\":\"bind\"}]}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client.readConnector(PROFILE, DEMO).skippedSkills())
+            .containsExactly(new HermesConnectorClient.SkippedSkill("demo-runner", List.of("name_taken")));
+        assertThat(client.readConnector(PROFILE, DEMO).skippedSkills()).isNull();
+        server.verify();
+    }
+
+
     @DisplayName("모양이 맞는 목록에 받은 커넥터가 없으면 설치되지 않은 것으로 읽는다")
     @Test
     void readsConnectorMissingFromWellFormedListAsNotInstalled() {
@@ -1204,6 +1271,24 @@ class HttpHermesConnectorClientTest {
         assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).ok()).isTrue();
         assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).error())
             .isEqualTo(ConnectorCallError.CREDENTIAL_REJECTED);
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("OAuth 확인 호출은 대기와 본 연결의 보관 파일 모드를 구분한다")
+    void specifiesVaultAccessForOAuthVerification() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+            .andExpect(content().json("""
+                {"tool":"list_scopes","vault":"c7","oauth":"pending","owner_browser":"https://browser.example.test/call"}
+                """, JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"result\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+            .andExpect(content().json("{\"tool\":\"list_scopes\",\"vault\":\"c7\",\"oauth\":\"current\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess("{\"ok\":true,\"result\":[]}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", "https://browser.example.test/call", VaultAccess.PENDING).ok()).isTrue();
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null, VaultAccess.CURRENT).ok()).isTrue();
         server.verify();
     }
 

@@ -10,6 +10,7 @@ from .connector_snapshot_manifest import _snapshot_manifest
 from .connector_remote import _is_remote, _remote_server, _remote_server_matches
 from .connector_launch import _is_launcher, _launcher_current, _launcher_inner
 from .connector_standard import STANDARD_SCHEMA, _standard_declaration
+from .connector_oauth_providers import _catalog_oauth, _normalize_oauth
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -75,6 +76,7 @@ from .connector_schema import (
 )
 
 from .connector_owner_env import _connector_owner_env
+from .connector_server_match import _server_matches
 
 from .connector_agent_skills import _catalog_agent_skills, _plugin_and_agent_skills
 from .connector_skills import _connector_skills, _skill_name
@@ -181,9 +183,23 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
     optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
-    if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env:
+    # `oauth.token_env` 는 다른 칸이 틀려도 이름만 맞으면 env 합에 넣는다. 그래야 `oauth` 만 버리고 붙여 넣기 연결이 남는다.
+    declared_oauth = declared.get("oauth")
+    oauth_env = declared_oauth.get("token_env") if isinstance(declared_oauth, dict) else None
+    # 칸, 운영자, 주인, 실행기 env 와 겹치는 이름은 통로 주소 자리로 보지 않는다. 비우면 그 값이 사라진다.
+    oauth_env = ({oauth_env} if isinstance(oauth_env, str) and ENV_NAME_RE.match(oauth_env)
+                 and oauth_env not in field_env | set(operator_env) | owner_env | BASE_ENV_KEYS
+                 and not oauth_env.startswith("FOS_ASSISTANT_CONNECTOR_VAULT_") else set())
+    if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env | oauth_env:
         raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env, "
-                         "owner_browser_env 의 합과 다르다")
+                         "owner_browser_env, oauth.token_env 의 합과 다르다")
+    oauth = None
+    if declared_oauth is not None:
+        try:
+            oauth = _normalize_oauth(declared_oauth, fields, field_env | set(operator_env) | owner_env, remote)
+        except ValueError as error:
+            # 틀린 선언은 단추만 뺀다. 플러그인 전체를 빼면 붙여 넣기 연결까지 끊긴다(스펙 DECISION11).
+            logger.warning("dashboard-profile-api: %s 의 oauth 선언을 쓰지 않는다: %s", connector_id, error)
     for name, value in ({} if remote else server["env"]).items():
         # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
         if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
@@ -261,6 +277,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "owner_browser_env": owner_browser_env,
         "owner_browser_login_url": owner_browser_login_url,
         "optional_env": optional_env,
+        # 정규화한 `oauth` 선언이다. 선언이 없거나 틀리면 None 이다. `token_env` 는 위 `oauth_env` 로 서버 env 에 남을 수 있다.
+        "oauth": oauth,
+        "oauth_env": next(iter(oauth_env), None),
         "errors": errors,
         "error_contracts": error_contracts,
         **_connector_binding_flags(declared),
@@ -313,49 +332,6 @@ def _entry_mode(entry) -> str | None:
     return entry.get("mode") if isinstance(entry, dict) else None
 
 
-def _server_matches(manifest: dict, server: dict) -> bool:
-    """소유 기록의 서버 정의가 지금 manifest 의 실행 정의와 같은지 본다.
-
-    칸의 env 는 자기 이름의 참조이고, 선택 칸은 명시한 빈 값도 된다.
-    운영자 env 는 옛 기록의 `${이름}` 참조와 지금 정의의 직접 값을 같다고 본다.
-    옛 판이 남긴 기록을 그대로 인정해야 이미 설치한 연결이 끊기지 않는다(ADR-041).
-    `tools` 는 견주지 않는다. 옛 기록에는 그 키가 없고, 다시 보낸 설치가 지금 manifest 의 값으로 덮어쓴다.
-    주인의 첨부 디렉터리 env 는 설치마다 그 주인의 값이라 manifest 와 견주지 않는다. 빈 값이거나
-    `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-20261007 connector-owner-attachments).
-    플러그인 출력 디렉터리 env 도 같다. `<루트>/users/<64자리 16진수>/<profile>/<id>` 모양인지만 본다(ADR-20261008 connector-output-files).
-    브라우저 중계 주소 env 도 같다. 빈 값이거나 `<gateway-base-url>/<접근 표식>` 모양인지만 본다(ADR-20261008 browser-gateway-token).
-    실행기 정의는 실행기 칸이 지금 값과 맞는지 본 뒤 옛 모양으로 펼쳐 같은 규칙으로 견준다(`connector_launch.py`).
-    """
-    expected = manifest["server"]
-    if manifest["transport"] == "http" or _is_remote(server):
-        # 원격 정의는 칸 값이 profile `.env` 를 거치는 헤더뿐이라 주소와 헤더, redirect 헤더 처리만 비교한다.
-        return manifest["transport"] == "http" and _remote_server_matches(expected, server)
-    if _is_launcher(server):
-        if not _launcher_current(manifest, server):
-            return False
-        server = _launcher_inner(server)
-    if (server["command"] != expected["command"] or server["args"] != expected["args"]
-            or set(server["env"]) != set(expected["env"])):
-        return False
-    for name, value in server["env"].items():
-        reference = "${%s}" % name
-        if name == manifest["owner_attachments_env"]:
-            if value != "" and not OWNER_ATTACHMENTS_VALUE_RE.match(value):
-                return False
-        elif name == manifest["owner_output_env"]:
-            if value != "" and not OWNER_OUTPUT_VALUE_RE.fullmatch(value):
-                return False
-        elif name == manifest["owner_browser_env"]:
-            if value != "" and not (isinstance(value, str) and OWNER_BROWSER_VALUE_RE.fullmatch(value)):
-                return False
-        elif name in manifest["operator_env"]:
-            if value not in (reference, expected["env"][name]):
-                return False
-        elif value != reference and not (value == "" and name in manifest["optional_env"]):
-            return False
-    return True
-
-
 def _connector_catalog_response(include_standard: bool = False):
     """검증을 통과한 플러그인의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
 
@@ -382,6 +358,8 @@ def _connector_catalog_response(include_standard: bool = False):
           "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")
                              for code, word in sorted(manifest["errors"].items()) if word == OUTCOME_UNKNOWN},
           # `ask` 일 때만 싣는다. 이 칸을 모르는 옛 Control Plane 은 선언하지 않은 도구를 지금처럼 거절한다(rule-66).
+          # 단추로 연결할 수 있는 플러그인만 싣는다. 이 칸을 모르는 옛 Control Plane 은 단추를 내지 않는다(rule-66).
+          **({"oauth": _catalog_oauth(manifest["oauth"])} if manifest.get("oauth") is not None else {}),
           **({"default_tool_policy": "ask"} if manifest["default_tool_policy"] == "ask" else {}),
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **({"event_watch": {key: manifest["event_watch"][key] for key in ("tool", "noun", "link")}} if manifest.get("event_watch") else {}),

@@ -155,7 +155,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         var answer = prepare(UUID.randomUUID().toString(), body);
         assertThat(answer.allowed()).isFalse();
         assertThat(answer.actionId()).isNull();
-        assertThat(answer.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+        assertThat(answer.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
         assertThat(rows()).isZero();
         assertThat(counters().path("prepare").intValue()).isZero();
     }
@@ -259,7 +259,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         // 승인을 마친 뒤 같은 호출이 다시 오면 승인 대기라고 말하지 않는다.
         var replayed = prepare(createCall, trade("create_order", ARGS));
         assertThat(replayed.actionId()).isEqualTo(created.actionId());
-        assertThat(replayed.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_SETTLED_MESSAGE);
+        assertThat(replayed.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_SETTLED_MESSAGE.text());
         assertThat(action(created).resultText()).contains("new-official-id");
         // 대역의 원주문은 실제 토스처럼 지정가 수량 주문에도 orderAmount 를 채운다.
         var cancel = prepare(UUID.randomUUID().toString(), trade("cancel_order", "{\"orderId\":\"new-official-id\"}"));
@@ -337,7 +337,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         var answer = prepare(UUID.randomUUID().toString(), trade("create_order", args));
         assertThat(answer.allowed()).isFalse();
         assertThat(answer.actionId()).isNull();
-        assertThat(answer.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+        assertThat(answer.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
         assertThat(rows()).isZero();
         assertThat(counters().path("prepare").intValue()).isEqualTo(1);
         assertThat(counters().path("financial").intValue()).isZero();
@@ -534,7 +534,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         OverridableLiveProperties.during(gate, with(open, List.of(), open.maxOrderAmountUsd(), open.digestKeyFile()));
         var failed = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
         assertThat(failed.actionId()).isNull();
-        assertThat(failed.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE)
+        assertThat(failed.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text())
             .contains("승인 카드를 만들지 않았고", "다시 요청하면 다시 불러도 된다").doesNotContain("이미 있을 수").doesNotContain("[승인 대기]");
         assertThat(rows()).isZero();
         OverridableLiveProperties.during(gate, open);
@@ -566,7 +566,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         var again = publicPolicy.decide(profile, other, other, UUID.randomUUID().toString(), PREPARE_TOOL, "prepare_trade",
             trade("create_order", ARGS));
         assertThat(again.actionId()).isNull();
-        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_PENDING_ELSEWHERE_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_PENDING_ELSEWHERE_MESSAGE.text()).doesNotContain("[승인 대기]");
         assertThat(rows()).isEqualTo(1);
     }
 
@@ -578,7 +578,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         jdbc.update("update connector_action set conversation_id = null where id = ?", action(first).id());
         var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
         assertThat(again.actionId()).isNull();
-        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE.text());
         assertThat(rows()).isEqualTo(1);
     }
 
@@ -589,7 +589,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         jdbc.update("update agent_execution set conversation_id = null where hermes_session_id = ?", session);
         var answer = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
         assertThat(answer.actionId()).isNotNull();
-        assertThat(answer.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_WITHOUT_CONVERSATION_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(answer.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_WITHOUT_CONVERSATION_MESSAGE.text()).doesNotContain("[승인 대기]");
         assertThat(action(answer).conversationId()).isNull();
     }
 
@@ -613,7 +613,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         jdbc.update("update connector_action set status = 'UNKNOWN' where id = ?", action(first).id());
         var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
         assertThat(again.actionId()).isNull();
-        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE.text()).doesNotContain("[승인 대기]");
         assertThat(rows()).isEqualTo(1);
     }
 

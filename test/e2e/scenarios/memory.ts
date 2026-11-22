@@ -19,7 +19,7 @@ type MemoryView = {
 type AgentToken = { id: number; token: string };
 
 /** 요청자를 정하지 못한 MCP 호출이 받는 도구 결과 문구다. 이유를 가리지 않고 같다. */
-const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
+const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.\n사용자에게 바로 알린다.";
 
 /** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
 export const MEMORY_CONTEXT_TURNS = 4;
@@ -292,7 +292,7 @@ export const memoryScenario: Scenario = {
       `- ${userAlways.content}`,
       "# 지금 묻는 사람에 대해 기억한 것",
       [
-        "아래는 이 사람에 대해 기억한 것의 요약이다. 줄마다 번호로 memory_read 를 불러 상세를 읽는다.",
+        "아래는 이 사람에 대해 기억한 것의 요약이다. 요약만으로 답할 수 있으면 그 줄의 상세를 읽는 memory_read 는 부르지 않는다. 상세가 필요하면 줄의 번호로 memory_read 를 불러 읽는다.",
         "일 맡기기, 이직과 경력, 돈과 지출, 여행과 일정처럼 이 사람의 사정이 답을 바꾸는 질문이면 답하기 전에 관련 줄의 상세를 읽는다.",
         "진행 중인 일(지원 현황, 예약 같은 것)은 요약에 없으니 memory_search 로 찾는다.",
       ].join("\n"),
@@ -494,7 +494,7 @@ export const memoryScenario: Scenario = {
       const denied = await mcp("memory_read", { id: target.id });
       expect(
         denied.result.isError &&
-          denied.result.content[0]?.text === "Memory 항목을 읽을 수 없습니다.",
+          denied.result.content[0]?.text === "Memory 항목을 읽을 수 없습니다.\n다음 방법: memory_search 로 다른 항목을 찾는다",
         "권한 철회 뒤에도 본문을 읽었다",
       );
     } finally {

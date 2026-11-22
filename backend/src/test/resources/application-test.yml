@@ -12,8 +12,8 @@ spring:
     properties:
       # Hibernate 가 기동할 때만 읽는다. 검사마다 켜면 컨텍스트가 갈라지므로 늘 켜 둔다. 질의 수는 UsageControllerTest 가 센다
       hibernate.generate_statistics: true
-      # 엔티티가 매핑하지 않는 기억 벡터 칸을 만든다
-      hibernate.hbm2ddl.import_files: memory-embedding-columns.sql
+      # 엔티티가 매핑하지 않는 기억 벡터 칸과 찾은 주소의 해시 칸을 만든다
+      hibernate.hbm2ddl.import_files: memory-embedding-columns.sql,conversation-found-link-hashes-column.sql
   flyway:
     enabled: false
     out-of-order: true
@@ -48,10 +48,6 @@ assistant:
     # 검사가 뜰 때마다 옛 줄 배치가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     backfill-cron: "-"
   push:
-    # 운영 값이 아니다. 검사 전용 VAPID 키 쌍이다. 키가 꺼진 동작은 VapidKeys spy 로 본다
-    vapid-public-key: BJLSTJcZ6Dt9L9GyQVxTOYazbfg-9vZjgMEnL_1gq-El1cIpTfFKBUd77zAwz97o3a9KYJ8LUYTHPIEnhbAuE9Y
-    vapid-private-key-file: src/test/resources/push/test-vapid-private.key
-    subject: mailto:test@example.invalid
     retry-delays: 10ms,20ms
     retry-after-max: 50ms
   memory:
@@ -102,6 +98,12 @@ assistant:
       apply-cron: "-"
       # 정의 어긋남 점검도 끈다. 검사는 resyncDrifted 를 직접 부른다
       drift-cron: "-"
+    oauth:
+      # 예약 갱신도 끈다. 검사는 refreshDue 를 직접 부른다
+      refresh-cron: "-"
+    ops:
+      # 운영 값이 아니다. 재시작 조회 검사 전용 토큰이다
+      token: test-ops-token
   proactive-check:
     # 아래 hermes.run-timeout(1s) 보다 짧아야 기동한다. 살펴보기 turn 을 돌리는 검사는 두 값을 함께 올린다
     max-duration: 500ms
@@ -160,6 +162,9 @@ assistant:
     # 시험 기본값은 꺼짐이다. 파일 공간 검사는 임시 디렉터리로 서비스를 직접 만든다
     root: ""
     delete-socket: ""
+  quality:
+    cleanup-cron: "-"
+    poll-interval: 10ms
 hermes:
   profile-key-dir: build/test-hermes-keys-${org.gradle.test.worker:0}
   # 실재하지 않는 주소다. 이 값으로 대시보드를 부르는 테스트가 없고, 부르면 닿지 못해 실패한다

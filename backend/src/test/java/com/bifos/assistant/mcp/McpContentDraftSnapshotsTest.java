@@ -35,6 +35,9 @@ import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpCurrentCallerGuard;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.mcp.application.McpFollowUpTools;
+import com.bifos.assistant.mcp.application.McpMemoryForgetTool;
+import com.bifos.assistant.mcp.application.McpConnectorAttachTool;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
@@ -84,7 +87,7 @@ class McpContentDraftSnapshotsTest {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftImages.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
         controller = new McpController(tools, mock(McpArtifactCalls.class), mock(McpFileSpaceCalls.class), callers, mock(McpMediaObservationTools.class), drafts, tool,
-            mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), mock(McpConnectorListTool.class), mock(McpTaskCalls.class), checks,
+            mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), mock(McpConnectorListTool.class), mock(McpTaskCalls.class), mock(McpFollowUpTools.class), mock(McpMemoryForgetTool.class), mock(McpConnectorAttachTool.class), checks,
             mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);
         when(origin.id()).thenReturn(31L);
@@ -126,13 +129,13 @@ class McpContentDraftSnapshotsTest {
             previewArgs().put("draftId", DRAFT.toString().toUpperCase()),
             (ObjectNode)previewArgs().without("revision"));
         for (ObjectNode args : previews) {
-            assertThat(error(call(McpContentDraftSnapshots.PREVIEW, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
+            assertThat(error(call(McpContentDraftSnapshots.PREVIEW, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.\n다음 방법: 도구 설명의 인자 형식에 맞게 고쳐 다시 부른다");
         }
         List<ObjectNode> savesArgs = List.of(json.createObjectNode(), saveArgs().put("draftId", DRAFT.toString()),
             json.createObjectNode().putNull("snapshotId"), json.createObjectNode().put("snapshotId", "not-a-uuid"),
             json.createObjectNode().put("snapshotId", 5));
         for (ObjectNode args : savesArgs) {
-            assertThat(error(call(McpContentDraftSnapshots.SAVE, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
+            assertThat(error(call(McpContentDraftSnapshots.SAVE, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.\n다음 방법: 도구 설명의 인자 형식에 맞게 고쳐 다시 부른다");
         }
         verifyNoInteractions(snapshots, saves);
     }
@@ -207,7 +210,7 @@ class McpContentDraftSnapshotsTest {
             .thenThrow(new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, null));
         var stale = result(call(McpContentDraftSnapshots.PREVIEW, previewArgs()));
         assertThat(stale.path("isError").booleanValue()).isTrue();
-        assertThat(text(stale)).isEqualTo("{\"code\":\"CONTENT_DRAFT_STALE\"}");
+        assertThat(text(stale)).isEqualTo("{\"code\":\"CONTENT_DRAFT_STALE\",\"next\":\"다음 방법: currentRevision 으로 다시 읽고 고쳐 부른다\"}");
     }
 
 

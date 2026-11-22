@@ -11,10 +11,10 @@
 | 칸 | 참일 때 | 판정하는 곳 | 어기면 |
 | --- | --- | --- | --- |
 | `single_binding` | 사용자의 그 연결은 에이전트 하나에만 붙는다 | Control Plane 의 붙이기. 사용자 행 잠금 안에서 그 연결의 바인딩이 이미 있는지 본다 | `CONNECTOR_SINGLE_BINDING`(409). 바인딩 행이 남지 않는다 |
-| `sandbox_required` | 실행 공간 정책에 등록된 profile 에만 붙는다 | 대시보드 plugin 의 바인딩 설치. 붙이기, 연결 확인, 반영 완료가 모두 같은 설치를 지난다 | 설치는 409 `sandbox_unavailable`. 붙이기는 `AGENT_SANDBOX_UNAVAILABLE`(409), 다시 설치하는 경로는 그 바인딩을 `PENDING` 으로 둔다 |
+| `sandbox_required` | 실행 공간 정책이 적용되는 profile 에만 붙는다 | 대시보드 plugin 의 바인딩 설치. 붙이기, 연결 확인, 반영 완료가 모두 같은 설치를 지난다 | 설치는 409 `sandbox_unavailable`. 붙이기는 `AGENT_SANDBOX_UNAVAILABLE`(409), 다시 설치하는 경로는 그 바인딩을 `PENDING` 으로 둔다 |
 
 - `single_binding` 은 카탈로그가 그대로 실어 Control Plane 에 준다. 대시보드는 다른 profile 의 바인딩을 보지 않는다. 바인딩의 원장은 Control Plane 이다.
-- `sandbox_required` 는 대시보드가 이미 읽는 운영 정책(`profiles`)으로 판정한다. Control Plane 은 profile 이 정책에 있는지 모른다.
+- `sandbox_required` 는 대시보드가 읽는 [실행 공간 정책](../../hermes/README.md#셸-실행-공간)으로 판정한다. Control Plane 은 정책이 profile 에 적용되는지 모른다.
 - 대시보드의 409 가운데 본문 `code` 가 `sandbox_unavailable` 인 것은 Control Plane 이 `AGENT_SANDBOX_UNAVAILABLE` 로 옮긴다. `owner_attachments_env` 의 정책 없음도 같은 409 라 그 붙이기도 이 코드로 끝난다. 나머지 409 는 지금처럼 `CONNECTOR_BIND_CONFLICT` 다.
 
 ### 맥락

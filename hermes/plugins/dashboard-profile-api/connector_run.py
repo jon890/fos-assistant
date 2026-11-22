@@ -23,7 +23,8 @@ from .common import (
     logger,
 )
 
-from .connector_launch import _binding_env
+from .connector_launch import _binding_env, _oauth_token_url
+from .connector_oauth_store import _read_pending_values
 
 from .connector_manifest import (
     _connector_manifest,
@@ -66,8 +67,10 @@ from .connector_vault import (
     _read_vault,
 )
 
-from .sandbox import (
-    _sandbox_policy,
+from .connector_installed_env import (
+    _installed_owner_attachments,
+    _installed_owner_browser,
+    _installed_server_env,
 )
 
 
@@ -98,6 +101,8 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `listing` 이면 `tool` 이 없다. `vault` 는 그 플러그인의 보관 파일이어야 한다.
     보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 플러그인의 옛 연결도 확인된다.
     `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 플러그인만 쓴다.
+    `oauth` 는 선택이고 `vault` 와만 받는다. `current` 면 본 자리 보관 파일과 OAuth 파일의 통로 주소를, `pending` 이면 대기 보관 파일의
+    칸 값과 대기 OAuth 파일의 통로 주소를 넣는다. `pending` 은 본 자리 보관 파일이 없어도 된다(docs/features/connector-oauth/design.md).
     """
     from starlette.responses import JSONResponse
     global _connector_calls
@@ -110,19 +115,30 @@ async def _connector_call_request(request, connector_id: str, listing=False):
         return _rejected("없는 connector 다", 404)
     body = await _json_object(request)
     shapes = ({"values"}, {"vault"}) if listing else ({"tool", "values"}, {"tool", "vault"})
-    if (body is None or set(body) - {"owner_browser"} not in shapes
+    if (body is None or set(body) - {"owner_browser", "oauth"} not in shapes
             or ("values" in body and not isinstance(body["values"], dict))
             or ("vault" in body and (not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])))):
         return _rejected("tool 과, values 나 vault 가운데 하나만 필요하다")
+    oauth_mode = body.get("oauth")
+    if "oauth" in body and ("vault" not in body or oauth_mode not in ("current", "pending")
+                            or manifest.get("oauth") is None):
+        return _rejected("oauth 는 단추로 연결하는 플러그인의 vault 와 함께 current 나 pending 으로만 받는다")
     if listing and manifest["schema"] != TOOL_LIST_SCHEMA:
         return _rejected("도구 목록은 assistant.json 이 없는 표준 플러그인에서만 받는다")
     # 도구 목록은 도구를 부르지 않는다. 로그에 남길 이름만 둔다.
     tool = "tools/list" if listing else body["tool"]
     if not listing and (not isinstance(tool, str) or tool not in manifest["call_tools"]):
         return _rejected("이 플러그인이 선택지나 확인에 쓰는 도구가 아니다")
+    token_url = ""
     if "vault" in body:
         try:
-            stored = await asyncio.to_thread(_read_vault, body["vault"])
+            if oauth_mode == "pending":
+                stored = await asyncio.to_thread(_read_pending_values, body["vault"])
+            else:
+                stored = await asyncio.to_thread(_read_vault, body["vault"])
+            if oauth_mode is not None:
+                token_url = await asyncio.to_thread(_oauth_token_url, body["vault"], connector_id,
+                                                    oauth_mode == "pending")
         except Exception as error:
             logger.warning("dashboard-profile-api: 플러그인 %s 의 보관 파일을 읽지 못했다: %s",
                            connector_id, type(error).__name__)
@@ -145,6 +161,9 @@ async def _connector_call_request(request, connector_id: str, listing=False):
         env[field["env"]] = value
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    if manifest.get("oauth_env") is not None:
+        # `oauth` 를 주지 않은 호출은 붙여 넣은 칸 값을 쓴다. 통로 주소는 빈 값이다.
+        env[manifest["oauth_env"]] = token_url
     if manifest["owner_attachments_env"] is not None:
         # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 플러그인이 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
         env[manifest["owner_attachments_env"]] = ""
@@ -203,54 +222,6 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     if answer is None:
         return _rejected("읽기 전용 도구가 아니다")
     return JSONResponse(answer, status_code=200)
-
-
-def _installed_server_env(profile_dir: pathlib.Path, manifest: dict) -> dict:
-    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 env 다.
-
-    `config.yaml` 이 없거나 링크이거나, 그 서버 정의나 env 가 사전이 아니면 빈 사전이다.
-    """
-    import yaml
-    config_path = profile_dir / "config.yaml"
-    if config_path.is_symlink() or not config_path.is_file():
-        return {}
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    servers = config.get("mcp_servers") if isinstance(config, dict) else None
-    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
-    env = server.get("env") if isinstance(server, dict) else None
-    return env if isinstance(env, dict) else {}
-
-
-def _installed_owner_attachments(installed_env: dict, manifest: dict) -> str:
-    """설치한 서버 정의의 env(`_installed_server_env`)가 가진 주인의 첨부 디렉터리다.
-
-    바인딩 설치가 운영 정책의 `attachment_agent_root` 와 주인으로 넣은 값만 돌려준다.
-    값이 없거나, 지금 정책의 루트 아래 `users/<64자리 16진수>` 모양이 아니거나, 정책이 없으면 빈 값이다.
-    빈 값을 받은 플러그인은 사용자 첨부를 읽지 않는다(ADR-20261007 connector-owner-attachments).
-    """
-    value = installed_env.get(manifest["owner_attachments_env"])
-    if not isinstance(value, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(value):
-        return ""
-    policy = _sandbox_policy()
-    if policy is None:
-        return ""
-    prefix = "%s/users/" % policy["attachment_agent_root"].rstrip("/")
-    key = value[len(prefix):]
-    if not value.startswith(prefix) or not re.fullmatch(r"[0-9a-f]{64}", key):
-        return ""
-    return value
-
-
-def _installed_owner_browser(installed_env: dict, manifest: dict) -> str:
-    """설치한 서버 정의의 env(`_installed_server_env`)가 가진 브라우저 중계 주소다.
-
-    바인딩 설치가 그 바인딩의 표식으로 넣은 값이다. 값이 없거나 `<gateway-base-url>/<접근 표식>` 모양이 아니면 빈 값이다.
-    빈 값을 받은 플러그인은 브라우저에 닿지 못한다고 답한다(ADR-20261008 browser-gateway-token).
-    """
-    value = installed_env.get(manifest["owner_browser_env"])
-    if not isinstance(value, str) or not OWNER_BROWSER_VALUE_RE.fullmatch(value):
-        return ""
-    return value
 
 
 async def _connector_execute_request(request, connector_id: str, prepare=False):

@@ -1,3 +1,5 @@
+import type { ReplyTarget } from "@/lib/reply";
+
 export const ACCEPTED_TYPES = [
   "image/jpeg",
   "image/png",
@@ -28,6 +30,8 @@ export type OutgoingMessage = {
   retry(key: string): void;
   omit(key: string): void;
   retrySend(): void;
+  /** 보내기를 누른 순간 집어 둔 답장 대상이다. 그 뒤에 새로 집은 것은 다음 메시지로 간다(스펙 chat-reference) */
+  reply?: ReplyTarget;
 };
 
 export async function buildThumbnail(file: File): Promise<string> {

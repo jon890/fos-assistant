@@ -434,7 +434,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 플러그인 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 플러그인 경로를 Control Plane 이 쓰는 방법은 [플러그인 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 플러그인 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 상태 조회의 설치 항목은 에이전트용 스킬이 있으면 `skipped_skills: [{name, reasons}]` 도 낸다. 지금 profile 기준으로 설치되지 않은 스킬과 까닭이고, Control Plane 은 칸이 없으면 기록을 두고 빈 목록이면 비운다. 플러그인 경로를 Control Plane 이 쓰는 방법은 [플러그인 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
@@ -2559,7 +2559,7 @@ Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이�
 | 경로 | 결과 |
 | --- | --- |
 | API server `GET /v1/skills` | v0.21.5 에서 늘 500. `_handle_skills` 가 `_find_all_skills` 에 없는 인자 `include_editorial` 을 넘겨 `TypeError` 가 난다. 테스트는 그 함수를 mock 으로 바꿔 두어 잡지 못한다 |
-| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
+| 대시보드 `GET /api/skills?profile=` | 이름, 설명, 켜짐, 출처(`provenance`), 사용 횟수(`usage`)를 준다. 대시보드 plugin 은 Control Plane 의 요청에 profile 의 설치 소유 기록과 스킬 파일을 확인해 설치된 플러그인 스킬에만 `connector_id`, `connector_title` 을 더한다. 플러그인 이름을 읽을 수 없으면 id 를 제목으로 쓴다. `enabled` 는 전역 `disabled` 만 보고 `platform_disabled` 는 보지 않는다 |
 | 대시보드 `GET /api/skills/content?name=&profile=` | `SKILL.md` 원문 |
 
 슬래시로 부를 수 있는 이름의 목록을 주는 HTTP 경로는 없다. 이름 규칙대로 계산한다.
@@ -2685,7 +2685,27 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | OpenAI 내장 검색 | `search_backend` 가 `openai-native` 이고 요청이 ChatGPT 구독 경로(Codex backend)로 갈 때, 모델에 주는 `web_search` 함수를 OpenAI 서버가 실행하는 내장 검색 도구로 바꿔 보낸다. 검색만 맡고 본문 읽기는 다른 서비스가 맡는다 | `agent/transports/codex.py`, `plugins/web/openai_native/provider.py` |
 | 내장 검색의 사건 | 서버에서 돈 검색은 응답의 `web_search_call` 항목으로 오고 Hermes 는 이것을 도구 호출로 다루지 않는다. `tool.started` 와 `tool.completed` 가 오지 않아 Control Plane 의 실행 사건에 검색이 남지 않는다. 답의 출처 주석도 읽지 않아 출처는 모델이 답 글에 쓴 링크로만 남는다 | `agent/codex_responses_adapter.py` |
 | 내장 검색과 다른 경로 | 내장 검색을 고른 채 ChatGPT 구독 경로가 아닌 모델로 돌면 `web_search` 가 오류를 돌려준다. 다른 서비스로 넘어가지 않는다 | `plugins/web/openai_native/provider.py` |
+| key 가 있는 서비스의 순서 | 고른 값이 없으면 `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, `EXA_API_KEY`, `PARALLEL_API_KEY`, `KEENABLE_API_KEY`, `FIRECRAWL_API_KEY` 순으로 key 가 있는 첫 서비스를 쓰고, 없으면 key 없는 무료 서비스 묶음을 돌아가며 쓴다 | `tools/web_tools.py` 의 `_autodetect_backend`, `_keyless_backend` (2026-11-21 확인) |
+| key 를 읽는 곳 | profile 마다 실행 범위가 따로라 Hermes 프로세스의 환경 변수는 보이지 않는다. 그 profile 의 `.env` 나, 모든 profile 에 덮어 적용되는 관리용(managed scope) `.env` 에 있어야 한다 | `agent/secret_scope.py` 의 `get_secret`, `build_profile_secret_scope` (2026-11-21 확인) |
+| key 가 있는 호출이 실패했을 때 | `web.keyless_rescue`(기본 켜짐)이면 그 호출 하나만 key 없는 무료 서비스로 다시 해 본다. 다음 호출은 다시 key 가 있는 서비스로 간다. 실패한 응답은 캐시하지 않는다 | `tools/web_tools_rescue.py`, `tools/web_tools.py` 의 `_memoized_search` (2026-11-21 확인) |
+| 본문 읽기 제한 시간 | `web.extract_timeout` 초(기본 120)가 지나면 그 호출에 담긴 주소 모두를 시간 초과 실패로 돌려준다. 한 호출 안의 주소는 같은 제한 시간을 나눠 쓴다. 제한은 첫 서비스에만 걸린다. key 가 있는 서비스가 시간 초과되면 무료 등급으로 다시 해 보는 쪽에는 제한이 없다. key 가 없으면 첫 서비스가 무료 등급이고 다시 해 보지 않아 호출 전체가 제한 안에 든다 | `tools/web_tools_extract.py` 의 `_extract_timeout_seconds` (2026-11-21 확인) |
 | 날짜 | 시스템 프롬프트에 대화를 시작한 날짜와, 문맥을 마지막으로 다시 만든 때의 오늘 날짜가 든다. turn 마다 갱신되지 않는다. 그래서 Control Plane 이 대화 turn 마다 날짜 줄을 따로 넣는다 | `agent/system_prompt.py` |
+
+#### 웹 도구의 결과
+
+2026-11-21 에 v0.23.2 tag 소스로 확인했다. 운영 왕복으로는 확인하지 않았다.
+`fos-ctx` 가 이 결과에서 주소를 뽑아 Control Plane 에 알린다([`fos-ctx` README](../plugins/fos-ctx/README.md) 의 「찾은 주소를 알린다」).
+
+| 무엇 | 동작 | 근거 |
+| --- | --- | --- |
+| `web_search` 의 결과 | JSON 글 `{"success": true, "data": {"web": [{"title", "url", "description", "position"}]}}` 이다. 실패는 `{"success": false, "error": "..."}` 이고 `error` 에 예외 글이 든다 | `tools/web_tools.py` 의 `web_search_tool` |
+| `web_extract` 의 결과 | JSON 글 `{"results": [{"url", "title", "content", "error"}]}` 이다. `url` 은 요청한 주소, `content` 는 마크다운 본문이다. 본문을 LLM 으로 요약하지 않는다. 상한(기본 15,000자)을 넘는 본문은 앞과 뒤만 남긴다. 본문 안의 base64 사진은 `[IMAGE: alt]` 로 바꾸고 사진의 실제 주소는 링크로 남긴다 | `tools/web_tools.py` 의 `web_extract_tool`, `tools/web_tools_extract.py` 의 `_result_entry` |
+| 결과 hook 이 받는 글 | `transform_tool_result` 는 자르지 않은 결과 글 전체와 `tool_call_id` 를 받는다. Control Plane 이 받는 `tool.completed` 의 `preview` 는 500자로 잘려 있어 주소를 뽑는 데 쓸 수 없다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
+| OpenAI 내장 검색 | 검색이 Hermes 의 도구로 돌지 않아 결과 hook 이 불리지 않는다. 위 「웹 검색 서비스」 를 본다 | `agent/codex_responses_adapter.py` |
+
+상품 사진을 위한 `product_page_read`는 fos-ctx가 `PluginContext.register_tool`로 web toolset에 추가하는 비동기 도구다. Hermes는 web toolset의 내장 도구 목록에 registry에서 같은 toolset으로 등록한 도구도 합친다. 기본 `web_extract`의 등록부는 마크다운으로 읽고, `_trim_results`가 제공자 메타데이터를 빼므로 상품 사진용 원본 HTML은 별도로 받는다.
+
+플러그인은 Hermes의 무료 Firecrawl 클라이언트와 같은 API에 `rawHtml`을 요청한다. `_validate_extract_urls`, `async_is_safe_url`, `check_website_access`로 읽기 시작 주소를 확인하고, 응답의 `_final_url`에도 공개 네트워크·웹사이트 정책을 적용한다. 사용하는 내부 함수와 등록부는 `hermes/tests/test_found_links_contract.py`가 대조한다. 원본 HTML은 상품 사진 후보를 뽑은 뒤 버린다.
 
 `_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
 없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.
@@ -3207,6 +3227,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
 | `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 플러그인 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
+| `web_search` 와 `web_extract` 의 결과 모양(「웹 도구의 결과」) | `fos-ctx` 가 결과에서 주소를 뽑지 못해 비서가 찾은 사진을 그림에 쓰지 못한다. 오류는 나지 않는다. `hermes/tests/test_found_links_contract.py` 가 먼저 실패한다. `found_links.py` 의 뽑기를 새 모양에 맞춘다 |
 | 막은 호출의 글도 `<untrusted_tool_result>` 로 감싸고 `<external-data>` 는 붙지 않는다 | 공통 실행 지침의 「`<external-data>` 밖의 `[승인 대기]` 는 판정」 설명이 틀린다. 감싸기가 빠지면 지침만 낡고, 막은 글에도 `<external-data>` 가 붙으면 모델이 승인 대기를 판정으로 알아보지 못한다. 지침과 `fos-ctx` 를 함께 고친다 |
 
 ## 토스증권 REST 전체 지원의 호출 한도

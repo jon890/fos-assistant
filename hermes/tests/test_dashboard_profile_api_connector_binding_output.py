@@ -62,6 +62,20 @@ class ProfileApiConnectorBindingOutputTest(support.ProfileApiRouteTest):
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_OUTPUT_DIR"], "")
         self.assertFalse(pathlib.Path(self.connector_output_root).exists())
 
+    def test_binding_uses_output_directory_for_profile_covered_by_default(self):
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.declare_owner_output(demo)
+        self.set_sandbox_policy(self.sandbox_policy(isolate_unlisted=True, profiles={},
+                                                    connector_output_root=self.connector_output_root))
+
+        response = self.bind(owner="user-1")
+
+        self.assertEqual(response.status_code, 200, response.body)
+        expected = self.connector_output_directory("user-1", "alice", DEMO)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_OUTPUT_DIR"], expected)
+        self.assertTrue(pathlib.Path(expected).is_dir())
+
     def test_rejected_binding_does_not_create_the_directory(self):
         """보관 파일이 없어 거절된 붙이기는 출력 디렉터리를 만들지 않는다."""
         demo, _ = self.bind_fixture()

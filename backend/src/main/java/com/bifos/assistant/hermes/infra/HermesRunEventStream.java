@@ -64,8 +64,8 @@ public class HermesRunEventStream {
     /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
     private static final String MEMORY_READ_STARTED = "tool.started";
 
-    /** 할 일을 제안하는 Control Plane MCP 도구 이름의 끝이다. 인자에 할 일 제목이 실린다. */
-    private static final String FOLLOW_UP_PROPOSE_TOOL_SUFFIX = "follow_up_propose";
+    /** 할 일을 다루는 Control Plane MCP 도구(제안, 목록, 끝내기) 이름에 든 글이다. 인자와 결과에 할 일 제목이 실린다. */
+    private static final String FOLLOW_UP_TOOL_MARK = "follow_up_";
 
     /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-20261007 / memory-remember). */
     private static final String MEMORY_REMEMBER_TOOL_SUFFIX = "memory_remember";
@@ -255,7 +255,7 @@ public class HermesRunEventStream {
             detail = null;
         }
         if (toolName != null
-            && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
+            && (toolName.contains(FOLLOW_UP_TOOL_MARK)
                 || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
                 || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
             // 시작의 preview 에 할 일 제목이나 기억할 사실이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게

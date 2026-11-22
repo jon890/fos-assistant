@@ -348,9 +348,10 @@ test("모르는 id 는 찾을 수 없는 화면을 보인다", async ({ page }) 
     route.fulfill({ status: 404, json: notFound }),
   );
   await page.goto("/connections/missing-id");
-  await expect(page.getByTestId("connector-not-found")).toContainText(
-    "찾을 수 없는 서비스예요",
-  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: "찾을 수 없는 서비스예요" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("connector-not-found")).toBeVisible();
   await expect(page.getByText("raw upstream")).toHaveCount(0);
 });
 
@@ -363,11 +364,12 @@ test("형식이 틀린 id 는 서버를 부르지 않고 찾을 수 없는 화�
     return route.fulfill({ status: 404, json: notFound });
   });
   await page.goto("/connections/Bad_Id");
-  await expect(page.getByTestId("connector-not-found")).toContainText(
-    "찾을 수 없는 서비스예요",
-  );
   await expect(
-    page.getByRole("button", { name: "상태 다시 읽기" }),
+    page.getByRole("heading", { level: 1, name: "찾을 수 없는 서비스예요" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("connector-not-found")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "다시 읽기" }),
   ).toHaveCount(0);
   expect(called).toEqual([]);
 });
@@ -394,7 +396,7 @@ test("카탈로그를 읽지 못하면 쓸 수 없다고 하지 않고 다시 �
   await expect(page.getByText("지금은 쓸 수 없어요")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "연결 해제" })).toHaveCount(0);
   catalogOk = true;
-  await page.getByRole("button", { name: "상태 다시 읽기" }).click();
+  await page.getByRole("button", { name: "다시 읽기" }).click();
   await expect(page.getByLabel("토큰", { exact: true })).toBeVisible();
 });
 
@@ -464,6 +466,10 @@ function adminBinding(
     restartRequired: true,
     restartRequiredSince: SHOWN_SINCE,
     undeclaredTools: 0,
+    applyFailed: false,
+    waitingSince: SHOWN_SINCE,
+    // 기본 줄은 대기가 24시간을 넘어 다시 확인할 수 있는 줄이다.
+    recheckable: true,
     ...overrides,
   };
 }
@@ -475,11 +481,12 @@ const boundView = {
   bound: true,
   status: "READY",
   restartRequired: false,
+  applyFailed: false,
   toolCount: 3,
   skills: [],
 };
 
-test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에서 받은 대기 시각을 실어 보낸다", async ({
+test("관리자는 바인딩마다 한 줄을 보고 다시 확인에 목록에서 받은 대기 시각을 보낸다", async ({
   page,
 }) => {
   let confirmed = false;
@@ -495,6 +502,7 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
                 status: "READY",
                 restartRequired: false,
                 restartRequiredSince: null,
+                recheckable: false,
               }
             : {},
         ),
@@ -515,11 +523,17 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
   await expect(rows.nth(0)).toContainText("연결 확인 사용자");
   await expect(rows.nth(0)).toContainText("검사용 메모");
   await expect(rows.nth(0)).toContainText("에이전트 agent-first");
-  await expect(rows.nth(0)).toContainText("반영 대기");
+  await expect(rows.nth(0)).toContainText("자동 반영 중");
   await expect(rows.nth(1)).toContainText("에이전트 agent-second");
-  await expect(panel).toContainText("공유 gateway 를 재시작한 뒤 눌러 주세요.");
+  await expect(panel).toContainText(
+    "「다시 확인」 은 자동 반영이 실패했을 때만 누르세요.",
+  );
+  await expect(rows.nth(0)).toContainText(
+    "하루 넘게 자동 반영이 끝나지 않았어요.",
+  );
+  await expect(panel).not.toContainText("재시작한 뒤 눌러 주세요");
 
-  await rows.nth(0).getByRole("button", { name: "반영 완료" }).click();
+  await rows.nth(0).getByRole("button", { name: "다시 확인" }).click();
 
   await expect(rows).toHaveCount(1);
   await expect(rows.nth(0)).toContainText("에이전트 agent-second");
@@ -534,7 +548,7 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
   ).toBe(true);
 });
 
-test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고 다시 확인하는 반영 완료 단추가 있다", async ({
+test("진행 중인 줄은 자동 반영 중으로 보이고 다시 확인 단추가 없으며, 실패한 줄만 반영 실패와 단추를 보인다", async ({
   page,
 }) => {
   await page.route("**/api/admin/connections", (route) =>
@@ -543,29 +557,32 @@ test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고
         adminBinding("agent-live", {
           restartRequired: false,
           restartRequiredSince: null,
+          recheckable: false,
         }),
-        adminBinding("agent-restart"),
+        adminBinding("agent-restart", { recheckable: false }),
+        adminBinding("agent-failed", {
+          restartRequired: false,
+          restartRequiredSince: null,
+          applyFailed: true,
+        }),
       ],
     }),
   );
   await page.goto("/admin/connections");
   const rows = page.getByTestId("connector-admin-panel").getByRole("listitem");
-  await expect(rows).toHaveCount(2);
-  const live = rows.filter({ hasText: "에이전트 agent-live" });
-  const restart = rows.filter({ hasText: "에이전트 agent-restart" });
-  await expect(live).toContainText("반영 중");
-  await expect(live.getByRole("button", { name: "반영 완료" })).toBeVisible();
-  await expect(live).toContainText(
-    "몇 분이 지나도 남아 있으면 눌러 다시 확인해요.",
-  );
-  await expect(live).not.toContainText("재시작한 뒤 눌러 주세요");
-  await expect(restart).toContainText("반영 대기");
-  await expect(
-    restart.getByRole("button", { name: "반영 완료" }),
-  ).toBeVisible();
+  await expect(rows).toHaveCount(3);
+  const failed = rows.filter({ hasText: "에이전트 agent-failed" });
+  for (const code of ["agent-live", "agent-restart"]) {
+    const row = rows.filter({ hasText: `에이전트 ${code}` });
+    await expect(row).toContainText("자동 반영 중");
+    await expect(row.getByRole("button")).toHaveCount(0);
+  }
+  await expect(failed).toContainText("반영 실패");
+  await expect(failed).toContainText("자동 반영이 실패했어요.");
+  await expect(failed.getByRole("button", { name: "다시 확인" })).toBeVisible();
 });
 
-test("재시작한 뒤 다시 설치된 바인딩의 반영 완료는 한 번 더 재시작하라고 알리고 목록을 다시 읽는다", async ({
+test("재시작한 뒤 다시 설치된 바인딩의 다시 확인은 한 번 더 재시작하라고 알리고 목록을 다시 읽는다", async ({
   page,
 }) => {
   let reads = 0;
@@ -584,17 +601,17 @@ test("재시작한 뒤 다시 설치된 바인딩의 반영 완료는 한 번 �
   await expect(panel.getByRole("listitem")).toHaveCount(1);
   const before = reads;
 
-  await panel.getByRole("button", { name: "반영 완료" }).click();
+  await panel.getByRole("button", { name: "다시 확인" }).click();
 
   await expect(panel.getByRole("alert")).toHaveText(
     "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
   );
   await expect(page.getByText("raw upstream")).toHaveCount(0);
   expect(reads).toBeGreaterThan(before);
-  await expect(panel.getByRole("button", { name: "반영 완료" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "다시 확인" })).toBeVisible();
 });
 
-test("반영 완료가 설치 상태 어긋남으로 거절되면 그 까닭의 문구를 보인다", async ({
+test("다시 확인이 설치 상태 어긋남으로 거절되면 그 까닭의 문구를 보인다", async ({
   page,
 }) => {
   await page.route("**/api/admin/connections", (route) =>
@@ -610,7 +627,7 @@ test("반영 완료가 설치 상태 어긋남으로 거절되면 그 까닭의 
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel.getByRole("listitem")).toHaveCount(1);
 
-  await panel.getByRole("button", { name: "반영 완료" }).click();
+  await panel.getByRole("button", { name: "다시 확인" }).click();
 
   await expect(panel.getByRole("alert")).toHaveText(
     "설치 상태가 맞지 않아요. 서버 로그에서 까닭을 확인해 주세요.",
@@ -944,6 +961,8 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
           restartRequired: false,
           restartRequiredSince: null,
           undeclaredTools: 1,
+          waitingSince: null,
+          recheckable: false,
         },
       ],
     }),
@@ -955,7 +974,7 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
   await expect(panel.getByTestId("admin-undeclared")).toContainText(
     "선언하지 않은 도구 1개",
   );
-  await expect(panel.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "다시 확인" })).toHaveCount(0);
 });
 
 test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async ({ page }) => {

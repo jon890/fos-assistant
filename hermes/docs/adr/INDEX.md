@@ -7,25 +7,26 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 
 | 식별자 | 제목 | 상태 |
 | --- | --- | --- |
-| [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다. 운영 값이 있어야 도는 플러그인은 그 서비스의 저장소에 두고 원격 MCP 로 받는다(ADR-20261026 / remote-mcp-plugin) |
+| [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다. 운영 값이 있어야 도는 플러그인은 그 서비스의 저장소에 두고 원격 MCP 로 받는다([ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md)) |
 | [ADR-066](ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | Accepted. 서버와 scope 는 ADR-084 로 부분 대체했다 |
-| [ADR-084](ADR-084-gmail-typescript-filters.md) | Gmail 커넥터는 TypeScript 묶음 파일로 실행하고 필터 권한을 따로 받는다 | Accepted. ADR-066 의 서버와 단일 scope 를 대체한다. 실행 파일 커밋과 대조 검사는 ADR-20261011 / connector-source-build 가 대체한다 |
+| [ADR-084](ADR-084-gmail-typescript-filters.md) | Gmail 커넥터는 TypeScript 묶음 파일로 실행하고 필터 권한을 따로 받는다 | Accepted. ADR-066 의 서버와 단일 scope 를 대체한다. 실행 파일 커밋과 대조 검사는 [ADR-20261011 / connector-source-build](ADR-20261011-connector-source-build.md) 가 대체한다 |
 | [ADR-088](ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) | 대시보드 plugin 은 감싸는 경로의 바꿔 끼우기를 두고, 기대는 Hermes 내부 지점을 계약 시험으로 확인한다 | Accepted. ADR-041 의 plugin 을 기능 모듈로 나누는 경계를 정한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
 | [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다. local 로 되돌릴 때 지우는 경로는 [ADR-20261120 / no-local-shell](../../../docs/adr/ADR-20261120-no-local-shell.md) 로 없어졌다 |
-| [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |
-| [ADR-20261009 / naver-blog-overwrite](ADR-20261009-naver-blog-overwrite.md) | 네이버 블로그 임시저장 글 덮어쓰기는 원본 사본을 먼저 남기고, 승인 카드의 지문과 바뀌는 내용을 작업이 다시 대조한다 | Accepted. ADR-20261009 / naver-blog-primitives 의 읽기 도구 위에 쓰기 도구를 더한다 |
+| [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | Accepted. [ADR-20261008 / connector-binding-guards](../../../docs/adr/ADR-20261008-connector-binding-guards.md) 의 두 선언을 쓴다 |
+| [ADR-20261009 / naver-blog-overwrite](ADR-20261009-naver-blog-overwrite.md) | 네이버 블로그 임시저장 글 덮어쓰기는 원본 사본을 먼저 남기고, 승인 카드의 지문과 바뀌는 내용을 작업이 다시 대조한다 | Accepted. [ADR-20261009 / naver-blog-primitives](ADR-20261009-naver-blog-primitives.md) 의 읽기 도구 위에 쓰기 도구를 더한다 |
 | [ADR-20261009 / naver-blog-primitives](ADR-20261009-naver-blog-primitives.md) | 네이버 블로그 커넥터는 임시저장 글을 읽는 기본 도구를 갖고, 글을 어떻게 쓸지는 모델과 Memory 가 정한다 | Accepted. [ADR-20261007 / naver-blog-connector](../../../docs/adr/ADR-20261007-naver-blog-connector.md) 에 읽기 도구를 더하고, 문체를 비공개 스킬로 둔다는 부분을 Memory 로 바꾼다 |
 | [ADR-20261011 / connector-source-build](ADR-20261011-connector-source-build.md) | 커넥터 실행 파일은 소스로 빌드하고 Git 으로 추적하지 않는다 | Accepted. ADR-084 의 실행 파일 커밋과 대조 검사를 부분 대체한다 |
 | [ADR-20261011 / content-snapshot-compiler](ADR-20261011-content-snapshot-compiler.md) | 원고 compiler는 별도 private process로 호출한다 | Accepted |
 | [ADR-20261012 / bodyless-request-diagnostics](ADR-20261012-bodyless-request-diagnostics.md) | 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다 | Accepted, 운영 미연결(2026-10-13). ADR-001의 관리 entrypoint 내부 교체 예외와 일반 writer 계약을 정하고, 운영 연결은 upstream 공식 설정이 생길 때까지 보류한다 |
-| [ADR-20261026 / plugin-standard-format](ADR-20261026-plugin-standard-format.md) | 플러그인은 Claude Code·Codex 플러그인 형식을 그대로 읽고, assistant 전용 정보는 `assistant.json` 하나에 덧붙인다 | Accepted. ADR-043 의 선언 파일 이름과 manifest 읽기 규칙을 바꾼다. `assistant.json` 이 없는 플러그인의 기본값은 ADR-20261101 / plugin-without-assistant-json 이 정한다 |
-| [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) | 원격 MCP 플러그인은 운영자가 믿은 주소에만 붙고, 사용자의 토큰은 헤더로만 간다 | Accepted. 옮기는 순서의 1, 2, 4단계를 구현했다. 2단계(금융 워크벤치 전환)로 ADR-20261025 / connector-operator-base-url 을 대체했다 |
-| [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) | `assistant.json` 이 없는 표준 플러그인도 받고, 그 도구는 모두 호출마다 사람이 승인한다 | Accepted. ADR-20261026 / plugin-standard-format 의 기본값과 원격 MCP ADR 「옮기는 순서」 의 4단계를 정한다. 1단계(카탈로그와 판정)를 구현했다 |
+| [ADR-20261026 / plugin-standard-format](ADR-20261026-plugin-standard-format.md) | 플러그인은 Claude Code·Codex 플러그인 형식을 그대로 읽고, assistant 전용 정보는 `assistant.json` 하나에 덧붙인다 | Accepted. ADR-043 의 선언 파일 이름과 manifest 읽기 규칙을 바꾼다. `assistant.json` 이 없는 플러그인의 기본값은 [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) 이 정한다 |
+| [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) | 원격 MCP 플러그인은 운영자가 믿은 주소에만 붙고, 사용자의 토큰은 헤더로만 간다 | Accepted. 옮기는 순서의 1, 2, 4단계를 구현했다. 2단계(금융 워크벤치 전환)로 [ADR-20261025 / connector-operator-base-url](archive/ADR-20261025-connector-operator-base-url.md) 을 대체했다 |
+| [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) | `assistant.json` 이 없는 표준 플러그인도 받고, 그 도구는 모두 호출마다 사람이 승인한다 | Accepted. [ADR-20261026 / plugin-standard-format](ADR-20261026-plugin-standard-format.md) 의 기본값과 원격 MCP ADR 「옮기는 순서」 의 4단계를 정한다. 1단계(카탈로그와 판정)를 구현했다 |
 | [ADR-20261103 / connector-vault-key](ADR-20261103-connector-vault-key.md) | 커넥터 보관 파일은 Control Plane KEK 와 다른 key 로 대시보드 plugin 이 암호화한다 | Accepted. ADR-083 의 보관 파일을 평문으로 두던 것을 바꾼다. profile `.env` 사본은 스펙 REQ6, REQ7 의 다음 PR 이 없앤다 |
 | [ADR-20261110 / korail-ktx-connector](ADR-20261110-korail-ktx-connector.md) | 코레일 KTX 는 내 브라우저의 코레일 화면을 고정 단계로 눌러 한 번 조회하고, 약관 위험은 사용자가 감수한다 | Accepted. [ADR-20261110 / naver-shopping-connector](../../../docs/adr/ADR-20261110-naver-shopping-connector.md) 의 `attended_only` 경계를 쓴다 |
 | [ADR-20261118 / web-search-backend](ADR-20261118-web-search-backend.md) | 웹 검색 서비스는 값을 정하지 않고 Hermes 자동 선택을 유지하며 OpenAI 내장 검색은 쓰지 않는다 | Accepted |
 | [ADR-20261120 / plugin-agent-skills](ADR-20261120-plugin-agent-skills.md) | 플러그인의 에이전트용 스킬은 붙이기로 설치하고, 실행기가 필요한 스킬은 운영이 셸 env 를 준 profile 에만 둔다 | Accepted. ADR-086 의 비밀 경계를 바꾸지 않고, 그 「감당할 것」 의 커리어 실행 공간을 쓴다 |
+| [ADR-20261121 / sandbox-default-policy](ADR-20261121-sandbox-default-policy.md) | 실행 공간 정책에 목록 밖 named profile 을 위한 기본 설정을 둔다 | Accepted. 운영이 켜면 목록 밖 named profile 도 공통 Docker 설정으로 격리한다 |
 
 ## 보관
 

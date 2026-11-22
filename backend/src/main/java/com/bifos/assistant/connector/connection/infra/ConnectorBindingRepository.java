@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.connection.domain.DetachTarget;
 import com.bifos.assistant.connector.connection.domain.DueBinding;
 import com.bifos.assistant.connector.connection.domain.EventWatchTarget;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
+import com.bifos.assistant.connector.connection.domain.RestartWaiting;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import jakarta.persistence.LockModeType;
@@ -95,11 +96,37 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
 
 
     /**
+     * 공유 gateway 재시작으로 풀릴 재시작 대기 바인딩의 연결 사용자와 대기 시각이다(ADR-20261120 / connector-auto-apply). 운영 정기
+     * 작업이 재시작할지 정할 때 읽는다. 재시작 감지({@link #findRestartWaiting})처럼 실패 표시가 있거나 껐다 켜기 단계거나 대기 시각이 빈 옛
+     * 바인딩은 뺀다. 재시작으로 풀리지 않아 세면 운영 작업이 재시작을 되풀이한다. 반영 예정 시각이 남은 바인딩도 재시작을 기다리므로 센다.
+     * 생성자 식을 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.RestartWaiting(b.connection.userId, b.restartRequiredSince)"
+        + " from ConnectorBinding b"
+        + " where b.restartRequired = true and b.restartRequiredSince is not null and b.applyFailedAt is null"
+        + " and b.cyclePhase is null")
+    List<RestartWaiting> findRestartWaitingOwners();
+
+
+    /**
+     * 관리자 알림을 보낼 바인딩의 번호들이다(ADR-20261120 / connector-auto-apply). 이 대기에 아직 알리지 않은 {@code PENDING} 바인딩
+     * 가운데 자동 반영이 실패했거나 대기 시각이 {@code before} 이전인 것이다. 생성자 식을 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.DueBinding(b.id, b.agent.id, b.connection.userId)"
+        + " from ConnectorBinding b"
+        + " where b.adminNotifiedAt is null"
+        + " and b.status = com.bifos.assistant.connector.connection.domain.type.BindingStatus.PENDING"
+        + " and (b.applyFailedAt is not null or b.waitingSince <= :before)"
+        + " order by b.id")
+    List<DueBinding> findAdminAlertDue(@Param("before") Instant before);
+
+
+    /**
      * 그 에이전트들에 붙어 바인딩과 연결이 모두 그 상태인 줄이다. 에이전트 목록의 할 수 있는 일이 쓴다. 생성자 식을 문자열로 두는
      * 까닭은 {@link #findApplyDue} 와 같다.
      */
     @Query("select new com.bifos.assistant.connector.connection.domain.ReadyBinding(b.id, b.agent.id, b.connection.userId,"
-        + " b.agent.hermesProfile, b.connection.connectorId)"
+        + " b.agent.hermesProfile, b.connection.connectorId, b.updatedAt)"
         + " from ConnectorBinding b"
         + " where b.agent.id in :agentIds and b.status = :status and b.connection.status = :connectionStatus"
         + " order by b.id")
@@ -116,7 +143,7 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
      * 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
      */
     @Query("select new com.bifos.assistant.connector.connection.domain.ReadyBinding(b.id, b.agent.id, b.connection.userId,"
-        + " b.agent.hermesProfile, b.connection.connectorId)"
+        + " b.agent.hermesProfile, b.connection.connectorId, b.updatedAt)"
         + " from ConnectorBinding b"
         + " where b.status = :status and b.id > :after"
         + " order by b.id")

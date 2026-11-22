@@ -11,12 +11,15 @@
 | --- | --- |
 | `/` | 새 대화 화면 |
 | `/settings` | 「설정」. 묶음 목록과, 넓은 화면에서 처음 골라진 「에이전트」 화면. 아래 「설정 틀」 |
+| `/settings/notifications` | 설정의 「알림」. 이 기기에서 웹 푸시를 받을지와 내 기기 목록([`docs/features/attention.md`](../../docs/features/attention.md) 의 「웹 푸시」) |
+| `/n/{id}` | 푸시를 누르면 여는 주소. 알림을 읽음으로 바꾸고 그 알림이 가리키는 곳으로 넘긴다. 화면을 그리지 않는다 |
 | `/now` | 지금 화면. 실패, 내 차례, 맡긴 일, 이어서 하기, 보고 카드([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `/chat/{id}` | 대화 하나. `{id}` 는 대화의 공개 식별자 |
 | `/c/{번호}` | 옛 주소. 주인이면 `/chat/{id}` 로, 없거나 남의 대화면 `/` 로 넘긴다. 그 밖의 실패는 오류 화면이다 |
 | `/signin` | 로그인 |
 | `/privacy` | 데이터 보관 안내. 로그인 없이 열리며 로그인 화면에서 안내 링크로 간다. [`docs/privacy.md`](../../docs/privacy.md)의 대화 보관·암호화 한계·모델 제공사 전달·삭제와 연결 해제 안내를 다섯 절로 요약한다. 공개 화면 틀을 쓰며 로그인 없는 렌더는 Control Plane을 부르지 않는다. 로그인한 사용자가 열면 설정 틀 안에 보이고 로그인 안내와 「로그인 화면으로」 를 그리지 않는다 |
 | `/memory` | 에이전트가 남긴 기억의 검토와 고치기, 개인 문서. 구성은 [`docs/features/memory.md`](../../docs/features/memory.md) |
+| `/new` | 새 대화. `?agent=<code>` 로 처음 고를 에이전트를 받는다 |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 실행 트리 |
 | `/agents` | 내가 쓸 수 있는 에이전트 목록과 「새 에이전트」. `?new=1` 이면 「새 에이전트」 창이 열린 채로 보이고, 뒤로 가기나 새로 고침에 다시 열리지 않게 주소에서 `new=1` 을 지운다 |
 | `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 스킬, 먼저 살펴보기와 매일 깨우기. 주인과 `ADMIN` 에게 공개와 삭제 |
@@ -24,16 +27,19 @@
 | `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
 | `/connections` | 「외부 서비스 연결」. 플러그인 카드 목록. [`docs/features/connector.md`](../../docs/features/connector.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
 | `/connections/{id}` | 플러그인 하나의 외부 서비스 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
+| `/connections/oauth/callback` | 단추 연결의 서비스 화면에서 돌아오는 주소. 결과를 그 연결 화면으로 넘긴다([`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md) 의 「웹 화면」) |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 설정의 「연결」 묶음과 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`docs/features/user-browser.md`](../../docs/features/user-browser.md)) |
-| `/files` | 파일 공간. 내 에이전트들이 함께 쓰는 실행 공간의 목록, 미리보기, 내려받기, 지우기. `?path=` 는 연 디렉터리이고 `?file=` 은 미리 보는 파일이다. 설정의 「내 데이터」 묶음에서 간다. [`docs/features/workspace.md`](../../docs/features/workspace.md) 의 「파일 공간」 |
+| `/files` | 파일 공간. 「내 파일」 목록을 먼저 보이고 「에이전트 작업 폴더」 는 링크로 들어간다. 옛 실행 공간 주소(`?path=`, `?file=`)는 `/files/workspace` 의 같은 자리로 넘긴다. 설정의 「내 데이터」 묶음에서 간다. [`docs/features/workspace.md`](../../docs/features/workspace.md) 의 「파일 공간」 |
+| `/files/workspace` | 에이전트 작업 폴더. 내 에이전트들이 함께 쓰는 실행 공간의 목록, 미리보기, 내려받기, 지우기. `?path=` 는 연 디렉터리이고 `?file=` 은 미리 보는 파일이다 |
 | `/dev-docs` | 개발 문서. 로그인한 모든 사용자. 배포 커밋의 로드맵(`docs/prd.md` 의 「로드맵」)과 문서 목록. 설정의 「도움말」 묶음에서 간다([`docs/features/dev-overview.md`](../../docs/features/dev-overview.md)) |
 | `/dev-docs/{저장소 경로}` | 개발 문서 하나. 목록에 든 문서만 열고 나머지는 404 다 |
 | `/tasks` | 내 예약 작업 목록과 「새 작업」([`docs/features/schedule.md`](../../docs/features/schedule.md) 의 「화면(예약 작업)」) |
 | `/tasks/new` | 예약 작업 만들기 |
 | `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
-| `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」) |
-| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)) |
+| `/notifications` | 전의 알림 화면 주소. 「알림」 탭이 열린 `/now?tab=notifications` 로 넘긴다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」) |
+| `/admin` | 관리자 영역의 첫 화면(요약). 그룹 전체의 최근 7일 실패와 이번 달 사용량 카드 둘. 카드마다 따로 읽는다([`docs/features/admin-area.md`](../../docs/features/admin-area.md)). 평가 전용 사용자는 두 카드의 합계에서 빠지고 사용량 카드에 「평가」 한 줄로 따로 보인다 |
+| `/admin/quality` | 품질. 첫 칸은 배포 뒤 확인 기록이다. 시각, 계기, 결과, 걸린 시간을 한 줄로, 펼치면 기능별 결과와 까닭을 보인다. 실패 기능은 남겨 둔 평가 대화의 실행 트리(`/admin/quality/executions/{id}`)로 잇는다. 「확인 시작」, 「다시 확인」. 평가 사용자가 없거나 덜 준비됐으면 「평가 사용자 준비」 칸을 보인다([`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md)) |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |
 | `/admin/agents/{code}` | 에이전트 하나의 관리. 일반 상세의 절에 「모델」, 「기억 영역」, 「관리」 절이 더해진다 |
@@ -41,9 +47,9 @@
 | `/admin/tools` | 그룹의 화면에 보일 도구와 도구마다 켜진 에이전트 수 |
 | `/admin/usage` | 금액, 모델, 토큰이 보이는 사용량 |
 | `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「로그와 저장」 이 갖는다 |
-| `/admin/connections` | 반영을 기다리는 연결의 반영 완료 |
+| `/admin/connections` | 자동 반영이 실패했거나 24시간 넘게 남은 바인딩의 「다시 확인」([`docs/features/connector.md`](../../docs/features/connector.md)) |
 | `/admin/browsers` | 모든 사용자 브라우저의 사용자 이름, 상태, 마지막 사용 시각, 오류 코드와 끄기, 지우기 |
-| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md)) |
+| `/admin/secrets` | 서버 비밀값. 브라우저 중계 서명 비밀의 입력됨 여부, 앞부분, 마지막으로 바꾼 사람과 시각, 새로 만들기와 지우기. 값이 있을 때 다시 만들면 바인딩 다시 설치 확인 창을 거친다. KEK 가 없으면 단추를 끄고 안내한다. 단추 연결의 OAuth 앱 줄과 서명 비밀 줄도 둔다. 원문은 그리지 않는다([`docs/features/secret-store.md`](../../docs/features/secret-store.md), [`docs/features/connector-oauth/design.md`](../../docs/features/connector-oauth/design.md)) |
 | `/admin/workspaces` | 실행 공간마다 주인, 용량, 항목 수와 일부만 셌는지. 주인은 사용자 이름이거나 「에이전트 · <이름>」 이고 이름이 없으면 「알 수 없음」 이다. 일부만 센 공간에 「일부만 셈」 배지. 루트가 없으면 「파일 공간을 쓸 수 없어요」, 공간이 없으면 「아직 실행 공간이 없어요」, 실패는 「불러오지 못했어요」 와 다시 읽기. 관리자 영역이지만 오류 코드와 파일 이름은 그리지 않는다 |
 
 `/admin` 아래는 `ADMIN` 만 연다.
@@ -55,7 +61,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 
 ```
 ┌─ 사이드바 ─┬─ 대화 ─────────────────────┬─ 작업 과정 패널 ─┐
-│ 앱 이름 🔔 ◧│ 에이전트 이름               │ (열었을 때만)     │
+│ 앱 이름    ◧│ 에이전트 이름               │ (열었을 때만)     │
 │ 대화방      │                            │                  │
 │ ✎ 새 대화   ├────────────────────────────┤                  │
 │ 🔍 검색     │ 메시지                      │ 실행 트리         │
@@ -72,7 +78,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 └────────────┴────────────────────────────┴──────────────────┘
 ```
 
-사이드바는 대화 쪽 화면(`/`, `/new`, `/chat/{id}`, `/now`, `/tasks`, `/memory`, `/notifications`)에 있다.
+사이드바는 대화 쪽 화면(`/`, `/new`, `/chat/{id}`, `/now`, `/tasks`, `/memory`)에 있다. `/notifications` 는 `/now?tab=notifications` 로 넘기기만 한다.
 관리자 영역의 틀은 아래 「관리자 영역의 틀」, 설정 화면들의 틀은 「설정 틀」 절이 갖는다.
 무엇을 남기고 무엇을 뒤로 보냈는지와 그 까닭은 [`docs/features/app-shell/spec.md`](../../docs/features/app-shell/spec.md) 가 갖는다.
 
@@ -80,7 +86,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 
 | 구역 | 높이가 모자랄 때 |
 | --- | --- |
-| 앱 이름과 알림 단추, 대화방, 「새 대화」, 대화 검색, 「지금 볼 것」 | 줄어들지 않는다. 대화 목록이 길어도 스크롤 없이 보인다 |
+| 앱 이름, 대화방, 「새 대화」, 대화 검색, 「지금 볼 것」 | 줄어들지 않는다. 대화 목록이 길어도 스크롤 없이 보인다 |
 | 주요 화면 메뉴(「예약 작업」, 「기억」) | 대화 목록이 다 줄어든 뒤에 줄어들고 그 안에서 스크롤한다 |
 | 대화 목록 | 남는 높이를 쓰고 그 안에서 스크롤한다. 가장 먼저 줄어든다 |
 | 맨 아래 이름 줄 | 줄어들지 않는다 |
@@ -101,7 +107,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 | 관리자 화면(이름 메뉴) | `ShieldCheck` |
 | 로그아웃(이름 메뉴) | `LogOut` |
 
-설정 틀의 묶음 목록도 같은 규칙이다. 에이전트 `Bot`, 외부 서비스 연결 `Plug`(플러그인 아이콘이 없는 서비스의 카드도 같다), 내 브라우저 `Globe`(관리자 메뉴의 「브라우저」 와 같다), 파일 공간 `FolderOpen`, 개발 문서 `BookOpen`, 데이터 보관 안내 `ShieldQuestion` 이다.
+설정 틀의 묶음 목록도 같은 규칙이다. 에이전트 `Bot`, 알림 `Bell`, 외부 서비스 연결 `Plug`(플러그인 아이콘이 없는 서비스의 카드도 같다), 내 브라우저 `Globe`(관리자 메뉴의 「브라우저」 와 같다), 파일 공간 `FolderOpen`, 개발 문서 `BookOpen`, 데이터 보관 안내 `ShieldQuestion` 이다.
 
 **맨 아래 이름 줄은 화면 높이가 낮아도 잘리지 않는다.**
 전에는 메뉴와 이름이 한 덩어리였고 줄어들지 않아, 가로로 돌린 전화기나 키보드가 올라온 화면에서 아래쪽이 화면 밖으로 잘렸다.
@@ -111,8 +117,8 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 「화면 밝기」 는 하위 메뉴로 두지 않는다. 좁은 서랍에서 하위 메뉴가 부모 메뉴를 덮는다.
 로그아웃은 `POST /signout` 이 이 브라우저의 세션만 지운 뒤 `/signin` 을 문서째 연다. 뒤로 가기로 bfcache 에서 꺼낸 문서는 화면 틀이 세션을 확인해 없을 때 다시 읽는다. 순서와 까닭은 [`docs/features/app-shell/design.md`](../../docs/features/app-shell/design.md) 의 「로그아웃」 이 갖는다.
 
-알림 단추는 앱 이름 바로 옆에 둔다. 서랍에서는 그 줄 오른쪽 끝이 서랍 닫기 단추 자리라 비워 둔다. 좁은 화면에서는 서랍을 열지 않아도 보이게 머리의 「새 대화」 옆에 하나 더 둔다.
-알림 단추의 동작은 [`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」 이 갖는다.
+알림 단추는 없다. 「지금 볼 것」 줄이 할 것의 수나 새 알림의 점을 붙이고, 좁은 화면에서는 서랍을 열지 않아도 보이게 위 막대의 「새 대화」 옆에 같은 단추를 하나 더 둔다. 서랍에서 앱 이름 줄의 오른쪽 끝은 서랍 닫기 단추 자리라 비워 둔다.
+수와 점의 규칙은 [`docs/features/app-shell/design.md`](../../docs/features/app-shell/design.md) 의 「지금 볼 것 수와 점」, 알림 목록은 [`docs/features/attention.md`](../../docs/features/attention.md) 의 「화면(알림)」 이 갖는다.
 
 ### 관리자 입구
 
@@ -130,9 +136,29 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 어느 경로가 드는지와 묶음 목록은 `web/src/components/shell/settings-area.ts` 가 갖는다.
 
 - 머리에 「설정」 과 오른쪽 「대화로」 를 둔다. 「대화로」 는 관리자 틀의 「사용 화면으로 돌아가기」 와 같이 마지막으로 본 대화, 없으면 `/` 로 간다(`back-to-chat.ts`).
-- 넓은 화면은 왼쪽에 묶음 목록, 오른쪽에 본문이다. `/settings` 는 「에이전트」 가 골라진 것으로 친다. 실행 하나의 화면은 설정 틀 밖에서 보인다.
+- 넓은 화면은 왼쪽에 묶음 목록, 오른쪽에 본문이다. `/settings` 자체는 「에이전트」 가 골라진 것으로 치고, 그 아래 주소(`/settings/notifications`)는 자기 줄이 골라진다. 실행 하나의 화면은 설정 틀 밖에서 보인다.
 - 좁은 화면은 `/settings` 에서 묶음 목록만, 다른 주소에서는 본문만 보이고 머리 왼쪽의 뒤로 가기가 목록으로 돌아간다. 넓이는 CSS 로만 나눈다.
 - 대화 목록과 알림 구독은 끄지 않는다. 「대화로」 로 돌아갈 때 다시 읽지 않는다. 단축키는 켜지 않는다.
+- 묶음 목록의 폭은 사이드바와 같다. 본문 자리의 폭이 같아 사이드바 틀의 화면에서 설정으로 옮겨도 제목의 왼쪽 끝이 같다.
+
+### 화면 머리 틀과 세 안내
+
+사이드바와 설정에서 여는 화면은 `components/ui/page-frame.tsx` 의 `PageFrame` 하나로 감싼다. 대상 화면과 문구는 [`docs/features/app-shell/design.md`](../../docs/features/app-shell/design.md) 의 「같은 머리 틀」 이 갖는다.
+
+- **화면이 폭 클래스와 `h1` 을 따로 갖지 않는다.** `PageFrame` 이 바깥 폭, 뒤로 가기(상세 화면), 제목과 한 줄 설명, 오른쪽 주 단추, 본문 자리를 그린다. 폭을 고르는 prop 은 없다. 화면마다 폭을 고르면 화면을 옮길 때 내용이 좌우로 튄다.
+- 목록 화면의 제목과 설명은 `lib/page-head.ts` 가 갖고 page 와 `loading.tsx` 가 같은 값을 읽는다.
+- `loading.tsx` 는 `PageFrame` 을 `busy` 로 그린다. 머리는 실제 글자이고 본문에 뼈대를 둔다. 이름을 아직 모르는 상세 화면만 제목 자리에 뼈대를 둔다.
+- 에이전트 상세의 절 부품은 폭을 갖지 않는다. `AgentDetailBody` 가 일반 화면은 `PageFrame` 으로, 관리자 영역은 그 영역의 폭으로 감싼다.
+
+화면의 목록이 비었을 때, 불러오지 못했을 때, 읽는 중일 때는 아래 부품을 쓴다.
+
+| 상태 | 부품 |
+| --- | --- |
+| 빈 목록 | `components/ui/empty-state.tsx` 의 `EmptyState` |
+| 불러오기 실패 | `components/ui/page-state.tsx` 의 `LoadFailure`. 한 줄과 「다시 읽기」 다. 브라우저가 읽는 화면은 다시 읽는 함수를 `onRetry` 로 넘기고, 서버가 읽는 화면은 넘기지 않아 문서를 새로 연다 |
+| 읽는 중 | 같은 파일의 `ListSkeleton` |
+
+화면 안쪽의 작은 목록(에이전트 상세의 절, 기억의 필터 결과, 작업 폴더 탐색기)은 대상이 아니다.
 
 ### 관리자 영역의 틀
 
@@ -180,7 +206,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 위 표의 사이드바는 일반 화면의 것이다.
 
 접은 상태는 그 브라우저에 남긴다.
-좁은 화면의 위쪽 막대에는 서랍 단추, 화면 제목, 알림 단추, 새 대화 단추를 둔다.
+좁은 화면의 위쪽 막대에는 서랍 단추, 화면 제목, 「지금 볼 것」 단추, 새 대화 단추를 둔다.
 화면 제목이 없으면 앱 이름을 보인다. 제목은 가운데 정렬하고 길면 말줄임한다.
 제목을 누르면 `/` 로 가서 새 대화를 시작한다. 이미 홈이어도 대화 상태와 입력을 비운다.
 화면 낭독기는 보이는 제목과 관계없이 「<앱 이름> 홈」 으로 읽는다.
@@ -228,6 +254,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 
 **서버에서 데이터를 읽는 화면 경로는 `loading.tsx` 를 함께 둔다.** 옮기는 동안 보일 뼈대다.
 뼈대는 그 화면의 바깥 틀(최대 폭, 제목 자리, 목록이나 표의 줄 높이)을 `page.tsx` 와 같게 둔다.
+화면 머리 틀을 쓰는 화면은 같은 틀을 `busy` 로 그려 폭과 제목 자리를 맞추고, 본문은 화면과 상관없이 같은 `ListSkeleton` 을 둔다. 읽는 중의 모양을 화면마다 같게 하려는 것이라 줄 높이는 맞추지 않는다.
 `/` 에는 두지 않는다. 로그인 확인 말고는 서버에서 읽는 데이터가 없다.
 
 **`components/ui/` 를 shadcn/ui 에서 복사한 부품으로 채우기로 했다.** 근거는

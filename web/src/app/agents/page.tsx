@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageFrame } from "@/components/ui/page-frame";
+import { LoadFailure } from "@/components/ui/page-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import { SpecialistAgentDialog } from "@/components/agent/specialist-agent-dialog";
 import type { AgentView } from "@/lib/agent";
 import { capabilitiesLine } from "@/lib/agent-badge";
+import { PAGE_HEADS } from "@/lib/page-head";
 import { AgentBadge } from "@/components/agent/agent-badge";
 
 export default async function AgentsPage({
@@ -21,26 +24,33 @@ export default async function AgentsPage({
 
   const { new: openNew } = await searchParams;
   const result = await callControlPlane<AgentView[]>("/api/v1/agents");
-  if (!result.ok) return <p className="text-sm">{result.message}</p>;
+  if (!result.ok)
+    return (
+      <PageFrame {...PAGE_HEADS.agents}>
+        <LoadFailure message={result.message} />
+      </PageFrame>
+    );
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">에이전트</h1>
-        <div className="flex flex-wrap justify-end gap-2">
+    <PageFrame
+      {...PAGE_HEADS.agents}
+      action={
+        <>
           <SpecialistAgentDialog />
           <CreateAgentDialog defaultOpen={openNew === "1"} />
-        </div>
-      </div>
+        </>
+      }
+    >
       {result.data.length === 0 ? (
         <EmptyState
           title="아직 에이전트가 없어요"
           description="새 에이전트를 만들어 보세요"
         />
       ) : (
-        <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">
+        // 열을 정하지 않은 grid 는 칸이 줄바꿈하지 않는 글자 길이만큼 넓어져 휴대폰에서 틀을 넘는다. 한 열(minmax(0, 1fr))로 묶는다.
+        <ul aria-label="쓸 수 있는 에이전트" className="grid grid-cols-1 gap-3">
           {result.data.map((agent) => (
-            <li key={agent.code}>
+            <li key={agent.code} className="min-w-0">
               <Link
                 prefetch={false}
                 href={`/agents/${agent.code}`}
@@ -69,6 +79,6 @@ export default async function AgentsPage({
           ))}
         </ul>
       )}
-    </div>
+    </PageFrame>
   );
 }

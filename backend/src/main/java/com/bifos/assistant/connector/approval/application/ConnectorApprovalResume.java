@@ -19,10 +19,8 @@ import com.bifos.assistant.connector.financial.application.ConnectorExecutionGua
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
-import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.financial.application.dto.ConnectorExecutionCatalog;
 import com.bifos.assistant.connector.financial.application.dto.ConnectorExecutionReadContext;
-import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
@@ -31,6 +29,7 @@ import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.shared.util.ToolFailureText;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -49,29 +48,31 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 사람 화면에서 멈춘 승인한 주문서 채우기를 같은 승인으로 이어 간다(docs/features/browser-cowork/spec.md 의 REQ8, REQ9, 설계의
  * 「PR4 이어 가기」). 에이전트의 MCP 도구가 부른다.
  *
- * <p>그 대화의 {@code WAITING} 줄 하나만 고른다. 사람이 그 뒤 이 대화에 메시지를 보내 넘기기 카드가 닫혀 있어야 하고, 수명과 같은 브라우저와
- * 그 순간의 구매 상한을 다시 본다. 이어 가는 전이({@code WAITING} 에서 {@code EXECUTING})를 행 잠금 아래에서 한 번만 하므로 멈출 때마다 한
+ * <p>그 대화의 {@code WAITING} 줄 하나만 고른다. 사람이 그 뒤 이 대화에 메시지를 보내 넘기기 카드가 닫혀 있어야 하고, 수명과 같은 브라우저인지 다시 본다.
+ * 이어 가는 전이({@code WAITING} 에서 {@code EXECUTING})를 행 잠금 아래에서 한 번만 하므로 멈출 때마다 한
  * 번이다. 실행은 처음 승인과 같은 {@link ConnectorFinancialApproval#run} 이고 ticket 을 새로 낸다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class ConnectorApprovalResume implements ApprovalResumes {
-    static final String NONE = "이 대화에 이어 갈 승인이 없다. 승인이 이미 끝났거나 이어 갈 수 있는 시간이 지났다."
-        + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.";
-    static final String NOT_YET = "사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.";
-    static final String HELD = "사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.";
-    static final String ENDED = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
+    // 이어 가지 못한 글은 승인이나 사람 손이 필요해 바로 알림으로 끝난다(docs/features/tool-fallback/spec.md 의 REQ2, REQ3). RUNNING 은 실패가 아니다.
+    static final String NONE = ToolFailureText.askUser("이 대화에 이어 갈 승인이 없다. 승인이 이미 끝났거나 이어 갈 수 있는 시간이 지났다."
+        + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.").text();
+    static final String NOT_YET = ToolFailureText.askUser("사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.").text();
+    static final String HELD = ToolFailureText.askUser("사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.").text();
+    /** 끝낸 줄의 결과를 뒤에 붙일 때 쓰는 앞글이다. 뒤에 붙는 복구 안내(ADR-092)는 끝 줄 규칙의 대상이 아니다(docs/features/tool-fallback/design.md 의 DECISION2). */
+    static final String ENDED_LEAD = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
+    static final String ENDED = ToolFailureText.askUser(ENDED_LEAD).text();
     static final String RUNNING = "이미 이어 가는 중이다. 새로 준비하지 말고 그 결과를 기다린다.";
-    static final String RETRY = "지금은 플러그인 상태를 확인하지 못해 이어 가지 않았다. 승인은 그대로다. 사용자에게 잠시 뒤 다시 하겠다고 알리고 새로 준비하지 않는다.";
-    static final String SENT = "같은 승인으로 이어 가기를 보냈지만 결과를 읽지 못했다. 새로 준비하지 말고 사용자에게 승인 카드와 「내 브라우저」 를 확인해 달라고 한다.";
+    static final String RETRY = ToolFailureText.askUser("지금은 플러그인 상태를 확인하지 못해 이어 가지 않았다. 승인은 그대로다. 사용자에게 잠시 뒤 다시 하겠다고 알리고 새로 준비하지 않는다.").text();
+    static final String SENT = ToolFailureText.askUser("같은 승인으로 이어 가기를 보냈지만 결과를 읽지 못했다. 새로 준비하지 말고 사용자에게 승인 카드와 「내 브라우저」 를 확인해 달라고 한다.").text();
 
     private final ConnectorFinancialApproval approval;
     private final ConnectorExecutionCurrent current;
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
-    private final PurchaseLimits purchases;
     private final HermesConnectorClient hermes;
     private final ConnectorApprovalBrowser browsers;
     private final ConnectorActionResultSource results;
@@ -138,9 +139,6 @@ class ConnectorApprovalResume implements ApprovalResumes {
         if (started.isEmpty()) {
             return render(user, conversationId, actionId, RUNNING);
         }
-        if (started.get().snapshot() == null) {
-            return render(user, conversationId, actionId, ENDED);
-        }
         approval.run(user, actionId, prepared.context(), prepared.manifest(), started.get().snapshot(), started.get().resume());
         return render(user, conversationId, actionId, SENT);
     }
@@ -158,10 +156,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
     }
 
 
-    /**
-     * 잠근 줄을 다시 보고 이어 간다. 줄이 바뀌었으면 빈 값, 그 순간의 상한에 걸려 끝냈으면 snapshot 이 없는 값이다(spec DECISION19).
-     * 자기 줄을 뺀 오늘 합계로 본다. 뒤의 claim 이 승인 날짜의 합계로 한 번 더 보므로 둘 다 지나야 「구매하기」 를 누른다.
-     */
+    /** 잠근 줄을 다시 보고 이어 간다. 줄이 바뀌었으면 빈 값이다. */
     private Optional<Started> begin(CurrentUser user, Long conversationId, UUID actionId, Prepared prepared) {
         users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
         var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
@@ -175,14 +170,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
         ConnectorExecutionSnapshot checked = current.validateLocked(prepared.context(), prepared.catalog(), action, row);
         conflicts.requireAvailable(row.requestKey(), action.id());
         gate.requireOpen();
-        long expected = checked.expectedTotalKrw().orElseThrow(ConnectorFinancialProducer::rejected);
-        try {
-            purchases.requireWithin(action.userId(), action.id(), expected, now);
-        } catch (PurchaseLimitExceeded ex) {
-            ConnectorCheckoutOutcome.limited(action, ex, expected, bodies, now);
-            settled(action, now);
-            return Optional.of(new Started(null, null));
-        }
+        require(checked.expectedTotalKrw().isPresent());
         var resume = new ConnectorApprovedExecution.Resume(action.handoff().tab(), action.waiting().step());
         action.resume(now);
         return Optional.of(new Started(checked, resume));
@@ -190,8 +178,8 @@ class ConnectorApprovalResume implements ApprovalResumes {
 
 
     /**
-     * 수명이 다했거나 남긴 탭이 있던 브라우저가 꺼진 사람 기다림을 끝낸다(spec REQ9). 일정이 1분마다 부른다. 끝낸 줄은 하루 합계에서
-     * 빠진다. 모델은 이미 멈춤을 전해 받았으므로 다시 깨우지 않는다. 다음 이어 가기는 이어 갈 승인이 없다는 답을 받아 새로 준비한다.
+     * 수명이 다했거나 남긴 탭이 있던 브라우저가 꺼진 사람 기다림을 끝낸다(spec REQ9). 일정이 1분마다 부른다.
+     * 모델은 이미 멈춤을 전해 받았으므로 다시 깨우지 않는다. 다음 이어 가기는 이어 갈 승인이 없다는 답을 받아 새로 준비한다.
      *
      * @return 끝낸 줄 수
      */
@@ -251,7 +239,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
             return fallback;
         }
         String input = rendered.get(0).input();
-        return Objects.equals(fallback, ENDED) ? ENDED + "\n" + input : input;
+        return Objects.equals(fallback, ENDED) ? ENDED_LEAD + "\n" + input : input;
     }
 
 

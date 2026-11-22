@@ -16,6 +16,7 @@ import {
 } from "@/lib/connection";
 import { readJsonBody } from "@/lib/json-body";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
+import { safeAuth, safeOAuth, safeRevoke } from "@/lib/connection-oauth";
 
 /** Control Plane 의 오류 본문을 브라우저에 그대로 전달하지 않는다. 표에 없는 코드는 연결 실패로 바꾼다. */
 export function connectionResponse<T>(result: ControlPlaneResult<T>) {
@@ -178,6 +179,8 @@ function safeBindings(value: unknown) {
       agentName: text(item.agentName),
       status: bindingStatus(item.status),
       restartRequired: bool(item.restartRequired),
+      // 옛 Control Plane 은 이 칸을 내지 않는다. 없으면 실패가 아니다.
+      applyFailed: bool(item.applyFailed ?? false),
     };
   });
 }
@@ -218,6 +221,7 @@ function safeSummary(value: unknown) {
     standardPlugin: item.standardPlugin === true,
     singleBinding: item.singleBinding === true,
     ownerBrowser: item.ownerBrowser === true,
+    oauth: safeOAuth(item.oauth),
   };
 }
 
@@ -266,9 +270,7 @@ function listedCount(value: unknown): number | null {
 }
 
 function undeclaredCount(value: unknown): number {
-  return Number.isSafeInteger(value) && (value as number) >= 0
-    ? (value as number)
-    : 0;
+  return listedCount(value) ?? 0;
 }
 
 function safeField(value: unknown) {
@@ -310,6 +312,8 @@ function safeConnection(value: unknown) {
     undeclaredTools: undeclaredCount(item.undeclaredTools),
     listedTools: listedCount(item.listedTools),
     readOnlyTools: listedCount(item.readOnlyTools),
+    auth: safeAuth(item.auth),
+    oauthRevoke: safeRevoke(item.oauthRevoke),
   };
 }
 
@@ -319,6 +323,9 @@ function safeAdmin(value: unknown) {
     throw new Error();
   const since = nullableText(item.restartRequiredSince);
   if (since !== null && !Number.isFinite(Date.parse(since))) throw new Error();
+  const waiting = nullableText(item.waitingSince ?? null);
+  if (waiting !== null && !Number.isFinite(Date.parse(waiting)))
+    throw new Error();
   return {
     connectorId: connectorId(item.connectorId),
     userId: item.userId as number,
@@ -328,6 +335,10 @@ function safeAdmin(value: unknown) {
     restartRequired: bool(item.restartRequired),
     restartRequiredSince: since,
     undeclaredTools: undeclaredCount(item.undeclaredTools),
+    // 옛 Control Plane 은 아래 칸을 내지 않는다. 그때는 지금처럼 PENDING 줄을 모두 다시 확인할 수 있게 둔다.
+    applyFailed: bool(item.applyFailed ?? false),
+    waitingSince: waiting,
+    recheckable: bool(item.recheckable ?? item.status === "PENDING"),
   };
 }
 
@@ -356,6 +367,7 @@ function safeAgentConnection(value: unknown) {
         ? null
         : bindingStatus(item.status),
     restartRequired: bool(item.restartRequired),
+    applyFailed: bool(item.applyFailed ?? false),
     toolCount: count(item.toolCount),
     skills: list(item.skills ?? []).map(text),
     // 옛 Control Plane 은 이 칸을 내지 않는다. 없으면 빈 목록이다.

@@ -58,6 +58,7 @@ public class MemoryCaptureService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
+    private final MemoryReplacements replacements;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -118,19 +119,33 @@ public class MemoryCaptureService {
             throw ex;
         }
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
-        record(saved.id(), user, request, kind, direct ? saved.revision() : null);
+        // 합치기: 바로 저장은 같은 트랜잭션에서 옛 기억을 대신하고, 제안은 받아들일 때 대신할 번호만 기록에 둔다(설계 DECISION5)
+        List<Long> replaced = direct
+            ? replacements.supersede(user, access, saved.id(), request.replaces())
+            : replacements.replaceable(user, access, request.replaces(), saved.id());
+        record(saved.id(), user, request, kind, direct ? saved.revision() : null, null, replaced);
         if (!direct) {
             // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
             feedback.record(MemoryProposalFeedback.of(
                 user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
         }
         return new MemoryRememberResult(
-            direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
+            direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED,
+            saved.id(),
+            replaced,
+            notReplaced(request.replaces(), replaced));
+    }
+
+
+    /** 요청한 번호 가운데 대신하지 못한 것을 요청한 순서로 낸다. */
+    private static List<Long> notReplaced(List<Long> requested, List<Long> replaced) {
+        return requested.stream().distinct().filter(id -> !replaced.contains(id)).toList();
     }
 
 
     /**
-     * 한 대화에서 요청자가 남긴 기록과 그 항목을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다.
+     * 한 대화에서 요청자가 남긴 기록과 그 항목을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다. 합친 기록에는 대신한 옛 기억 가운데 요청자가 지금
+     * 읽을 수 있는 것의 제목을 붙인다.
      *
      * @param conversationId 요청자의 대화임을 부르는 쪽이 확인한 번호
      */
@@ -147,10 +162,30 @@ public class MemoryCaptureService {
             .stream()
             .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
             .collect(Collectors.toMap(Memory::id, Function.identity()));
+        Map<Long, String> titles = replacements.titlesOf(user, rows.stream()
+            .flatMap(row -> row.replacedMemoryIds().stream())
+            .distinct()
+            .toList());
         return rows.stream()
             .filter(row -> byId.containsKey(row.memoryId()))
-            .map(row -> new CapturedMemory(row, byId.get(row.memoryId())))
+            .map(row -> new CapturedMemory(row, byId.get(row.memoryId()), shownReplaced(user, row, byId.get(row.memoryId()))
+                .stream()
+                .filter(titles::containsKey)
+                .map(titles::get)
+                .toList()))
             .toList();
+    }
+
+
+    /**
+     * 기록 줄에 보일 대신한 번호다. 아직 받아들이지 않은 제안은 받아들일 때 다시 판정하므로, 그 사이 다른 합치기로 대체되거나 바뀐 기억은 빼고 지금 대신할 수
+     * 있는 번호만 보인다.
+     */
+    private List<Long> shownReplaced(CurrentUser user, MemoryCapture row, Memory memory) {
+        if (row.replacedMemoryIds().isEmpty() || memory.status() != MemoryStatus.PROPOSED) {
+            return row.replacedMemoryIds();
+        }
+        return replacements.replaceable(user, MemoryAccess.owner(), row.replacedMemoryIds(), memory.id());
     }
 
 
@@ -177,6 +212,46 @@ public class MemoryCaptureService {
         capture.undo(clock.instant());
         captures.save(capture);
         log.info("memory capture undone userId={} captureId={} kind={}", user.id(), captureId, capture.kind());
+    }
+
+
+    /**
+     * 한 기억을 고친 기록 여럿을 한 번에 되돌린다. 가장 먼저 고치기 전의 판으로 돌리고 그 기록들을 모두 되돌린 것으로 적는다. 평가 전용 사용자의 평가 대화가 고친
+     * 것을 비울 때 쓴다(docs/features/agent-quality/design.md 의 「비우기」). 하나씩 되돌리면 앞 기록을 되돌릴 때 판이 맞지 않아 막힌다.
+     *
+     * @param captureIds 같은 기억을 고친({@code UPDATED}) 요청자의 기록
+     * @throws ApiException 남의 기록이거나 없거나 다른 기억의 기록이면 MEMORY_NOT_FOUND, 돌아갈 판이 없거나 읽을 수 없으면 MEMORY_REVISION_CONFLICT
+     */
+    @Transactional
+    public void undoUpdates(CurrentUser user, Long memoryId, List<Long> captureIds) {
+        List<MemoryCapture> rows = captures.findAllById(captureIds).stream()
+            .filter(row -> !row.undone())
+            .toList();
+        if (rows.isEmpty()) {
+            return;
+        }
+        for (MemoryCapture row : rows) {
+            if (!row.userId().equals(user.id()) || !row.memoryId().equals(memoryId) || row.kind() != MemoryCaptureKind.UPDATED) {
+                throw notFound();
+            }
+        }
+        Memory memory = memories.findByIdForUpdate(memoryId).orElseThrow(MemoryCaptureService::notFound);
+        if (!Objects.equals(memory.ownerUserId(), user.id()) || memory.scope() != MemoryScope.USER) {
+            throw notFound();
+        }
+        int first = rows.stream().mapToInt(MemoryCapture::baseRevision).min().orElseThrow();
+        MemoryRevision before = revisions
+            .findById(new MemoryRevisionId(memoryId, first))
+            .orElseThrow(() -> conflict("the previous revision is missing"));
+        if (!before.readable()) {
+            throw conflict("an unreadable revision is not restored here");
+        }
+        memoryService.revise(user, memory, before.content(), before.summary(), before.retrieval());
+        for (MemoryCapture row : rows) {
+            row.undo(clock.instant());
+            captures.save(row);
+        }
+        log.info("memory updates undone userId={} memoryId={} count={}", user.id(), memoryId, rows.size());
     }
 
 
@@ -275,9 +350,20 @@ public class MemoryCaptureService {
 
     /**
      * 같은 제목과 본문의 줄이 이미 있을 때다. 승인 전의 제안을 사용자가 지금 직접 말했으면 받아들인 것으로 본다. 거절한 줄은 다시
-     * 만들지 않는다.
+     * 만들지 않는다. 새 항목을 만들지 않은 결과면 이번 호출의 {@code replaces} 는 모두 대신하지 못한 번호로 알린다(스펙 REQ6). 모델이
+     * 합쳤다고 잘못 답하지 않게 한다.
      */
     private MemoryRememberResult existingOutcome(
+        CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
+        MemoryRememberResult result = existingOutcomeOf(user, existing, direct, request);
+        if (result.outcome() == MemoryRememberOutcome.REMEMBERED || request.replaces().isEmpty()) {
+            return result;
+        }
+        return new MemoryRememberResult(result.outcome(), result.memoryId(), List.of(), notReplaced(request.replaces(), List.of()));
+    }
+
+
+    private MemoryRememberResult existingOutcomeOf(
         CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
         return switch (existing.status()) {
             case ACCEPTED -> new MemoryRememberResult(
@@ -292,8 +378,13 @@ public class MemoryCaptureService {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());
-                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED);
-                yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
+                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED, List.of());
+                // 합치기 번호는 제안 때 기록한 것을 쓴다. 이번 호출의 replaces 가운데 그 밖의 번호는 대신하지 못한 것으로 알린다
+                List<Long> replaced = captures.findFirstByMemoryIdAndKindOrderByIdDesc(memory.id(), MemoryCaptureKind.PROPOSED)
+                    .map(MemoryCapture::replacedMemoryIds)
+                    .orElse(List.of());
+                yield new MemoryRememberResult(
+                    MemoryRememberOutcome.REMEMBERED, memory.id(), replaced, notReplaced(request.replaces(), replaced));
             }
         };
     }
@@ -307,7 +398,7 @@ public class MemoryCaptureService {
 
     private void record(
         Long memoryId, CurrentUser user, MemoryRememberRequest request, MemoryCaptureKind kind, Integer base) {
-        record(memoryId, user, request, kind, base, null);
+        record(memoryId, user, request, kind, base, null, List.of());
     }
 
 
@@ -317,7 +408,8 @@ public class MemoryCaptureService {
         MemoryRememberRequest request,
         MemoryCaptureKind kind,
         Integer base,
-        MemoryStatus previousStatus) {
+        MemoryStatus previousStatus,
+        List<Long> replaced) {
         captures.save(MemoryCapture.of(
             memoryId,
             user.id(),
@@ -326,13 +418,15 @@ public class MemoryCaptureService {
             kind,
             base,
             previousStatus,
-            request.externalRead()));
+            request.externalRead())
+            .replacing(replaced));
         log.info(
-            "memory captured userId={} memoryId={} executionId={} kind={}",
+            "memory captured userId={} memoryId={} executionId={} kind={} replaced={}",
             user.id(),
             memoryId,
             request.executionId(),
-            kind);
+            kind,
+            replaced);
     }
 
 

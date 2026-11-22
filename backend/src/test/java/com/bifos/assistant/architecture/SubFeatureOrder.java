@@ -18,9 +18,9 @@ final class SubFeatureOrder {
     /** 기능마다 하위 기능의 순서. 아래에서 위로 적는다. */
     static final Map<String, List<String>> ORDER = Map.of(
         "chat", List.of(
-            "conversation", "delivery", "modelchoice", "attachment", "artifact", "contentdraft",
+            "conversation", "delivery", "modelchoice", "attachment", "artifact", "contentdraft", "reply",
             "starter", "room", "turn", "nextturn", "recovery", "purge"),
-        "connector", List.of("connection", "action", "financial", "contentdraft", "approval", "handoff"),
+        "connector", List.of("connection", "oauth", "action", "financial", "contentdraft", "approval", "handoff"),
         "proactive", List.of("check"),
         "usage", List.of("pricing", "execution", "subagent", "tree", "summary"),
         "skill", List.of("usage", "library", "upload"));

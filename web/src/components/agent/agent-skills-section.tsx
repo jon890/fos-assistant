@@ -170,7 +170,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
   return (
     <section
       aria-label="스킬"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -207,7 +207,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
           {error}
         </Notice>
       ) : null}
-      {list.skills.filter((skill) => admin || skill.source === "UPLOADED")
+      {list.skills.filter((skill) => admin || skill.source !== "HERMES")
         .length === 0 ? (
         <Notice variant="info" className="mt-4">
           {editable && !list.skillsToolsetEnabled
@@ -217,7 +217,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
       ) : (
         <ul className="mt-4 divide-y divide-border rounded-md border border-border">
           {list.skills
-            .filter((skill) => admin || skill.source === "UPLOADED")
+            .filter((skill) => admin || skill.source !== "HERMES")
             .map((skill) => {
               const usage = usageText(skill);
               const uploaded = skill.source === "UPLOADED";
@@ -243,7 +243,8 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                         </p>
                       )}
                       <Badge variant="outline">
-                        {uploaded ? "올린 스킬" : "기본 스킬"}
+                        {skill.connectorTitle ??
+                          (uploaded ? "올린 스킬" : "기본 스킬")}
                       </Badge>
                     </div>
                     {skill.description ? (
@@ -282,7 +283,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                       </div>
                     ) : null}
                   </div>
-                  {editable ? (
+                  {editable && skill.source !== "CONNECTOR" ? (
                     <Switch
                       checked={skill.enabled}
                       loading={

@@ -2,11 +2,13 @@
 // 기준은 docs/features/answer-quality/spec.md 의 DECISION10 이, 세는 규칙은 docs/features/answer-quality.md 의 「답변 품질 평가」 가 갖는다.
 import type { ExecutionNode, MessageView } from "../control-plane.ts";
 
-export type Check = "sources" | "date" | "none";
+export type Check = "sources" | "date" | "none" | "photo-request";
 export type Question = { id: string; category: string; messages: string[]; check: Check; compare: boolean };
 /** 링크 하나를 열어 본 결과다. `unknown` 은 자동 요청을 막은 사이트라 열렸는지 모르는 것이다. */
 export type LinkState = "open" | "closed" | "unknown";
 export type ToolCounts = { search: number; searchFailed: number; extract: number; extractFailed: number };
+/** 도구 호출 수와 도구를 부른 차례 수다. 차례 하나는 모델 응답 한 번이 함께 부른 도구 묶음이다. */
+export type ToolRounds = { calls: number; rounds: number };
 export type Verdict = "similar" | "lacking";
 export type Comparison = { id: string; verdict: Verdict; note: string };
 export type QuestionScore = {
@@ -23,6 +25,8 @@ export type QuestionScore = {
   unknownLinks: number;
   latencyMs: number | null;
   tools: ToolCounts;
+  /** 도구 차례 칸이다. 칸이 생기기 전 보고서를 다시 쓴 문항에는 없다. */
+  rounds?: ToolRounds;
   /** 형식 참고 칸이다. 통과 판정에 쓰지 않는다. 칸이 생기기 전 보고서를 다시 쓴 문항에는 없다. */
   format?: FormatCheck;
 };
@@ -46,6 +50,12 @@ export type SetScore = {
   /** 형식 참고 칸을 하나라도 어긴 문항 수와 형식을 본 문항 수다. 통과 판정에 쓰지 않는다. */
   formatViolations: number;
   formatChecked: number;
+  /** 속도 참고 칸이다. 통과 판정에 쓰지 않는다. 걸린 시간을 아는 문항의 평균 초, 도구 차례를 센 문항 수와 그 문항들의 호출과 차례의 합, 출처 링크의 합이다. */
+  averageSeconds: number | null;
+  roundsChecked: number;
+  toolCalls: number;
+  toolRounds: number;
+  sourceLinks: number;
   reasons: string[];
 };
 
@@ -226,11 +236,49 @@ export function toolCounts(root: ExecutionNode): ToolCounts {
   return counts;
 }
 
+/**
+ * 실행 트리 전체의 도구 호출 수와 차례 수를 센다. 실행마다 사건 순서대로 읽어, 끝 사건 없이 이어진 시작 사건을 한 차례로 센다.
+ * Hermes 는 한 응답이 함께 부른 도구를 동시에 돌려 시작 사건이 먼저 몰리고, 하나씩 부르면 시작과 끝이 번갈아 온다.
+ * 아주 빨리 끝난 도구가 묶음 중간에 끝 사건을 내면 한 차례가 둘로 세어질 수 있어 참고 값이다.
+ */
+export function toolRounds(root: ExecutionNode): ToolRounds {
+  const result: ToolRounds = { calls: 0, rounds: 0 };
+  const visit = (node: ExecutionNode) => {
+    let previousStarted = false;
+    for (const event of node.events) {
+      const started = event.eventType === "TOOL_STARTED";
+      if (started) {
+        result.calls++;
+        if (!previousStarted) result.rounds++;
+      }
+      if (started || event.eventType === "TOOL_COMPLETED") previousStarted = started;
+    }
+    node.children.forEach(visit);
+  };
+  visit(root);
+  return result;
+}
+
 /** HTTP 상태로 링크를 나눈다. 403 과 429 는 자동 요청을 막은 것이라 틀린 링크로 세지 않는다. 상태가 없으면 연결 실패나 시간 초과다. */
 export function linkState(status: number | null): LinkState {
   if (status === null) return "closed";
   if (status === 403 || status === 429) return "unknown";
   return status >= 200 && status < 400 ? "open" : "closed";
+}
+
+/** 사진이나 링크를 보내 달라고 부탁하는 말이 있는가(스펙 tool-fallback REQ7, agent-found-image REQ6). 사진을 받지 못해 그리지 않고 대안을 알린 답을 알아본다. 「사진을 올려 주세요」, 「링크를 보내 주시면」 을 받는다. 「링크를 공유합니다」 처럼 부탁이 아닌 말은 받지 않는다. */
+// 부탁하는 끝맺음만 받는다. 「보내 주실 필요는 없어요」, 「보내 주지 않아도 돼요」 같은 부정은 받지 않는다.
+const PHOTO_REQUEST = /(사진|이미지|링크|주소)[^\n]{0,40}(보내|올려|첨부해|공유해|붙여) ?(주세요|주시면|주실 수|주시겠|줄래|주면|달라)/;
+
+export function asksForPhoto(text: string): boolean {
+  return PHOTO_REQUEST.test(text);
+}
+
+/** 실행 트리에서 그림 만들기 도구가 실패 없이 끝난 적이 있는가. 막힌 호출은 사건이 남지 않으므로 끝 사건이 있으면 그림을 만든 것이다. */
+export function drewImage(root: ExecutionNode | null): boolean {
+  if (!root) return false;
+  if (root.events.some((event) => event.eventType === "TOOL_COMPLETED" && event.toolName === "image_generate" && !event.failed)) return true;
+  return root.children.some(drewImage);
 }
 
 export function scoreQuestion(
@@ -244,7 +292,13 @@ export function scoreQuestion(
   const states = urls.map((url) => links.get(url) ?? "closed");
   const answers = Array.isArray(answer) ? answer : [answer];
   const passed =
-    question.check === "none" ? true : question.check === "date" ? answers.some((text) => mentionsDate(text, startedAt)) : urls.length > 0;
+    question.check === "none"
+      ? true
+      : question.check === "date"
+        ? answers.some((text) => mentionsDate(text, startedAt))
+        : question.check === "photo-request"
+          ? drewImage(root) || answers.some(asksForPhoto)
+          : urls.length > 0;
   return {
     id: question.id,
     category: question.category,
@@ -257,6 +311,7 @@ export function scoreQuestion(
     unknownLinks: states.filter((state) => state === "unknown").length,
     latencyMs: root?.latencyMs ?? null,
     tools: root ? toolCounts(root) : { search: 0, searchFailed: 0, extract: 0, extractFailed: 0 },
+    rounds: root ? toolRounds(root) : { calls: 0, rounds: 0 },
     format: formatCheck(answer),
   };
 }
@@ -304,12 +359,21 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
   if (checkedLinks > 0 && openLinks / checkedLinks < OPEN_LINK_RATIO)
     reasons.push(`열린 링크 ${openLinks}/${checkedLinks} (기준 90% 이상)`);
   if (!datePassed) reasons.push("오늘 날짜 문항이 그날 날짜로 답하지 않았다");
+  const photoMissed = scores.filter((score) => score.check === "photo-request" && !score.passed && !score.error).length;
+  if (photoMissed > 0) reasons.push(`사진을 찾아 그려 달라는 문항 ${photoMissed}개가 그림을 만들지도, 사진이나 링크를 보내 달라고 하지도 않았다`);
   const similarNeeded = Math.ceil(compareIds.size * SIMILAR_RATIO - 1e-9);
   const compareDone = given.length >= compareIds.size;
   if (compareDone && similar < similarNeeded) reasons.push(`「비슷하다」 ${similar}/${compareIds.size} (기준 ${similarNeeded} 이상)`);
   const formatted = scores.filter((score) => score.format !== undefined);
   const formatViolations = formatted.filter((score) => violatesFormat(score.format!)).length;
   const errors = scores.filter((score) => score.error).length;
+  const timed = scores.filter((score) => score.latencyMs !== null);
+  const averageSeconds = timed.length === 0 ? null : timed.reduce((sum, score) => sum + score.latencyMs!, 0) / timed.length / 1000;
+  // 칸이 생기기 전 보고서를 다시 쓴 문항은 도구 차례를 세지 않았으므로 합계에서 뺀다
+  const counted = scores.filter((score) => score.rounds !== undefined);
+  const toolCalls = counted.reduce((sum, score) => sum + score.rounds!.calls, 0);
+  const toolRoundCount = counted.reduce((sum, score) => sum + score.rounds!.rounds, 0);
+  const sourceLinkCount = scores.reduce((sum, score) => sum + score.sourceLinks, 0);
   let outcome: SetOutcome;
   if (errors > 0) {
     outcome = "ERROR";
@@ -332,6 +396,11 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
     compareTotal: compareIds.size,
     formatViolations,
     formatChecked: formatted.length,
+    averageSeconds,
+    roundsChecked: counted.length,
+    toolCalls,
+    toolRounds: toolRoundCount,
+    sourceLinks: sourceLinkCount,
     reasons,
   };
 }
@@ -349,6 +418,15 @@ const OUTCOME_TEXT: Record<SetOutcome, string> = {
   FAIL: "기준 미달",
   ERROR: "오류",
 };
+
+function perRound(calls: number, rounds: number): string {
+  return rounds === 0 ? "-" : (calls / rounds).toFixed(2);
+}
+
+function toolSummary(set: SetScore): string {
+  if (set.roundsChecked === 0) return "도구 차례 미집계";
+  return `도구 차례를 센 문항 ${set.roundsChecked}개에서 도구 ${set.toolCalls}번을 ${set.toolRounds}차례에 불렀다(차례당 ${perRound(set.toolCalls, set.toolRounds)}개)`;
+}
 
 function seconds(latencyMs: number | null): string {
   return latencyMs === null ? "-" : `${Math.round(latencyMs / 1000)}초`;
@@ -369,13 +447,14 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     `- 사람 비교: 「비슷하다」 ${set.similar}/${set.compareTotal} (적은 것 ${set.compared}개)`,
     ...set.reasons.map((reason) => `- ${set.outcome === "PARTIAL" ? "참고" : "미달"}: ${reason}`),
     `- 형식 참고(통과 기준 아님): 어긴 문항 ${set.formatViolations}/${set.formatChecked}`,
+    `- 속도 참고(통과 기준 아님): 평균 걸린 시간 ${set.averageSeconds === null ? "-" : `${Math.round(set.averageSeconds)}초`}, ${toolSummary(set)}, 출처 링크 합 ${set.sourceLinks}개`,
     "",
-    "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) | 도구 차례(호출) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...scores.map((score) => {
       const result = score.error ? `오류: ${score.error}` : score.passed ? "통과" : "미달";
       const tools = score.tools;
-      return `| ${score.id} | ${score.category} | ${score.check} | ${result} | ${score.sourceLinks} | ${score.openLinks} | ${score.closedLinks} | ${score.unknownLinks} | ${seconds(score.latencyMs)} | ${tools.search}(${tools.searchFailed}) | ${tools.extract}(${tools.extractFailed}) |`;
+      return `| ${score.id} | ${score.category} | ${score.check} | ${result} | ${score.sourceLinks} | ${score.openLinks} | ${score.closedLinks} | ${score.unknownLinks} | ${seconds(score.latencyMs)} | ${tools.search}(${tools.searchFailed}) | ${tools.extract}(${tools.extractFailed}) | ${score.rounds ? `${score.rounds.rounds}(${score.rounds.calls})` : "-"} |`;
     }),
     "",
     "## 형식 참고",

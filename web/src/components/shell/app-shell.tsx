@@ -38,6 +38,7 @@ import {
 } from "./sidebar-collapsed";
 import { NotificationsProvider } from "@/components/notification/notifications-provider";
 import { MobileTopBar } from "./mobile-top-bar";
+import { NowStatusProvider } from "./now-status";
 import { TitleSlotContext, useTitleSlotState } from "./title-slot";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
@@ -360,9 +361,18 @@ export function AppShell({
               {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
               <ConversationsProvider enabled={signedIn && !inAdminArea}>
                 <NotificationsProvider enabled={signedIn && !inAdminArea}>
-                  <ShellBody signedIn={signedIn} hasSession={hasSession}>
-                    {children}
-                  </ShellBody>
+                  {/* 설정 틀에는 「지금 볼 것」 단추가 없어 수를 읽지 않는다. */}
+                  <NowStatusProvider
+                    enabled={
+                      signedIn &&
+                      !inAdminArea &&
+                      !isSettingsArea(pathname, hasSession)
+                    }
+                  >
+                    <ShellBody signedIn={signedIn} hasSession={hasSession}>
+                      {children}
+                    </ShellBody>
+                  </NowStatusProvider>
                 </NotificationsProvider>
               </ConversationsProvider>
             </AppNameContext.Provider>

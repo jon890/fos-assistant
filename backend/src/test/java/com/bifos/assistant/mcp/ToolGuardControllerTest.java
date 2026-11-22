@@ -43,6 +43,9 @@ class ToolGuardControllerTest {
 
         assertThat(response.decision()).isEqualTo("block");
         assertThat(response.message()).isNotBlank();
+        // 판정 실패는 같은 호출을 다시 부르지 않는 다음 방법으로 끝난다(docs/features/tool-fallback/spec.md 의 DECISION10)
+        assertThat(ToolFailureCoverageTest.endsWithStep(response.message())).isTrue();
+        assertThat(response.message()).endsWith("없으면 잠시 뒤 다시 해 달라고 알린다");
     }
 
 

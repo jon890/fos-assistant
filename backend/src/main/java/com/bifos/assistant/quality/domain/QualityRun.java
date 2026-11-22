@@ -5,7 +5,6 @@ import com.bifos.assistant.quality.domain.type.QualityRunStatus;
 import com.bifos.assistant.quality.domain.type.QualityRunTrigger;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -19,6 +18,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -80,10 +80,11 @@ public class QualityRun extends CreatedAtEntity {
     @Column(name = "elapsed_ms")
     private Long elapsedMs;
 
-    @Convert(converter = FeatureResultsConverter.class)
+    /** 종류마다 모양이 다르다. 배포 뒤 확인은 기능 결과 배열({@link FeatureResultsConverter}), 평가는 {@link EvalResult} 다. */
+    @Getter(AccessLevel.NONE)
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "result_json", columnDefinition = "JSON")
-    private List<FeatureResult> results = new ArrayList<>();
+    private String resultJson;
 
     @Column(name = "requested_by_user_id", updatable = false)
     private Long requestedByUserId;
@@ -99,6 +100,21 @@ public class QualityRun extends CreatedAtEntity {
         run.status = QualityRunStatus.RUNNING;
         run.startedAt = now.truncatedTo(ChronoUnit.MICROS);
         run.requestedByUserId = requestedByUserId;
+        run.resultJson = kind == QualityRunKind.DEPLOY_CHECK ? FeatureResultsConverter.write(List.of()) : null;
+        return run;
+    }
+
+
+    /**
+     * 도는 평가 한 줄을 만든다. 문항 수는 고른 문항 수로 정하고 결과를 더해도 바꾸지 않는다.
+     *
+     * @param initial 단계와 묶음이 적힌 빈 결과
+     */
+    public static QualityRun startEval(
+        Long groupId, QualityRunTrigger trigger, Long requestedByUserId, int itemCount, EvalResult initial, Instant now) {
+        QualityRun run = start(groupId, QualityRunKind.EVAL, trigger, requestedByUserId, now);
+        run.itemCount = Math.max(0, itemCount);
+        run.resultJson = EvalResult.write(Objects.requireNonNull(initial, "initial"));
         return run;
     }
 
@@ -108,9 +124,31 @@ public class QualityRun extends CreatedAtEntity {
         requireRunning();
         List<FeatureResult> next = new ArrayList<>(results());
         next.add(Objects.requireNonNull(result, "result"));
-        results = next;
+        resultJson = FeatureResultsConverter.write(next);
         itemCount = next.size();
         modelCallCount += Math.max(0, modelCalls);
+    }
+
+
+    /** 평가 결과를 바꿔 적는다. 끝난 줄에는 적지 않는다. */
+    public void recordEval(EvalResult result, int modelCalls) {
+        requireRunning();
+        replaceEval(result);
+        modelCallCount += Math.max(0, modelCalls);
+    }
+
+
+    /** 끝난 평가의 결과를 고친다. 비우기 끝남 표시와 보관 기간 뒤 링크 비우기만 쓴다. 판정과 숫자는 부르는 쪽이 바꾸지 않는다. */
+    public void replaceEval(EvalResult result) {
+        requireKind(QualityRunKind.EVAL);
+        resultJson = EvalResult.write(Objects.requireNonNull(result, "result"));
+    }
+
+
+    /** 평가 결과다. 평가 줄이 아니면 예외다. */
+    public EvalResult evalResult() {
+        requireKind(QualityRunKind.EVAL);
+        return EvalResult.read(resultJson);
     }
 
 
@@ -128,17 +166,40 @@ public class QualityRun extends CreatedAtEntity {
 
     /** 30일이 지난 실패 기능의 대화와 실행 링크를 비운다. 결과와 숫자는 남는다. */
     public void dropLinks() {
-        results = results().stream().map(FeatureResult::withoutLinks).toList();
+        resultJson = FeatureResultsConverter.write(results().stream().map(FeatureResult::withoutLinks).toList());
     }
 
 
+    /**
+     * 지운 대화의 링크만 비운다. 지우지 못한 대화의 링크는 남겨 다음 정리가 다시 찾게 한다. 대화 없이 실행 번호만 남은 기능은 비운다.
+     *
+     * @param removed 지웠거나 이미 없는 대화의 공개 식별자
+     */
+    public void dropLinks(Set<UUID> removed) {
+        resultJson = FeatureResultsConverter.write(results().stream()
+            .map(result -> result.conversationPublicId() == null || removed.contains(result.conversationPublicId())
+                ? result.withoutLinks()
+                : result)
+            .toList());
+    }
+
+
+    /** 배포 뒤 확인의 기능 결과다. 배포 뒤 확인 줄이 아니면 예외다. */
     public List<FeatureResult> results() {
-        return results == null ? List.of() : List.copyOf(results);
+        requireKind(QualityRunKind.DEPLOY_CHECK);
+        return FeatureResultsConverter.read(resultJson);
     }
 
 
     public boolean running() {
         return status == QualityRunStatus.RUNNING;
+    }
+
+
+    private void requireKind(QualityRunKind expected) {
+        if (kind != expected) {
+            throw new IllegalStateException("quality run kind is " + kind + ", not " + expected);
+        }
     }
 
 

@@ -46,7 +46,7 @@ class McpConnectorListToolTest {
         Map<String, Object> result = tool.list(caller());
 
         assertThat(result).containsEntry("isError", true);
-        assertThat(text(result)).contains("/connections", "연결했다고 말하지 않고");
+        assertThat(text(result)).contains("/connections", "연결했다고 말하지 않는다");
     }
 
 

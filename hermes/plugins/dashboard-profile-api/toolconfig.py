@@ -31,6 +31,7 @@ from .sandbox import (
     SANDBOX_OWNER_RE,
     SANDBOX_TOOLSETS,
     _sandbox_policy,
+    _sandbox_profile_settings,
     _sandbox_terminal,
     _sandbox_unavailable,
     _sandbox_validate_attachment_snapshot,
@@ -203,7 +204,7 @@ async def _check_config_update(request):
         sandbox = _sandbox_policy()
         if sandbox is None:
             return _sandbox_unavailable()
-        if profile not in sandbox["profiles"]:
+        if _sandbox_profile_settings(sandbox, profile) is None:
             # local 로 켜면 셸이 Hermes 프로세스의 사용자로 돌아 다른 profile 의 .env 와 플러그인 값 파일에 닿는다.
             return _sandbox_unavailable("unlisted")
         if owner is None:

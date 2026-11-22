@@ -195,6 +195,14 @@ assistant:
       apply-cron: "*/30 * * * * *"
       # READY 바인딩의 설치가 manifest 와 어긋났는지 읽고 다시 설치하는 주기(ADR-20261009 / connector-install-drift)
       drift-cron: "0 */10 * * * *"
+      # 자동 대기가 이만큼 지나도 READY 가 되지 않으면 그룹 관리자에게 한 번 알린다(ADR-20261120 / connector-auto-apply)
+      admin-alert-after: 24h
+    oauth:
+      # 단추로 만든 연결의 access token 을 만료 전에 갱신하는 주기(ADR-20261120 / connector-oauth)
+      refresh-cron: "0 5/10 * * * *"
+    ops:
+      # 운영 정기 작업이 공유 gateway 재시작 조회에 보내는 서비스 Bearer 토큰. 비어 있으면 조회는 늘 거절한다
+      token: ${CONNECTOR_OPS_TOKEN:}
   restart-reconcile:
     # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061). 끄면 그 줄이 그대로 남는다
     enabled: true
@@ -298,12 +306,6 @@ assistant:
     cleanup-cron: "0 30 4 * * *"
     # 사건이 없는 동안 알림 SSE 에 주석 줄을 보내는 간격. 앞단 프록시가 연결을 끊지 않게 한다
     stream-heartbeat: 20s
-  push:
-    # 웹 푸시 VAPID 키와 연락처(ADR-20261120 / web-push). 셋을 함께 채우거나 함께 비운다. 비우면 푸시가 꺼진 채 기동한다
-    vapid-public-key: ${ASSISTANT_PUSH_VAPID_PUBLIC_KEY:}
-    # 비밀 키 base64url 한 줄을 담은 파일의 경로. 비밀 키 값을 환경 변수나 데이터베이스에 두지 않는다
-    vapid-private-key-file: ${ASSISTANT_PUSH_VAPID_PRIVATE_KEY_FILE:}
-    subject: ${ASSISTANT_PUSH_SUBJECT:}
   task:
     # 발화기와 시작 단계가 도는 때(초 포함 6필드). 검사에서는 - 로 끈다
     dispatch-cron: "*/30 * * * * *"
@@ -395,6 +397,16 @@ assistant:
     retention: 365d
     # 보관 기간이 지난 판단 피드백 사건을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 45 4 * * *"
+  quality:
+    # 배포 뒤 확인의 기능 하나 마감. 넘으면 그 기능만 TIMED_OUT 이다(docs/features/agent-quality/design.md)
+    feature-timeout: ${ASSISTANT_QUALITY_FEATURE_TIMEOUT:10m}
+    # 실패한 기능의 평가 대화를 남기는 기간과, 지난 대화를 지우는 시각
+    link-retention: 30d
+    cleanup-cron: "0 15 5 * * *"
+    # 평가 묶음 파일을 읽는 폴더. e2e 가 테스트 묶음 폴더로 바꾼다
+    bundle-location: ${ASSISTANT_QUALITY_BUNDLE_LOCATION:classpath*:quality/bundles/}
+    # 있으면 모든 묶음의 문항 상한을 이 값으로 바꾼다. 테스트와 e2e 만 줄이고 운영은 비운다
+    eval-timeout-override: ${ASSISTANT_QUALITY_EVAL_TIMEOUT_OVERRIDE:}
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

@@ -13,6 +13,11 @@ export async function POST(request: Request) {
     agentCode?: string;
     attachmentIds?: number[];
     delegateTo?: string | null;
+    reply?: {
+      messageId: number;
+      attachmentId?: number | null;
+      imagePath?: string | null;
+    } | null;
   };
   if (!body.text || body.text.trim().length === 0) {
     return errorResponse(
@@ -37,6 +42,8 @@ export async function POST(request: Request) {
       agentCode: body.agentCode ?? null,
       attachmentIds: body.attachmentIds ?? [],
       delegateTo: body.delegateTo ?? null,
+      // 답장으로 집은 것(스펙 chat-reference). Control Plane 이 이 대화의 것인지 검사한다
+      reply: body.reply ?? null,
     },
   });
   if (!opened.ok) {

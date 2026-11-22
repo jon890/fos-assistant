@@ -91,10 +91,21 @@ public class LinkImageFetcher {
      * @throws LinkImageRejectedException 받지 못했을 때. 까닭은 {@link LinkImageRejectedException#reason()} 이다
      */
     public LinkImage fetch(URI link) {
+        return fetch(link, true);
+    }
+
+
+    /** 이미 읽은 페이지에서 고른 주소를 받는다. 이 주소에서 또 다른 페이지의 대표 사진을 고르지 않는다. */
+    public LinkImage fetchDirect(URI link) {
+        return fetch(link, false);
+    }
+
+
+    private LinkImage fetch(URI link, boolean readPage) {
         ArtifactSourceCancellation cancellation = new ArtifactSourceCancellation();
         Future<LinkImage> future;
         try {
-            future = executor.submit(() -> fetchLink(link, cancellation));
+            future = executor.submit(() -> fetchLink(link, readPage, cancellation));
         } catch (RejectedExecutionException ex) {
             throw reject(Reason.FAILED, "busy", host(link), ex);
         }
@@ -118,7 +129,7 @@ public class LinkImageFetcher {
     }
 
 
-    private LinkImage fetchLink(URI link, ArtifactSourceCancellation cancellation) throws IOException {
+    private LinkImage fetchLink(URI link, boolean readPage, ArtifactSourceCancellation cancellation) throws IOException {
         int[] redirects = {0};
         Fetched first = follow(link, redirects, cancellation);
         String html;
@@ -130,6 +141,9 @@ public class LinkImageFetcher {
             if (!"text/html".equals(type)) {
                 // 사진을 다른 종류로 적어 주는 이미지 서버가 있다. 머리 바이트가 받는 사진 형식일 때만 받는다.
                 return image(null, response, first.uri());
+            }
+            if (!readPage) {
+                throw reject(Reason.NO_IMAGE, "preview_not_image", first.uri().getHost(), null);
             }
             html = new String(readUpTo(response.body(), properties.maxPageBytes()), StandardCharsets.UTF_8);
         }

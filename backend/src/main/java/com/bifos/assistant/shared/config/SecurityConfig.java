@@ -51,11 +51,17 @@ public class SecurityConfig {
                 // 커넥터가 부르는 브라우저 중계다. 경로의 접근 표식이 인증이고 BrowserGateway 가 확인한다.
                 .requestMatchers("/internal/browser-gateway/**")
                 .permitAll()
+                // 단추로 연결한 플러그인이 부르는 토큰 통로다. 경로의 표식이 인증이고 ConnectorOAuthSigner 가 확인한다.
+                .requestMatchers(HttpMethod.GET, "/internal/connector-token/*")
+                .permitAll()
                 // 본문의 일회성 ticket은 claim controller가 직접 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/connector-executions/claim")
                 .permitAll()
                 // support는 controller에서 서비스 Bearer만 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/connector-executions/support")
+                .permitAll()
+                // 운영 정기 작업의 재시작 조회는 controller 에서 서비스 Bearer 만 인증한다.
+                .requestMatchers(HttpMethod.GET, "/internal/ops/connector-restart")
                 .permitAll()
                 // 원고 저장 worker 의 범위 ticket 은 authorize controller 가 직접 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/content-draft-jobs/authorize")
@@ -64,7 +70,8 @@ public class SecurityConfig {
                     "/internal/hermes/attachment-inspect",
                     "/internal/hermes/attachment-inspect/validate",
                     "/internal/hermes/generated-image",
-                    "/internal/hermes/image-source")
+                    "/internal/hermes/image-source",
+                    "/internal/hermes/found-links")
                 .hasRole("MCP")
                 .anyRequest()
                 .authenticated())

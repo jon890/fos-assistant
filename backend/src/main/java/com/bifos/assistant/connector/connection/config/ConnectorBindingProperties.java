@@ -15,13 +15,15 @@ import org.springframework.validation.annotation.Validated;
  * 차례로 돌므로 한 주기가 다른 예약 작업을 늦추는 크기를 이 값으로 묶는다
  * @param cycleIdleMax 그 서버만 껐다 켜기 전에 주인의 실행이 비기를 기다리는 최대 시간(ADR-20261120 / connector-auto-apply).
  * 지나면 실행이 돌아도 끈다. 사용자가 정한 값이다(스펙 DECISION18)
+ * @param adminAlertAfter 자동 대기가 이만큼 지나도 {@code READY} 가 되지 않으면 그룹 관리자에게 한 번 알린다. 사용자가 정한 값이다(스펙 DECISION8)
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.binding")
 public record ConnectorBindingProperties(
     @DefaultValue("150s") Duration applyDelay,
     @DefaultValue("20") int driftBatch,
-    @DefaultValue("10m") Duration cycleIdleMax) {
+    @DefaultValue("10m") Duration cycleIdleMax,
+    @DefaultValue("24h") Duration adminAlertAfter) {
 
     /**
      * 지연이 0 이하이면 기동을 멈춘다. gateway 가 연결하기 전에 확인해 바인딩이 늘 {@code PENDING} 으로 남는데 기동은 성공해 알아채지 못한다.
@@ -35,6 +37,10 @@ public record ConnectorBindingProperties(
         if (cycleIdleMax == null || cycleIdleMax.isNegative()) {
             throw new IllegalStateException(
                 "assistant.connector.binding.cycle-idle-max must not be negative: " + cycleIdleMax);
+        }
+        if (adminAlertAfter == null || adminAlertAfter.isZero() || adminAlertAfter.isNegative()) {
+            throw new IllegalStateException(
+                "assistant.connector.binding.admin-alert-after must be longer than zero: " + adminAlertAfter);
         }
         if (driftBatch < 1) {
             throw new IllegalStateException(

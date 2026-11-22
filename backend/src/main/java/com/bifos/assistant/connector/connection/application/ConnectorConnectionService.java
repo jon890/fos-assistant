@@ -1,27 +1,33 @@
 package com.bifos.assistant.connector.connection.application;
 
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
-import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.connection.application.dto.ConnectionOAuthRevoke;
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorOAuthSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOperationFailure;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorVerified;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
+import com.bifos.assistant.connector.connection.application.port.ConnectionOAuth;
+import com.bifos.assistant.connector.connection.domain.ConnectionFields;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.hermes.application.port.ConnectorOAuthFlowConflict;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorOAuth.VaultAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -33,8 +39,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -53,7 +59,6 @@ import tools.jackson.databind.JsonNode;
  * 다시 읽는다. 운영자가 목록을 바꾸면 바로 반영되어야 하고 호출이 드물기 때문이다. 순서와 실패 처리는
  * {@code docs/features/connector.md} 의 「설치와 실패 처리」 가 갖는다.
  */
-@Slf4j
 @Service
 public class ConnectorConnectionService {
     private static final String STEP_VAULT = "vault";
@@ -69,6 +74,7 @@ public class ConnectorConnectionService {
     private final ConnectorCallLimiter limiter;
     private final ConnectorActionService approvals;
     private final ConnectorVerifier verifier;
+    private final ConnectionOAuth oauth;
     private final Clock clock;
 
 
@@ -76,8 +82,9 @@ public class ConnectorConnectionService {
      * 연결 확인의 앞 트랜잭션이 본 것이다. 확인 도구를 부를지 정한다.
      *
      * @param vault 확인 도구가 값을 읽을 보관 파일. 값이 보관 파일에 없거나 해제된 연결이면 null
+     * @param oauth 단추 연결이면 확인 도구가 토큰을 받을 본 자리. 붙여 넣은 연결이면 null
      */
-    private record Prepared(String vault, Instant revision) {
+    private record Prepared(long connectionId, String vault, Instant revision, VaultAccess oauth) {
     }
 
     /**
@@ -105,7 +112,8 @@ public class ConnectorConnectionService {
         PlatformTransactionManager transactionManager,
         ConnectorCallLimiter limiter,
         ConnectorActionService approvals,
-        BrowserGatewayTokens tokens,
+        ConnectorVerifier verifier,
+        ConnectionOAuth oauth,
         Clock clock) {
         this.connections = connections;
         this.bindings = bindings;
@@ -115,7 +123,8 @@ public class ConnectorConnectionService {
         this.transactions = new TransactionTemplate(transactionManager);
         this.limiter = limiter;
         this.approvals = approvals;
-        this.verifier = new ConnectorVerifier(connector, tokens);
+        this.verifier = verifier;
+        this.oauth = oauth;
         this.clock = clock;
     }
 
@@ -147,7 +156,8 @@ public class ConnectorConnectionService {
                 manifest.ownerBrowserLoginUrl(),
                 manifest.schema() == ConnectorToolPolicies.STANDARD_SCHEMA,
                 manifest.singleBinding(),
-                manifest.ownerBrowser()));
+                manifest.ownerBrowser(),
+                ConnectorOAuthSummary.from(manifest.oauth(), manifest.oauth() != null && oauth.ready(manifest))));
         }
         mine.values().stream()
             .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
@@ -213,13 +223,28 @@ public class ConnectorConnectionService {
             ConnectorManifest manifest = requireManifest(connectorId);
             Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
             ListedTools listed = verifier.values(user.id(), manifest, accepted);
-            List<ConnectorBindingAttempt> started = bindingService.start(() -> apply(user, manifest, accepted, listed));
-            if (started == null) {
-                throw new ConnectorOperationFailure();
-            }
-            started.forEach(bindingService::execute);
-            return transactions.execute(status -> snapshot(requireConnection(user.id(), connectorId, true)));
+            return store(user, manifest, connection -> {
+                connector.putVault(connection.vault(), manifest.id(), accepted);
+                oauth.forget(connection);
+            }, ConnectorValues.stored(manifest, accepted), listed);
         });
+    }
+
+
+    /**
+     * 확인을 통과한 값을 잠금 안에서 반영하고 붙은 바인딩을 다시 설치한다. 붙여 넣기 등록과 단추 연결의 돌아오기가 함께 쓴다.
+     *
+     * @param write 보관 파일을 쓴다. 단추 연결은 대시보드 commit 이다. {@code ConnectorOAuthFlowConflict} 는 나중 흐름이 이긴 것이라
+     * 아무것도 바꾸지 않고 그대로 나간다. 그 밖의 실패는 연결을 {@code PENDING} 으로 남긴다
+     */
+    public ConnectionSnapshot store(
+        CurrentUser user, ConnectorManifest manifest, Consumer<ConnectorConnection> write, ConnectionFields fields, ListedTools listed) {
+        List<ConnectorBindingAttempt> started = bindingService.start(() -> apply(user, manifest, write, fields, listed));
+        if (started == null) {
+            throw new ConnectorOperationFailure();
+        }
+        started.forEach(bindingService::execute);
+        return transactions.execute(status -> snapshot(requireConnection(user.id(), manifest.id(), true)));
     }
 
 
@@ -230,7 +255,7 @@ public class ConnectorConnectionService {
      * @return 커밋할 설치 입력. 보관 파일을 쓰지 못해 {@code PENDING} 만 남겼으면 null. 예외로 알리면 그 커밋이 되돌려진다
      */
     private List<ConnectorBindingAttempt> apply(
-        CurrentUser user, ConnectorManifest manifest, Map<String, String> accepted, ListedTools listed) {
+        CurrentUser user, ConnectorManifest manifest, Consumer<ConnectorConnection> write, ConnectionFields fields, ListedTools listed) {
         AppUser owner = lock(user.id());
         Instant now = now();
         ConnectorConnection connection = connections
@@ -239,14 +264,16 @@ public class ConnectorConnectionService {
         // 다른 계정의 값으로 바꿀 수 있다. 앞선 값에 한 승인 요청과 상시 허락을 남기지 않는다(ADR-050).
         approvals.rejectPendingFor(connection, now);
         try {
-            connector.putVault(connection.vault(), manifest.id(), accepted);
+            write.accept(connection);
+        } catch (ConnectorOAuthFlowConflict ex) {
+            throw ex;
         } catch (RuntimeException ex) {
-            warn(STEP_VAULT, manifest.id(), ex);
+            ConnectorVerifier.warn(STEP_VAULT, manifest.id(), ex);
             connection.pending(now);
             connections.save(connection);
             return null;
         }
-        connection.connected(ConnectorValues.stored(manifest, accepted), now);
+        connection.connected(fields, now);
         // 앞선 상시 허락은 위에서 모두 거뒀다. 새 값으로 받은 읽기 표시만 남는다.
         connection.recordListedTools(listed);
         connections.save(connection);
@@ -256,7 +283,7 @@ public class ConnectorConnectionService {
 
 
     /**
-     * 연결을 해제한다. 붙은 바인딩을 모두 뗀 뒤 보관 파일을 지운다.
+     * 연결을 해제한다. 붙은 바인딩을 모두 뗀 뒤 단추 연결이면 서비스 쪽 허락 취소를 시도하고 보관 파일을 지운다.
      *
      * <p>바인딩마다 떼기가 성공하면 그 행을 바로 지운다. 중간에 실패하면 연결을 {@code PENDING} 으로 두고 연결 실패로
      * 끝낸다. 남은 바인딩의 profile 에는 값이 남아 있고 보관 파일도 그대로다. 다시 해제하면 남은 바인딩부터 이어서 뗀다.
@@ -264,26 +291,30 @@ public class ConnectorConnectionService {
      */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot disconnect(CurrentUser user, String connectorId) {
-        Optional<ConnectorManifest> manifest = findManifest(connectorId);
+        Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
         Instant now = now();
         approvals.rejectPendingFor(connection, now);
         String step = STEP_DETACH;
+        final ConnectionOAuthRevoke revoke;
         try {
             for (ConnectorBinding binding : bindings.findByConnectionId(connection.id())) {
                 bindingService.detach(binding);
             }
+            // 바인딩 떼기가 실패했을 때 허락만 사라지지 않게 모두 뗀 뒤에 취소한다. 취소가 실패해도 해제는 잇는다(스펙 REQ8).
+            revoke = oauth.revoke(connection, manifest);
             step = STEP_VAULT;
             connector.deleteVault(connection.vault());
         } catch (RuntimeException ex) {
-            warn(step, connectorId, ex);
+            ConnectorVerifier.warn(step, connectorId, ex);
             connection.pending(now);
             connections.save(connection);
             throw new ConnectorOperationFailure();
         }
+        oauth.forget(connection);
         connection.disconnected(now);
-        return ConnectionSnapshot.from(connections.save(connection), List.of());
+        return ConnectionSnapshot.from(connections.save(connection), List.of()).withOAuthRevoke(revoke);
     }
 
 
@@ -291,7 +322,7 @@ public class ConnectorConnectionService {
      * 보관 파일의 값으로 확인 도구를 부르고, 붙은 바인딩마다 설치와 반영을 맞춘다.
      *
      * <p>트랜잭션을 나눈다. 먼저 잠금 안에서 연결의 보관 파일 상태와 revision을 읽는다.
-     * 다음으로 트랜잭션 밖에서 확인 도구를 부른다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다. 끝으로 다시
+     * 다음으로 트랜잭션 밖에서 확인 도구를 부른다. 단추 연결은 그 전에 토큰을 새로 받고, 받지 못하면 그 오류로 끝낸다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다. 끝으로 다시
      * 잠그고 revision을 대조해 설치 시작을 커밋한 뒤 트랜잭션 밖에서 바인딩마다 설치를 맞춘다. 이 메서드에 {@code @Transactional} 을 붙이지 않는다.
      *
      * <p>확인 도구가 실패하면 연결을 {@code PENDING} 으로 커밋하고 공통 어휘의 오류로 끝낸다.
@@ -301,25 +332,14 @@ public class ConnectorConnectionService {
      */
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
         return limiter.call(user.id(), () -> {
-            Optional<ConnectorManifest> manifest = findManifest(connectorId);
+            Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
             Prepared prepared = transactions.execute(status -> prepare(user, connectorId, manifest.isPresent()));
             if (prepared == null) {
                 throw new ConnectorOperationFailure();
             }
-            ApiException verifyFailure = null;
-            boolean verified = false;
-            ListedTools listedTools = null;
-            if (prepared.vault() != null && manifest.isPresent()) {
-                ConnectorVerifier.Verified result = verifier.vault(user.id(), manifest.get(), prepared.vault());
-                verifyFailure = result.failure();
-                listedTools = result.listed();
-                verified = verifyFailure == null;
-            }
-            ApiException failure = verifyFailure;
-            boolean ready = verified;
-            ListedTools listed = listedTools;
-            Checked checked = bindingService.start(
-                () -> recordCheck(user, connectorId, manifest, prepared.revision(), new CheckResult(ready, failure, listed)));
+            CheckResult outcome = prepared.vault() == null || manifest.isEmpty()
+                ? new CheckResult(false, null, null) : verify(user, manifest.get(), prepared);
+            Checked checked = bindingService.start(() -> recordCheck(user, connectorId, manifest, prepared.revision(), outcome));
             if (checked == null) {
                 throw new ConnectorOperationFailure();
             }
@@ -338,14 +358,28 @@ public class ConnectorConnectionService {
     }
 
 
+    /** 단추 연결이면 토큰을 먼저 새로 받는다(스펙 DECISION19). 받지 못하면 확인 도구를 부르지 않고 연결 상태도 여기서 더 바꾸지 않는다. */
+    private CheckResult verify(CurrentUser user, ConnectorManifest manifest, Prepared prepared) {
+        if (prepared.oauth() != null) {
+            oauth.refreshForCheck(prepared.connectionId()).ifPresent(error -> {
+                throw ConnectorErrors.of(error);
+            });
+        }
+        ConnectorVerified result = verifier.vault(user.id(), manifest, prepared.vault(), prepared.oauth());
+        return new CheckResult(result.failure() == null, result.failure(), result.listed());
+    }
+
+
     /** 연결 확인의 앞 트랜잭션이다. */
     private Prepared prepare(CurrentUser user, String connectorId, boolean known) {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, known);
         if (connection.status() == ConnectionStatus.DISCONNECTED) {
-            return new Prepared(null, connection.updatedAt());
+            return new Prepared(connection.id(), null, connection.updatedAt(), null);
         }
-        return new Prepared(connection.vaultStored() ? connection.vault() : null, connection.updatedAt());
+        return new Prepared(
+            connection.id(), connection.vaultStored() ? connection.vault() : null, connection.updatedAt(),
+            connection.fields().auth().usesOAuth() ? VaultAccess.CURRENT : null);
     }
 
 
@@ -401,13 +435,16 @@ public class ConnectorConnectionService {
     /** 관리자가 보는 같은 그룹 사용자의 바인딩들이다. 반영 완료는 바인딩마다 누른다. */
     @Transactional(readOnly = true)
     public List<AdminConnectionSnapshot> listForAdmin(CurrentUser admin) {
-        requireAdmin(admin);
+        if (!admin.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
+        }
         Map<Long, String> names = users.findAll().stream()
             .filter(user -> user.groupId().equals(admin.groupId()))
             .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
+        Instant now = now();
         return bindings.findByConnectionUserIdIn(List.copyOf(names.keySet())).stream()
             .map(binding -> AdminConnectionSnapshot.from(
-                binding, names.get(binding.connection().userId())))
+                binding, names.get(binding.connection().userId()), now))
             .toList();
     }
 
@@ -418,7 +455,7 @@ public class ConnectorConnectionService {
         try {
             result = connector.call(manifest.id(), tool, values, verifier.ownerBrowser(userId, manifest));
         } catch (RuntimeException ex) {
-            warn(STEP_TOOL_CALL, manifest.id(), ex);
+            ConnectorVerifier.warn(STEP_TOOL_CALL, manifest.id(), ex);
             throw ConnectorErrors.unavailable();
         }
         if (!result.ok()) {
@@ -433,13 +470,8 @@ public class ConnectorConnectionService {
     }
 
 
-    private Optional<ConnectorManifest> findManifest(String connectorId) {
-        return ConnectorManifests.find(connector, connectorId);
-    }
-
-
     private ConnectorManifest requireManifest(String connectorId) {
-        return findManifest(connectorId).orElseThrow(ConnectorErrors::notFound);
+        return ConnectorManifests.find(connector, connectorId).orElseThrow(ConnectorErrors::notFound);
     }
 
 
@@ -455,20 +487,6 @@ public class ConnectorConnectionService {
 
     private AppUser lock(Long userId) {
         return bindingService.lockOwner(userId);
-    }
-
-
-    private static void requireAdmin(CurrentUser admin) {
-        if (!admin.isAdmin()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
-        }
-    }
-
-
-    /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
-    private static void warn(String step, String connectorId, RuntimeException ex) {
-        String kind = ex.getClass().getSimpleName();
-        log.warn("connector {} failed at {}: {}", connectorId, step, kind);
     }
 
 

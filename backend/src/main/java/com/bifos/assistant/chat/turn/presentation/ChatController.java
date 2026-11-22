@@ -45,6 +45,8 @@ import com.bifos.assistant.chat.turn.presentation.ChatDtos.StartConversationRequ
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.UpdateGroupModelTiersRequest;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
@@ -57,6 +59,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -125,6 +128,10 @@ public class ChatController {
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        // 답장은 흐르는 보내기만 받는다. 화면은 흐르는 보내기만 쓰고, 받지 않는 칸을 조용히 버리지 않는다(스펙 chat-reference).
+        if (request.reply() != null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply is sent through the stream");
+        }
         ChatTurn turn = chat.send(
             user,
             numberOf(user, request.conversationId()),
@@ -157,6 +164,7 @@ public class ChatController {
             request.agentCode(),
             request.attachmentIds(),
             request.delegateTo(),
+            request.replyPick(),
             event -> event.forViewer(user).ifPresent(send)));
     }
 
@@ -346,6 +354,7 @@ public class ChatController {
         Map<Long, List<DelegationLine>> deliveredResults = chat.deliveredResults(user, number);
         MentionMarks mentions = chat.mentionMarks(user, number);
         Map<Long, String> nativeStatuses = noticeStatuses.byNotice(number);
+        Map<Long, ChatMessage> byId = history.stream().collect(Collectors.toMap(ChatMessage::id, it -> it));
         return history.stream()
             .map(it -> new MessageView(
                 it.id(),
@@ -382,7 +391,8 @@ public class ChatController {
                     : null,
                 it.role() == MessageRole.USER ? mentions.questions().get(it.id()) : null,
                 SteerView.of(it),
-                it.role() == MessageRole.SYSTEM ? NativeResultView.of(nativeStatuses.get(it.id())) : null))
+                it.role() == MessageRole.SYSTEM ? NativeResultView.of(nativeStatuses.get(it.id())) : null,
+                ReplyViews.of(it, byId, attached, produced)))
             .toList();
     }
 

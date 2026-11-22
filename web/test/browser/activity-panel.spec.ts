@@ -204,6 +204,31 @@ test("패널이 트리를 읽지 못하면 다시 읽을 수 있다", async ({ p
   await expect(panel.getByTestId("execution-tree")).toBeVisible();
 });
 
+test("패널은 트리의 첫 읽기만 실패하면 누르지 않아도 다시 읽어 보인다", async ({
+  page,
+}) => {
+  await send(page, "패널 첫 읽기 실패 검사");
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+  // 접힌 줄이 먼저 읽은 뒤 가로채야 패널의 읽기만 센다.
+  await block.getByTestId("activity-toggle").click();
+  await expect(block.getByTestId("activity-scroll")).toBeVisible();
+  let calls = 0;
+  await page.route("**/api/usage/executions/*/tree", (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 502, body: "{}" })
+      : route.continue();
+  });
+  await block.getByTestId("activity-open-panel").click();
+  const panel = page.getByTestId("activity-panel");
+  await expect(panel.getByTestId("execution-tree")).toBeVisible();
+  await expect(panel.getByText("작업 과정을 불러오지 못했어요")).toHaveCount(0);
+  expect(calls).toBe(2);
+});
+
 test("중간 폭에서는 패널이 대화 위 오른쪽에 겹친다", async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 });
   await send(page, "중간 폭 검사");

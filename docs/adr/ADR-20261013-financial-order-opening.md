@@ -5,7 +5,7 @@
 - [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) 의 snapshot 과 claim, [ADR-20261012 / financial-unsent-proof](ADR-20261012-financial-unsent-proof.md) 의 미전송 판정 위에 선다.
   금융 해시 key 교체는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md) 을 그대로 따른다.
 - [ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 「`FINANCIAL` 은 FOS 소유 MCP wrapper 를 둔 뒤에 연다」 를 개정한다. wrapper 대신 커넥터가 claim 으로 ticket 을 한 번 소비하지 못하면 전송하지 않는 것이 hook 이 빠졌을 때 닫는 장치다.
-- ADR-20261010 / financial-execution-guard 의 「적용 범위」 에 적은 「이 결정은 해당 경로를 열지 않는다」 를 개정한다. 이 결정이 일반 주문의 생성과 취소에 한해 그 경로를 연다.
+- [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) 의 「적용 범위」 에 적은 「이 결정은 해당 경로를 열지 않는다」 를 개정한다. 이 결정이 일반 주문의 생성과 취소에 한해 그 경로를 연다.
 
 ### 맥락
 

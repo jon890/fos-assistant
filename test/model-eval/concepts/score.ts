@@ -2,7 +2,7 @@
 // 문항 형식과 세는 규칙은 docs/features/service-concepts/design.md 의 「평가 세트」 가, 기준은 같은 문서의 DECISION4 가 갖는다.
 import type { ExecutionNode } from "../control-plane.ts";
 
-export const CONCEPTS = ["file_space", "schedule", "memory", "follow_up", "connection", "model_tier", "agent_pick"] as const;
+export const CONCEPTS = ["file_space", "schedule", "memory", "follow_up", "connection", "agent_pick"] as const;
 export type Concept = (typeof CONCEPTS)[number];
 /** 문항이 쓸 수 있는 자리다. 운영에 따라 달라지는 값이라 실행할 때 환경 변수로 채운다. */
 export const PLACEHOLDERS = ["otherAgentName", "otherAgentCode", "connectorTitle", "connectorId"] as const;

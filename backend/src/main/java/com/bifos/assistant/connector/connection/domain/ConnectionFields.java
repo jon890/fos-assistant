@@ -12,12 +12,19 @@ import java.util.Map;
  *
  * @param values 비밀이 아닌 칸의 값
  * @param secretPrefixes 비밀 칸의 앞 4자. 값이 16자 미만인 칸은 없다
+ * @param auth 연결 방식과 다시 연결 필요 상태
  */
-public record ConnectionFields(Map<String, String> values, Map<String, String> secretPrefixes) {
+public record ConnectionFields(Map<String, String> values, Map<String, String> secretPrefixes, ConnectionAuth auth) {
 
     public ConnectionFields {
         values = copy(values);
         secretPrefixes = copy(secretPrefixes);
+        auth = auth == null ? ConnectionAuth.MANUAL : auth;
+    }
+
+
+    public ConnectionFields(Map<String, String> values, Map<String, String> secretPrefixes) {
+        this(values, secretPrefixes, ConnectionAuth.MANUAL);
     }
 
 

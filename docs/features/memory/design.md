@@ -65,7 +65,7 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 항상 층 → 요약 구역(MEMORY_FACTS) → 질문 관련 구역(MEMORY_SEARCH) → 색인(MEMORY_INDEX)
 ```
 
-- 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 지금처럼 `MEMORY_FACTS` 줄을 읽는다
+- 요약 구역 한 줄은 `- [번호] 제목: 요약` 이다. 줄바꿈은 공백 하나로 바꾼다(`MemoryItems.oneLine`). 항목 본문 칸(`ContextItem.body`)에는 요약을 넣는다. 「참고한 기억」 은 `MEMORY_FACTS` 줄을 읽지 않고 `memory_read` 로 읽은 `MEMORY_READ` 줄만 보인다(스펙 DECISION31). `MEMORY_FACTS` 줄은 실행 기록에 그대로 남는다
 - 요약 구역에 든 기억도 질문 관련 구역의 후보다. `MemorySearchSection.place` 에 「색인에 다시 놓지 않을 번호」(요약 구역에 든 번호)를 넘긴다. 요약 구역에 든 기억이 색인에 두 번 오르지 않게 한다
 - 요약 구역의 고른 규칙 이름은 `facts-recent-v2` 로 올린다(`ContextSelection` 의 「규칙을 바꾸면 버전을 올린다」)
 - 예산은 `MemoryContextSettings.budgetFor(groupId)` 의 `summaryMaxChars` 와 `maxChars` 다. `assistant.context.max-chars`, `facts-max-chars`, `facts-item-max-chars` 설정은 지운다. 그룹이 없는 사용자는 기본값이다
@@ -102,10 +102,10 @@ PR 마다 그 PR 의 요구사항 절만 구현 근거로 삼는다. PR2 와 PR3
 | `replaces` | 정수 배열, 1~10개, 선택, 중복 없음 | 새 기억이 대신할 옛 기억 번호. `memory_id` 와 함께 주면 `-32602` 다(`McpController`) |
 
 - 바로 저장 조건 3 은 본문과 요약을 따로 질문 원문과 대조한다. 요약이 없거나 빈 글이면 요약은 대조하지 않는다. 둘 중 하나라도 어긋나면 제안이다. 조건 7 은 제목, 본문, 요약을 본다
-- 같은 제목과 본문의 제안이 이미 있고 이번 호출이 바로 저장 조건이면 지금은 그 제안을 받아들인다(`existingOutcome`). 이때 저장된 제안의 요약에도 조건 7 을 다시 적용하고, 어긋나면 받아들이지 않고 「같은 제안이 이미 있다」 로 둔다. 이번 호출의 `summary` 와 `replaces` 는 이 분기에서 쓰지 않는다(결과 글에 「이미 있는 제안을 받아들였다」 만 알린다)
+- 같은 제목과 본문의 제안이 이미 있고 이번 호출이 바로 저장 조건이면 지금은 그 제안을 받아들인다(`existingOutcome`). 이때 저장된 제안의 요약에도 조건 7 을 다시 적용하고, 어긋나면 받아들이지 않고 「같은 제안이 이미 있다」 로 둔다. 이번 호출의 `summary` 가 저장된 제안의 요약과 다르면 받아들이지 않는다. 이번 호출의 `replaces` 는 이 분기에서 쓰지 않는다. 합치기는 제안 때 기록한 번호로 하고, 결과 글은 그 번호와 이번 호출의 `replaces` 가운데 대신하지 못한 번호를 알린다
 - 중복 판정은 지금처럼 제목과 본문이다. 같은 제목과 본문의 새 기억은 요약이 달라도 「이미 안다」 다
 - `memory_id` 로 고치는 경로는 본문을 주지 않고 요약만 바꿀 수 없다. 본문은 지금처럼 필수 인자다. 「이미 안다」 판정은 본문과 요약(주지 않았으면 지금 값)이 모두 같을 때다. 같은 본문에 다른 요약을 주면 요약만 바뀐 revision 이 하나 생긴다
-- 대신할 수 있는 번호는 `MemoryCaptureService.replaceable` 이 판정한다: 요청자의 `USER`, `MEMORY`, `ACCEPTED`, 풀림, 대체되지 않음, 받는 collection, 새 기억 자신이 아님. 나머지는 건너뛰고 결과 글에 「대신하지 못함: 번호 목록」 만 적는다. 까닭은 적지 않는다
+- 대신할 수 있는 번호는 `MemoryReplacements.replaceable` 이 판정한다(`MemoryService.accept` 도 부르므로 `MemoryCaptureService` 에 두면 순환이 생겨 따로 뒀다): 요청자의 `USER`, `MEMORY`, `ACCEPTED`, 풀림, 대체되지 않음, 받는 collection, 새 기억 자신이 아님. 나머지는 건너뛰고 결과 글에 「대신하지 못함: 번호 목록」 만 적는다. 까닭은 적지 않는다
 - 대체 칸의 매핑은 지금처럼 읽기 전용(`insertable = false, updatable = false`)으로 둔다. 쓰기는 조건부 네이티브 UPDATE 하나다: `SET superseded_by_memory_id = :new WHERE id IN (:ids) AND scope = 'USER' AND owner_user_id = :user AND entry_type = 'MEMORY' AND status = 'ACCEPTED' AND superseded_by_memory_id IS NULL AND id <> :new` 에 collection 조건(받는 collection 이 있을 때)을 더한다. 판정과 쓰기가 한 문장이라 남의 줄을 잠그지 않고 경쟁도 없다. 번호는 정렬해서 넘긴다. 영향받은 줄의 번호는 같은 트랜잭션에서 다시 조회해 결과 글과 기록에 쓴다. 풀리는지는 쓰기 전에 엔티티를 잠그지 않고 읽어 제외한다
 - 바로 저장이든 제안이든 판정을 통과한 번호를 `memory_capture.replaced_memory_ids` 에 둔다. 바로 저장은 위 UPDATE 로 실제 대체한 번호만 둔다
 - 제안을 받아들이는 `MemoryService.accept` 는 그 기억의 `PROPOSED` 기록을 찾아 같은 UPDATE 를 돈다. 이 경로에는 에이전트의 collection 범위가 없으므로 collection 조건을 빼고 주인·범위·상태 조건만 건다(대신할 옛 기억도 주인 자신의 기억이다). 실제로 대체한 번호로 기록의 `replaced_memory_ids` 를 고쳐, 대신하지 않은 제목이 「합쳤어요」 에 보이지 않게 한다

@@ -1,18 +1,16 @@
 "use client";
 
-import { FileText } from "lucide-react";
 import { cn } from "cn";
-import { attachmentPlaceholder, revealedTime } from "./variants";
+import { revealedTime } from "./variants";
+import { ArtifactList, AttachmentGallery } from "./message-media";
 import type { AgentIdentity } from "@/components/agent/agent-badge";
 import { AssistantRow } from "./assistant-row";
 
 export { AssistantRow };
 import { AnswerBody } from "./answer-body";
-import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
-import { artifactNames } from "@/lib/artifact-name";
-import { ArtifactVaultStatus } from "./artifact/artifact-vault-status";
 import { GeneratedImages } from "./artifact/generated-images";
+import { withLiveImages } from "./artifact/live-images";
 import { PutFiles } from "./artifact/put-files";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
@@ -29,115 +27,11 @@ export type {
   MessageDelivery,
   Turn,
 } from "./message-types";
-import type { MessageArtifact, MessageAttachment, Turn } from "./message-types";
+import type { Turn } from "./message-types";
+import { replyTargetOf, type ReplyTarget } from "@/lib/reply";
+import { ReplyPreview } from "./reply-box";
+import { useReplyMenu } from "./reply-menu";
 import type { MemoryUse } from "@/lib/memory-use-api";
-
-function AttachmentGallery({
-  conversationId,
-  attachments,
-}: {
-  conversationId: string | null;
-  attachments: MessageAttachment[];
-}) {
-  if (attachments.length === 0 || conversationId === null) return null;
-  return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      {attachments.map((attachment) =>
-        attachment.visible ? (
-          <a
-            key={attachment.id}
-            href={`/api/chat/conversations/${conversationId}/attachments/${attachment.id}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <img
-              data-testid="message-attachment"
-              src={`/api/chat/conversations/${conversationId}/attachments/${attachment.id}`}
-              alt={attachment.originalName}
-              loading="lazy"
-              className="h-24 w-24 rounded-md border border-border object-cover"
-            />
-          </a>
-        ) : (
-          <div
-            key={attachment.id}
-            data-testid="message-attachment-gone"
-            className={attachmentPlaceholder({ size: "message" })}
-          >
-            {describeError("ATTACHMENT_GONE", "사진을 표시할 수 없어요.")}
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-function ArtifactList({
-  artifacts,
-  conversationId,
-  messageId,
-  onOpen,
-}: {
-  artifacts: MessageArtifact[];
-  conversationId: string | null;
-  /** 저장한 답의 번호다. 아직 저장하지 않은 답이면 자동 보관 상태를 그리지 않는다 */
-  messageId: Turn["id"];
-  onOpen?(path: string, name: string): void;
-}) {
-  if (artifacts.length === 0) return null;
-  const names = artifactNames(artifacts.map((artifact) => artifact.path));
-  return (
-    <ul className="mt-2 flex flex-col gap-1">
-      {artifacts.map((artifact) => {
-        const name = names.get(artifact.path) ?? artifact.path;
-        const content = (
-          <>
-            <FileText aria-hidden="true" className="size-4 shrink-0" />
-            <span className="min-w-0 truncate">{name}</span>
-          </>
-        );
-        return (
-          <li
-            key={artifact.path}
-            data-testid="message-artifact"
-            className="flex min-w-0 items-center gap-2 text-sm"
-          >
-            {artifact.deleted || !onOpen ? (
-              <span
-                aria-disabled="true"
-                className="flex min-w-0 items-center gap-2 text-muted-foreground opacity-60"
-              >
-                {content}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpen(artifact.path, name)}
-                className="flex min-w-0 items-center gap-2 rounded-sm underline-offset-4 hover:underline"
-              >
-                {content}
-              </button>
-            )}
-            {artifact.deleted ? (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                보관 기간이 지나 볼 수 없어요.
-              </span>
-            ) : null}
-            {conversationId !== null && typeof messageId === "number" ? (
-              <ArtifactVaultStatus
-                conversationId={conversationId}
-                messageId={messageId}
-                path={artifact.path}
-                state={artifact.autoVault ?? null}
-                error={artifact.autoVaultError ?? null}
-              />
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 export function MessageBubble({
   turn,
@@ -156,11 +50,14 @@ export function MessageBubble({
   onOpenArtifact,
   skillCommandChip = false,
   liveActivity,
+  liveImages = [],
   memoryUses,
   onRetryDelivery,
   deliveryRetrying = false,
   delegations = [],
   answerAgent,
+  onReply,
+  onJump,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -183,6 +80,8 @@ export function MessageBubble({
   skillCommandChip?: boolean;
   /** 답이 흘러나오는 동안의 진행 중 작업 과정이다. 저장된 블록과 같은 자리에 그린다 */
   liveActivity?: React.ReactNode;
+  /** 답이 흘러나오는 동안 받은, 아직 답에 묶이지 않은 그림 경로다 */
+  liveImages?: string[];
   /** 이 답의 실행이 본문을 받은 기억이다. 저장된 작업 과정을 펼쳤을 때만 보인다 */
   memoryUses?: MemoryUse[];
   /** 실패하거나 중지한 결과 전달의 「결과 다시 전달」 을 누르면 그 묶음 번호로 부른다 */
@@ -193,12 +92,25 @@ export function MessageBubble({
   delegations?: DelegationLine[];
   /** 이 답을 쓴 에이전트가 대화의 에이전트가 아니면 그 에이전트다. `@` 로 맡긴 답이 그렇다 */
   answerAgent?: AgentIdentity;
+  /** 메시지나 그 안의 사진, 그림을 집는다. 저장된 사용자 메시지와 답에만 준다(스펙 chat-reference REQ1) */
+  onReply?(target: ReplyTarget): void;
+  /** 보낸 답장 상자를 누르면 원래 메시지로 간다(스펙 chat-reference REQ6) */
+  onJump?(messageId: number): void;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
   // 저장되기 전의 줄은 임시 문자열 id 를 갖는다. 등장 움직임은 그 줄에만 줘서, 대화를 열 때와 답이 저장될 때 다시 움직이지 않게 한다.
   const unsaved = typeof turn.id === "string";
+  const pick = (choice?: { attachmentId?: number; imagePath?: string }) => {
+    const target = replyTargetOf(turn, choice);
+    if (target && onReply) onReply(target);
+  };
+  const canReply = onReply !== undefined && replyTargetOf(turn) !== null;
+  const replyMenu = useReplyMenu({
+    onReply: canReply && !streaming ? () => pick() : undefined,
+    copyText: turn.content,
+  });
 
   if (turn.role === "SYSTEM") {
     return (
@@ -219,18 +131,30 @@ export function MessageBubble({
     return (
       <li
         className={cn(
-          "group flex min-w-0 justify-end focus-visible:outline-none",
+          "group relative flex min-w-0 justify-end rounded-lg focus-visible:outline-none data-[highlight=true]:bg-muted",
           // 맡김 질문은 말풍선 아래에 맡긴 줄을, steer 말풍선은 상태 글을 둔다. 오른쪽 정렬은 그대로다.
-          (turn.delegatedTo || turn.steer) && "flex-col items-end",
+          (turn.delegatedTo || turn.steer || turn.reply || canReply) &&
+            "flex-col items-end",
         )}
         tabIndex={0}
+        data-message-id={turn.id}
       >
+        {turn.reply ? (
+          <ReplyPreview
+            reply={turn.reply}
+            conversationId={conversationId}
+            onJump={onJump}
+            className="mb-1 max-w-[70%]"
+          />
+        ) : null}
         <div
           data-testid="user-message"
+          {...replyMenu.bind}
           className={cn(
             "relative max-w-[70%] rounded-xl rounded-br-sm bg-primary-soft px-4 py-2.5",
             "group-focus-visible:outline-2 group-focus-visible:outline-ring",
             unsaved && "animate-message-user",
+            replyMenu.bind.className,
           )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
@@ -259,6 +183,10 @@ export function MessageBubble({
           <AttachmentGallery
             conversationId={conversationId}
             attachments={attachments}
+            onReply={
+              canReply ? (attachmentId) => pick({ attachmentId }) : undefined
+            }
+            copyText={turn.content}
           />
           {sentAt ? (
             // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
@@ -275,6 +203,20 @@ export function MessageBubble({
         </div>
         {turn.delegatedTo ? <MentionLine line={turn.delegatedTo} /> : null}
         {turn.steer ? <SteerStatus steer={turn.steer} /> : null}
+        {canReply ? (
+          // 자리를 차지하지 않게 말풍선 아래 틈에 띄운다. 질문이 저장될 때 아래 답이 밀리지 않는다.
+          // 휴대폰은 길게 누르기 메뉴를 쓴다(스펙 chat-reference REQ3).
+          // 휴대폰 화면에는 보이지 않지만 화면 낭독기로는 찾을 수 있게 남긴다.
+          <div className="max-md:sr-only md:absolute md:right-0 md:top-full md:-mt-1.5">
+            <MessageActions
+              content={turn.content}
+              latest={false}
+              copyLabel="메시지 복사"
+              onReply={() => pick()}
+            />
+          </div>
+        ) : null}
+        {replyMenu.menu}
       </li>
     );
   }
@@ -282,8 +224,9 @@ export function MessageBubble({
   return (
     <AssistantRow
       data-testid="assistant-message"
+      data-message-id={turn.id}
       agent={answerAgent}
-      className="focus-visible:outline-2 focus-visible:outline-ring"
+      className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring data-[highlight=true]:bg-muted"
       tabIndex={0}
       header={
         sentAt ? (
@@ -314,7 +257,12 @@ export function MessageBubble({
       {/* 기다림 점이 있던 자리에 답이 들어올 때는 흐려짐으로만 바뀐다. */}
       <div
         data-testid="assistant-body"
-        className={cn("leading-7", unsaved && "animate-fade-in")}
+        {...replyMenu.bind}
+        className={cn(
+          "leading-7",
+          unsaved && "animate-fade-in",
+          replyMenu.bind.className,
+        )}
       >
         <AnswerBody
           content={turn.content}
@@ -343,18 +291,26 @@ export function MessageBubble({
           }
           canRegenerate={canRegenerate}
           onRegenerate={onRegenerate}
+          onReply={canReply ? () => pick() : undefined}
         />
       ) : null}
+      {replyMenu.menu}
       <AttachmentGallery
         conversationId={conversationId}
         attachments={attachments}
+        copyText={turn.content}
       />
       <GeneratedImages
-        images={(turn.artifacts ?? []).filter(
-          (artifact) => artifact.kind === "IMAGE",
+        images={withLiveImages(
+          (turn.artifacts ?? []).filter(
+            (artifact) => artifact.kind === "IMAGE",
+          ),
+          liveImages,
         )}
         conversationId={conversationId}
         messageId={turn.id}
+        onReply={canReply ? (imagePath) => pick({ imagePath }) : undefined}
+        copyText={turn.content}
       />
       <PutFiles
         files={(turn.artifacts ?? []).filter(

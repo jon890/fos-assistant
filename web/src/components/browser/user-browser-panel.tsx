@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { Notice } from "@/components/ui/notice";
 import { describeFailure } from "@/components/error-message";
 import { BrowserScreen } from "@/components/browser/browser-screen";
@@ -45,16 +46,18 @@ function keepView(setView: (view: BrowserView) => void) {
 }
 
 /** 상태를 아직 그릴 수 없을 때의 안내다. */
-function notReady(view: BrowserView | null, loadError: boolean) {
+function notReady(
+  view: BrowserView | null,
+  loadError: boolean,
+  onRetry: () => void,
+) {
   if (view === null && loadError) {
     return (
-      <Notice variant="error" role="alert">
-        브라우저 상태를 읽지 못했어요. 화면을 다시 열어 주세요.
-      </Notice>
+      <LoadFailure message="브라우저 상태를 읽지 못했어요." onRetry={onRetry} />
     );
   }
   if (view === null) {
-    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
+    return <ListSkeleton />;
   }
   return <Notice variant="info">아직 준비 중이에요.</Notice>;
 }
@@ -118,26 +121,30 @@ export function UserBrowserPanel({
     setConfirming(false);
   }
 
-  if (view === null || !view.enabled) return notReady(view, loadError);
+  if (view === null || !view.enabled)
+    return notReady(view, loadError, () => {
+      setLoadError(false);
+      void readView().then(apply);
+    });
 
   const minutes = Math.max(1, Math.round((view.idleTimeoutSeconds ?? 0) / 60));
 
   return (
     <div className="space-y-4">
       {status === undefined ? (
-        <>
-          <EmptyState
-            title="아직 브라우저가 없어요"
-            description="브라우저를 만들면 연결에 필요한 사이트에 로그인해 둘 수 있어요."
-          />
-          <Button
-            onClick={() => void run("create")}
-            loading={pending === "create"}
-            loadingText={LOADING_TEXT.create}
-          >
-            브라우저 만들기
-          </Button>
-        </>
+        <EmptyState
+          title="아직 브라우저가 없어요"
+          description="브라우저를 만들면 연결에 필요한 사이트에 로그인해 둘 수 있어요."
+          action={
+            <Button
+              onClick={() => void run("create")}
+              loading={pending === "create"}
+              loadingText={LOADING_TEXT.create}
+            >
+              브라우저 만들기
+            </Button>
+          }
+        />
       ) : (
         <section
           aria-label="내 브라우저 상태"

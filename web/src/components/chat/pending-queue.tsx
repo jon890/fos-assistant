@@ -30,7 +30,9 @@ export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
     >
       <div className="flex min-h-7 items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {queue.held ? "중지해서 보내지 않았어요." : "답이 끝나면 보내요."}
+          {queue.held
+            ? "중지해서 보내지 않았어요."
+            : "답이 끝나면 이어서 보내요."}
         </p>
         {queue.held ? (
           <Button

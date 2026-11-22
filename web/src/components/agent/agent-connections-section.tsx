@@ -51,6 +51,7 @@ const UNBOUND = {
   bound: false,
   status: null,
   restartRequired: false,
+  applyFailed: false,
   skippedSkills: [],
 } satisfies Partial<AgentConnectionView>;
 
@@ -321,7 +322,7 @@ export function AgentConnectionsSection({
   return (
     <section
       aria-label="이 에이전트가 쓰는 연결"
-      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+      className="mt-8 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>

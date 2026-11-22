@@ -21,6 +21,7 @@ import urllib.request
 
 from .context import CTX_VERSION, _read_token, logger, root_session, signing_key
 from .tool_guard import guard_url
+from .next_step import ask_user
 
 TOOL = "image_generate"
 VERSION = "v1-generated-image"
@@ -40,19 +41,20 @@ MAX_TITLE_CHARS = 200
 MAX_PROMPT_CHARS = 30_000
 
 SAVED_MESSAGE = "그림을 대화에 저장했다. 사용자의 화면에 자동으로 보인다. 답에 파일 경로나 MEDIA: 를 쓰지 않는다."
-FAILED_MESSAGE = ("그림을 만들었지만 대화에 저장하지 못했다. 사용자에게 그림을 보여 주지 못했다고 알리고 "
-                  "잠시 뒤 다시 부탁하라고 안내한다.")
+FAILED_MESSAGE = ask_user("그림을 만들었지만 대화에 저장하지 못했다. 사용자에게 그림을 보여 주지 못했다고 알리고 "
+                          "잠시 뒤 다시 부탁하라고 안내한다.")
 
 _titles: dict = {}
 _titles_lock = threading.Lock()
 
 
 def sign_generated_image(key: str, root_session_id: str, session_id: str, tool_call_id: str,
-                         image_sha256: str, title: str, prompt: str, source_links=None) -> str:
+                         image_sha256: str, title: str, prompt: str, source_links=None, found_links=None) -> str:
     """그림 올리기의 서명을 소문자 16진수로 돌려준다. key 는 `_fos_ctx` 와 같다. 제목과 지시문은 글 그대로가 아니라 SHA-256 을 넣는다.
 
     참고한 링크가 있을 때만 주소를 줄바꿈으로 이은 글의 SHA-256 을 여덟째 줄로 더한다. 없으면 지금 일곱 줄 그대로다
-    (fos-assistant ADR-20261120 / link-image-source).
+    (fos-assistant ADR-20261120 / link-image-source). 그 가운데 비서가 찾은 주소가 있으면 같은 방법으로 아홉째 줄을 더한다
+    (fos-assistant ADR-20261121 / found-link-image-source). 찾은 주소는 참고한 링크의 부분이라 링크 없이 오지 않는다.
     """
     lines = [
         VERSION, root_session_id, session_id, tool_call_id, image_sha256,
@@ -60,6 +62,8 @@ def sign_generated_image(key: str, root_session_id: str, session_id: str, tool_c
     ]
     if source_links:
         lines.append(hashlib.sha256("\n".join(source_links).encode("utf-8")).hexdigest())
+        if found_links:
+            lines.append(hashlib.sha256("\n".join(found_links).encode("utf-8")).hexdigest())
     message = "\n".join(lines)
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
@@ -145,7 +149,7 @@ def _failed() -> str:
     return json.dumps({"success": False, "error": FAILED_MESSAGE}, ensure_ascii=False)
 
 
-def publish(args, result, session_id, tool_call_id, source_links=None):
+def publish(args, result, session_id, tool_call_id, source_links=None, found_links=None):
     """`image_generate` 의 성공 결과에서 그림을 올리고 모델이 받을 글을 돌려준다. 바꾸지 않을 결과면 None 이다.
 
     None 은 실패한 결과, 원격 주소, 캐시 폴더 밖 경로, 올리기 경로가 없는 옛 Control Plane(404)이다. 그 밖의 실패는 모두 경로 없는
@@ -181,14 +185,18 @@ def publish(args, result, session_id, tool_call_id, source_links=None):
     except sqlite3.Error as exc:
         logger.warning("fos-ctx: state.db 에서 루트 session 을 찾지 못했다: %s", type(exc).__name__)
         root = session_id
+    # 찾은 주소는 참고한 링크 안에 있는 것만 보낸다. Control Plane 이 링크 밖의 찾은 주소를 거절해 그림까지 잃지 않게 한다.
+    found = [link for link in (found_links or []) if link in (source_links or [])]
     meta = {
         "v": CTX_VERSION, "root_session_id": root, "session_id": session_id, "tool_call_id": tool_call_id,
         "title": title, "prompt": prompt,
         "sig": sign_generated_image(signing_key(token), root, session_id, tool_call_id,
-                                    hashlib.sha256(image).hexdigest(), title, prompt, source_links),
+                                    hashlib.sha256(image).hexdigest(), title, prompt, source_links, found),
     }
     if source_links:
         meta["source_links"] = list(source_links)
+    if found:
+        meta["found_links"] = found
     body, content_type = _multipart(meta, image)
     status, answer = _post(url, body, content_type, token)
     if status == 404:

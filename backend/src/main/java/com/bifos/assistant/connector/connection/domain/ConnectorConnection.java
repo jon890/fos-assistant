@@ -88,6 +88,16 @@ public class ConnectorConnection extends CreatedAtEntity {
     }
 
 
+    /**
+     * 단추 연결을 시작할 때 보관 파일 이름을 정하려고 미리 만드는 행이다. 연결이 끝나기 전에는 화면에 연결로 보이지 않게 해제 상태로 둔다.
+     */
+    public static ConnectorConnection reserved(Long userId, String connectorId, Instant now) {
+        ConnectorConnection connection = new ConnectorConnection(userId, connectorId, now);
+        connection.status = ConnectionStatus.DISCONNECTED;
+        return connection;
+    }
+
+
     /** 에이전트 없는 연결이다. 값은 보관 파일에 두고 에이전트에는 바인딩으로 붙인다(ADR-083). */
     public static ConnectorConnection pending(Long userId, String connectorId, Instant now) {
         return new ConnectorConnection(userId, connectorId, now);
@@ -141,6 +151,28 @@ public class ConnectorConnection extends CreatedAtEntity {
         now = nextRevision(now);
         this.status = ConnectionStatus.PENDING;
         this.updatedAt = now;
+    }
+
+
+    /**
+     * 서비스가 단추 연결의 갱신을 거절했다. 다시 연결할 때까지 준비 안 됨으로 두고 표시를 남긴다. 단추 연결에서만 부른다.
+     */
+    public void reconnectRequired(Instant now) {
+        now = nextRevision(now);
+        this.fields = new ConnectionFields(
+            fields.values(), fields.secretPrefixes(), new ConnectionAuth(fields.auth().provider(), true));
+        this.status = ConnectionStatus.PENDING;
+        this.updatedAt = now;
+    }
+
+
+    /**
+     * 다시 연결 필요였던 단추 연결이 새 토큰을 받았다. 표시만 지운다. 쓸 수 있는지는 이어지는 확인 도구가 정하므로 상태와 revision 은
+     * 그대로 둔다.
+     */
+    public void reconnectResolved() {
+        this.fields = new ConnectionFields(
+            fields.values(), fields.secretPrefixes(), new ConnectionAuth(fields.auth().provider(), false));
     }
 
 
