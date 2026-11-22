@@ -29,3 +29,19 @@ test("서비스 개념 묶음은 옛 평가 세트의 문항 id, 글, 기대를 
     assert.deepEqual(question.expect, before.expect, question.id);
   }
 });
+
+test("답변 품질 묶음은 옛 질문 세트의 문항 id 와 글을 그대로 옮기고 대화를 남긴다", () => {
+  const old = readJson<{ questions: { id: string; category: string; messages: string[] }[] }>("test/model-eval/answer/questions.json").questions;
+  const bundle = readJson<{ id: string; pass: { type: string }; questions: (NewQuestion & { keepConversation: boolean })[] }>(
+    "backend/src/main/resources/quality/bundles/answer-quality.json",
+  );
+
+  assert.equal(bundle.id, "answer-quality");
+  assert.equal(bundle.pass.type, "external", "판정은 answer/run.ts score-eval 이 한다");
+  assert.deepEqual(bundle.questions.map((question) => question.id), old.map((question) => question.id));
+  for (const [index, question] of bundle.questions.entries()) {
+    assert.equal(question.tag, old[index].category, question.id);
+    assert.deepEqual(question.turns.map((turn) => turn.text), old[index].messages, question.id);
+    assert.equal(question.keepConversation, true, question.id);
+  }
+});

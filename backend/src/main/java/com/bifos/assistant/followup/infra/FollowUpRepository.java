@@ -97,4 +97,10 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from FollowUp f where f.userId = :userId")
     int deleteAllOfUser(@Param("userId") Long userId);
+
+
+    /** 그 사용자의 한 대화에서 생긴 할 일을 지운다. 평가 문항이 만든 것을 지울 때 쓴다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from FollowUp f where f.userId = :userId and f.conversationId = :conversationId")
+    int deleteByUserIdAndConversationId(@Param("userId") Long userId, @Param("conversationId") Long conversationId);
 }
