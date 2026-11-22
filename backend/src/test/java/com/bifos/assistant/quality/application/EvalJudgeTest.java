@@ -150,6 +150,15 @@ class EvalJudgeTest {
     }
 
 
+    @Test
+    @DisplayName("밖에서 채점하는 묶음은 통과·실패를 정하지 않고 답을 받은 수만 센다")
+    void externalBundleOnlyCounts() {
+        BundleResult result = EvalJudge.bundleResult("answer-quality", new PassRule(PassRule.EXTERNAL, null), ran(2, 3));
+
+        assertThat(result).isEqualTo(new BundleResult("answer-quality", "EXTERNAL", 2, 3, 0, 0));
+    }
+
+
     private static List<ItemResult> ran(int passed, int total) {
         List<ItemResult> items = new ArrayList<>();
         for (int index = 0; index < total; index++) {
