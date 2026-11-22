@@ -111,6 +111,8 @@ SYMBOLS = {
     # 도구와 실행 공간 설정
     ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="set[str]"),
     ("hermes_cli.tools_config", "_get_plugin_toolset_keys"): Call(),
+    # 기동 이관이 문자열로 저장된 옛 허용 목록도 Hermes 와 같게 푼다.
+    ("hermes_cli.tools_config", "_coerce_platform_toolsets_value"): Call(positional=2),
     ("hermes_cli.tools_config", "PLATFORMS"): Value(),
     ("hermes_cli.web_server_profiles", "_config_profile_scope"): Call(positional=1),
     ("toolsets", "TOOLSETS"): Value(),

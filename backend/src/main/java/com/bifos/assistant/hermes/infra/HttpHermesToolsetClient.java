@@ -25,6 +25,9 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
 
     /** Hermes 의 「그림 만들기」 toolset 이름이다. {@code hermes} 가 {@code agent} 보다 아래라 그쪽 상수를 쓰지 못한다. */
     private static final String IMAGE_TOOLSET = "image_gen";
+    private static final String WEB_TOOLSET = "web";
+    /** fos-ctx 의 상품 페이지 도구가 든 toolset 이다. {@code web} 을 쓰는 목록에만 둔다. */
+    private static final String PRODUCT_PAGE_TOOLSET = "fos-product-page";
 
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
@@ -117,7 +120,8 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     }
 
 
-    private void writeConfig(String profileName, List<String> toolsets, String sandboxOwner, boolean requireSandbox) {
+    private void writeConfig(String profileName, List<String> requested, String sandboxOwner, boolean requireSandbox) {
+        List<String> toolsets = withProductPage(requested);
         attachmentDirectory.ensure(sandboxOwner);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("profile", profileName);
@@ -175,5 +179,22 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
 
     private static String stripTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+
+    /**
+     * 상품 페이지 toolset 을 {@code web} 에 맞춘다. {@code web} 이 있으면 더하고 없으면 뺀다.
+     *
+     * <p>Hermes 는 plugin toolset 을 그 profile 의 {@code known_plugin_toolsets} 에 없으면 목록과 상관없이 켠다. profile 틀과 대시보드
+     * plugin 이 이 이름을 그 기록에 적어 두므로, 목록에 있는지가 켜짐을 정한다(hermes-contract 의 「plugin toolset 이름」). 모든 쓰기가 이
+     * 메서드를 지나서, 웹 검색을 허락하지 않은 profile 에 상품 페이지 도구가 켜지지 않는다.
+     */
+    private static List<String> withProductPage(List<String> toolsets) {
+        List<String> result = new ArrayList<>(toolsets);
+        result.remove(PRODUCT_PAGE_TOOLSET);
+        if (result.contains(WEB_TOOLSET)) {
+            result.add(PRODUCT_PAGE_TOOLSET);
+        }
+        return List.copyOf(result);
     }
 }

@@ -38,12 +38,23 @@ class EvalBundlesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"duplicate-question", "unknown-slot", "empty-turns", "zero-timeout", "answer-quality", "empty-expect", "blank-value",
-        "no-tag", "bad-card-status", "missing-attachment"})
+        "no-tag", "bad-card-status", "missing-attachment", "external-drops-conversation"})
     @DisplayName("틀린 묶음 파일은 파일 이름을 담은 예외로 읽기를 멈춘다")
     void rejectsInvalidBundles(String name) {
         assertThatThrownBy(() -> load("classpath:quality/bad-bundles/" + name + "/"))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining(name + ".json");
+    }
+
+
+    @Test
+    @DisplayName("답변 품질 묶음은 밖에서 채점하므로 기대 없이 읽히고 모든 문항이 대화를 남긴다")
+    void answerQualityBundleIsExternal() {
+        EvalBundle bundle = load("classpath:quality/bundles/").find("answer-quality").orElseThrow();
+
+        assertThat(bundle.pass().external()).isTrue();
+        assertThat(bundle.timeoutMinutes()).isEqualTo(15);
+        assertThat(bundle.questions()).isNotEmpty().allMatch(EvalQuestion::keepConversation);
     }
 
 

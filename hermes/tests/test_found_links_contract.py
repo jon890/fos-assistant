@@ -31,8 +31,12 @@ class PluginValuesTest(unittest.TestCase):
             self.assertIn(tool, contract.HERMES_BUILTIN_TOOLS)
         self.assertEqual(found_links.SEARCH_FIELDS, contract.WEB_SEARCH_ITEM_FIELDS)
 
-    def test_product_reader_is_registered_as_an_async_web_tool(self):
-        """상품 페이지 읽기를 기존 web toolset에서 실행하고 내장 도구는 바꾸지 않는다."""
+    def test_product_reader_is_registered_in_its_own_toolset(self):
+        """상품 페이지 읽기는 자기 toolset 의 비동기 도구다. 내장 도구는 바꾸지 않는다.
+
+        plugin 이 등록한 toolset 은 `known_plugin_toolsets` 에 없는 profile 에서 기본으로 켜진다.
+        Hermes 기본 이름(`web` 등)으로 등록하면 그 내장 toolset 까지 허용 목록과 상관없이 켜진다(운영 R7).
+        """
         plugin = load_plugin("fos_ctx_product_page_registration", ROOT / "plugins/fos-ctx/__init__.py", self.addCleanup)
         registered = {}
 
@@ -45,7 +49,10 @@ class PluginValuesTest(unittest.TestCase):
 
         plugin.register(Context())
         product = registered["product_page_read"]
-        self.assertEqual(product["toolset"], "web")
+        self.assertEqual(product["toolset"], "fos-product-page")
+        for tool in registered.values():
+            self.assertNotIn(tool["toolset"], contract.HERMES_TOOLSETS)
+            self.assertFalse(tool["toolset"].startswith("hermes-"))
         self.assertIs(product["is_async"], True)
         self.assertFalse(product.get("override", False))
 
@@ -102,3 +109,14 @@ class HermesWebResultTest(unittest.TestCase):
         self.assertIn("def provider_tier(", self.source("plugins/web/keyless_mcp.py"))
         self.assertIn("is_async: bool", self.source("hermes_cli/plugins_context.py"))
         self.assertIn("registry.get_tool_names_for_toolset(name)", self.source("toolsets.py"))
+
+    def test_unknown_plugin_toolset_is_enabled_by_default(self):
+        """plugin toolset 은 그 platform 의 `known_plugin_toolsets` 에 없으면 허용 목록과 상관없이 켜진다.
+
+        그래서 profile 틀과 대시보드 plugin 이 `fos-product-page` 를 알려진 이름으로 적어 둔다.
+        """
+        tools = self.source("hermes_cli/tools_config.py")
+        self.assertIn('known_for_platform = set((config.get("known_plugin_toolsets", {}) or {}).get(platform, []) or [])',
+                      tools)
+        self.assertIn("if pts in toolset_names or (pts not in _DEFAULT_OFF_TOOLSETS and pts not in known_for_platform)",
+                      tools)

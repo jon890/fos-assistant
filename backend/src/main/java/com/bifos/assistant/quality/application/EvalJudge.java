@@ -33,6 +33,9 @@ final class EvalJudge {
     static final String FORBIDDEN_WORD = "FORBIDDEN_WORD";
     static final String MISSING_INSTRUCTION = "MISSING_INSTRUCTION";
     static final String CARD_STATUS = "CARD_STATUS";
+    static final String NO_ANSWER = "NO_ANSWER";
+    /** 밖의 채점기가 판정하는 묶음의 결과다. 평가 전체의 통과·실패를 정하지 않는다. */
+    static final String EXTERNAL = "EXTERNAL";
 
     private static final String TOOL_PREFIX = "mcp__fos_assistant__";
     /** JavaScript 의 {@code \\s} 와 같은 공백이다. Java 의 {@code \\s} 는 줄바꿈 없는 공백과 전각 공백을 잡지 않는다. */
@@ -149,6 +152,10 @@ final class EvalJudge {
         List<ItemResult> ran = items.stream().filter(item -> item.status() != EvalItemStatus.SKIPPED).toList();
         int passed = (int)ran.stream().filter(item -> item.status() == EvalItemStatus.PASSED).count();
         int errors = (int)ran.stream().filter(EvalJudge::isError).count();
+        if (rule.external()) {
+            // 판정은 밖의 채점기가 한다. 여기서는 답을 받은 문항 수만 센다.
+            return new BundleResult(bundleId, EXTERNAL, passed, ran.size(), items.size() - ran.size(), errors);
+        }
         int needed = (int)Math.ceil(ran.size() * rule.ratio() - 1e-9);
         boolean ok = errors == 0 && !ran.isEmpty() && passed >= needed;
         return new BundleResult(bundleId, ok ? "PASSED" : "FAILED", passed, ran.size(), items.size() - ran.size(), errors);

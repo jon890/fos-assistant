@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
  * <li>스킴은 {@code https}, 포트는 없거나 443
  * <li>userinfo 가 없고 호스트가 IP 리터럴이 아니다
  * <li>호스트가 허용 항목과 정확히 같거나, 항목이 {@code .} 으로 시작하면 그 접미사로 끝난다
+ * <li>Chromium 의 FCM 스테이징 호스트는 구독 경로만 받는다
  * </ul>
  */
 public final class PushEndpointPolicy {
@@ -24,6 +25,8 @@ public final class PushEndpointPolicy {
     public static final int MAX_LENGTH = 1024;
 
     private static final Pattern IPV4 = Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}");
+    private static final String CHROMIUM_STAGING_HOST = "jmt17.google.com";
+    private static final Pattern FCM_SUBSCRIPTION_PATH = Pattern.compile("/fcm/send/[A-Za-z0-9_:-]+");
     private static final int HTTPS_PORT = 443;
 
     private final List<String> allowedHosts;
@@ -56,6 +59,11 @@ public final class PushEndpointPolicy {
             return false;
         }
         String lower = host.toLowerCase(Locale.ROOT);
+        if (CHROMIUM_STAGING_HOST.equals(lower)
+            && (!FCM_SUBSCRIPTION_PATH.matcher(uri.getRawPath()).matches()
+                || uri.getRawQuery() != null || uri.getRawFragment() != null)) {
+            return false;
+        }
         return allowedHosts.stream().anyMatch(allowed -> matches(lower, allowed));
     }
 

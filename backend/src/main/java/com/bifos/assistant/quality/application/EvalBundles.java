@@ -168,8 +168,8 @@ public class EvalBundles {
         if (bundle.timeoutMinutes() <= 0) {
             throw invalid(name, "timeoutMinutes must be positive");
         }
-        if (!EvalBundle.PassRule.RATIO.equals(bundle.pass().type())) {
-            // 답변 품질 기준(answer-quality)은 그 묶음을 옮기는 PR 이 판정과 함께 더한다.
+        if (!EvalBundle.PassRule.RATIO.equals(bundle.pass().type()) && !bundle.pass().external()) {
+            // 답변 품질 기준(answer-quality)은 그 판정을 옮기는 PR 이 더한다.
             throw invalid(name, "unsupported pass type " + bundle.pass().type());
         }
         if (bundle.pass().ratio() <= 0 || bundle.pass().ratio() > 1) {
@@ -201,10 +201,14 @@ public class EvalBundles {
                     throw invalid(name, "question " + question.id() + " attaches a missing resource " + turn.attachment());
                 }
             }
+            if (bundle.pass().external() && !question.keepConversation()) {
+                // 밖의 채점기가 대화를 읽어야 하므로 통과해도 지우지 않는다.
+                throw invalid(name, "question " + question.id() + " of an external bundle must keep its conversation");
+            }
             EvalExpect expect = question.expect();
             List<List<String>> lists = List.of(expect.links(), expect.linkPrefixes(), expect.noLinkPrefixes(), expect.tools(),
                 expect.includes(), expect.absent(), expect.instructionIncludes());
-            if (lists.stream().allMatch(List::isEmpty) && expect.cardStatus() == null) {
+            if (!bundle.pass().external() && lists.stream().allMatch(List::isEmpty) && expect.cardStatus() == null) {
                 // 기대가 없으면 무엇을 답해도 통과한다. 옛 평가 세트의 형식 검사와 같이 막는다.
                 throw invalid(name, "question " + question.id() + " has no expectation");
             }

@@ -168,6 +168,28 @@ export function touchesGuide(files) {
   return files.some((file) => GUIDE_FILES.some((pattern) => pattern.test(file)));
 }
 
+// profile 의 Hermes toolset 목록을 정하고 쓰는 파일과, 그 쓰기를 받는 가짜 Hermes 다. 고치면 도구 켜기 E2E 와 브라우저 검사가 깨질 수 있다.
+// 앞 넷은 Control Plane 이 목록을 만들고 보내는 클래스, 뒤 둘은 가짜 Hermes 가 목록을 검사하는 경로와 그 toolset 목록이다.
+export const TOOLSET_FILES = [
+  /^backend\/src\/main\/java\/com\/bifos\/assistant\/agent\/domain\/AgentToolPolicy\.java$/,
+  /^backend\/src\/main\/java\/com\/bifos\/assistant\/agent\/application\/(?:AgentToolService|AgentDefaultToolsets)\.java$/,
+  /^backend\/src\/main\/java\/com\/bifos\/assistant\/hermes\/infra\/HttpHermesToolsetClient\.java$/,
+  /^test\/e2e\/fake-hermes\/(?:dashboard|runtime-fixtures)\.ts$/,
+];
+
+/** 바꾼 파일 중 Hermes toolset 목록을 정하거나 받는 것이 있으면 true. */
+export function touchesToolsets(files) {
+  return files.some((file) => TOOLSET_FILES.some((pattern) => pattern.test(file)));
+}
+
+/** 라벨 없이도 PR 에서 돌릴 느린 job. 모델 지시문은 E2E 만, toolset 목록은 E2E 와 브라우저를 돌린다. */
+export function slowJobsToKeep(files) {
+  const keep = new Set();
+  if (touchesGuide(files)) keep.add("e2e");
+  if (touchesToolsets(files)) for (const job of SLOW_JOBS) keep.add(job);
+  return [...keep];
+}
+
 /** PR 의 merge 커밋이 첫 부모(base) 에 대해 바꾼 파일과 지운 파일. 이름 변경은 옛 경로(지움)와 새 경로(추가)로 낸다. */
 function changedFiles() {
   const parents = execFileSync("git", ["rev-list", "--parents", "-n", "1", "HEAD"], { encoding: "utf8" }).trim().split(" ");
@@ -195,7 +217,8 @@ function main() {
       const { files, removed } = changedFiles();
       // 경로를 지운 PR 은 라벨이 없어도 e2e 와 브라우저를 돌린다. 지운 경로를 부르는 쪽은 PR 에서 드러나야 한다.
       // 모델 지시문을 만드는 파일을 바꾼 PR 은 E2E 만 라벨 없이 돌린다. 브라우저는 그 파일을 읽지 않는다.
-      result = withoutSlow(classify(files), process.env.FULL_LABEL === "true" || removesRoute(removed), touchesGuide(files) ? ["e2e"] : []);
+      // Hermes toolset 목록을 정하거나 받는 파일을 바꾼 PR 은 E2E 와 브라우저를 라벨 없이 돌린다.
+      result = withoutSlow(classify(files), process.env.FULL_LABEL === "true" || removesRoute(removed), slowJobsToKeep(files));
     } else {
       result = Object.fromEntries(JOBS.map((job) => [job, event === "push"
         ? { run: PUSH_JOBS.includes(job), because: "(main push 빠른 검사)" }

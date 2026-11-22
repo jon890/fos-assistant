@@ -97,6 +97,23 @@ export function collectAnswers(messages: MessageView[], executionIds: (number | 
   return answers;
 }
 
+/**
+ * 사용자 turn 이 연 실행의 번호다. 사용자 메시지 바로 뒤의 첫 실행 답을 고른다. 위임 결과를 전하는 자동 turn 은 빠진다.
+ * 평가 사용자로 돈 대화(score-eval)는 보낸 실행 번호를 따로 갖지 않아, 옛 score 처럼 「마지막 사용자 turn 의 실행 트리」 를 보려고 쓴다.
+ */
+export function userTurnExecutionIds(messages: MessageView[]): number[] {
+  const ids: number[] = [];
+  let waiting = false;
+  for (const message of messages) {
+    if (message.role === "USER") waiting = true;
+    else if (waiting && message.role === "ASSISTANT" && message.executionId !== null) {
+      ids.push(message.executionId);
+      waiting = false;
+    }
+  }
+  return ids;
+}
+
 /** 그 줄이 「출처」 절의 머리면 같은 줄에 이어진 본문(없으면 빈 글)을, 아니면 null 을 돌려준다. */
 function headingRest(line: string): string | null {
   if (HASH_HEADING.test(line)) return "";

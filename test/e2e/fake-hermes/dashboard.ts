@@ -27,12 +27,19 @@ import {
   TOOLSET_CATALOG,
   SANDBOX_OWNER_PATTERN,
   CONTROL_PLANE_MCP,
+  PRODUCT_PAGE_TOOLSET,
   SANDBOX_TOOLSETS,
   SKILL_VERSION_DIR,
   DEFAULT_API_SERVER_TOOLSETS,
 } from "./runtime-fixtures.ts";
 import { BUILTIN_SKILLS, readPublishedSkills } from "./scenario-fixtures.ts";
 import { lstatSync } from "node:fs";
+/** 상품 페이지 toolset 을 web 에 맞춘 목록이다. 실제 대시보드 plugin 의 `product_page_toolset._with_product_page` 와 같다. */
+export function withProductPage(toolsets: readonly string[]): string[] {
+  const result = toolsets.filter((name) => name !== PRODUCT_PAGE_TOOLSET);
+  return result.includes("web") ? [...result, PRODUCT_PAGE_TOOLSET] : result;
+}
+
 /** 대시보드 인증을 확인한 뒤 원래 순서대로 경로를 처리한다. */
 export function createDashboard(state: FakeHermesState, bindings: ReturnType<typeof createBindings>, lifecycle: ReturnType<typeof createLifecycle>, skillRoot?: string) {
   const connectorRoutes = createConnectorRoutes(state, bindings);
@@ -294,14 +301,15 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
       if (configKeys.includes("platform_toolsets")) {
         const toolsets = body.config?.platform_toolsets?.api_server;
         const bound = boundServers(profile);
-        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP, ...bound]);
+        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP, PRODUCT_PAGE_TOOLSET, ...bound]);
         if (Object.keys(body.config?.platform_toolsets ?? {}).length !== 1 || !Array.isArray(toolsets)
             || !toolsets.includes(CONTROL_PLANE_MCP)
             || !toolsets.every((name) => typeof name === "string" && validNames.has(name))) {
           send(response, 400, { error: "invalid toolset configuration" });
           return true;
         }
-        nextToolsets = toolsets as string[];
+        // plugin 의 `_with_product_page` 처럼 상품 페이지 toolset 을 web 에 맞춰 저장한다. web 이 있으면 더하고 없으면 뺀다.
+        nextToolsets = withProductPage(toolsets as string[]);
         // plugin 처럼 셸 도구가 있을 때만 주인을 읽는다. 없거나 모양이 틀리면 설정을 바꾸지 않고 거절한다.
         if (nextToolsets.some((name) => SANDBOX_TOOLSETS.includes(name))) {
           if (typeof body.sandbox_owner !== "string" || !SANDBOX_OWNER_PATTERN.test(body.sandbox_owner)) {

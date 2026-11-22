@@ -27,16 +27,23 @@ public record EvalBundle(String id, String title, Integer timeoutMinutes, PassRu
     /**
      * 묶음 통과 규칙이다.
      *
-     * @param type {@code ratio} 는 통과 문항 비율. 답변 품질 기준({@code answer-quality})은 그 묶음을 옮기는 PR 이 더한다
+     * @param type {@code ratio} 는 통과 문항 비율. {@code external} 은 실행기가 판정하지 않고 답을 받은 대화를 남겨 두며, 밖의 채점기가 그 대화를
+     * 읽어 판정한다(답변 품질 묶음의 판정을 Java 로 옮기기 전까지). 답변 품질 기준({@code answer-quality})은 그 판정을 옮기는 PR 이 더한다
      * @param ratio 돈 문항 가운데 통과해야 하는 비율. 올림한 수 이상이면 통과다
      */
     public record PassRule(String type, Double ratio) {
 
         public static final String RATIO = "ratio";
+        public static final String EXTERNAL = "external";
 
 
         public PassRule {
             ratio = ratio == null ? DEFAULT_RATIO : ratio;
+        }
+
+
+        public boolean external() {
+            return EXTERNAL.equals(type);
         }
     }
 

@@ -2704,7 +2704,7 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | 결과 hook 이 받는 글 | `transform_tool_result` 는 자르지 않은 결과 글 전체와 `tool_call_id` 를 받는다. Control Plane 이 받는 `tool.completed` 의 `preview` 는 500자로 잘려 있어 주소를 뽑는 데 쓸 수 없다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
 | OpenAI 내장 검색 | 검색이 Hermes 의 도구로 돌지 않아 결과 hook 이 불리지 않는다. 위 「웹 검색 서비스」 를 본다 | `agent/codex_responses_adapter.py` |
 
-상품 사진을 위한 `product_page_read`는 fos-ctx가 `PluginContext.register_tool`로 web toolset에 추가하는 비동기 도구다. Hermes는 web toolset의 내장 도구 목록에 registry에서 같은 toolset으로 등록한 도구도 합친다. 기본 `web_extract`의 등록부는 마크다운으로 읽고, `_trim_results`가 제공자 메타데이터를 빼므로 상품 사진용 원본 HTML은 별도로 받는다.
+상품 사진을 위한 `product_page_read`는 fos-ctx가 `PluginContext.register_tool`로 자기 toolset `fos-product-page`에 등록하는 비동기 도구다. 이 toolset은 웹 검색(`web`)을 허락한 profile에서만 켠다. 아래 「plugin toolset 이름」을 본다. 기본 `web_extract`의 등록부는 마크다운으로 읽고, `_trim_results`가 제공자 메타데이터를 빼므로 상품 사진용 원본 HTML은 별도로 받는다.
 
 플러그인은 Hermes의 무료 Firecrawl 클라이언트와 같은 API에 `rawHtml`을 요청한다. `_validate_extract_urls`, `async_is_safe_url`, `check_website_access`로 읽기 시작 주소를 확인하고, 응답의 `_final_url`에도 공개 네트워크·웹사이트 정책을 적용한다. 사용하는 내부 함수와 등록부는 `hermes/tests/test_found_links_contract.py`가 대조한다. 원본 HTML은 상품 사진 후보를 뽑은 뒤 버린다.
 
@@ -2716,7 +2716,7 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 
 - `_enable_recently_shipped_toolsets` 가 새 toolset 을 더할 수 있다. v0.21.0 의 추가 목록은 비어 있다.
   `known_builtin_toolsets` 에 적힌 이름은 이미 확인하고 거절한 것으로 본다.
-- `known_plugin_toolsets` 에 없는 plugin toolset 은 기본 꺼짐 목록을 제외하고 켜진다.
+- `known_plugin_toolsets` 에 없는 plugin toolset 은 기본 꺼짐 목록을 제외하고 켜진다. 아래 「plugin toolset 이름」 을 본다.
 - MCP 서버 이름을 하나도 지정하지 않으면 등록된 MCP 서버가 모두 통과한다.
   전부 막으려면 `no_mcp` 를 둔다.
 
@@ -2736,6 +2736,27 @@ profile 별 목록을 대신한다.
 근거는 [v0.21.0 tools_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/tools_config.py),
 [toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/toolsets.py),
 [managed_scope.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/managed_scope.py) 다.
+
+#### plugin toolset 이름
+
+**plugin 도구는 Hermes 기본 toolset 이름(`web` 등)으로 등록하지 않는다.**
+plugin 이 `register_tool(toolset=...)` 에 준 이름은 plugin toolset 이 된다(`_get_plugin_toolset_keys`).
+`_enabled_plugin_toolsets` 는 그 platform 의 `known_plugin_toolsets` 에 없는 plugin toolset 을 허용 목록과 상관없이 켠다.
+그래서 내장 이름으로 등록하면 그 내장 toolset 전체가 허용 목록 밖에서 열린다.
+2026-11-21 에 상품 페이지 도구를 `web` 으로 등록해, 웹 검색을 허락하지 않은 손님 profile 에 웹 검색이 열린 일이 있었다.
+
+`known_plugin_toolsets` 는 Hermes 의 도구 화면 저장(`_save_platform_tools`)만 쓴다. 대시보드 `PUT /api/config` 처리기는 쓰지 않는다.
+그래서 우리 쪽이 이렇게 맞춘다.
+
+| 무엇 | 어디 |
+| --- | --- |
+| 새 profile 의 `known_plugin_toolsets.api_server` 에 `fos-product-page` 를 적는다 | profile 틀 |
+| API 허용 목록을 쓸 때 같은 기록을 적고, 목록의 `fos-product-page` 를 `web` 에 맞춘다. 새 이름을 모르는 이전 Control Plane 이 `web` 만 보내도 함께 켠다 | `dashboard-profile-api` 의 `product_page_toolset.py` |
+| 기동 때 이미 있는 profile 의 기록을 채우고 허용 목록의 `fos-product-page` 를 Hermes 가 최종 계산한 웹 검색 권한에 맞춘다. 문자열로 저장된 옛 목록과 `agent.disabled_toolsets` 도 Hermes 처럼 해석한다 | 같은 파일의 기동 이관 |
+| Hermes 에 쓰는 목록에 `web` 이 있을 때만 `fos-product-page` 를 둔다 | Control Plane `HttpHermesToolsetClient` |
+
+`fos-attachments` 는 기록에 적지 않아 모든 profile 에서 켜진다. 현재 실행의 대화 사진만 읽어 그대로 둔다.
+규칙의 소스 대조는 `hermes/tests/test_found_links_contract.py`, 저장과 이관은 `test_dashboard_profile_api_product_page.py` 가 본다.
 
 #### 설정 API와 profile 경계
 

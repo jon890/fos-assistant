@@ -73,10 +73,12 @@ Hermes 는 이 기능에 닿지 않는다.
 **등록 주소는 알려진 푸시 서비스의 `https` 주소만 받는다.** Control Plane 이 사용자가 준 주소로 POST 하므로, 막지 않으면 내부망으로 요청을 보내는 길이 된다.
 
 - 호스트는 허용 목록의 항목과 정확히 같거나, 항목이 `.` 으로 시작하면 그 접미사로 끝나야 한다(`.notify.windows.com` 은 `a.notify.windows.com` 을 받고 `evilnotify.windows.com` 은 받지 않는다). 기본 목록(FCM, Mozilla, Apple, Microsoft)은 `PushProperties` 가 갖고 설정으로 바꾼다
+- Chromium 이 쓰는 FCM 스테이징 호스트 `jmt17.google.com` 은 `/fcm/send/<구독 토큰>` 경로만 받는다. 토큰은 영문자, 숫자, `_`, `-`, `:` 로 이루어진 한 구간이며 쿼리와 fragment 는 받지 않는다. [Chromium 푸시 주소 정의](https://chromium.googlesource.com/chromium/src/+/refs/tags/148.0.7734.4/components/push_messaging/push_messaging_constants.cc)
 - 스킴은 `https`, 포트는 없거나 443, userinfo 와 IP 리터럴은 받지 않는다
 - 보낼 때 저장된 주소를 같은 규칙으로 다시 검사한다. 설정에서 호스트를 빼면 그때부터 보내지 않는다
 - `HttpClient` 는 redirect 를 따르지 않는다
 - 이름과 키의 길이 상한도 등록 때 검사한다
+- 등록 실패 안내는 화면이 한국어로 고른다. 등록 요청이 400 으로 거절되면 다른 브라우저로 다시 시도하거나 관리자에게 알리도록 안내한다
 
 ### 등록의 순서
 

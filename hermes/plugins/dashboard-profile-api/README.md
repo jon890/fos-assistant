@@ -333,6 +333,11 @@ Hermes 는 허용 목록을 계산한 뒤 `agent.disabled_toolsets` 를 마지�
 - 요청 목록에 없는 이름은 그대로 둔다. 도구를 끌 때 다시 넣지 않는다. API 는 허용 목록이 막는다
 - `memory` 는 요청 목록에 들어올 수 없으므로 `disabled_toolsets` 에 남는다
 
+**상품 페이지 toolset(`fos-product-page`)은 웹 검색(`web`)과 함께만 켠다.**
+API 목록을 쓸 때마다 `known_plugin_toolsets.api_server` 에 이 이름을 적어, 목록에 없으면 꺼지게 한다. 요청 목록의 이 이름은 `web` 에 맞춰 넣거나 빼고, 그 목록으로 검사한다.
+Hermes 처리기는 본문 목록을 그대로 쓰므로, 보정한 목록이 다르면 처리기가 성공한 뒤 경로가 파일의 목록을 보정한 목록으로 바꾼다. 새 이름을 모르는 이전 Control Plane 이 `web` 만 보내도 상품 페이지가 함께 켜진다.
+기동 때 `_migrate_product_page_toolset` 이 이미 있는 profile 의 기록을 채우고, 목록의 이 이름을 Hermes 가 최종 계산한 웹 검색 권한(`agent.disabled_toolsets` 포함)에 맞춘다. 까닭은 [Hermes 계약](../../docs/hermes-contract.md)의 「plugin toolset 이름」 이 갖는다.
+
 Hermes 처리기의 병합은 본문의 키만 쓰므로, plugin 이 검사를 마친 설정 전체를 처리기보다 먼저 쓴다.
 검사한 뒤 파일이 바뀌었으면 쓰지 않고 409 를 돌려준다. 처리기가 실패하면 파일이 plugin 이 쓴 그대로일 때만 원래 바이트로 되돌린다.
 Control Plane 은 사용자 소유권과 도구 등급을 판정한다. plugin 은 도구 등급을 판정하지 않는다.

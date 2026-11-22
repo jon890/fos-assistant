@@ -1,0 +1,8 @@
+{
+  "id": "e2e",
+  "title": "e2e 평가",
+  "questions": [
+    {"id": "files-link", "tag": "file_space", "turns": [{"text": "평가 e2e: 내 파일은 어디서 봐?"}], "expect": {"linkPrefixes": ["/files"]}},
+    {"id": "memory-link", "tag": "memory", "turns": [{"text": "평가 e2e: 내 기억은 어디서 봐?"}], "expect": {"linkPrefixes": ["/memory"]}}
+  ]
+}

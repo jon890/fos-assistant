@@ -144,7 +144,7 @@ async function routePush(
   state: {
     config?: { enabled: boolean; publicKey: string | null };
     devices: Device[];
-    putStatuses?: { status: number; code?: string }[];
+    putStatuses?: { status: number; code?: string; message?: string }[];
   },
 ) {
   const puts: Record<string, unknown>[] = [];
@@ -159,7 +159,7 @@ async function routePush(
     if (answer && answer.status !== 200) {
       // 서버가 키를 바꿨다는 거절 뒤에는 새 공개 키를 준다.
       if (answer.code === "PUSH_KEY_CHANGED") config = { enabled: true, publicKey: ROTATED_KEY };
-      return route.fulfill({ status: answer.status, json: { code: answer.code, message: "거절" } });
+      return route.fulfill({ status: answer.status, json: { code: answer.code, message: answer.message ?? "거절" } });
     }
     const device = {
       id: `device-${puts.length}`,
@@ -257,6 +257,32 @@ test("서버의 공개 키가 바뀌었다고 거절되면 다시 구독해 한 
   const record = await recorded(page);
   expect(record.subscribed).toBe(2);
   expect(record.unsubscribed).toBe(1);
+});
+
+test("서버가 알림 주소를 거절하면 한국어로 다시 시도할 방법을 보인다", async ({ page }) => {
+  await fakeBrowser(page);
+  const calls = await routePush(page, {
+    devices: [],
+    putStatuses: [{
+      status: 400,
+      code: "VALIDATION_FAILED",
+      message: "endpoint is not an allowed push service",
+    }],
+  });
+  await page.goto("/settings/notifications");
+  const enable = thisDevice(page).getByRole("button", { name: "이 기기에서 알림 받기" });
+  await enable.click();
+  await expect(thisDevice(page).getByRole("alert")).toHaveText(
+    "이 기기를 등록하지 못했어요. 다른 브라우저에서 다시 시도하거나 관리자에게 알려 주세요.",
+  );
+  await expect(enable).toBeEnabled();
+  await expect(deviceList(page).getByTestId("push-device")).toHaveCount(0);
+  expect(calls.puts).toHaveLength(1);
+
+  // 다시 누르면 등록을 한 번 더 보내고, 이번에 받아들여지면 목록에 보인다.
+  await enable.click();
+  await expect(deviceList(page).getByTestId("push-device")).toHaveCount(1);
+  expect(calls.puts).toHaveLength(2);
 });
 
 test("알림을 거절한 브라우저는 단추 없이 다시 켜는 방법을 보인다", async ({ page }) => {
