@@ -356,7 +356,7 @@ OAuth 앱 설정은 `connector.oauth` 가 맡고 아래 하위 기능인 `connec
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다. 순서는 아래 표다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 싣는 모델과 effort 는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「모델 선택」 이 정한다.
+6. `AgentRuntimes` 로 고른 런타임 구현(Hermes 는 `HermesAgentRuntime` 안의 `HttpHermesRunsClient`)이 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 보내는 모델과 effort 는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「모델 선택」 이 정한다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 9. `ExecutionRecorder` 가 완료 기록 서비스에 위임해 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「합계와 완전성」 이 갖는다.

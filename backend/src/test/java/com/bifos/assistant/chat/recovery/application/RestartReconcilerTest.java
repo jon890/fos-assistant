@@ -365,6 +365,26 @@ class RestartReconcilerTest {
 
 
     @Test
+    @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 상한에서 실행이 돈 profile 로 중지를 보낸다")
+    void stopsRunOnStoredProfileWhenAgentProfileDiffers() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
+
+        reconciler.claim();
+        reconciler.reconcile(SHORT_WAIT);
+
+        awaitStatus(row, ExecutionStatus.FAILED);
+        assertThat(stub.stoppedProfile(row.hermesRunId())).isEqualTo(storedProfile);
+        awaitIdle(conversation.id());
+        releaseRemoteEndHold(row);
+    }
+
+
+    @Test
     @DisplayName("상한까지 계속 돌면 중지를 보내고 RECONCILE_TIMEOUT 으로 적는다")
     void stopsAndRecordsTimeoutWhenStillRunningAtLimit() {
         AgentExecution row = chatTurn(conversation, chief);

@@ -1,6 +1,5 @@
 package com.bifos.assistant.chat.recovery.application;
 
-import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.chat.recovery.config.RestartReconcileProperties;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
@@ -408,7 +407,7 @@ public class RestartReconciler implements SmartLifecycle {
                 return;
             }
             try {
-                RuntimeTarget target = agent.runtimeTargetOf(row.profileName());
+                var target = agent.runtimeTargetOf(row.profileName());
                 RunLookup lookup = runtimes.of(target).lookupRun(target, runId);
                 // 답을 받았으면 닿은 것이다. 그 뒤 적다가 실패해 상한을 넘겨도 닿지 못한 것으로 적지 않는다.
                 reached = true;
@@ -478,7 +477,8 @@ public class RestartReconciler implements SmartLifecycle {
     /** 보내지 못하면 경고 로그만 남기고 거짓을 돌려준다. */
     private boolean sendStop(Agent agent, AgentExecution row) {
         try {
-            runtimes.of(agent.runtimeTarget()).stop(agent.runtimeTargetOf(row.profileName()), row.hermesRunId());
+            var target = agent.runtimeTargetOf(row.profileName());
+            runtimes.of(target).stop(target, row.hermesRunId());
             return true;
         } catch (RuntimeException ex) {
             log.warn("남은 실행에 중지를 보내지 못했다 executionId={} runId={}", row.id(), row.hermesRunId(), ex);

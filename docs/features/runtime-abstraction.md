@@ -16,14 +16,14 @@ port 가 무엇을 감싸야 하는지 정하려고 지금 기대는 곳을 모�
 | 묶음 | 지금 하는 일 | 부르는 port |
 | --- | --- | --- |
 | 실행 | turn 제출, 사건 스트림, 끝난 결과, 중지, 글 끼워 넣기, 실행 조회, 잃은 실행 해제, session 삭제, 실제로 돈 모델 읽기 | `AgentRuntime`. Hermes 구현은 `HermesAgentRuntime` 이고 그 안에서 `HermesRunsClient` 를 부른다 |
-| 지침과 기억 | 실행마다 `instructions` 에 공통 답변 지침과 요청자가 볼 수 있는 Memory 를 넣는다 | `HermesRunCommand` |
+| 지침과 기억 | 실행마다 `instructions` 에 공통 답변 지침과 요청자가 볼 수 있는 Memory 를 넣는다 | `RunCommand` |
 | Control Plane 도구 | Hermes 가 Control Plane MCP 서버를 부르고, `fos-ctx` plugin 이 실행 맥락을 서명해 요청자를 정한다([MCP 와 토큰](mcp.md)) | `hermes/plugins/fos-ctx/` |
 | 플러그인과 승인 | 플러그인 설치와 바인딩, 보관 파일, 도구 호출 판정과 승인 카드 | `HermesConnectorClient`, `fos-ctx` hook |
-| 위임 | Control Plane 이 맡기는 위임과 Hermes 내장 하위 에이전트, 그 사용량 | `HermesRunsClient`, 사건 스트림 |
+| 위임 | Control Plane 이 맡기는 위임과 Hermes 내장 하위 에이전트, 그 사용량 | `AgentRuntime`, 사건 스트림 |
 | profile | profile 생성과 삭제, 성격 글, 환경 값 | `HermesDashboardClient` |
 | 도구와 스킬 | toolset 목록과 켜기, 스킬 목록과 게시 | `HermesToolsetClient`, `HermesSkillClient` |
 | 실행 공간 | 셸과 파일 도구가 사용자별 Docker 실행 공간에서 돈다 | profile 설정 |
-| 모델 | provider 와 모델 목록, 실행마다 모델 지정, reasoning effort | `HermesRunCommand`, 모델 조회 |
+| 모델 | provider 와 모델 목록, 실행마다 모델 지정, reasoning effort | `RunCommand`, 모델 조회 |
 | 그 밖 | gateway 기동 시각, 플러그인 사건 목록 | `HermesGatewayClient`, `HermesEventFeedClient` |
 
 ## 조사
