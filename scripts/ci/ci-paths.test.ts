@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, touchesGuide, withoutSlow } from "./ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, slowJobsToKeep, touchesGuide, touchesToolsets, withoutSlow } from "./ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -297,6 +297,33 @@ test("모델 지시문을 만드는 파일을 바꾸면 E2E 만 라벨 없이 �
   // keep 에 없는 느린 job 은 그대로 건너뛰고, 판정에서 돌지 않는 job 은 keep 에 들어도 돌지 않는다.
   assert.equal(withoutSlow(classify(["web/src/app.tsx"]), false, ["e2e"]).browser.run, false);
   assert.equal(withoutSlow(classify(["docs/prd.md"]), false, ["e2e"]).e2e.run, false);
+});
+
+test("Hermes toolset 목록을 정하거나 받는 파일을 바꾸면 E2E 와 브라우저를 라벨 없이 돌린다", () => {
+  const toolset = [
+    "backend/src/main/java/com/bifos/assistant/agent/domain/AgentToolPolicy.java",
+    "backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java",
+    "backend/src/main/java/com/bifos/assistant/agent/application/AgentDefaultToolsets.java",
+    "backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesToolsetClient.java",
+    "test/e2e/fake-hermes/dashboard.ts",
+    "test/e2e/fake-hermes/runtime-fixtures.ts",
+  ];
+  for (const file of toolset) {
+    assert.equal(touchesToolsets([file]), true, file);
+    assert.deepEqual(slowJobsToKeep(["docs/prd.md", file]).sort(), [...SLOW_JOBS].sort(), file);
+    const kept = withoutSlow(classify([file]), false, slowJobsToKeep([file]));
+    assert.equal(kept.e2e.run, true, file);
+    assert.equal(kept.browser.run, true, file);
+  }
+  // 같은 패키지의 다른 클래스와 테스트, 다른 가짜 Hermes 파일은 대상이 아니다.
+  for (const file of [
+    "backend/src/main/java/com/bifos/assistant/agent/application/AgentService.java",
+    "backend/src/test/java/com/bifos/assistant/agent/AgentToolPolicyTest.java",
+    "test/e2e/fake-hermes/connectors.ts", "hermes/plugins/dashboard-profile-api/toolconfig.py",
+  ]) assert.equal(touchesToolsets([file]), false, file);
+  // 지시문 파일만 바꾸면 E2E 만, 둘 다 아니면 아무것도 남기지 않는다.
+  assert.deepEqual(slowJobsToKeep(["test/e2e/fake-hermes/scenario-fixtures.ts"]), ["e2e"]);
+  assert.deepEqual(slowJobsToKeep(["web/src/app.tsx"]), []);
 });
 
 test("API 컨트롤러와 웹 경로 파일을 지우면 경로 삭제로 본다", () => {
