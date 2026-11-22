@@ -220,6 +220,7 @@ from .connector_vault_key import (
 )
 
 from .connector_binding_migration import _migrate_bindings, _migrate_connectors
+from .product_page_toolset import _migrate_product_page_toolset
 from .connector_vault_migration import (
     _migrate_vault_files,
 )
@@ -332,7 +333,6 @@ from .toolconfig import (
 )
 
 
-
 ENV_VAR = "HERMES_DASHBOARD_PROFILE_API_SECRET"
 
 
@@ -361,9 +361,9 @@ def register(ctx) -> None:
         )
         return
 
-    # 보관 파일을 활성 key 로 옮기고, 붙은 로컬 바인딩을 실행기 정의로 옮긴다. 경로를 감싸기 전에 돌아 요청과 겹치지 않는다.
-    # 실패해도 기동은 잇는다.
+    # 보관 파일과 붙은 로컬 바인딩을 옮기고 상품 페이지 toolset 을 web 에 맞춘다. 경로를 감싸기 전이라 요청과 겹치지 않고, 실패해도 기동은 잇는다.
     _migrate_connectors()
+    _migrate_product_page_toolset()
 
     if not _install_gate():
         logger.error(

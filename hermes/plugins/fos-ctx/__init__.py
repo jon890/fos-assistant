@@ -227,13 +227,14 @@ from .subagent import (
 
 
 from .attachment_inspect import TOOL as INSPECT_TOOL, SCHEMA as INSPECT_SCHEMA, handle as inspect_attachment
-from .product_page import TOOL as PRODUCT_PAGE_TOOL, SCHEMA as PRODUCT_PAGE_SCHEMA, handle as read_product_page
+from .product_page import (TOOL as PRODUCT_PAGE_TOOL, TOOLSET as PRODUCT_PAGE_TOOLSET, SCHEMA as PRODUCT_PAGE_SCHEMA,
+                           handle as read_product_page)
 
 
 def register(ctx):
     ctx.register_tool(name=INSPECT_TOOL, toolset="fos-attachments", schema=INSPECT_SCHEMA,
                       handler=inspect_attachment)
-    ctx.register_tool(name=PRODUCT_PAGE_TOOL, toolset="web", schema=PRODUCT_PAGE_SCHEMA,
+    ctx.register_tool(name=PRODUCT_PAGE_TOOL, toolset=PRODUCT_PAGE_TOOLSET, schema=PRODUCT_PAGE_SCHEMA,
                       handler=read_product_page, is_async=True)
     ctx.register_hook("pre_tool_call", pre_tool_call)
     ctx.register_hook("subagent_start", subagent_start)

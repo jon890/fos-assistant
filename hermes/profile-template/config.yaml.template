@@ -40,6 +40,13 @@ platform_toolsets:
     - fos-assistant
     - fos-attachments
 
+# Hermes turns on every plugin toolset that is missing from this record, whatever the allowlist says.
+# fos-product-page reads web pages, so it must stay off until the Control Plane turns on web for this
+# profile; listing it here makes the allowlist above decide. The Control Plane lists it only with web.
+known_plugin_toolsets:
+  api_server:
+    - fos-product-page
+
 agent:
   # The Control Plane decides what the agent may know and may do. Toolsets that reach the host,
   # other services, or a second memory store stay off until a deliberate decision turns them on.

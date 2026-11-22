@@ -11,6 +11,9 @@ from .context import logger
 from .next_step import alternative
 
 TOOL = "product_page_read"
+# 이 도구만 담는 자기 toolset 이다. Hermes 기본 이름(`web`)으로 등록하면 그 이름이 plugin toolset 이 되어,
+# `known_plugin_toolsets` 에 없는 profile 에서 웹 검색까지 기본으로 켜진다. Control Plane 은 `web` 을 켠 profile 에만 이것을 켠다.
+TOOLSET = "fos-product-page"
 MAX_URL_CHARS = 2048
 MAX_IMAGES = 24
 MAX_HTML_CHARS = 2_000_000

@@ -53,7 +53,7 @@ class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
         self.assertEqual(saved["agent"], before["agent"])
         # GET /p/<profile>/v1/toolsets 가 표시하는 API 경로의 실제 켜짐 상태를 계산한다.
         self.assertEqual(fake_platform_tools(saved, "api_server"),
-                         {"delegation", "web", "fos-assistant"})
+                         {"delegation", "web", "fos-assistant", "fos-product-page"})
         self.assertEqual(self.request("/api/tools/toolsets", "GET", token="valid"), 204)
         self.assertEqual(self.request("/api/tools/toolsets", "POST", token="valid"), 401)
         self.assertEqual(self.request("/api/config", "GET", token="valid"), 401)
@@ -67,7 +67,7 @@ class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
         saved = yaml.safe_load((self.root / "blog/config.yaml").read_text(encoding="utf-8"))
         self.assertEqual(fake_platform_tools(saved, "api_server"),
-                         {"delegation", "web", "fos-assistant"})
+                         {"delegation", "web", "fos-assistant", "fos-product-page"})
 
         body["config"]["platform_toolsets"]["api_server"] = ["fos-assistant"]
         original = (self.root / "blog/config.yaml").read_bytes()
@@ -169,7 +169,7 @@ class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
         # 끌 때는 허용 목록만 바뀐다. disabled_toolsets 에 다시 넣지 않는다.
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.toolset_body()), 200)
         saved = self.saved_config()
-        self.assertEqual(fake_platform_tools(saved, "api_server"), {"delegation", "web", "fos-assistant"})
+        self.assertEqual(fake_platform_tools(saved, "api_server"), {"delegation", "web", "fos-assistant", "fos-product-page"})
         self.assertEqual(saved["agent"]["disabled_toolsets"], ["memory", "terminal"])
 
     def test_toolset_update_keeps_memory_disabled(self):
