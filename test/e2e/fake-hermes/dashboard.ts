@@ -27,6 +27,7 @@ import {
   TOOLSET_CATALOG,
   SANDBOX_OWNER_PATTERN,
   CONTROL_PLANE_MCP,
+  PRODUCT_PAGE_TOOLSET,
   SANDBOX_TOOLSETS,
   SKILL_VERSION_DIR,
   DEFAULT_API_SERVER_TOOLSETS,
@@ -294,7 +295,7 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
       if (configKeys.includes("platform_toolsets")) {
         const toolsets = body.config?.platform_toolsets?.api_server;
         const bound = boundServers(profile);
-        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP, ...bound]);
+        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP, PRODUCT_PAGE_TOOLSET, ...bound]);
         if (Object.keys(body.config?.platform_toolsets ?? {}).length !== 1 || !Array.isArray(toolsets)
             || !toolsets.includes(CONTROL_PLANE_MCP)
             || !toolsets.every((name) => typeof name === "string" && validNames.has(name))) {
