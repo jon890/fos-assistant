@@ -28,7 +28,6 @@ public class ConnectorExecutionClaims {
     private final ConnectorActionExecutionRepository contents;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
-    private final PurchaseLimits purchases;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
@@ -63,11 +62,7 @@ public class ConnectorExecutionClaims {
                 gate.requireOpen();
                 // 승인 뒤 계좌 주인이 상한을 낮췄으면 소비 전에 막는다. 상한 변경도 위에서 잠근 사용자 행을 잠그므로 그 순간에 커밋된 값을 본다.
                 // 자기 EXECUTING 줄은 하루 합계에서 빼고, 하루는 합계가 주문을 묶는 승인 시각의 KST 날짜로 센다.
-                var expected = snapshot.expectedTotalKrw();
-                if (expected.isPresent()) {
-                    // 주문서 준비는 계좌가 없고 구매 상한으로 본다(ADR-20261113 / purchase-checkout). 걸리면 플러그인은 구매하기를 누르지 않는다.
-                    purchases.requireWithin(payload.userId(), action.id(), expected.getAsLong(), action.decidedAt());
-                } else {
+                if (snapshot.expectedTotalKrw().isEmpty()) {
                     gate.requireScope(payload.userId(), snapshot.scopeJson());
                     gate.requireWithinLimits(payload.userId(), action.id(), snapshot.executionArgsJson(), action.decidedAt());
                 }
