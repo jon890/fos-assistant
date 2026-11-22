@@ -229,8 +229,29 @@ class ReportTest(FoundLinksFixture):
             "/boots/preview.jpg": 120_000,
             "/boots/responsive.jpg": 60_000,
             "/boots/medium.jpg": 60_000,
-            "/boots/small.jpg": 9_600,
         })
+        self.assertNotIn("/boots/small.jpg", page["links"], "한 변이 200px 보다 작은 그림은 후보가 아니다")
+
+    def test_product_reader_does_not_offer_badges_or_icons_as_photos(self):
+        """og:image 와 상품 사진이 없는 페이지에서 배지, 아이콘, 작은 그림을 본문 사진 후보로 알리지 않는다."""
+        product_page = sys.modules[self.plugin.__name__ + ".product_page"]
+        html = (Path(__file__).parent / "fixtures" / "product-page-badge.html").read_text(encoding="utf-8")
+
+        self.assertEqual(product_page.photos(html), [])
+
+    def test_product_reader_keeps_large_product_photo_next_to_badge(self):
+        """배지와 큰 상품 사진이 함께 있으면 상품 사진만 후보로 남고, 크기를 모르는 사진은 0으로 남는다."""
+        product_page = sys.modules[self.plugin.__name__ + ".product_page"]
+        html = (Path(__file__).parent / "fixtures" / "product-page-badge.html").read_text(encoding="utf-8")
+        html += ('<img width="800" height="800" alt="Classic Short Boot" src="https://cdn.example.com/p/classic-short.jpg">'
+                 '<img alt="Classic Short Boot side" src="https://cdn.example.com/p/classic-short-side.jpg">'
+                 '<img srcset="https://cdn.example.com/p/classic-short-back.jpg 900w">')
+
+        self.assertEqual(product_page.photos(html), [
+            {"kind": "body", "url": "https://cdn.example.com/p/classic-short-back.jpg", "size": 810_000},
+            {"kind": "body", "url": "https://cdn.example.com/p/classic-short.jpg", "size": 640_000},
+            {"kind": "body", "url": "https://cdn.example.com/p/classic-short-side.jpg", "size": 0},
+        ])
 
     def test_product_reader_does_not_report_failed_page(self):
         """읽기 서비스가 상품 페이지를 읽지 못하면 후보를 남기지 않는다."""
