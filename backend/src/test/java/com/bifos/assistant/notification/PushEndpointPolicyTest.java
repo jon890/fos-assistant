@@ -55,6 +55,7 @@ class PushEndpointPolicyTest {
         "https://jmt17.google.com:8443/fcm/send/abc",
         "https://user@jmt17.google.com/fcm/send/abc",
         "https://jmt17.google.com.evil.example/fcm/send/abc",
+        "https://jmt17.google.com./fcm/send/abc",
         "https://other.google.com/fcm/send/abc",
         "https://jmt17.google.com/fcm/send/",
         "https://jmt17.google.com/another/path/abc",
