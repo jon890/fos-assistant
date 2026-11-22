@@ -278,6 +278,11 @@ test("서버가 알림 주소를 거절하면 한국어로 다시 시도할 방�
   await expect(enable).toBeEnabled();
   await expect(deviceList(page).getByTestId("push-device")).toHaveCount(0);
   expect(calls.puts).toHaveLength(1);
+
+  // 다시 누르면 등록을 한 번 더 보내고, 이번에 받아들여지면 목록에 보인다.
+  await enable.click();
+  await expect(deviceList(page).getByTestId("push-device")).toHaveCount(1);
+  expect(calls.puts).toHaveLength(2);
 });
 
 test("알림을 거절한 브라우저는 단추 없이 다시 켜는 방법을 보인다", async ({ page }) => {
