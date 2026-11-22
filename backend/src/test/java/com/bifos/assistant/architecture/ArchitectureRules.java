@@ -423,6 +423,7 @@ public final class ArchitectureRules {
         .should()
         .dependOnClassesThat(resideInAPackage("com.bifos.assistant.hermes..")
             .and(simpleName("HermesRunsClient")
+                .or(simpleName("HermesAgentRuntime"))
                 .or(simpleName("HermesRunEventStream"))
                 .or(simpleName("HermesRunCommand"))
                 .or(simpleName("HermesRunResult"))

@@ -365,6 +365,26 @@ class RestartReconcilerTest {
 
 
     @Test
+    @DisplayName("복구한 결과에 실제 모델이 없으면 실행이 돈 profile 의 세션에서 읽는다")
+    void readsActualModelOnStoredProfileWhenResultLacksRuntime() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        String sessionId = "sess-" + UUID.randomUUID();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.finished(new HermesRunResult(
+            row.hermesRunId(), sessionId, "completed", "끝난 답", null, null, null, USAGE, null)));
+
+        reconciler.claim();
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        assertThat(stub.sessionRuntimeProfile(sessionId)).isEqualTo(storedProfile);
+    }
+
+
+    @Test
     @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 상한에서 실행이 돈 profile 로 중지를 보낸다")
     void stopsRunOnStoredProfileWhenAgentProfileDiffers() {
         String storedProfile = "moved-" + chief.hermesProfile();

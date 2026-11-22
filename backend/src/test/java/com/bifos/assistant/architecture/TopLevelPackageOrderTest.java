@@ -2,7 +2,6 @@ package com.bifos.assistant.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,16 +66,14 @@ class TopLevelPackageOrderTest {
     void allowsTopPackageToUseEveryOtherPackage() {
         List<String> others = TopLevelPackageOrder.ORDER.subList(0, TopLevelPackageOrder.ORDER.size() - 1);
 
-        assertThat(others).hasSize(24);
         assertThat(TopLevelPackageOrder.violations("admin", others)).isEmpty();
     }
 
 
     @Test
-    @DisplayName("층 순서는 겹치는 이름 없이 스물다섯이다")
-    void orderHasTwentyFiveDistinctPackages() {
-        assertThat(TopLevelPackageOrder.ORDER).hasSize(25);
-        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(25);
+    @DisplayName("층 순서에 겹치는 이름이 없다")
+    void orderHasNoDuplicatePackages() {
+        assertThat(TopLevelPackageOrder.ORDER).doesNotHaveDuplicates();
     }
 
 

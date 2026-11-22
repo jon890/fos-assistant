@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.execution.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.runtime.application.AgentRuntimes;
@@ -56,7 +57,7 @@ public class ExecutionCompletionRecorder {
     public AgentExecution complete(
         AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String outputText) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
+        SessionRuntime served = served(execution, agent, result, requested);
         String provider = served.provider();
         String model = served.model();
         execution.attachRunId(result.runId());
@@ -81,7 +82,7 @@ public class ExecutionCompletionRecorder {
             return fail(execution, errorCode);
         }
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
+        SessionRuntime served = served(execution, agent, result, requested);
         String provider = served.provider();
         String model = served.model();
         execution.attachRunId(result.runId());
@@ -116,7 +117,7 @@ public class ExecutionCompletionRecorder {
             return cancel(execution);
         }
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
+        SessionRuntime served = served(execution, agent, result, requested);
         String provider = served.provider();
         String model = served.model();
         execution.attachRunId(result.runId());
@@ -140,12 +141,12 @@ public class ExecutionCompletionRecorder {
      * <p>v0.21.5 실행 조회의 {@code runtime} 에 둘 다 있으면 그 짝을 통째로 쓴다. 출처가 다른 두 값을 한 짝으로
      * 적으면 금액도 틀린 짝으로 계산된다. 없으면 세션 조회, {@code runtime}, 대화가 고른 값 순서로 칸마다 채운다.
      */
-    private SessionRuntime served(Agent agent, RunResult result, ModelChoice requested) {
+    private SessionRuntime served(AgentExecution execution, Agent agent, RunResult result, ModelChoice requested) {
         SessionRuntime runtime = result.runtime();
         if (runtime != null && !isBlank(runtime.provider()) && !isBlank(runtime.model())) {
             return runtime;
         }
-        SessionRuntime actual = readActualRuntime(agent, result);
+        SessionRuntime actual = readActualRuntime(execution, agent, result);
         String provider = firstNonBlank(
             actual == null ? null : actual.provider(),
             firstNonBlank(
@@ -162,11 +163,12 @@ public class ExecutionCompletionRecorder {
     }
 
 
-    private SessionRuntime readActualRuntime(Agent agent, RunResult result) {
-        SessionRuntime actual = runtimes.of(agent.runtimeTarget()).readSessionRuntime(agent.runtimeTarget(), result.sessionId());
+    /** 실행 기록에 저장된 격리 단위로 읽는다. 에이전트의 값이 바뀐 뒤 복구한 실행도 그 실행이 돈 곳의 세션을 읽는다. */
+    private SessionRuntime readActualRuntime(AgentExecution execution, Agent agent, RunResult result) {
+        RuntimeTarget target = agent.runtimeTargetOf(execution.profileName());
+        SessionRuntime actual = runtimes.of(target).readSessionRuntime(target, result.sessionId());
         if (actual == null) {
-            log.info(
-                "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.runtimeTarget().unit(), result.sessionId());
+            log.info("실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", target.unit(), result.sessionId());
         }
         return actual;
     }
