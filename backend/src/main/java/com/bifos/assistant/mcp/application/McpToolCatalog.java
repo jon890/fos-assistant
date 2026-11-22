@@ -221,7 +221,9 @@ public class McpToolCatalog {
 
     /** 기다림 상한이 0 이면 지금 설명, 아니면 그 초까지 기다려 결과를 함께 돌려준다는 설명이다(ADR-20261121 / delegate-wait). */
     private static String delegateDescription(DelegationProperties delegation) {
-        String target = "agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. ";
+        String target = "agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. "
+            + "구매를 맡길 때 결제 금액처럼 승인 전에 확인할 수 없는 값은 준비를 시작하는 조건으로 붙이지 않는다. "
+            + "사용자가 정한 예산은 카드와 주문서를 확인할 때 알려 주고, 최종 가격 판단과 결제는 사용자가 한다. ";
         long waitSeconds = delegation.delegateWaitMax().toSeconds();
         if (waitSeconds <= 0) {
             return "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. " + target

@@ -56,6 +56,13 @@ export function fetchRunningTurn(conversationId: string): Promise<Response> {
   });
 }
 
+/** 아직 답에 묶이지 않은 그림 경로를 저장한 순서대로 읽는다(generated-image 설계의 PR7). */
+export function fetchLiveImages(conversationId: string): Promise<Response> {
+  return fetch(`${conversationPath(conversationId)}/live-images`, {
+    cache: "no-store",
+  });
+}
+
 /** 그 대화의 저장된 이력을 읽는다. */
 export function fetchConversationMessages(
   conversationId: string,

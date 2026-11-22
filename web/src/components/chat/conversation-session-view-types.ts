@@ -41,6 +41,7 @@ export type Props = Pick<
   | "setDraft"
   | "executionId"
   | "liveDelegations"
+  | "liveImages"
   | "stopRequested"
   | "setComposerBlocking"
   | "replace"

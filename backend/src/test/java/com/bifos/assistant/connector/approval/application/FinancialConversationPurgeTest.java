@@ -64,4 +64,27 @@ class FinancialConversationPurgeTest extends FinancialConnectorTestBase {
         assertThat(limits.spentToday(user.id(), null, nextDay)).isEmpty();
         assertThat(counters().path("financial").intValue()).isEqualTo(1);
     }
+
+
+    @Test
+    @DisplayName("당일 성공 구매의 본문은 하루 상한 계산에 쓰이지 않아 대화 purge 때 지운다")
+    void erasesSucceededPurchaseBodyOnConversationPurge() {
+        var pending = request();
+        assertThat(publicApproval.approve(user, pending.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var action = action(pending);
+        var stored = contents.findById(action.id()).orElseThrow();
+        assertThat(stored.executionArgsJson()).isNotNull();
+
+        jdbc.update("UPDATE connector_action SET risk = 'PURCHASE' WHERE id = ?", action.id());
+        jdbc.update("UPDATE agent_execution SET status = 'SUCCEEDED' WHERE id = ?", action.originExecutionId());
+        chat.delete(user, action.conversationId());
+
+        assertThat(purger.purgeDue(now)).isPositive();
+        var erased = contents.findById(action.id()).orElseThrow();
+        assertThat(erased.executionArgsJson()).isNull();
+        assertThat(erased.summaryJson()).isNull();
+        assertThat(erased.scopeJson()).isNull();
+        assertThat(erased.contentKeyId()).isNull();
+        assertThat(actions.findById(action.id()).orElseThrow().bodyErasedAt()).isEqualTo(now);
+    }
 }

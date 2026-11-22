@@ -60,10 +60,13 @@ class McpToolCatalogTest {
                 "memory_search", McpTaskTools.LIST, McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE,
                 McpTaskTools.DELETE, McpFollowUpTools.LIST, McpFollowUpTools.DONE, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);
         assertThat(first).contains(list, record, memory);
-        assertThat(description(first))
+        assertThat(description(first, "agent_delegate"))
+            .contains("승인 전에 확인할 수 없는 값은 준비를 시작하는 조건으로 붙이지 않는다",
+                "최종 가격 판단과 결제는 사용자가 한다");
+        assertThat(description(first, "agent_status"))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
             .endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 20초).");
-        assertThat(description(catalog.tools())).endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 40초).");
+        assertThat(description(catalog.tools(), "agent_status")).endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 40초).");
     }
 
 

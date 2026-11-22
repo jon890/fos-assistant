@@ -31,13 +31,13 @@ export function pick(value: Json, keys: Key[]): Json {
 
 /** 0 이상의 정수 원화. 숫자 글(`"12,900"`)도 받는다. 아니면 `null`. */
 export function won(value: Json): number | null {
-  const number =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value.replace(/[,원\s]/g, ""))
-        : NaN;
-  return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  const raw = typeof value === "string" ? value.replace(/[,원\s]/g, "") : value;
+  const number = typeof raw === "string" && raw !== "" ? Number(raw) : raw;
+  return typeof number === "number" &&
+    Number.isSafeInteger(number) &&
+    number >= 0
+    ? number
+    : null;
 }
 
 /** 제어 문자를 뺀 한 줄 글을 `max` 자로 자른다. 비면 `null`. */

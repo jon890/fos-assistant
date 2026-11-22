@@ -18,6 +18,7 @@ type Artifact = {
   prompt: string | null;
   vaultItemId: number | null;
   sourceLinks?: string[];
+  foundSourceLinks?: string[];
 };
 
 function image(title: string, extra: Partial<Artifact> = {}): Artifact {
@@ -100,6 +101,24 @@ for (const width of [1280, 390]) {
     await expect(images.nth(1).getByTestId("generated-image-source-links")).toHaveCount(0);
   });
 }
+
+test("비서가 찾은 링크에만 「비서가 찾음」 이 붙고 사용자가 보낸 링크와 옛 응답에는 없다", async ({ page }) => {
+  const sent = "https://shop.example.com/goods/1";
+  const found = "https://img.example.com/p.png";
+  await openWithImages(page, [
+    image("양말 신은 아이", { sourceLinks: [sent, found], foundSourceLinks: [found] }),
+    image("옛 응답 그림", { sourceLinks: [found] }),
+  ]);
+
+  const images = page.getByTestId("assistant-message").last().getByTestId("generated-image");
+  await images.nth(0).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+  const items = images.nth(0).getByTestId("generated-image-source-links").getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).getByTestId("generated-image-found-link")).toHaveCount(0);
+  await expect(items.nth(1).getByTestId("generated-image-found-link")).toHaveText("비서가 찾음");
+  await images.nth(1).getByTestId("generated-image-prompt").getByText("그림 지시문 보기").click();
+  await expect(images.nth(1).getByTestId("generated-image-found-link")).toHaveCount(0);
+});
 
 test("그림을 누르면 크게 보이고 내려받는 파일 이름이 제목이며 보관본이 없으면 보관할 수 있다", async ({ page }) => {
   const conversationId = await openWithImages(page, [image("수채화 고양이")]);
@@ -186,4 +205,53 @@ test("내 파일의 그림 줄은 제목과 작은 그림을 보이고 주소가
   const image = page.getByTestId("my-file-preview").getByTestId("my-file-image");
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+});
+
+test("답이 도는 중 그림이 저장되면 끝 사건 전에 흐르는 답에 보이고 끝나면 저장된 답의 그림으로 이어진다", async ({
+  page,
+  hermes,
+}) => {
+  // 그림 올리기는 profile 플러그인 몫이라 `test/e2e` 의 그림 시나리오가 본다. 여기서는 대화 단위 SSE 의 `image` 사건과
+  // 묶이지 않은 그림 목록만 넣는다. 받은 연결이 끝나면 화면이 다시 붙어 목록을 다시 읽고, 같은 경로는 한 번만 그린다.
+  const path = "generated/수채화 고양이.png";
+  await page.route("**/api/chat/conversations/*/live-images", (route) =>
+    route.fulfill({ status: 200, json: [path] }));
+  await page.route("**/api/chat/conversations/*/events", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: `data: ${JSON.stringify({ type: "image", detail: path })}\n\n`,
+    }));
+  await page.route("**/api/chat/conversations/*/files/generated/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  await page.route("**/api/chat/conversations/*/messages", async (route) => {
+    const response = await route.fetch();
+    const messages = (await response.json()) as { role: string; artifacts: Artifact[] }[];
+    const answer = messages.findLast((message) => message.role === "ASSISTANT");
+    if (answer) answer.artifacts = [image("수채화 고양이")];
+    await route.fulfill({ response, json: messages });
+  });
+
+  await hermes.holdNextRun();
+  await page.goto("/new");
+  await page.getByRole("textbox", { name: "메시지" }).fill(`그림 바로 보기 ${Date.now()}`);
+  await page.getByTestId("composer-shell").getByRole("button", { name: "보내기" }).click();
+  await hermes.waitForHeldRun();
+
+  // 붙잡은 실행도 첫 조각을 흘리므로 그림은 흐르는 답 줄에 붙는다. 조각이 오기 전이면 기다림 줄에 있다.
+  const live = page.getByTestId("generated-image");
+  await expect(live).toHaveCount(1);
+  await expect(live.getByRole("img")).toHaveAttribute("alt", "수채화 고양이");
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  // 임시 그림은 저장한 답이 아니어서 지시문 칸이 없다.
+  await expect(live.getByTestId("generated-image-prompt")).toHaveCount(0);
+
+  await hermes.releaseHeldRun();
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  const saved = page.getByTestId("assistant-message").last().getByTestId("generated-image");
+  await expect(saved).toHaveCount(1);
+  await expect(saved.getByTestId("generated-image-prompt")).toHaveCount(1);
+  await expect(page.getByTestId("pending-assistant")).toHaveCount(0);
 });

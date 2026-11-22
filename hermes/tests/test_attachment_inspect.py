@@ -16,7 +16,7 @@ class AttachmentInspectTest(unittest.TestCase):
         self.plugin = load_ctx(self.addCleanup)
         self.inspect = importlib.import_module(self.plugin.__name__ + ".attachment_inspect")
         self.mapping = patch(self.plugin.__name__ + ".hooks.read_tool_map", return_value=(None, False))
-        self.mapping.start()
+        self.read_tool_map = self.mapping.start()
         self.addCleanup(self.mapping.stop)
 
     def test_hook_overwrites_model_context_with_actual_call(self):
@@ -32,6 +32,30 @@ class AttachmentInspectTest(unittest.TestCase):
         self.assertEqual(result["action"], "modify")
         self.assertEqual(result["args"]["_fos_ctx"]["tool_call_id"], "actual")
         self.assertNotEqual(result["args"]["_fos_inspect"]["sig"], "forged")
+
+    def test_hook_checks_isolation_only_when_tool_map_exists(self):
+        context = {
+            "v": 1, "root_session_id": "root", "session_id": "session",
+            "tool_call_id": "call", "sig": "signed",
+        }
+        with patch.object(self.inspect, "build_context", return_value=context), \
+             patch.object(self.inspect, "_read_token", return_value="fake-token"), \
+             patch.object(self.inspect, "top_level_session", return_value=True):
+            for servers, isolated, expected_action in (
+                (None, True, "modify"),
+                ({}, True, "block"),
+                ({}, False, "modify"),
+            ):
+                with self.subTest(servers=servers, isolated=isolated):
+                    self.read_tool_map.return_value = (servers, isolated)
+                    result = self.plugin.pre_tool_call("attachment_inspect", {"attachment_id": 7}, "session", "call")
+
+                    self.assertEqual(result["action"], expected_action)
+                    if expected_action == "block":
+                        self.assertEqual(result, {"action": "block", "message": self.inspect.FAILURE})
+                    else:
+                        self.assertEqual(result["args"]["_fos_ctx"], context)
+                        self.assertTrue(result["args"]["_fos_inspect"]["sig"])
 
     def test_missing_context_and_bad_inputs_block(self):
         for args in ({"attachment_id": "file:///x"}, {"attachment_id": True},
@@ -64,11 +88,11 @@ class AttachmentInspectTest(unittest.TestCase):
             def register_hook(self, *args):
                 pass
             def register_tool(self, **kwargs):
-                registered.update(kwargs)
+                registered[kwargs["name"]] = kwargs
         self.plugin.register(Context())
-        self.assertEqual(registered["name"], "attachment_inspect")
-        self.assertFalse(registered.get("override", False))
-        schema = registered["schema"]["parameters"]
+        tool = registered["attachment_inspect"]
+        self.assertFalse(tool.get("override", False))
+        schema = tool["schema"]["parameters"]
         self.assertNotIn("additionalProperties", schema)
         for field in ("_fos_ctx", "_fos_inspect"):
             self.assertNotIn(field, schema["properties"])

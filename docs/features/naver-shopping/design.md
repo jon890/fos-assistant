@@ -15,10 +15,10 @@
 | REQ6 | PR1 | 도구 선언에 범용 칸 `attended_only` 를 더한다. turn 을 열 때 실행 줄에 「사람이 없는 실행」 표식을 남기고, Control Plane 의 도구 판정이 그 트리의 호출을 거절한다 |
 | REQ7 | PR2 | 플러그인 결과의 `handoff` 칸을 fos-ctx `transform_tool_result` hook 이 Control Plane 에 알리고, 판정 줄에 적은 넘기기로 웹이 카드를 그린다. 알림은 `HANDOFF_REQUESTED`. 아래 「PR2 화면 넘기기」 |
 | REQ8 | PR2 | 「다 했어요」 가 정해 둔 글을 다음 메시지로 보내고, 사람이 보낸 turn 의 시작이 열린 넘기기를 닫는다. 플러그인은 다음 호출에서 남긴 탭을 닫는다 |
-| REQ9 | PR3a | `app_user` 의 상한 컬럼 둘과 연결 화면. 아래 「PR3 구매 상한과 주문서」 |
-| REQ10 | PR3b, PR3c | 금융 준비 틀에 주문서 종류(`CHECKOUT`)를 더한 서버 요약 카드와 상한 판정. 아래 「PR3 구매 상한과 주문서」 |
+| REQ9 | PR3a | 사용자 결정 2026-11-21 로 없앰. [ADR-20261121 / purchase-approval](../../adr/ADR-20261121-purchase-approval.md) |
+| REQ10 | PR3b, PR3c | 금융 준비 틀에 주문서 종류(`CHECKOUT`)를 더한 서버 요약 카드. 아래 「PR3 승인 카드와 주문서」 |
 | REQ11 | PR3c | 승인 뒤 ticket 을 한 번 소비하고 주문서까지 가는 `fill_checkout`. 결제 단추 경로가 없다 |
-| REQ12 | PR3b, PR3c | 주문서 최종 금액을 결과 판정이 예상 합계와 지금 상한에 견주고 `payment` 넘기기를 적는다 |
+| REQ12 | PR3b, PR3c | 주문서 최종 금액을 결과 판정이 승인한 예상 합계에 견주고 `payment` 넘기기를 적는다 |
 | REQ13 | PR3a | REQ6 의 표식 검사를 금융 준비 가로채기보다 앞에 두고, 주문서 준비 도구에 `attended_only` 를 둔다 |
 | REQ14 | PR4 | 주문 확인 도구 `check_shopping_order` 가 결제 내역 화면의 상태 JSON 을 읽는다. 넘긴 시각과 금액은 Control Plane 이 판정 응답에 싣고 fos-ctx 가 인자로 넣는다. 아래 「PR4 주문 확인(REQ14)」 |
 
@@ -68,7 +68,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | 도구 | 위험도 | `attended_only` | 인자 | 결과 |
 | --- | --- | --- | --- | --- |
 | `check_shopping_login` | `READ` | 참 | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED` |
-| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄) | `{query, count, products: [...]}` |
+| `search_products` | `READ` | 참 | `query`(1~100자, 한 줄), 선택 `sort`(값은 [기능 문서](../naver-shopping.md#도구와-정책)) | `{query, count, products: [...]}` |
 | `get_product_detail` | `READ` | 참 | `url`(검색 결과의 상품 주소, 2,048자까지) | 종류별 결과(아래) |
 
 확인 도구도 `attended_only` 다. 에이전트에게도 MCP 도구로 보여 예약 작업이 부르면 꺼진 브라우저를 켠다. 연결 확인은 도구 판정을 거치지 않는 대시보드 직접 호출이라 칸이 있어도 막히지 않는다.
@@ -83,7 +83,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21) |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21). 무료 배송의 `fee_krw` 는 0 이고, 기본 배송비를 읽지 못하면 `null` 이다 |
 | `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽고, 판매처별 가격 목록은 읽는 칸을 가려내지 못해 `sellers` 는 빈 목록이다(2026-11-13 실측). spec 의 REQ3·DECISION28 이 말하는 판매처 목록 돌려주기는 판매처 목록을 가려낼 때까지 미룬다(2026-11-13 사용자 결정) |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
@@ -362,17 +362,17 @@ sequenceDiagram
 `message` 는 사이트가 띄운 글이라 500자에서 자르고 로그와 오류 응답에 싣지 않는다. `prompt` 창은 글을 넣는 칸 없이 기본값으로 수락하거나 취소한다.
 화면이 붙기 전에 이미 떠 있던 창은 Chrome 이 `Page.enable` 때 사건을 다시 보낸다고 기대한다. 실제 Chrome 으로 확인하지 않았고, 보이지 않으면 지금처럼 「끄기」 뒤 「켜기」 로 풀린다.
 
-## PR3 구매 상한과 주문서(REQ9~REQ13)
+## PR3 승인 카드와 주문서(REQ9~REQ13)
 
-### 나눔
+### 구현 이력
 
 PR3 는 운영 코드 줄 상한(`scripts/pr/pr-size.mjs`)을 넘어 세 PR 로 나눈다. 각 PR 이 그 단계의 설계와 구현을 함께 담고, 이 절은 첫 PR 이 세 단계 모두의 구현 깊이로 쓴다.
 
 | PR | 담는 것 | 요구사항 | 이 PR 만 머지됐을 때 |
 | --- | --- | --- | --- |
-| PR3a | 이 절과 ADR, 위험도 `PURCHASE`, 구매 상한 컬럼 둘과 화면 API·화면, 사람이 없는 실행의 거절을 금융 준비 가로채기 앞으로 | REQ9, REQ13 | `PURCHASE` 도구를 선언한 플러그인이 없어 상한 칸이 보이지 않는다. `attended_only` 준비 도구를 선언한 플러그인도 아직 없어(토스는 아니다) 운영 동작은 바뀌지 않는다 |
-| PR3b | Control Plane 과 대시보드의 주문서 종류(`CHECKOUT`). 준비 결과 검증, 상한 판정 넷, 결과 판정, `payment` 와 `tab_check` 넘기기 | REQ10~REQ12 의 서버 쪽 | 그 종류를 내는 플러그인이 없어 운영 동작이 같다 |
-| PR3c | 플러그인의 준비·채우기 도구와 옵션 드롭다운 열기, 웹의 주문서 승인 카드와 결제 넘기기 카드, 기능 파일의 실제 계정 확인 절차 | REQ10~REQ12 의 플러그인과 화면 | 기능이 열린다. 사용자가 상한을 0 보다 크게 정해야 카드가 뜬다 |
+| PR3a | 위험도 `PURCHASE` 와 사람이 없는 실행의 거절을 더했다 | REQ13 | 아직 주문서 도구를 연결하지 않았다 |
+| PR3b | 주문서 종류(`CHECKOUT`), 준비 결과 검증, `payment` 와 `tab_check` 넘기기를 더했다 | REQ10~REQ12 의 서버 쪽 | 선언이 추가되기 전까지 운영 동작은 같았다 |
+| PR3c | 플러그인 도구, 옵션 드롭다운 열기, 웹의 승인 카드와 결제 넘기기 카드를 더했다 | REQ10~REQ12 의 플러그인과 화면 | 주문서 준비와 결제 화면 넘기기를 연결했다 |
 
 ### 위험도와 선언
 
@@ -390,7 +390,7 @@ PR3 는 운영 코드 줄 상한(`scripts/pr/pr-size.mjs`)을 넘어 세 PR 로 
 | --- | --- |
 | `operations` 의 도구 | `PURCHASE`/`always` 여야 한다. `ORDER`, `CONDITIONAL` 도구는 지금처럼 `FINANCIAL`/`always` 다. 한 선언에 두 위험도를 섞지 않는다 |
 | `scope_fields` | 모든 도구가 `CHECKOUT` 이면 빈 배열이어야 한다. 쇼핑 연결에는 계좌 같은 공개 칸이 없다. 저장 scope 는 `{}` 이고 claim 의 `scope` 도 `{}` 다 |
-| 금융 관문 | keyed hash key 와 같은 의도 검사는 그대로 지난다. 계좌 허용 목록과 주문 상한은 보지 않고 아래 「구매 상한」 이 대신한다 |
+| 금융 관문 | keyed hash key 와 같은 의도 검사는 그대로 지난다. 계좌 허용 목록과 토스의 주문 상한은 적용하지 않는다 |
 
 검증하는 자리는 Control Plane 의 `ConnectorExecutionGuard` 와 대시보드의 `connector_guard_validation.py` 둘이고 같은 규칙을 갖는다. ticket, claim 인증, 지원 확인(`bind.guard`), manifest SHA 대조는 바꾸지 않는다.
 
@@ -403,8 +403,8 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 | `ConnectorFinancialIntake.owns` | 같은 키의 구매 줄도 금융 준비가 맡는다 |
 | `ConnectorExecutionGuard`, 대시보드 `connector_guard.py`, `connector_prepare.py` | `CHECKOUT` 선언이면 `operations` 도구가 `PURCHASE` 다 |
 | `ConnectorExecutionSnapshot`, `ConnectorExecutionCurrent` | 선언이 `CHECKOUT` 이면 승인 줄과 도구가 `PURCHASE` 여야 한다 |
-| `ConnectorConversationActionPurge` | 대화 삭제 때 구매 하루 합계에 필요한 본문도 남긴다 |
-| `ConnectorActionController`, `ConnectorFinancialSummaries` | 구매 줄에는 금융 요약 대신 주문서 요약(`checkout`)을 붙인다. 오늘 남은 구매 한도를 읽을 때 계산한다 |
+| `ConnectorConversationActionPurge` | 대화 삭제 뒤 당일 성공한 주문서 실행의 본문은 KST 날짜가 바뀔 때까지 보존한다 |
+| `ConnectorActionController`, `ConnectorFinancialSummaries` | 구매 줄에는 금융 요약 대신 주문서 요약(`checkout`)을 붙인다 |
 | `ConnectorExecutionClaimCodec` | claim 의 `scope` 가 빈 object 여도 받는다. 저장 scope 와 같은지는 claim 이 그대로 본다 |
 | 웹 `financial-summary.tsx` | 구매 줄은 PR3c 가 더한 `checkout-summary.tsx` 의 주문서 카드로 그린다. 배송지·결제 수단 칸이 없고, 요약을 열지 못한 줄은 거절만 남긴다 |
 
@@ -429,7 +429,7 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 | `NAVER_SHOPPING_SOLD_OUT` | `invalid_input` | `recheck` | 고른 조합이 품절이다 |
 | `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 상품 상태가 판매 중이 아니다(네이버페이로 바로 살 수 없다) |
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인한 금액보다 크다 |
-| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조가 어긋나거나 claim 이 거절됐다(만료, 이미 소비, 채우기 직전 상한) |
+| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조가 어긋나거나 claim 이 거절됐다(만료, 이미 소비) |
 | `NAVER_SHOPPING_TAB_GONE` | `unavailable` | | 이어 갈 남긴 탭이 없다(사람이 닫았거나 브라우저가 다시 켜졌다). claim 전이다 |
 | `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다. 「구매하기」 단추를 찾지 못했거나, 누르기 전부터 「바로구매」 가 보이거나, 층에서 옵션이나 수량을 맞추지 못했거나, 고른 뒤에도 「바로구매」 가 막혀 있다 |
 
@@ -448,35 +448,6 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원문의 `url`, `quantity`, `expectedTotalKrw`, 옵션 값이 같은지, 글 길이(제목 200자, 판매처 50자, 옵션 이름·값 100자)와 금액 범위(0 이상, 10억 원 미만)를 본다.
 배송지와 결제 수단 칸은 없다(spec DECISION8). 같은 의도 키(`request_key`)는 지금 규칙대로 사용자, 플러그인, 도구와 실행 원문의 글 칸으로 만든다. 같은 상품, 옵션, 수량의 카드가 열려 있으면 새 카드를 만들지 않는다.
 
-### 구매 상한(REQ9, PR3a)
-
-`app_user` 에 컬럼 둘을 더한다. 새 테이블은 없다.
-
-| 컬럼 | 뜻 |
-| --- | --- |
-| `purchase_limit_order_krw` | 한 건 상한. BIGINT NOT NULL DEFAULT 0. 원 단위 |
-| `purchase_limit_daily_krw` | KST 하루 상한. BIGINT NOT NULL DEFAULT 0 |
-
-- 운영 최대치는 없다(spec DECISION31). 값은 0 이상 1조 미만 정수다. 0 이면 그 사용자의 주문서 준비가 「상한을 정해 주세요」 로 거절된다
-- 읽기와 쓰기는 토스 주문 상한과 같은 원칙이다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 전용 쿼리로만 쓴다. 쓰는 쪽은 먼저 사용자 행을 잠근다. 그래서 판정과 상한 변경이 차례로 일어난다
-- 화면 API 는 `GET /api/v1/purchase-limits` 와 `PUT /api/v1/purchase-limits/{order|daily}` 다. 누구의 상한인지는 로그인에서만 정하고 에이전트의 MCP 토큰으로는 부를 수 없다. 에이전트가 상한을 바꾸는 도구는 없다(spec DECISION15)
-- 응답은 두 상한과 오늘 승인한 합계, 오늘 남은 한도다. 하루 합계는 아래 규칙으로 센다
-- 「외부 서비스 연결」 화면은 `PURCHASE` 도구를 선언한 플러그인의 연결 칸에 구매 상한 두 칸을 보인다. 토스의 주문 상한 칸(`FINANCIAL`)과 같은 모양이고 따로 그린다
-
-하루 합계는 그 사용자가 KST 그날 승인한 `PURCHASE` 승인 줄의 `expectedTotalKrw` 합이다. `EXECUTING`, `SUCCEEDED`, `UNKNOWN` 을 세고 `FAILED`, `REJECTED`, `EXPIRED`, `PENDING` 은 세지 않는다(spec DECISION17, DECISION30). 결제 화면을 넘긴 줄이 `SUCCEEDED` 이고, 결제 화면을 넘기지 못한 줄이 `FAILED` 다. 날짜는 토스의 하루 합계와 같은 칸(`decided_at`)으로 가른다.
-
-### 상한을 보는 때(REQ10, REQ12, PR3b)
-
-| 때 | 자리 | 보는 금액 | 걸리면 |
-| --- | --- | --- | --- |
-| 카드를 만들 때 | 금융 준비의 저장 잠금 아래 | 예상 합계 | 카드를 만들지 않는다. 모델에게 걸린 상한과 오늘 남은 한도를 준다. 상한이 0 이면 「상한을 정해 주세요」 |
-| 승인하는 순간 | 금융 승인의 잠금 아래. 자기 줄은 하루 합계에서 뺀다 | 예상 합계 | 승인 줄을 `FAILED`(`PURCHASE_LIMIT`)로 끝내고 채우지 않는다(spec DECISION30) |
-| 채우기 직전 | claim 의 소비 잠금 아래 | 예상 합계 | claim 이 409 로 거절하고 플러그인은 구매하기를 누르지 않는다. 승인 줄은 `FAILED` 다 |
-| 결제 직전 | 결과 판정의 잠금 아래. 자기 줄은 하루 합계에서 뺀다 | 주문서의 최종 결제 금액 | 결제 화면을 넘기지 않는다. 아래 「결과 판정」 |
-
-판정 함수는 `PurchaseLimits.requireWithin(userId, ownActionId, amountKrw, now)` 하나다. 한 건 상한보다 크거나, 오늘 합계에 더해 하루 상한보다 크면 `PurchaseLimitExceeded`(종류, 상한, 오늘 남은 한도)를 던진다.
-카드에 보이는 「오늘 남은 구매 한도」 는 저장하지 않고 카드를 읽을 때 지금 상한과 합계로 계산한다.
-
 ### 채우기(REQ11, PR3c)
 
 승인하면 금융 승인이 지금처럼 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 다시 보내지 않는다. 플러그인의 `fill_checkout` 은 이 순서로 돈다.
@@ -490,7 +461,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 7. 층의 「바로구매」 를 누른다. 몇 초 안에 주문서(`orders.pay.naver.com` 의 `/ordersheet/`)가 열린다. 같은 탭이 넘어갈 수도, 새 탭이 열릴 수도 있어 둘 다 본다. 새 탭은 누르기 직전의 탭 목록에 없던 탭만 본다. 주문서 탭에서 화면 분류를 하고 최종 결제 금액을 읽는다. 결제 단추는 누르지 않는다
 8. 주문서 탭을 남기고 `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 로 끝난다. 새 탭이 주문서면 상품 탭은 닫는다. 최종 금액이 원문의 예상 합계보다 크면 결과 판정이 넘기지 않으므로 주문서 탭도 닫는다(아래 「결과 판정」)
 
-「바로구매」 를 보내는 순간부터는 주문서가 열렸을 수 있다. 그 뒤의 실패(시간 초과, 연결 끊김, 주문서를 찾지 못함, 금액을 읽지 못함)는 오류가 아니라 `{status: "UNKNOWN", tab}` 결과다. 오류로 돌려주면 선언된 코드라 승인 줄이 `FAILED` 가 되어 하루 합계에서 빠진다.
+「바로구매」 를 보내는 순간부터는 주문서가 열렸을 수 있다. 그 뒤의 실패(시간 초과, 연결 끊김, 주문서를 찾지 못함, 금액을 읽지 못함)는 오류가 아니라 `{status: "UNKNOWN", tab}` 결과다. 오류로 돌려주면 선언된 코드라 승인 줄이 `FAILED` 로 기록된다.
 「구매하기」 는 층을 여는 단추라 그 뒤에도 층이 떴는지 확인할 수 있다. 층도 주문서도 보이지 않으면 결과를 모르는 것(`UNKNOWN`)으로 본다. 층 없이 주문서가 바로 열리면 옵션과 수량을 고르지 못했으므로, 옵션이 없고 수량이 1 일 때만 금액을 읽고 그 밖에는 `UNKNOWN` 으로 끝내 사람이 탭을 보게 한다.
 
 `Runtime.evaluate` 의 식은 지금처럼 `expressions.ts` 의 상수뿐이다. 채우기만 쓰는 식(구매하기·바로구매 누르기, 층 확인, 주문서 금액 읽기)과 값을 받는 함수 선언(층의 옵션 칩 고르기, 드롭다운 열기와 값 고르기, 수량 맞추기)은 따로 묶는다. 함수 선언은 `Runtime.callFunctionOn` 에 상수 그대로 싣고 옵션 글과 수량은 인자 값으로만 넘겨, 인자가 식을 정하지 못한다. 누르기는 `Input.*` 명령 없이 요소의 `click()` 으로 한다. 누르는 식은 모두 지금 주소가 스마트스토어·브랜드스토어 호스트가 아니면 누르지 않는다.
@@ -569,12 +540,11 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 
 | 판정 | 승인 줄 | 넘기기 | 모델에게 주는 결과 |
 | --- | --- | --- | --- |
-| 최종 금액 ≤ 예상 합계이고 지금 상한 안 | `SUCCEEDED` | `payment`, 플러그인이 남긴 탭 | 결제 화면을 사람에게 넘겼다. 최종 금액과 예상 합계 |
+| 최종 금액 ≤ 예상 합계 | `SUCCEEDED` | `payment`, 플러그인이 남긴 탭 | 결제 화면을 사람에게 넘겼다. 최종 금액과 예상 합계 |
 | 최종 금액 > 예상 합계(1원이라도) | `FAILED`(`PURCHASE_AMOUNT_CHANGED`) | 없음 | 승인보다 커서 넘기지 않았다. 두 금액 |
-| 지금 상한에 걸림 | `FAILED`(`PURCHASE_LIMIT`) | 없음 | 걸린 상한과 최종 금액 |
 
 결과 글은 Control Plane 이 정한 JSON(`{status: "PAYMENT_HANDOFF", message, finalAmountKrw, expectedTotalKrw}`)으로 저장하고 플러그인의 글을 싣지 않는다. `message` 는 결제 단추를 누르지 않았고 결제를 사람에게 넘겼다는 고정 글이다.
-멈춘 줄의 `error_code` 는 `purchase_limit`, `purchase_amount_changed` 이고 결과 글은 오류 계약(ADR-092) 꼴로 금액과 상한을 정수 세부로 싣는다. 모델은 이 세부를 결과로 받는다.
+최종 금액이 커서 멈춘 줄의 `error_code` 는 `purchase_amount_changed` 이고, 결과 글은 오류 계약(ADR-092) 꼴로 두 금액을 정수 세부에 넣는다. 모델은 이 세부를 결과로 받는다.
 
 채우기 결과 표의 나머지 경우도 같은 잠금 안에서 판정한다.
 
@@ -586,8 +556,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 그 밖의 성공 | 소비 전 | `UNKNOWN`(금융 줄과 같은 「claim 없는 성공」) | `tab_check` |
 | 실패나 응답 잃음 | 지금 규칙(`ConnectorFinancialOutcome`) | `FAILED` 나 `UNKNOWN` | `UNKNOWN` 이면 탭 없는 `tab_check` |
 
-승인 순간의 상한에 걸린 줄은 `EXECUTING` 으로 옮긴 뒤 같은 트랜잭션에서 `FAILED`(`purchase_limit`)로 끝내고 ticket 을 발급하지 않는다. 판정 함수 `PurchaseLimits.requireWithin` 은 트랜잭션 표시를 두지 않는다. 거절을 받은 쪽이 같은 트랜잭션에서 줄을 끝내야 하는데, 표시가 있으면 거절이 그 트랜잭션을 롤백 전용으로 만든다.
-금액이 커서 멈춘 경우 플러그인이 예상 합계를 원문으로 알고 있으므로 주문서 탭을 닫는다. 상한에만 걸린 경우는 플러그인이 지금 상한을 몰라 탭이 남는다. 사람이 승인 뒤 상한을 낮춘 드문 경우라 감수한다.
+금액이 커서 멈춘 경우 플러그인이 예상 합계를 원문으로 알고 있으므로 주문서 탭을 닫는다.
 
 ### 넘기기 어휘 더하기(PR3b)
 
@@ -623,7 +592,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 - **준비**: 옵션 글이 묶음 차례대로 그 묶음의 값 하나와 같아야 한다. 아니면 `NAVER_SHOPPING_OPTION_MISMATCH` 다. 묶음은 셋까지다
 - **추가 금액은 0 으로 계산한다**(사용자 결정 2026-11-16). 카드는 판매가 기준 예상 합계를 보인다. 실제 추가 금액이 있어도 승인보다 큰 결제는 넘어가지 않는다. 채우기가 주문서의 최종 금액을 읽고, 그 금액이 승인한 예상 합계보다 1원이라도 크면 결과 판정이 `FAILED`(`PURCHASE_AMOUNT_CHANGED`)로 끝내 결제를 넘기지 않으며 플러그인은 주문서 탭을 닫는다(「결과 판정」). 카드에 「추가금 확인 불가」 를 보이는 안은 승인 카드 칸을 늘려 Control Plane 과 웹까지 바꿔야 해 고르지 않았다
 - **품절**: 조합별 재고가 없어 상품 전체 `stockQuantity` 가 0 일 때만 `NAVER_SHOPPING_SOLD_OUT` 이다. 고른 값이 막혀 있거나(`disabled`, `aria-disabled`) 「바로구매」 가 풀리지 않으면 채우기가 「바로구매」 전에 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 멈춘다. 칩 `img alt` 끝의 `true`·`false` 가 품절 표시인지는 재지 않았다
-- **채우기**: 층의 옵션은 묶음마다 radio 칩이다(2026-11-17 실측). 고르는 방법은 「주문서 화면」 아래의 층 옵션 표가 갖는다. 2026-11-17 첫 실계정 확인은 층에 드롭다운이 없어 `layer.failed` 로 끝났다(결제·한도 사용 없음). 배포 뒤 기능 파일 「주문서까지 가 보기」 의 옵션 단계로 다시 확인한다
+- **채우기**: 층의 옵션은 묶음마다 radio 칩이다(2026-11-17 실측). 고르는 방법은 「주문서 화면」 아래의 층 옵션 표가 갖는다. 2026-11-17 첫 실계정 확인은 층에 드롭다운이 없어 `layer.failed` 로 끝났다(결제 없음). 배포 뒤 기능 파일 「주문서까지 가 보기」 의 옵션 단계로 다시 확인한다
 
 ### 사람이 연 대화(REQ13, PR3a)
 
@@ -634,18 +603,16 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 ### 실패와 일관성
 
 - 같은 승인으로 주문서를 두 번 열지 않는다. 승인 줄의 `EXECUTING` 전이와 ticket 단일 소비가 지금처럼 막는다
-- 구매하기를 누른 뒤의 결과 불명은 `UNKNOWN` 이고 하루 합계에 센다. 사람이 탭을 보고 정한다
+- 구매하기를 누른 뒤의 결과 불명은 `UNKNOWN` 이다. 사람이 탭을 보고 확인한다
 - 배포 순서: Hermes 묶음(대시보드 plugin 의 `PURCHASE` 와 `CHECKOUT` 검증)을 먼저 올린다. 옛 Control Plane 은 카탈로그의 모르는 위험도를 읽지 못해 그 플러그인을 막는다. 옛 대시보드는 모르는 위험도를 거절해 카탈로그에 올리지 않는다. 둘 다 닫히는 쪽이다
-- 상한 컬럼은 기본 0 이라 배포 직후 모든 사용자의 주문서 준비가 닫혀 있다
 
 ### 검증 전략(PR3)
 
 | ID | 경계 | 방법 |
 | --- | --- | --- |
-| REQ9 | Control Plane, 웹 | 상한 API 의 주인 한정, 0 이상 정수 검사, 잠금 뒤 쓰기. 기본 0 에서 준비가 「상한을 정해 주세요」 로 거절(PR3b). 연결 화면이 `PURCHASE` 도구가 있는 연결에만 두 칸을 보이는지 |
-| REQ10 | Control Plane, 대시보드, 플러그인, 웹 | `CHECKOUT` 준비 결과의 정확한 키·합계·대조 검증(Java 와 Python 이 같은 사례 표). 카드를 만들 때와 승인 순간의 상한. 상시 허락과 대화 허락이 없는지. 카드가 배송지·결제 수단 칸 없이 요약과 남은 한도, 「지역 추가 배송비 별도」 를 보이는지 |
+| REQ10 | Control Plane, 대시보드, 플러그인, 웹 | `CHECKOUT` 준비 결과의 정확한 키·합계·대조 검증(Java 와 Python 이 같은 사례 표). 설정 없이 준비하면 카드가 뜨고, 승인 전에는 주문서를 열지 않는지. 상시 허락과 대화 허락이 없는지. 카드가 배송지·결제 수단 칸 없이 상품 요약과 「지역 추가 배송비 별도」 를 보이는지 |
 | REQ11 | 플러그인, Control Plane | 가짜 CDP 와 가짜 상품·층·주문서 화면으로 채우기 순서(가격 확인 → claim → 구매하기 → 층의 옵션·수량 → 바로구매 → 주문서 금액). 같은 탭과 새 탭. claim 거절이면 구매하기를 누르지 않는지. 식 상수와 명령 기록에 결제 단추 경로가 없는지. 결과 불명이 `UNKNOWN` 과 `tab_check` 가 되고 다시 부르지 않는지 |
-| REQ12 | Control Plane, 웹 | 결과 판정 표의 세 경우(같거나 작음, 1원 큼, 상한 낮춤). `payment` 카드가 두 금액을 보이는지 |
+| REQ12 | Control Plane, 웹 | 예상 합계 이하면 결제를 넘기고, 1원이라도 크면 멈추는지. `payment` 카드가 두 금액을 보이는지 |
 | REQ13 | Control Plane | 사람이 없는 트리에서 준비 도구가 `ATTENDED_ONLY` 거절 줄을 남기고 금융 준비를 부르지 않는지. 사람이 연 대화의 흐름(DECISION32)은 넘어가는지 |
 
 ## PR4 주문 확인(REQ14)
@@ -792,7 +759,6 @@ sequenceDiagram
 
 - 옆 패널의 「내 브라우저」 탭(`handoff-browser.tsx`)도 결제 카드면 같은 두 단추를 보인다. 탭 주소가 바뀌어 끝났는지 묻는 줄도 「결제했어요」, 「사지 않을래요」, 「아직이에요」 다
 - 단추 글과 보내는 글은 웹 `handoff.ts` 가 갖는다. Control Plane 은 바뀌지 않는다. 어느 단추든 사람이 보낸 turn 이라 카드를 닫는다
-- 「사지 않을래요」 뒤에도 그 승인은 하루 합계에 남는다(spec DECISION17). 결제했는지 Control Plane 이 알 수 없어서다
 
 ### 실패와 일관성
 
@@ -831,11 +797,11 @@ sequenceDiagram
 | DECISION16 | 「내 브라우저 열기」 | 새 창으로 `/browser?tab=` 을 열고 웹이 첫 `tabs` 사건에서 그 탭으로 옮긴다. 새 창 부분은 [ADR-20261112 / handoff-drawer](../../../web/docs/adr/ADR-20261112-handoff-drawer.md) 가 대화 위 옆 패널로 대체했다 | 작성자 | 대화 화면을 떠나지 않는다. 화면 중계에 탭 고르기 입력이 이미 있어 서버 경로가 늘지 않는다 |
 | DECISION17 | 확인 창(#702) | 플러그인이 읽는 탭은 닫기로 넘기고, 그 밖의 탭은 화면이 창을 보이고 사람이 고른다 | 사용자 2026-11-10(방향), 작성자(나눔) | 읽는 탭은 사람이 보지 않고, 넘긴 탭은 사람의 탭이다. 플러그인이 넘긴 탭의 창을 누르지 않는다 |
 | DECISION18 | 주문서 승인의 틀 | 금융 보호 선언(`execution_guard`)과 준비·승인·ticket·claim 을 그대로 쓰고 종류 `CHECKOUT` 을 더한다 | 작성자 | 서버가 만든 요약 카드, 승인 때와 실행 직전의 다시 판정, 한 번 실행, 결과 불명의 `UNKNOWN` 이 이미 그 틀에 있다. 새 길을 두면 같은 보호를 두 벌 만든다 |
-| DECISION19 | 채우기 도구의 위험도 | 새 위험도 `PURCHASE` | 사용자 2026-11-13 | 하루 합계와 연결 화면의 상한 칸이 위험도로 줄을 고른다. `FINANCIAL` 을 쓰면 토스 합계와 칸에 섞인다 |
-| DECISION20 | 결제 직전 다시 판정의 자리 | 플러그인이 최종 금액을 결과로 내고 Control Plane 의 결과 판정이 예상 합계와 지금 상한에 견준다 | 작성자 | 지금 상한과 오늘 합계는 Control Plane 만 안다. claim 응답 모양을 바꾸지 않는다 |
+| DECISION19 | 채우기 도구의 위험도 | 새 위험도 `PURCHASE` | 사용자 2026-11-13 | 토스 하루 합계와 연결 화면의 금융 주문 상한 칸은 `FINANCIAL` 줄만 쓴다 |
+| DECISION20 | 결제 직전 다시 판정의 자리 | 플러그인이 최종 금액을 결과로 내고 Control Plane 의 결과 판정이 승인한 예상 합계에 견준다 | 작성자 | Control Plane 은 승인 때 저장한 예상 합계를 쓴다 |
 | DECISION21 | 옵션 드롭다운을 닫는 식 | 두지 않는다. 읽기 탭은 정상으로 끝나면 탭째 닫는다 | 작성자 | 닫기 식을 더하면 누르기 식이 둘이 된다. 연 상태는 탭과 함께 사라진다 |
-| DECISION22 | 주문서 준비의 개방 조건 | 사용자 두 상한이 0 보다 크고 금융 관문의 keyed hash key 를 읽을 수 있으면 열린다. 계좌 허용 목록과 운영 스위치는 없다 | 사용자 2026-11-13 | 결제는 사람이 하고 기본 0 이 이미 닫힌 상태다(spec DECISION31 과 같은 근거) |
-| DECISION23 | 결정 기록 | 루트 `docs/adr/ADR-20261113-purchase-checkout.md` 하나. 구매 경계(spec DECISION8~10), 위험도 `PURCHASE`, 개방 조건, 옵션 드롭다운 열기 예외를 갖는다 | 작성자 | backend, hermes, 웹에 걸쳐 루트에 둔다 |
+| DECISION22 | 주문서 준비의 개방 조건 | 플러그인을 붙이고 금융 관문의 keyed hash key 를 읽을 수 있으면 열린다. 계좌 허용 목록과 운영 스위치는 없다 | 사용자 2026-11-13, 2026-11-21 | 사용자가 주문서 준비를 매번 승인하고 결제도 직접 한다 |
+| DECISION23 | 결정 기록 | [ADR-20261113 / purchase-checkout](../../adr/ADR-20261113-purchase-checkout.md) 과 [ADR-20261121 / purchase-approval](../../adr/ADR-20261121-purchase-approval.md). 승인 카드, 결제 직전 금액 비교, 위험도 `PURCHASE`, 개방 조건, 옵션 드롭다운 열기 예외를 다룬다 | 작성자 | backend, hermes, 웹에 걸쳐 루트에 둔다 |
 | DECISION24 | 주문 확인에 넘긴 시각과 금액을 주는 길 | 도구 선언 `payment_context` 를 보고 Control Plane 이 판정 응답에 그 대화의 마지막 결제 넘기기 맥락을 싣고, fos-ctx 가 `action=modify` 로 인자 `_fos_payment` 에 넣는다 | 작성자 | 모델 인자로 받으면 지어낸 시각으로 예전 주문을 맞출 수 있다(spec DECISION27). 플러그인은 Control Plane 에 닿지 못한다(ADR-064). 판정과 hook 은 이미 같은 호출마다 오가므로 새 경로가 없다 |
 | DECISION25 | 맥락을 찾지 못했을 때 | 판정은 허용 그대로이고 플러그인이 `NO_PAYMENT_HANDOFF` 로 답한다 | 작성자 | 판정 줄의 통과 여부와 hook 의 답을 어긋나게 두지 않는다. 화면을 열지 않으므로 잃는 것이 없다 |
 | DECISION26 | 결제 금액과 주문 시각 칸 | 금액 후보 둘 가운데 하나가 최종 금액과 같으면 맞다고 보고, `date` 가 넘긴 시각 이후인 주문만 본다. 칸의 뜻은 둘 다 가설이다 | 작성자 | 실제 결제가 없어 재지 못했다(2026-11-16). 둘 다 다르면 맞다고 하지 않고 금액이 다르다고 알려 거짓 확인은 없다. 사람이 결제한 뒤 진단 줄로 맞춘다 |

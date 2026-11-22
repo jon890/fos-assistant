@@ -42,6 +42,8 @@ export function useConversationSessionState({
   const [stopRequested, setStopRequested] = useState(false);
   /** `delegation` 사건으로 받은 맡긴 줄이다. 대화가 바뀌면 이 상태째 새로 만든다 */
   const [liveDelegations, setLiveDelegations] = useState<DelegationLine[]>([]);
+  /** `image` 사건으로 받은, 아직 답에 묶이지 않은 그림 경로다. turn 이 시작하거나 끝나면 비운다 */
+  const [liveImages, setLiveImages] = useState<string[]>([]);
   /**
    * 이 창의 스트림 없이 도는 turn 을 보고 있다.
    *
@@ -165,6 +167,8 @@ export function useConversationSessionState({
     setStopRequested,
     liveDelegations,
     setLiveDelegations,
+    liveImages,
+    setLiveImages,
     observing,
     setObserving,
     observedTurnFilter,

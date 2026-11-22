@@ -23,7 +23,7 @@ covers: `web/src/lib/dev-docs/catalog.ts`, `web/src/lib/dev-docs/links.ts`, `web
 - 목록 이름은 문서의 첫 제목이고, ADR 줄은 그 `INDEX.md` 표의 제목 칸(백틱과 링크를 벗긴 글)이다. 찾기 칸은 목록 이름과 확장자를 뺀 파일 이름을 맞추고, 스펙과 설계 줄은 목록 이름만 맞춘다. 스펙이나 설계만 맞으면 그 기능 줄이 펼쳐진 채 남는다.
 - 목록에 든 문서만 `/dev-docs/<저장소 경로>` 로 열린다. 나머지 경로는 404 다.
 - 본문은 react-markdown 의 기본값으로 그려 문서 안의 HTML 이 돌지 않는다. 목록 안 문서를 가리키는 링크는 화면 안으로 가고 `#절` 로 내려간다. 목록 밖 파일(코드, README, 그림)은 같은 커밋의 GitHub 파일을 새 탭으로 연다. 그림은 그리지 않고 「그림: <이름>」 링크로 바꾼다.
-- mermaid 블록은 그 문서를 열 때만 mermaid 를 불러 그린다. 손그림을 지원하는 그림 종류(flowchart, state 등)는 손그림과 `classDef` 색, sequence 는 기본 모양이다. 어두운 테마에서도 흰 바탕에 그린다. 문법이 틀린 블록만 원문과 「그림을 그리지 못했어요」 가 보인다.
+- mermaid 블록은 그 문서를 열 때만 mermaid 를 불러 그린다. 손그림을 지원하는 그림 종류(flowchart, state 등)는 손그림과 `classDef` 색, sequence 는 기본 모양이다. 어두운 테마에서도 흰 바탕에 그린다. 문법이 틀린 블록만 원문과 「그림을 그리지 못했어요」 가 보인다. 그림을 누르면 화면을 덮는 창에서 원래 크기로 보인다([app-shell spec](app-shell/spec.md) 의 DECISION26).
 
 `web/test/unit/dev-docs-*.test.ts` 와 `web/test/browser/dev-docs.spec.ts` 가 확인한다.
 

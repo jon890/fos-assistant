@@ -14,7 +14,6 @@ const row = {
   expectedTotalKrw: 25000,
   regionalExtraFee: true,
   url: "https://smartstore.naver.com/shop/products/1",
-  remainingTodayKrw: 50000,
 };
 
 test("주문서 요약은 계약의 칸만 옮기고 배송지·결제 수단 같은 칸이 더해져도 버린다", () => {
@@ -46,13 +45,11 @@ test("열지 못한 줄이나 모양이 틀린 줄은 승인할 수 없는 줄(a
   }
 });
 
-test("https 가 아닌 상품 링크는 그 칸만 비우고, 남은 한도를 읽지 못했으면 null 이다", () => {
+test("https 가 아닌 상품 링크는 그 칸만 비운다", () => {
   const safe = safeCheckout({
     ...row,
     url: "javascript:alert(1)",
-    remainingTodayKrw: null,
   });
   assert.equal(safe.available, true);
   assert.equal(safe.url, null);
-  assert.equal(safe.remainingTodayKrw, null);
 });

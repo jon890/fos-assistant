@@ -17,11 +17,13 @@ import urllib.parse
 import urllib.request
 
 from .context import _read_token, build_context, logger
+from .product_page import TOOL as PRODUCT_PAGE_TOOL
 from .tool_guard import guard_url
 
 SEARCH_TOOL = "web_search"
 EXTRACT_TOOL = "web_extract"
-TOOLS = frozenset({SEARCH_TOOL, EXTRACT_TOOL})
+WEB_TOOLS = frozenset({SEARCH_TOOL, EXTRACT_TOOL})
+TOOLS = WEB_TOOLS | {PRODUCT_PAGE_TOOL}
 # 호출 맥락을 서명할 때 넣는 도구 이름이다. Control Plane 의 `FoundLinkService.TOOL` 과 같다.
 CTX_TOOL = "found_links"
 REPORT_PATH = "found-links"
@@ -141,9 +143,9 @@ def typed_urls(tool_name, args) -> list:
 
     읽기 서비스에 따라 결과 항목의 `url` 이 넘어간 뒤의 최종 주소일 수 있어, 적어 넣은 원래 주소를 따로 보낸다.
     """
-    if tool_name != EXTRACT_TOOL or not isinstance(args, dict):
+    if tool_name not in {EXTRACT_TOOL, PRODUCT_PAGE_TOOL} or not isinstance(args, dict):
         return []
-    urls = args.get("urls")
+    urls = args.get("url" if tool_name == PRODUCT_PAGE_TOOL else "urls")
     if isinstance(urls, str):
         urls = [urls]
     if not isinstance(urls, list):
@@ -151,7 +153,7 @@ def typed_urls(tool_name, args) -> list:
     return [url for url in urls if isinstance(url, str) and 0 < len(url) <= MAX_LINK_CHARS][:MAX_TYPED]
 
 
-def pages(tool_name, result) -> list:
+def pages(tool_name, result, args=None) -> list:
     """도구 결과에서 `[{"base": 기준 주소나 None, "links": [후보]}]` 를 만든다. 뽑을 것이 없거나 모양이 다르면 빈 목록이다."""
     if tool_name not in TOOLS or not isinstance(result, str):
         return []
@@ -161,6 +163,12 @@ def pages(tool_name, result) -> list:
         return []
     if not isinstance(parsed, dict):
         return []
+    if tool_name == PRODUCT_PAGE_TOOL:
+        typed = typed_urls(tool_name, args)
+        base, images = parsed.get("base"), parsed.get("images")
+        if not typed or not isinstance(base, str) or len(base) > MAX_LINK_CHARS or not isinstance(images, list):
+            return []
+        return [{"base": base, "requested": typed[0], "links": [image["url"] for image in images], "images": images}]
     raw = _search_page(parsed) if tool_name == SEARCH_TOOL else _extract_pages(parsed)
     kept, total = [], 0
     for page in raw:
@@ -182,10 +190,11 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
     """웹 도구의 결과에서 뽑은 주소를 Control Plane 에 알린다. 알릴 것이 없거나 맥락이 없으면 아무것도 하지 않는다.
 
     주소와 결과 글은 로그에 남기지 않는다. 옛 Control Plane 은 이 경로를 몰라 거절로 답하고, 그때도 넘어간다.
+    알리지 못하면 그 결과의 주소로 그림을 그리지 못하므로 경고로 남긴다. 운영에서 원인을 찾으려면 기본 로그 수준에 보여야 한다.
     """
     if not session_id or not tool_call_id:
         return
-    found = pages(tool_name, result)
+    found = pages(tool_name, result, args)
     if not found:
         return
     guard = guard_url()
@@ -193,6 +202,7 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
     token = _read_token()
     ctx = build_context(CTX_TOOL, session_id, tool_call_id)
     if not url or not token or not ctx:
+        logger.warning("fos-ctx: 찾은 주소를 알릴 주소나 토큰, 맥락이 없다")
         return
     payload = {"_fos_ctx": ctx, "pages": found}
     typed = typed_urls(tool_name, args)
@@ -208,6 +218,6 @@ def report(tool_name, result, session_id, tool_call_id, args=None) -> None:
             response.read()
     except urllib.error.HTTPError as exc:
         exc.close()
-        logger.debug("fos-ctx: 찾은 주소를 알리지 못했다: HTTP %d", exc.code)
+        logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: HTTP %d", exc.code)
     except OSError as exc:
-        logger.debug("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)
+        logger.warning("fos-ctx: 찾은 주소를 알리지 못했다: %s", type(exc).__name__)

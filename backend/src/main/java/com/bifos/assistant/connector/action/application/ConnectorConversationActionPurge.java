@@ -16,14 +16,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 감사 기록을 남기고 실행·복구·하루 상한 계산에 더 쓰지 않는 승인 본문만 지운다. */
+/** 감사 기록을 남기고 실행·복구·금융 한도 계산에 더 쓰지 않는 승인 본문만 지운다. */
 @Component
 @RequiredArgsConstructor
 class ConnectorConversationActionPurge implements ConversationActionPurge {
     private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN,
         ActionStatus.WAITING);
-    /** 하루 합계가 본문을 읽는 위험도다. 금융 주문과 주문서 준비다(ADR-20261113 / purchase-checkout). */
-    private static final Set<ToolRisk> SPENDING = Set.of(ToolRisk.FINANCIAL, ToolRisk.PURCHASE);
+    /** 금융 주문의 하루 합계가 본문을 읽으므로 KST 당일 성공 본문을 보존한다. */
+    private static final Set<ToolRisk> SPENDING = Set.of(ToolRisk.FINANCIAL);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;

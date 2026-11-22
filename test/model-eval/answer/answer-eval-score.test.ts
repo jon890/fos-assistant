@@ -15,6 +15,7 @@ import {
   scoreSet,
   sourceLinks,
   toolCounts,
+  toolRounds,
   type Comparison,
   type LinkState,
   type Question,
@@ -116,6 +117,42 @@ test("도구 수는 실행 트리 전체의 끝 사건만 세어 시작 사건�
   );
 
   assert.deepEqual(toolCounts(root), { search: 2, searchFailed: 1, extract: 1, extractFailed: 1 });
+});
+
+test("도구 차례를 센 문항만 합계에 넣고 센 문항 수를 함께 낸다", () => {
+  const scores = fullSet(17);
+  scores[0] = { ...scores[0], rounds: { calls: 6, rounds: 2 } };
+  const set = scoreSet(scores, []);
+  const report = markdown("", "", scores, set, []);
+
+  assert.equal(set.roundsChecked, 1);
+  assert.equal(set.toolCalls, 6);
+  assert.match(report, /도구 차례를 센 문항 1개에서 도구 6번을 2차례에 불렀다\(차례당 3\.00개\)/);
+});
+
+test("함께 부른 도구는 한 차례로, 하나씩 부른 도구는 각각 한 차례로 센다", () => {
+  const started = (toolName: string) => ({ eventType: "TOOL_STARTED", toolName, failed: null });
+  const completed = (toolName: string) => ({ eventType: "TOOL_COMPLETED", toolName, failed: false });
+  const child = node([started("web_extract"), completed("web_extract")]);
+  const root = node(
+    [
+      { eventType: "RUN_STARTED", toolName: null, failed: null },
+      started("web_search"),
+      started("web_search"),
+      started("web_search"),
+      completed("web_search"),
+      completed("web_search"),
+      completed("web_search"),
+      started("web_extract"),
+      completed("web_extract"),
+      started("web_search"),
+      { eventType: "SUBAGENT_STARTED", toolName: null, failed: null },
+      completed("web_search"),
+    ],
+    [child],
+  );
+
+  assert.deepEqual(toolRounds(root), { calls: 6, rounds: 4 });
 });
 
 test("링크 상태는 2xx 와 3xx 가 열림이고 403 과 429 는 확인 못 함이다", () => {
@@ -232,6 +269,9 @@ test("보고서는 문항 표와 사람 비교 표를 내고 적은 값을 옮�
   const report = markdown("exa", "MEDIUM", scores, scoreSet(scores, given), given);
 
   assert.match(report, /이름표: exa, 모델 칸: MEDIUM/);
+  assert.match(report, /속도 참고\(통과 기준 아님\): 평균 걸린 시간 /);
+  assert.match(report, /\| 도구 차례\(호출\) \|/);
+  assert.match(report, /도구 차례 미집계/);
   assert.match(report, /자동 기준 통과, 사람 비교 대기/);
   assert.match(report, /\| s0 \| 모자라다 \| 가격이 \/ 다르다 \|/);
   assert.match(report, /\| s7 \|  \|  \|/);

@@ -280,9 +280,10 @@ main 의 세 검사가 깨진 것을 고치는 PR(#689)에서 두 빈틈이 드�
 | PR 이 바꾼 파일(추가, 수정, 삭제 모두) | 결과 |
 | --- | --- |
 | `ContextAssembler.java`(지침 상수를 가진 Control Plane 클래스) | 라벨 없이 `e2e` 도 돈다 |
+| 같은 패키지의 `*Instructions.java`(절마다 둔 지침 상수 클래스, 2026-11-21 추가) | 같다 |
 | `test/e2e/fake-hermes/scenario-fixtures.ts`(가짜 Hermes 의 `MODEL_GUIDE_HEADERS`) | 같다 |
 
-- 브라우저는 그 두 파일이 만드는 지시문을 읽지 않으므로 건너뛴다. `withoutSlow` 의 세 번째 인자 `keep` 이 라벨 없이 돌릴 느린 job 을 정하고, 판정은 `GUIDE_FILES` 와 `touchesGuide` 가 갖는다.
+- 브라우저는 그 파일들이 만드는 지시문을 읽지 않으므로 건너뛴다. `withoutSlow` 의 세 번째 인자 `keep` 이 라벨 없이 돌릴 느린 job 을 정하고, 판정은 `GUIDE_FILES` 와 `touchesGuide` 가 갖는다.
 - 경로 삭제 규칙(`removesRoute`)과 달리 수정만 해도 돈다. 지침 절을 더하는 것이 곧 #676 의 실수였기 때문이다.
-- 남은 빈틈: 지침을 만드는 다른 파일(새 지침 상수를 다른 클래스에 두는 경우)은 `GUIDE_FILES` 에 더해야 잡힌다. 지침이 어디서 만들어지는지는 파일 목록으로 고정했고, 위치가 바뀌면 이 표와 상수를 함께 고친다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
+- 남은 빈틈: 지침을 만드는 다른 파일(새 지침 상수를 `context.application` 밖이나 `*Instructions` 가 아닌 이름의 클래스에 두는 경우)은 `GUIDE_FILES` 에 더해야 잡힌다. 지침이 어디서 만들어지는지는 파일 목록으로 고정했고, 위치가 바뀌면 이 표와 상수를 함께 고친다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
 - 되돌릴 때는 `ci-paths.mjs` 의 `touchesGuide` 호출 인자를 빼고 `GUIDE_FILES` 를 지운다. `e2e-failures` 는 `ci.yml` 에서 job 을 지우고 `e2e-tests` 의 실패 기록 단계를 함께 뺀다.

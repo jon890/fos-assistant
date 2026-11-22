@@ -26,8 +26,19 @@ public class LinkImageService {
      * @throws ApiException {@code IMAGE_SOURCE_LINK_*} 가운데 하나
      */
     public InspectedImage read(URI link) {
+        return read(link, false);
+    }
+
+
+    /** 페이지에서 이미 선택한 사진 주소를 기존 안전 검사로 받는다. */
+    public InspectedImage readDirect(URI link) {
+        return read(link, true);
+    }
+
+
+    private InspectedImage read(URI link, boolean direct) {
         try {
-            LinkImage image = fetcher.fetch(link);
+            LinkImage image = direct ? fetcher.fetchDirect(link) : fetcher.fetch(link);
             return new InspectedImage(image.contentType(), image.bytes());
         } catch (LinkImageRejectedException ex) {
             throw new ApiException(code(ex.reason()), "link image is not usable", ex);

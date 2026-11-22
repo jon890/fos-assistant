@@ -264,9 +264,10 @@ export function ConnectorCatalog({
             .map(({ title, items }) => (
               <section key={title} aria-label={title} className="space-y-3">
                 <h2 className="text-lg font-semibold">{title}</h2>
+                {/* 본문 폭(max-w-4xl)에서 세 열은 카드 설명이 잘려 두 열까지만 둔다(app-shell spec DECISION26). */}
                 <ul
                   data-testid="connector-grid"
-                  className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+                  className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2"
                 >
                   {items.map((connector) => (
                     <li key={connector.id} className="min-w-0">

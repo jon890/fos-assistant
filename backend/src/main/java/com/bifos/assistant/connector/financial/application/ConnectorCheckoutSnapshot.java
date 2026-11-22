@@ -75,7 +75,7 @@ final class ConnectorCheckoutSnapshot {
     }
 
 
-    /** 실행 원문의 예상 합계다. 검증을 지난 원문만 받는다. 하루 합계와 결과 판정이 쓴다. */
+    /** 실행 원문의 예상 합계다. 검증을 지난 원문만 받는다. 결제 화면을 넘기기 전에 최종 금액과 비교한다. */
     static long expectedTotal(JsonNode args) {
         return amount(args.get("expectedTotalKrw"));
     }

@@ -156,9 +156,10 @@ export function removesRoute(removed) {
 }
 
 // 모델이 받는 지시문을 만드는 파일. 고치면 가짜 Hermes 가 답에서 지침을 빼는 규칙과 어긋나 E2E 가 깨질 수 있다.
-// 앞은 지침 상수를 가진 Control Plane 클래스, 뒤는 가짜 Hermes 의 MODEL_GUIDE_HEADERS 를 가진 파일이다.
+// 앞 둘은 지침 상수를 가진 Control Plane 클래스(조립하는 클래스와 절마다 둔 *Instructions 클래스), 뒤는 가짜 Hermes 의 MODEL_GUIDE_HEADERS 를 가진 파일이다.
 export const GUIDE_FILES = [
   /^backend\/src\/main\/java\/com\/bifos\/assistant\/context\/application\/ContextAssembler\.java$/,
+  /^backend\/src\/main\/java\/com\/bifos\/assistant\/context\/application\/[A-Za-z]+Instructions\.java$/,
   /^test\/e2e\/fake-hermes\/scenario-fixtures\.ts$/,
 ];
 
