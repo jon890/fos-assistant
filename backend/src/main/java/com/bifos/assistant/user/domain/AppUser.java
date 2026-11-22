@@ -69,16 +69,6 @@ public class AppUser extends AuditedEntity {
     @Column(name = "limit_updated_at", insertable = false, updatable = false)
     private Instant limitUpdatedAt;
 
-    // 구매 상한이다(ADR-20261113 / purchase-checkout). 주문 상한과 같은 까닭으로 넣기와 고치기에서 빼고 getter 를 두지 않는다.
-    // 읽기와 쓰기는 PurchaseLimitRepository 의 전용 쿼리로만 한다. 기본 0 은 DB 가 넣고, 검사의 create-drop 스키마도 같은 기본값을 둔다.
-    @ColumnDefault("0")
-    @Column(name = "purchase_limit_order_krw", nullable = false, insertable = false, updatable = false)
-    private Long purchaseLimitOrderKrw;
-
-    @ColumnDefault("0")
-    @Column(name = "purchase_limit_daily_krw", nullable = false, insertable = false, updatable = false)
-    private Long purchaseLimitDailyKrw;
-
     // 웹 푸시 기기 목록 JSON 이다(ADR-20261120 / web-push). 주문 상한과 같은 까닭으로 넣기와 고치기에서 빼고 getter 를 두지 않는다.
     // 읽기와 쓰기는 PushDeviceRepository 의 전용 쿼리로만 한다. 검사의 create-drop 스키마가 같은 칸을 갖도록 매핑한다.
     @Column(name = "push_devices", columnDefinition = "TEXT", insertable = false, updatable = false)

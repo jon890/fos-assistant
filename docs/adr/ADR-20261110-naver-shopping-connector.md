@@ -5,6 +5,7 @@
 - **decision-type**: `architecture`
 - **areas**: `security, operations`
 - **현재 규칙의 원본**: [네이버 쇼핑 플러그인](../features/naver-shopping.md), 스펙 [`docs/features/naver-shopping/spec.md`](../features/naver-shopping/spec.md)(사용자 확인 2026-11-10), 설계 [`design.md`](../features/naver-shopping/design.md)
+- 개정 2026-11-21: 요청당 검색 횟수는 [네이버 쇼핑 스펙의 DECISION34](../features/naver-shopping/spec.md#결정)가 대체한다. 아래의 검색 한 번은 도구 호출 하나가 읽는 첫 페이지 범위에 해당한다.
 - [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) 의 사용자 브라우저와 중계를 그대로 쓴다. [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 살펴보기 읽기 경계 옆에 도구 단위의 경계를 하나 더한다.
 
 ### 결정

@@ -7,9 +7,6 @@ import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.approval.application.dto.PaymentHandoffResult;
-import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
-import com.bifos.assistant.connector.financial.application.PurchaseLimits;
-import com.bifos.assistant.connector.financial.domain.type.PurchaseLimitKind;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
@@ -32,8 +29,6 @@ import tools.jackson.databind.JsonNode;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorCheckoutOutcome {
-    /** 승인 순간이나 결제 직전에 구매 상한에 걸렸다. */
-    static final String LIMIT = "purchase_limit";
     /** 주문서의 최종 결제 금액이 승인한 예상 합계보다 크다. */
     static final String AMOUNT_CHANGED = "purchase_amount_changed";
     /** 구매하기 전에 사람이 해야 하는 화면을 만났다. 넘기기는 그 단계다. */
@@ -49,14 +44,6 @@ final class ConnectorCheckoutOutcome {
 
 
     /**
-     * 승인 순간의 상한 판정에 걸린 줄을 채우지 않고 끝낸다(spec DECISION30). 부르는 쪽이 {@code EXECUTING} 으로 옮긴 뒤 부른다.
-     */
-    static void limited(ConnectorAction action, PurchaseLimitExceeded ex, long amountKrw, ConnectorActionBodies bodies, Instant now) {
-        bodies.fail(action, LIMIT, limitDetail(ex, "expected_total_krw", amountKrw).toStored(), now);
-    }
-
-
-    /**
      * 채우기의 결과로 줄을 끝낸다.
      *
      * @param result 실행 결과. 응답을 잃었으면 null
@@ -64,7 +51,7 @@ final class ConnectorCheckoutOutcome {
      * @return 사람에게 화면을 넘겼으면 그 단계
      */
     static Optional<HandoffNeed> settle(ConnectorAction action, ConnectorActionExecution row, CallResult result, long expectedTotalKrw,
-        PurchaseLimits purchases, ConnectorActionBodies bodies, Instant now) {
+        ConnectorActionBodies bodies, Instant now) {
         if (action.status() != ActionStatus.EXECUTING) {
             throw new IllegalStateException("connector action must be EXECUTING but is " + action.status());
         }
@@ -105,18 +92,6 @@ final class ConnectorCheckoutOutcome {
             bodies.fail(action, AMOUNT_CHANGED,
                 new ConnectorErrorDetail("PURCHASE_AMOUNT_CHANGED", details, ConnectorRecovery.RECHECK).toStored(), now);
             return Optional.empty();
-        }
-        try {
-            // 그 순간의 상한과, 이 주문을 뺀 승인 날짜의 합계로 다시 본다(spec DECISION23).
-            purchases.requireWithin(action.userId(), action.id(), finalAmount, action.decidedAt());
-        } catch (PurchaseLimitExceeded ex) {
-            bodies.fail(action, LIMIT, limitDetail(ex, "final_amount_krw", finalAmount).toStored(), now);
-            return Optional.empty();
-        } catch (RuntimeException ex) {
-            // 하루 합계가 다른 줄의 원문을 열지 못하면 판정할 수 없다. 결과 저장을 롤백하면 줄이 EXECUTING 으로 남고 넘기기도 없으므로,
-            // 결제를 넘기지 않고 결과를 모르는 것으로 끝내 사람이 남은 주문서 탭을 보게 한다.
-            action.unknown(now);
-            return handOff(action, HandoffNeed.TAB_CHECK, body.get("tab").stringValue(), now);
         }
         bodies.succeed(action, new PaymentHandoffResult(finalAmount, expectedTotalKrw).toStored(), now);
         return handOff(action, HandoffNeed.PAYMENT, body.get("tab").stringValue(), now);
@@ -166,7 +141,7 @@ final class ConnectorCheckoutOutcome {
     }
 
 
-    /** 사람 기다림을 이어 가지 않고 끝낸다. 결제 화면까지 가지 못했으므로 하루 합계에서 빠진다(spec DECISION20). */
+    /** 사람 기다림을 이어 가지 않고 끝낸다. */
     static void endWaiting(ConnectorAction action, ConnectorActionBodies bodies, Instant now) {
         bodies.fail(action, RESUME_ENDED, new ConnectorErrorDetail("RESUME_ENDED", Map.of(), null).toStored(), now);
     }
@@ -183,20 +158,5 @@ final class ConnectorCheckoutOutcome {
             }
         }
         return null;
-    }
-
-
-    /** 걸린 상한과 남은 한도를 세부로 싣는다. 세부 값의 상한(10억)을 넘는 상한 값은 싣지 않는다. */
-    private static ConnectorErrorDetail limitDetail(PurchaseLimitExceeded ex, String amountName, long amountKrw) {
-        var details = new LinkedHashMap<String, Object>();
-        details.put(amountName, amountKrw);
-        details.put("daily_limit", ex.kind() == PurchaseLimitKind.DAILY);
-        if (ex.limit() <= ConnectorErrorDetail.DETAIL_INT_MAX) {
-            details.put("limit_krw", ex.limit());
-        }
-        if (ex.remainingToday() <= ConnectorErrorDetail.DETAIL_INT_MAX) {
-            details.put("remaining_today_krw", ex.remainingToday());
-        }
-        return new ConnectorErrorDetail("PURCHASE_LIMIT", details, null);
     }
 }

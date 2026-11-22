@@ -80,6 +80,48 @@ test("도구 오류는 코드만 싣고 중계 주소를 싣지 않는다", asyn
   expect(text).not.toContain("gateway-token");
 });
 
+test("상품 찾기는 선택한 정렬을 네이버 검색 주소로 보내고 생략하면 기본 순서를 쓴다", async () => {
+  browser = startFakeBrowser({ state: "[]" });
+  const client = await connect({ [BROWSER_URL_ENV]: browser.url });
+  const sorts = [undefined, "LOW_PRICE", "HIGH_PRICE", "REVIEW"];
+  for (const sort of sorts) {
+    const result = await client.callTool({
+      name: "search_products",
+      arguments: { query: "물티슈 100매", ...(sort ? { sort } : {}) },
+    });
+    expect(result.isError).toBeFalsy();
+  }
+  const urls = browser.commands
+    .filter(({ method }) => method === "Page.navigate")
+    .map(({ params }) => new URL(params.url));
+  expect(urls.map((url) => [...url.searchParams])).toEqual([
+    [["query", "물티슈 100매"]],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "LOW_PRICE"],
+    ],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "HIGH_PRICE"],
+    ],
+    [
+      ["query", "물티슈 100매"],
+      ["sort", "REVIEW"],
+    ],
+  ]);
+});
+
+test("지원하지 않는 정렬은 상품 검색 탭을 열기 전에 거절한다", async () => {
+  browser = startFakeBrowser();
+  const client = await connect({ [BROWSER_URL_ENV]: browser.url });
+  const result = await client.callTool({
+    name: "search_products",
+    arguments: { query: "물티슈", sort: "RECENT" },
+  });
+  expect(result.isError).toBe(true);
+  expect(browser.http).toEqual([]);
+});
+
 test("사람이 해야 하는 화면이면 오류가 아닌 결과에 넘기기 칸(code, need, 남긴 탭)을 싣는다", async () => {
   browser = startFakeBrowser({
     href: "https://nid.naver.com/nidlogin.login",
