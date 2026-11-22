@@ -4,6 +4,11 @@
   "pr_scope": "평가 실행기가 서비스 개념과 답변 품질 묶음을 평가 전용 사용자로 돌리고, 문항마다 비우며, 관리자 API 로 시작하고 결과와 남긴 대화를 읽게 한다.",
   "deferred": [
     {
+      "what": "옛 서비스 개념 판정 테스트의 「끝나지 않은 도구 사건은 빼고 자식 실행까지 센다」 사례를 평가 관찰(DeployCheckObserver 를 쓰는 EvalRunner.observe)의 통합 테스트로 옮긴다",
+      "why": "관찰은 실행 트리와 사건 줄을 DB 에 만들어야 보는 통합 테스트라 이 PR 의 단위 테스트(EvalRunnerTest)에 넣지 못했다",
+      "after": "답변 품질 판정을 옮기는 PR 에서 관찰 테스트를 만들 때"
+    },
+    {
       "what": "답변 품질 판정(형식 검사, 사진 요청, 출처 링크 열기)을 Java 로 옮겨 answer-quality 묶음을 external 에서 answer-quality 규칙으로 바꾸고, 공개 주소 읽기를 shared 로 꺼낸다",
       "why": "운영 코드 상한 안에 두려고 이 PR 은 답변 품질 채점을 test/model-eval/answer/run.ts score-eval 에 맡긴다",
       "after": "이 PR 이 머지되고 배포 뒤 score-eval 결과로 옛 결과와 비교한 뒤"

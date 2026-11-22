@@ -300,7 +300,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | 칸 | `EVAL` 에서 |
 | --- | --- |
 | `kind`, `trigger_type` | `EVAL`, `ADMIN`. PR2b 가 `SCHEDULED` 를 더한다 |
-| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(보내기·읽기 오류와 시간 초과 문항 수). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
+| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(판정까지 가지 못한 문항 수: 시간 초과, 보내기 거절, 한도 거절, 카드 실패, 답 없음, 평가가 멈춰 돌지 못함(`NOT_RUN`). 이 수가 하나라도 있으면 묶음은 비율을 넘어도 통과가 아니다. 옛 평가가 보내기·읽기 오류를 「오류」 로 따로 둔 것과 같은 뜻이고, 카드 실패도 문항이 판정까지 가지 못한 것이라 같이 센다). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
 
 `result_json` 의 모양이 `kind` 마다 다르다. 지금 `QualityRun.results` 는 `FeatureResultsConverter` 로 `List<FeatureResult>` 에 묶여 있고 JPA 변환기는 `kind` 를 보지 못한다. 그래서 엔티티 칸을 JSON 문자열로 두고, `kind` 별 읽기·쓰기는 domain 의 codec 두 개(지금 `FeatureResultsConverter` 를 JPA 변환기에서 정적 codec 으로 바꾼 것과 새 `EvalResult` codec)가 한다. 지금 변환기처럼 codec 안의 정적 `JsonMapper` 를 쓴다. 엔티티는 `kind` 가 맞지 않는 읽기·쓰기를 거절한다. `item_count` 는 `EVAL` 에서 고른 문항 수이고 PR1 의 `record` 처럼 결과 수로 덮지 않는다. 답 본문과 질문 본문은 담지 않는다.
 
@@ -330,7 +330,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | 요청 | 응답 |
 | --- | --- |
 | `GET /api/v1/admin/quality/eval-bundles` | 묶음 목록(`id`, `title`, 문항 수, 상한) |
-| `POST /api/v1/admin/quality/evals` | 본문 `{bundles: [id...], tier}`. `bundles` 가 비면 전체, `tier` 가 없으면 평가 사용자에게 걸리는 기본 단계(스펙 DECISION41). 202 와 새 줄. 도는 평가가 있으면 새로 만들지 않고 200 과 그 줄(PR1 의 확인 시작과 같다). 화면과 스크립트는 200 이면 「평가가 돌고 있다」 를 보인다. 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING`. 없는 묶음 id 는 400 `QUALITY_EVAL_BUNDLE_UNKNOWN`, 모르는 단계는 400 |
+| `POST /api/v1/admin/quality/evals` | 본문 `{bundles: [id...], tier}`. `bundles` 가 비면 전체, `tier` 가 없으면 평가 사용자에게 걸리는 기본 단계(스펙 DECISION41). 202 와 새 줄. 도는 평가가 있으면 새로 만들지 않고 200 과 그 줄(PR1 의 확인 시작과 같다). 화면과 스크립트는 200 이면 「평가가 돌고 있다」 를 보인다. 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING`, 기본 에이전트가 없어 준비가 덜 됐으면 409 `EVALUATION_USER_NOT_READY`. 없는 묶음 id 는 400 `QUALITY_EVAL_BUNDLE_UNKNOWN`, 모르는 단계는 400 |
 | `GET /api/v1/admin/quality/evals?cursor=` | 최근 순 목록. 품질 화면 둘째 칸 |
 | `GET /api/v1/admin/quality/evals/{publicId}` | 한 줄과 묶음 결과, 문항 결과 |
 | `GET /api/v1/admin/quality/conversations/{publicId}/messages` | 평가 사용자의 대화만 연다. 남겨 둔 실패 대화와 사람 비교 문항의 답을 관리자가 읽는다. 다른 사용자의 대화는 404 다(PR1 의 트리 조회와 같은 이유, 이 문서 DECISION8) |
