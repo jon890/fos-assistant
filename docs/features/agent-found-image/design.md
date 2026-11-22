@@ -168,7 +168,7 @@ fos-ctx 는 받은 링크와 함께 이 머리를 호출마다 기억하고, 그
 
 ### 상품 페이지에서 대표 사진 고르기
 
-`web_extract`의 기본 경로는 마크다운만 넘기므로 `fos-ctx`가 web toolset에 상품 사진용 읽기 도구 `product_page_read`를 등록한다. 그림 지침은 검색 결과가 상품 페이지일 때 이 도구로 한 번 읽은 뒤 같은 페이지 주소를 가리키게 한다. 원본 HTML을 받는 데 Hermes가 사용하는 무료 Firecrawl 읽기 경로를 이용한다. 공개 웹 주소와 Hermes 웹사이트 정책을 요청 전과 제공자가 알려준 최종 주소에 적용한다. 유료 경로로 넘어가지 않는다. 페이지 원문은 모델이나 Control Plane에 보내지 않는다.
+`web_extract`의 기본 경로는 마크다운만 넘기므로 `fos-ctx`가 상품 사진용 읽기 도구 `product_page_read`를 자기 toolset `fos-product-page`에 등록한다. 이 toolset은 웹 검색(`web`)이 켜진 profile에서만 켜진다([Hermes 계약](../../../hermes/docs/hermes-contract.md)의 「plugin toolset 이름」). 그림 지침은 검색 결과가 상품 페이지일 때 이 도구로 한 번 읽은 뒤 같은 페이지 주소를 가리키게 한다. 원본 HTML을 받는 데 Hermes가 사용하는 무료 Firecrawl 읽기 경로를 이용한다. 공개 웹 주소와 Hermes 웹사이트 정책을 요청 전과 제공자가 알려준 최종 주소에 적용한다. 유료 경로로 넘어가지 않는다. 페이지 원문은 모델이나 Control Plane에 보내지 않는다.
 
 플러그인은 읽은 HTML에서 `Product.image`, `og:image`, 본문의 `img`와 `srcset`을 뽑고 HTML에 크기가 적혔으면 함께 알린다. 기존 `found-links` 요청의 페이지 항목에 `requested`와 `images`를 선택 칸으로 보낸다. 사진 후보는 기존 `links`에도 담는다. 알리기와 받기의 대화는 서명한 origin 실행에서 얻는다. 읽기 요청과 최종 페이지의 주소는 별도로 발견한 기록이 있을 때 쓸 수 있다.
 

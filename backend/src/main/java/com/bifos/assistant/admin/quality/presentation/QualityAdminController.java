@@ -2,8 +2,15 @@ package com.bifos.assistant.admin.quality.presentation;
 
 import com.bifos.assistant.admin.quality.presentation.QualityAdminDtos.EvaluationUserView;
 import com.bifos.assistant.admin.quality.presentation.QualityAdminDtos.PrepareEvaluationUserRequest;
+import com.bifos.assistant.admin.quality.presentation.QualityAdminDtos.StartEvalRequest;
 import com.bifos.assistant.quality.application.DeployCheckService;
+import com.bifos.assistant.quality.application.EvalService;
 import com.bifos.assistant.quality.application.EvaluationUserService;
+import com.bifos.assistant.quality.application.dto.EvalBundleView;
+import com.bifos.assistant.quality.application.dto.EvalMessageView;
+import com.bifos.assistant.quality.application.dto.EvalPage;
+import com.bifos.assistant.quality.application.dto.EvalView;
+import com.bifos.assistant.quality.application.dto.StartedEval;
 import com.bifos.assistant.quality.application.dto.DeployCheckPage;
 import com.bifos.assistant.quality.application.dto.DeployCheckView;
 import com.bifos.assistant.quality.application.dto.StartedDeployCheck;
@@ -11,6 +18,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionTree;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +44,7 @@ public class QualityAdminController {
 
     private final EvaluationUserService evaluationUsers;
     private final DeployCheckService checks;
+    private final EvalService evals;
     private final CurrentUserProvider currentUser;
 
 
@@ -74,6 +83,45 @@ public class QualityAdminController {
     public ExecutionTree executionTree(@PathVariable Long executionId) {
         CurrentUser admin = currentUser.requireAdmin();
         return checks.tree(admin, executionId);
+    }
+
+
+    /** 「지금 돌리기」 가 고를 평가 묶음이다. */
+    @GetMapping("/eval-bundles")
+    public List<EvalBundleView> evalBundles() {
+        CurrentUser admin = currentUser.requireAdmin();
+        return evals.bundles(admin);
+    }
+
+
+    /** 평가를 시작한다. 새로 시작하면 202, 이미 도는 평가를 돌려주면 200 이다. */
+    @PostMapping("/evals")
+    public ResponseEntity<EvalView> startEval(@RequestBody(required = false) StartEvalRequest request) {
+        CurrentUser admin = currentUser.requireAdmin();
+        StartedEval started = evals.start(admin, request == null ? List.of() : request.bundles(), request == null ? null : request.tier());
+        return ResponseEntity.status(started.created() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(started.eval());
+    }
+
+
+    @GetMapping("/evals")
+    public EvalPage evalList(@RequestParam(required = false) String cursor) {
+        CurrentUser admin = currentUser.requireAdmin();
+        return evals.list(admin, cursor);
+    }
+
+
+    @GetMapping("/evals/{publicId}")
+    public EvalView eval(@PathVariable UUID publicId) {
+        CurrentUser admin = currentUser.requireAdmin();
+        return evals.get(admin, publicId);
+    }
+
+
+    /** 평가 전용 사용자의 대화 메시지만 연다. 다른 사용자의 대화는 404 다. */
+    @GetMapping("/conversations/{publicId}/messages")
+    public List<EvalMessageView> evalConversation(@PathVariable UUID publicId) {
+        CurrentUser admin = currentUser.requireAdmin();
+        return evals.messages(admin, publicId);
     }
 
 

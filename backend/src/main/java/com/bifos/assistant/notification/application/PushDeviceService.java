@@ -215,7 +215,8 @@ public class PushDeviceService {
 
     private void validate(PushRegistration registration) {
         if (registration == null || !policy.allows(registration.endpoint())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "endpoint is not an allowed push service");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                "이 브라우저의 알림 주소를 받아들이지 못했어요. 다른 브라우저에서 다시 시도하거나 관리자에게 알려 주세요.");
         }
         requireLength("keys.p256dh", registration.p256dh(), P256DH_MAX);
         requireLength("keys.auth", registration.auth(), AUTH_MAX);

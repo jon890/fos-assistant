@@ -44,8 +44,14 @@ public final class AgentToolPolicy {
      * 모델의 원본 재조회 도구다. 사용자에게 설정 항목으로 노출하지 않는다.
      */
     public static final String ATTACHMENT_INSPECTION = "fos-attachments";
+    /**
+     * 상품 페이지를 읽는 fos-ctx 도구의 toolset 이다. 사용자에게 설정 항목으로 노출하지 않는다.
+     * {@code web} 을 켠 profile 에만 켜지도록 Hermes 쓰기({@code HttpHermesToolsetClient})가 목록을 맞춘다.
+     */
+    public static final String PRODUCT_PAGE = "fos-product-page";
+    private static final String WEB = "web";
 
-    private static final Set<String> OWNER_TOOLSETS = Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
+    private static final Set<String> OWNER_TOOLSETS = Set.of(WEB, "vision", "todo", "clarify", "skills", "tts", "delegation");
     private static final Set<String> ADMIN_TOOLSETS = Set.of(
         "terminal",
         "file",
@@ -142,7 +148,7 @@ public final class AgentToolPolicy {
         }
         LinkedHashSet<String> requestedSet = new LinkedHashSet<>();
         for (String name : requested) {
-            if (name != null && connectorServers.contains(name)) {
+            if (name != null && (connectorServers.contains(name) || PRODUCT_PAGE.equals(name))) {
                 continue;
             }
             if (name == null
@@ -186,6 +192,14 @@ public final class AgentToolPolicy {
         }
         result.addAll(connectorServers);
         return List.copyOf(result);
+    }
+
+
+    /**
+     * Control Plane 이 정하는 내부 toolset 인가. 화면에 보이지 않고 분류하지 못한 도구로도 알리지 않는다.
+     */
+    public static boolean isInternal(String name) {
+        return ATTACHMENT_INSPECTION.equals(name) || PRODUCT_PAGE.equals(name);
     }
 
 

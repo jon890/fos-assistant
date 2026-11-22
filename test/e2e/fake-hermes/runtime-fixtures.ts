@@ -43,9 +43,17 @@ export const TOOLSET_CATALOG = [
   { name: "spotify", label: "Spotify", description: "음악을 제어한다" },
   { name: "discord", label: "Discord", description: "Discord를 제어한다" },
   { name: "fos-attachments", label: "Attachment inspection", description: "원본 사진을 다시 읽는다" },
+  { name: "fos-product-page", label: "Product page", description: "상품 페이지를 읽는다" },
 ] as const;
 
 export const CONTROL_PLANE_MCP = "fos-assistant";
+
+/**
+ * fos-ctx 의 상품 페이지 도구가 든 toolset 이다. Control Plane 이 `web` 과 함께 목록에 넣는다.
+ *
+ * <p>대시보드 plugin 은 fos-ctx 가 없는 profile 에서도 이 이름을 받는다(`toolconfig.py` 의 `known`). 대역도 같게 받는다.
+ */
+export const PRODUCT_PAGE_TOOLSET = "fos-product-page";
 
 /** 허용 목록이 없는 API server의 v0.21.3 기본 toolset이다. */
 export const DEFAULT_API_SERVER_TOOLSETS = [
