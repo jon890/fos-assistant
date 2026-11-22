@@ -2,6 +2,8 @@
 
 Control Plane 이 Hermes 를 부르는 실행 경계를 port 로 모으고, 다른 Agent Runtime 을 붙여 비교하는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/runtime/`, `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesAgentRuntime.java`, `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunEventKinds.java`, `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunOutcomes.java`
+
 실행 port 가 `runtime` 패키지의 중립 계약(`AgentRuntime`)으로 옮겨졌고 구현은 Hermes 하나(`HermesAgentRuntime`)다. 실행을 부르는 곳은 `AgentRuntimes` 로 대상의 런타임 구현을 골라 부른다. 다른 런타임은 아직 붙지 않았다. 요구와 결정은 스펙 [`runtime-abstraction/spec.md`](runtime-abstraction/spec.md) 가 갖는다.
 지금 실행이 Hermes 로 가는 흐름은 [실행 기록과 한도](execution.md)와 [Hermes 계약](../../hermes/docs/hermes-contract.md)이 갖는다.
 

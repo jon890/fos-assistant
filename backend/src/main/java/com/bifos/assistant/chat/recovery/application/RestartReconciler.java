@@ -478,8 +478,7 @@ public class RestartReconciler implements SmartLifecycle {
     /** 보내지 못하면 경고 로그만 남기고 거짓을 돌려준다. */
     private boolean sendStop(Agent agent, AgentExecution row) {
         try {
-            RuntimeTarget target = agent.runtimeTargetOf(row.profileName());
-            runtimes.of(target).stop(target, row.hermesRunId());
+            runtimes.of(agent.runtimeTarget()).stop(agent.runtimeTargetOf(row.profileName()), row.hermesRunId());
             return true;
         } catch (RuntimeException ex) {
             log.warn("남은 실행에 중지를 보내지 못했다 executionId={} runId={}", row.id(), row.hermesRunId(), ex);
