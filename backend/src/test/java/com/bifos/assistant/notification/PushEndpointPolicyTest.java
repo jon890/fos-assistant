@@ -13,12 +13,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 class PushEndpointPolicyTest {
 
     private final PushEndpointPolicy policy = new PushEndpointPolicy(List.of(
-        "fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", ".notify.windows.com"));
+        "fcm.googleapis.com", "jmt17.google.com", "updates.push.services.mozilla.com", "web.push.apple.com", ".notify.windows.com"));
 
 
     @ParameterizedTest
     @ValueSource(strings = {
         "https://fcm.googleapis.com/fcm/send/abc",
+        "https://JMT17.google.com:443/fcm/send/token_1:token-2",
         "https://updates.push.services.mozilla.com/wpush/v2/abc",
         "https://web.push.apple.com/QOabc",
         "https://wns2-par02p.notify.windows.com/w/?token=abc",
@@ -44,6 +45,26 @@ class PushEndpointPolicyTest {
         ""})
     @DisplayName("다른 호스트, http, 다른 포트, userinfo, IP 리터럴은 받지 않는다")
     void rejectsEverythingElse(String endpoint) {
+        assertThat(policy.allows(endpoint)).isFalse();
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "http://jmt17.google.com/fcm/send/abc",
+        "https://jmt17.google.com:8443/fcm/send/abc",
+        "https://user@jmt17.google.com/fcm/send/abc",
+        "https://jmt17.google.com.evil.example/fcm/send/abc",
+        "https://jmt17.google.com./fcm/send/abc",
+        "https://other.google.com/fcm/send/abc",
+        "https://jmt17.google.com/fcm/send/",
+        "https://jmt17.google.com/another/path/abc",
+        "https://jmt17.google.com/fcm/send/../other",
+        "https://jmt17.google.com/fcm/send/abc%2Fdef",
+        "https://jmt17.google.com/fcm/send/abc?x=y",
+        "https://jmt17.google.com/fcm/send/abc#fragment"})
+    @DisplayName("Chromium 스테이징 주소는 정확한 호스트와 구독 경로의 https 주소만 받는다")
+    void rejectsNonSubscriptionRoutesForChromiumStaging(String endpoint) {
         assertThat(policy.allows(endpoint)).isFalse();
     }
 
