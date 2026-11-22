@@ -124,7 +124,15 @@ export function useConversationEffects({
               return;
             }
             // 맡긴 실행의 도구 사건은 도는 답의 작업 과정에 바로 넣는다. 도는 답이 없으면 버리고 끝난 뒤에는 트리가 그린다.
+            // 앞 답이 맡겨 둔 실행의 사건은 지금 도는 다른 답에 넣지 않는다.
             if (event.type === "delegation_activity") {
+              const running = currentExecutionId.current;
+              if (
+                running !== null &&
+                event.delegation &&
+                event.delegation.parentExecutionId !== running
+              )
+                return;
               setActivity(
                 (previous) =>
                   previous && applyDelegationActivity(previous, event),
