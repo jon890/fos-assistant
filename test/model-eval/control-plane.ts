@@ -18,6 +18,21 @@ export type ExecutionNode = {
   children: ExecutionNode[];
 };
 export type ExecutionTree = { root: ExecutionNode; truncated: boolean };
+/** 묶음 평가 한 번이다(관리자 API). 밖에서 채점하는 데 쓰는 칸만 적는다. */
+export type EvalRunView = {
+  publicId: string;
+  status: string;
+  tier: string | null;
+  items: {
+    bundle: string;
+    question: string;
+    status: string;
+    reasonCode: string | null;
+    startedAt: string | null;
+    conversationPublicId: string | null;
+    executionIds: number[];
+  }[];
+};
 /** 예약 작업 목록의 항목이다. 판정과 정리에 쓰는 칸만 적는다. */
 export type TaskView = { id: string; instruction: string; createdAt: string };
 
@@ -100,6 +115,25 @@ export class ControlPlane {
   async file(conversationId: string, path: string): Promise<string> {
     const encoded = path.split("/").map(encodeURIComponent).join("/");
     return (await this.request("GET", `/api/v1/chat/conversations/${conversationId}/files/${encoded}`)).text();
+  }
+
+  /** 관리자 토큰으로 묶음 평가 한 번을 읽는다. */
+  async evalRun(publicId: string): Promise<EvalRunView> {
+    return this.json("GET", `/api/v1/admin/quality/evals/${publicId}`);
+  }
+
+  /** 관리자 토큰으로 평가 전용 사용자의 대화 메시지를 읽는다. 다른 사용자의 대화는 404 다. */
+  async evalMessages(conversationPublicId: string): Promise<MessageView[]> {
+    const rows = await this.json<{ role: string; content: string | null; executionId: number | null }[]>(
+      "GET",
+      `/api/v1/admin/quality/conversations/${conversationPublicId}/messages`,
+    );
+    return rows.map((row) => ({ role: row.role, content: row.content, executionId: row.executionId, status: null, artifacts: [] }));
+  }
+
+  /** 관리자 토큰으로 평가 전용 사용자의 실행 트리를 읽는다. */
+  async evalTree(executionId: number): Promise<ExecutionTree> {
+    return this.json("GET", `/api/v1/admin/quality/executions/${executionId}/tree`);
   }
 
   async tree(executionId: number): Promise<ExecutionTree> {

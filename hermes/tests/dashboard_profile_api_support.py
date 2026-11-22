@@ -195,6 +195,9 @@ class ProfileApiRouteTest(unittest.TestCase):
         cls.web_profiles._config_profile_scope = config_profile_scope
         cls.config.save_config = save_config
         cls.tools._get_plugin_toolset_keys = lambda: set()
+        # 문자열로 저장된 목록(`"[web, delegation]"`)을 목록으로 푸는 Hermes 의 해석을 흉내 낸다.
+        cls.tools._coerce_platform_toolsets_value = (
+            lambda value, platform: yaml.safe_load(value) if isinstance(value, str) else value)
         cls.tools._get_platform_tools = fake_platform_tools
         cls.profiles.list_profile_names = list_profile_names
         cls.profiles.get_profile_dir = lambda name: cls.root / name
@@ -707,7 +710,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         return {
             "profile": "owner",
             "config": {
-                "platform_toolsets": {"api_server": ["delegation", "web", "fos-assistant"]},
+                # 지금 Control Plane 처럼 web 과 함께 상품 페이지 toolset 을 보낸다.
+                "platform_toolsets": {"api_server": ["delegation", "web", "fos-assistant", "fos-product-page"]},
             },
         }
 

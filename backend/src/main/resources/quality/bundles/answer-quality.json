@@ -1,0 +1,29 @@
+{
+  "id": "answer-quality",
+  "title": "답변 품질",
+  "timeoutMinutes": 15,
+  "pass": {"type": "external"},
+  "questions": [
+    {"id":"shop-vacuum","tag":"쇼핑·가격","turns":[{"text":"10만원대 무선 청소기 세 개를 비교해서 하나 추천해 줘"}],"keepConversation":true},
+    {"id":"shop-iphone","tag":"쇼핑·가격","turns":[{"text":"요즘 나온 아이폰 기본 모델의 국내 출고가가 얼마야?"}],"keepConversation":true},
+    {"id":"shop-dishwasher","tag":"쇼핑·가격","turns":[{"text":"4인 가족이 쓸 식기세척기를 고를 때 볼 것과 지금 많이 팔리는 모델을 알려 줘"}],"keepConversation":true},
+    {"id":"shop-tablet","tag":"쇼핑·가격","turns":[{"text":"초등학생 입문용 태블릿을 30만원 아래로 추천해 줘"}],"keepConversation":true},
+    {"id":"shop-gasoline","tag":"쇼핑·가격","turns":[{"text":"지금 휘발유 전국 평균 가격이 얼마야?"}],"keepConversation":true},
+    {"id":"trip-gangneung","tag":"여행·장소","turns":[{"text":"다음 달 주말에 초등학생과 갈 만한 강릉 1박 2일 일정을 짜 줘"}],"keepConversation":true},
+    {"id":"trip-seoul-events","tag":"여행·장소","turns":[{"text":"이번 주말 서울에서 열리는 아이와 갈 만한 전시나 행사를 알려 줘"}],"keepConversation":true},
+    {"id":"trip-jeju-indoor","tag":"여행·장소","turns":[{"text":"제주 동쪽에서 비 오는 날 갈 만한 실내 장소 다섯 곳과 운영 시간을 알려 줘"}],"keepConversation":true},
+    {"id":"trip-busan-transit","tag":"여행·장소","turns":[{"text":"부산역에서 해운대까지 대중교통으로 가는 방법과 걸리는 시간을 알려 줘"}],"keepConversation":true},
+    {"id":"trip-osaka-budget","tag":"여행·장소","turns":[{"text":"일본 오사카 3박 4일 가족 여행 예산을 항목별로 잡아 줘"}],"keepConversation":true},
+    {"id":"news-usdkrw","tag":"뉴스·시세","turns":[{"text":"오늘 원달러 환율이 얼마야?"}],"keepConversation":true},
+    {"id":"news-economy","tag":"뉴스·시세","turns":[{"text":"이번 주 한국 경제 뉴스에서 중요한 것 세 가지를 정리해 줘"}],"keepConversation":true},
+    {"id":"news-base-rate","tag":"뉴스·시세","turns":[{"text":"한국은행 기준금리가 지금 몇 퍼센트고 마지막으로 언제 바뀌었어?"}],"keepConversation":true},
+    {"id":"news-weather","tag":"뉴스·시세","turns":[{"text":"내일 서울 날씨가 어때?"}],"keepConversation":true},
+    {"id":"news-today","tag":"뉴스·시세","turns":[{"text":"오늘이 몇 월 며칠 무슨 요일이야?"}],"keepConversation":true},
+    {"id":"life-year-end-tax","tag":"생활 지식","turns":[{"text":"올해 연말정산에서 달라진 것을 정리해 줘"}],"keepConversation":true},
+    {"id":"life-fever","tag":"생활 지식","turns":[{"text":"아이가 38.5도 열이 날 때 집에서 할 수 있는 것과 병원에 가야 하는 때를 알려 줘"}],"keepConversation":true},
+    {"id":"life-fraction","tag":"생활 지식","turns":[{"text":"초등 5학년 분수의 나눗셈을 아이에게 설명하는 방법을 알려 줘"}],"keepConversation":true},
+    {"id":"life-kimchi-stew","tag":"생활 지식","turns":[{"text":"돼지고기 김치찌개 4인분 만드는 법을 알려 줘"}],"keepConversation":true},
+    {"id":"life-flu-shot","tag":"생활 지식","turns":[{"text":"어린이 독감 예방접종을 올해는 언제까지 맞아야 해?"}],"keepConversation":true},
+    {"id":"draw-found-photo","tag":"쇼핑·가격","turns":[{"text":"인터넷에서 GGRN 양말 상품 사진을 찾아서, 그 사진을 참고로 우리 아이가 그 양말을 신고 뛰어노는 그림을 그려 줘"}],"keepConversation":true}
+  ]
+}

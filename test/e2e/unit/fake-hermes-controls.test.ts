@@ -323,3 +323,33 @@ test("중지 뒤 처음 사건을 읽어도 run.cancelled 를 보내고 완료�
     await hermes.close();
   }
 });
+
+
+test("도구 저장은 실제 plugin 처럼 상품 페이지 toolset 을 web 에 맞춰 저장한다", async () => {
+  const hermes = await startFakeHermes({ browser: "example-key" });
+  const save = (apiServer: string[]) =>
+    fetch(`${hermes.baseUrl}/api/config`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${FAKE_DASHBOARD_TOKEN}` },
+      body: JSON.stringify({ profile: "browser", config: { platform_toolsets: { api_server: apiServer } } }),
+      signal: AbortSignal.timeout(2000),
+    });
+  const enabled = async () => {
+    const response = await fetch(`${hermes.baseUrl}/p/browser/v1/toolsets`, {
+      headers: { Authorization: "Bearer example-key" },
+      signal: AbortSignal.timeout(2000),
+    });
+    const body = await response.json() as { data: { name: string; enabled: boolean }[] };
+    return body.data.filter((toolset) => toolset.enabled).map((toolset) => toolset.name).sort();
+  };
+  try {
+    // web 만 보내도 상품 페이지 도구가 함께 켜진다.
+    assert.equal((await save(["web", "fos-assistant"])).status, 200);
+    assert.deepEqual(await enabled(), ["fos-product-page", "web"]);
+    // web 없이 상품 페이지 도구만 보내면 켜지지 않는다.
+    assert.equal((await save(["fos-product-page", "todo", "fos-assistant"])).status, 200);
+    assert.deepEqual(await enabled(), ["todo"]);
+  } finally {
+    await hermes.close();
+  }
+});
