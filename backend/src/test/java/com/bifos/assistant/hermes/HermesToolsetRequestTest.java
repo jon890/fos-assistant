@@ -132,10 +132,30 @@ class HermesToolsetRequestTest {
                     "profile",
                     "kid",
                     "config",
-                    Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant"))),
+                    Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant", "fos-product-page"))),
                     "sandbox_owner",
                     "u7"));
         });
+    }
+
+
+    @Test
+    @DisplayName("상품 페이지 toolset 은 웹 검색이 있는 목록에만 쓴다")
+    void productPageFollowsWeb() throws Exception {
+        client.writeApiServer("kid", List.of("fos-assistant", "fos-product-page", "fos-attachments"), "u7");
+        client.writeApiServerInSandbox("kid", List.of("fos-product-page", "web", "fos-assistant"), "u7");
+
+        assertThat(calls).extracting(call -> apiServer(call.body()))
+            .containsExactly(
+                List.of("fos-assistant", "fos-attachments"),
+                List.of("web", "fos-assistant", "fos-product-page"));
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private static List<String> apiServer(String body) {
+        Map<String, Object> config = (Map<String, Object>)new ObjectMapper().readValue(body, Map.class).get("config");
+        return ((Map<String, List<String>>)config.get("platform_toolsets")).get("api_server");
     }
 
 
