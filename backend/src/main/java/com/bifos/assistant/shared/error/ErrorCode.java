@@ -52,6 +52,8 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 기본 비서는 지울 수 없다(docs/features/agent-team/spec.md 의 DECISION24). */
     PRIMARY_AGENT_PROTECTED(HttpStatus.CONFLICT),
+    /** 기본 비서에는 연결을 붙이지 않는다. 연결은 전문 에이전트가 맡는다(docs/features/assistant-hub/spec.md 의 REQ9). */
+    PRIMARY_AGENT_NO_CONNECTIONS(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** 연결은 비공개 에이전트에만 붙인다. 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 한다(ADR-083). */
