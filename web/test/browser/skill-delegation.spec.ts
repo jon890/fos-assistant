@@ -51,6 +51,8 @@ test("/ 목록에 「에이전트 · 스킬」 이 보이고, 골라 보내면 �
       .getByRole("listbox", { name: "스킬 고르기" })
       .getByRole("option", { name: `/커리어 검사 · ${SKILL}` });
     await expect(option).toBeVisible();
+    // 맡길 스킬도 SKILL.md 의 설명을 이름 아래 한 줄로 보인다.
+    await expect(option.getByTestId("skill-option-description")).toHaveText("공고를 골라요");
     await input.press("Enter");
     await expect(input).toHaveValue(`/커리어 검사 · ${SKILL} `);
     await input.pressSequentially("이번 주 공고");
@@ -90,7 +92,9 @@ test("맡기기를 받아들이기 전에 다시 눌러도 한 번만 보내고,
   const { conversationId } = (await created.json()) as { conversationId: string };
   // 목록과 맡기기 응답만 바꾼다. 실제 맡기기는 위 검사와 Control Plane 테스트가 본다.
   await page.route("**/api/chat/skill-delegations/targets", (route) =>
-    route.fulfill({ json: [{ agentCode: "career-fake", agentName: "커리어", skills: [SKILL] }] }),
+    route.fulfill({
+      json: [{ agentCode: "career-fake", agentName: "커리어", skills: [{ name: SKILL, description: "" }] }],
+    }),
   );
   let posts = 0;
   let release = () => {};

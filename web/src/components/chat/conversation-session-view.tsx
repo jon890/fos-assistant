@@ -78,6 +78,7 @@ export function ConversationSessionView({
   startScreen,
   skillCommandsEnabled,
   skillNames,
+  skillDescriptions,
   starters,
 }: Props) {
   const { replyTo, replyRef, setReplyTo } = useReplyTarget();
@@ -329,6 +330,7 @@ export function ConversationSessionView({
                   void stop();
                 }}
                 skillNames={skillNames}
+                skillDescriptions={skillDescriptions}
                 onBlockingChange={setComposerBlocking}
                 modelChoiceUnknown={
                   conversationId !== null && currentConversation === undefined

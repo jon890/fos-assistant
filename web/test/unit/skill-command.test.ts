@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  commandSkillDescriptions,
   commandSkillNames,
   delegatedTargetOf,
+  delegationDescriptions,
   delegationLabels,
   filterSkillNames,
   findSkillQuery,
   parseSkillCommand,
+  skillDescriptionLine,
   withSkillCommand,
 } from "../../src/components/chat/skill-command.ts";
 
@@ -54,9 +57,32 @@ test("커맨드로 부를 이름은 켜진 스킬 가운데 점과 밑줄이 없
 });
 
 const TARGETS = [
-  { agentCode: "career", agentName: "커리어", skills: ["position-recommender", "resume-review"] },
-  { agentCode: "gmail", agentName: "Gmail 담당", skills: ["mail-digest"] },
+  {
+    agentCode: "career",
+    agentName: "커리어",
+    skills: [
+      { name: "position-recommender", description: "공고를 골라요" },
+      { name: "resume-review", description: "" },
+    ],
+  },
+  { agentCode: "gmail", agentName: "Gmail 담당", skills: [{ name: "mail-digest", description: "메일을\n  요약해요" }] },
 ];
+
+test("/ 목록의 설명은 비서 스킬은 이름, 맡길 스킬은 「에이전트 · 스킬」 을 키로 두고, 줄바꿈과 겹친 공백은 한 칸으로 줄인다", () => {
+  const skills = [
+    { name: "weekly-plan", description: "이번 주 계획을 세워요", source: "UPLOADED" as const, enabled: true },
+  ];
+  assert.deepEqual(commandSkillDescriptions({ skills, editable: true, skillsToolsetEnabled: true, uploadLimit: 30 }), {
+    "weekly-plan": "이번 주 계획을 세워요",
+  });
+  assert.deepEqual(delegationDescriptions(TARGETS), {
+    "커리어 · position-recommender": "공고를 골라요",
+    "커리어 · resume-review": "",
+    "Gmail 담당 · mail-digest": "메일을\n  요약해요",
+  });
+  assert.equal(skillDescriptionLine("메일을\n  요약해요 "), "메일을 요약해요");
+  assert.equal(skillDescriptionLine(undefined), "");
+});
 
 test("맡길 스킬은 「에이전트 이름 · 스킬」 로 붙고, 고르면 /에이전트 이름 · 스킬 이 들어가며 이름 일부로 걸러진다(스펙 assistant-hub REQ10)", () => {
   const labels = delegationLabels(TARGETS);

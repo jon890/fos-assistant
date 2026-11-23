@@ -55,6 +55,22 @@ export function filterSkillNames(names: string[], query: string): string[] {
   return names.filter((name) => name.includes(needle));
 }
 
+/** 커맨드로 부를 수 있는 스킬마다의 설명이다. `/` 목록이 이름 아래 한 줄로 보인다 */
+export function commandSkillDescriptions(
+  list: SkillListView,
+): Record<string, string> {
+  return Object.fromEntries(
+    list.skills.map((skill) => [skill.name, skill.description ?? ""]),
+  );
+}
+
+/**
+ * 목록 줄에 보일 설명 한 줄이다. 줄바꿈과 겹친 공백을 한 칸으로 줄인다. 길면 화면이 말줄임으로 자른다.
+ */
+export function skillDescriptionLine(description: string | undefined): string {
+  return (description ?? "").replace(/\s+/g, " ").trim();
+}
+
 /** 고른 이름으로 글의 첫 낱말을 바꾼다. 커서는 돌려준 글의 `/이름 ` 바로 뒤에 둔다 */
 export function withSkillCommand(
   value: string,
@@ -77,7 +93,7 @@ export function skillOptionId(listId: string, index: number): string {
 export type SkillDelegationTarget = {
   agentCode: string;
   agentName: string;
-  skills: string[];
+  skills: { name: string; description: string }[];
 };
 
 /**
@@ -88,7 +104,21 @@ export function delegationLabels(
   targets: readonly SkillDelegationTarget[],
 ): string[] {
   return targets.flatMap((target) =>
-    target.skills.map((skill) => `${target.agentName} · ${skill}`),
+    target.skills.map((skill) => `${target.agentName} · ${skill.name}`),
+  );
+}
+
+/** 「에이전트 이름 · 스킬」 항목마다의 스킬 설명이다 */
+export function delegationDescriptions(
+  targets: readonly SkillDelegationTarget[],
+): Record<string, string> {
+  return Object.fromEntries(
+    targets.flatMap((target) =>
+      target.skills.map((skill) => [
+        `${target.agentName} · ${skill.name}`,
+        skill.description,
+      ]),
+    ),
   );
 }
 
@@ -111,7 +141,9 @@ export function delegatedTargetOf(
   const skill = match[2]!;
   return (
     targets.find(
-      (target) => target.agentName === name && target.skills.includes(skill),
+      (target) =>
+        target.agentName === name &&
+        target.skills.some((candidate) => candidate.name === skill),
     ) ?? null
   );
 }

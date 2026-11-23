@@ -6,7 +6,12 @@ import {
 } from "@/components/agent/agent-badge";
 import { useEffect } from "react";
 import { ConversationSessionView } from "./conversation-session-view";
-import { commandSkillNames, delegationLabels } from "./skill-command";
+import {
+  commandSkillDescriptions,
+  commandSkillNames,
+  delegationDescriptions,
+  delegationLabels,
+} from "./skill-command";
 import { useStarterSuggestions } from "./use-starter-suggestions";
 import { useShellTitle } from "@/components/shell/app-shell";
 import { fetchCommandSkills } from "@/lib/chat-api";
@@ -109,6 +114,10 @@ export function ConversationSession(props: ConversationSessionProps) {
     commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
       ? [...skillCommands.names, ...delegationLabels(delegationTargets)]
       : undefined;
+  const skillDescriptions = {
+    ...skillCommands?.descriptions,
+    ...delegationDescriptions(delegationTargets),
+  };
 
   useEffect(() => {
     if (commandAgentCode === null) return;
@@ -122,6 +131,7 @@ export function ConversationSession(props: ConversationSessionProps) {
           setSkillCommands({
             agentCode: commandAgentCode,
             names: commandSkillNames(list),
+            descriptions: commandSkillDescriptions(list),
           });
       })
       .catch(() => {
@@ -167,6 +177,7 @@ export function ConversationSession(props: ConversationSessionProps) {
         startScreen={startScreen}
         skillCommandsEnabled={skillCommandsEnabled}
         skillNames={skillNames}
+        skillDescriptions={skillDescriptions}
         starters={starters}
         answerAgent={answerAgent}
       />
