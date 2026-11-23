@@ -48,6 +48,8 @@ export type ChatEvent = {
   toolName?: string | null;
   /** 플러그인 도구의 `tool` 사건이 싣는 서비스 이름과 도구 제목이다 */
   connector?: ConnectorToolName | null;
+  /** 실행 트리에서 옮긴 `agent_delegate` 도구 사건의 맡은 에이전트 이름이다. Control Plane 이 맡긴 실행에서 정한다 */
+  delegatedAgentName?: string | null;
   detail?: string | null;
   conversationId?: string | null;
   messageId?: number | null;

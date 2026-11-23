@@ -54,6 +54,7 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
           key: event.sequence,
           toolName: event.toolName,
           connector: event.connector ?? null,
+          delegatedAgentName: event.delegatedAgentName ?? null,
           durationMs: null,
           detail: event.detail,
           finished: false,
@@ -71,6 +72,8 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
         if (row) {
           row.durationMs = event.durationMs;
           row.connector = row.connector ?? event.connector ?? null;
+          row.delegatedAgentName =
+            row.delegatedAgentName ?? event.delegatedAgentName ?? null;
           row.detail = event.detail || row.detail;
           row.finished = true;
         } else {
@@ -79,6 +82,7 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
             key: event.sequence,
             toolName: event.toolName,
             connector: event.connector ?? null,
+            delegatedAgentName: event.delegatedAgentName ?? null,
             durationMs: event.durationMs,
             detail: event.detail,
             finished: true,

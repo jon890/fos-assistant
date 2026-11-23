@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  activityLabel, activityOutcome, activityUses, applyChatEvent, emptyActivity, failActivity, fromTree,
+  activityLabel, activityOutcome, activityUses, applyChatEvent, applyDelegationName, emptyActivity, failActivity, fromTree,
 } from "../../src/components/chat/activity/activity-state.ts";
 import { formatSeconds } from "../../src/lib/format.ts";
 import {
@@ -323,4 +323,28 @@ test("실행 번호가 정해지기 전에 온 맡긴 도구 사건은 붙잡았
   assert.equal(held.length, 0);
   assert.equal(routeDelegationActivity(held, 90, older), null);
   assert.equal(routeDelegationActivity(held, 90, mine), mine);
+});
+
+test("도는 답의 맡긴 줄이 오면 이름 없는 첫 맡기기 도구 줄에 그 에이전트 이름이 붙고, 끝난 뒤에도 남는다", () => {
+  let state = emptyActivity(0);
+  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" });
+  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" });
+  assert.equal(activityLabel(state.items[0]!), "다른 에이전트에게 맡기고 있어요");
+
+  state = applyDelegationName(state, "커리어");
+  state = applyDelegationName(state, "쇼핑 담당");
+  assert.deepEqual(state.items.map(activityLabel), ["커리어에게 맡기고 있어요", "쇼핑 담당에게 맡기고 있어요"]);
+
+  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "completed" });
+  assert.equal(activityLabel(state.items[0]!), "커리어에게 맡겼어요");
+  // 이름 없는 줄이 없거나 이름이 비면 그대로다.
+  assert.equal(applyDelegationName(state, "또 다른"), state);
+  assert.equal(applyDelegationName(emptyActivity(0), null).items.length, 0);
+});
+
+test("실행 트리의 맡기기 도구 사건은 Control Plane 이 정한 맡은 에이전트 이름으로 보인다", () => {
+  const started = { ...toolStarted(1, "mcp__fos__agent_delegate"), delegatedAgentName: "커리어" };
+  const completed = { ...started, sequence: 2, eventType: "TOOL_COMPLETED" as const };
+  const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [started, completed]) });
+  assert.deepEqual(items.map(activityLabel), ["커리어에게 맡겼어요"]);
 });

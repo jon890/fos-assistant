@@ -28,6 +28,8 @@ export type ExecutionEventView = {
   occurredAt: string;
   /** 플러그인 도구 사건의 서비스 이름과 도구 제목이다. 다른 사건은 null 이다. */
   connector?: ConnectorToolName | null;
+  /** `agent_delegate` 도구 사건의 맡은 에이전트 이름이다. 그 호출이 도는 동안 시작된 맡긴 실행에서 정한다. 모르면 null 이다. */
+  delegatedAgentName?: string | null;
   /** 비동기 하위 에이전트 사용량을 뒤늦게 읽는 상태다. 실행 성공 여부가 아니다. */
   subagentUsageStatus?: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
 };

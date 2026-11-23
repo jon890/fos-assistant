@@ -4,7 +4,11 @@ import type {
   ExecutionTreeResponse,
 } from "@/components/execution/execution-tree";
 import { subagentLabel } from "../../../lib/format.ts";
-import { toolLabel, type ConnectorToolName } from "../../../lib/tool-label.ts";
+import {
+  bareName,
+  toolLabel,
+  type ConnectorToolName,
+} from "../../../lib/tool-label.ts";
 import type { ActivityOutcome, ActivityUse } from "../../../lib/tool-kind.ts";
 import { interimKey } from "../turn-stream-text.ts";
 import { applyDelegationActivity } from "./activity-delegation.ts";
@@ -37,6 +41,8 @@ export type ActivityItem = {
   delegated?: boolean;
   /** 맡긴 실행의 도구 줄이면 그 도우미 줄의 `pairKey`(맡은 실행 번호)다 */
   parent?: string;
+  /** `agent_delegate` 도구 줄의 맡은 에이전트 이름이다. Control Plane 이 보낸 맡김 줄이나 실행 트리에서 받는다 */
+  delegatedAgentName?: string;
 };
 
 export type ActivityState = {
@@ -48,7 +54,12 @@ export type ActivityState = {
 /** 항목이 화면에 보이는 문장이다. 도구는 그리는 때 정해 도는 중과 끝남의 말이 다르다. */
 export function activityLabel(item: ActivityItem): string {
   return item.kind === "tool"
-    ? toolLabel(item.name, item.state === "running", item.connector)
+    ? toolLabel(
+        item.name,
+        item.state === "running",
+        item.connector,
+        item.delegatedAgentName,
+      )
     : item.name;
 }
 
@@ -139,6 +150,7 @@ function finish(
       durationMs: event.durationMs ?? null,
       state: event.failed ? "failed" : "done",
       pairKey,
+      delegatedAgentName: event.delegatedAgentName ?? undefined,
     });
   }
   return items.map((item, position) =>
@@ -146,6 +158,8 @@ function finish(
       ? {
           ...item,
           connector: item.connector ?? event.connector ?? null,
+          delegatedAgentName:
+            item.delegatedAgentName ?? event.delegatedAgentName ?? undefined,
           // 끝 사건의 빈 `detail` 은 시작 사건의 대상(검색어)을 지우지 않는다.
           detail: kind === "tool" ? event.detail || item.detail : item.detail,
           model: event.model ?? item.model,
@@ -156,6 +170,34 @@ function finish(
         }
       : item,
   );
+}
+
+/**
+ * 도는 답이 맡긴 줄(`delegation` 사건)을 받으면 아직 이름이 없는 맡기기 도구 줄 가운데 가장 먼저 시작한 줄에 맡은 에이전트 이름을 붙인다.
+ *
+ * <p>맡기기 도구가 도는 동안 맡긴 실행이 생기고 Control Plane 이 그 에이전트로 맡긴 줄을 보낸다. 이름은 모델의 인자가 아니라 그 줄에서
+ * 받는다(스펙 assistant-hub DECISION30). 이름이 없는 줄이 없으면 그대로다.
+ */
+export function applyDelegationName(
+  state: ActivityState,
+  agentName: string | null | undefined,
+): ActivityState {
+  const name = agentName?.trim();
+  if (!name) return state;
+  const index = state.items.findIndex(
+    (item) =>
+      item.kind === "tool" &&
+      item.parent === undefined &&
+      bareName(item.name) === "agent_delegate" &&
+      item.delegatedAgentName === undefined,
+  );
+  if (index < 0) return state;
+  return {
+    ...state,
+    items: state.items.map((item, position) =>
+      position === index ? { ...item, delegatedAgentName: name } : item,
+    ),
+  };
 }
 
 export function applyChatEvent(
@@ -217,6 +259,7 @@ export function applyChatEvent(
           durationMs: null,
           state: "running",
           pairKey: name,
+          delegatedAgentName: event.delegatedAgentName ?? undefined,
         }),
       };
     if (event.phase === "completed")
@@ -317,6 +360,7 @@ export function fromTree(
             type: "tool",
             toolName: event.toolName,
             connector: event.connector ?? null,
+            delegatedAgentName: event.delegatedAgentName ?? null,
             detail: event.detail,
             durationMs: event.durationMs,
             failed: event.failed,
