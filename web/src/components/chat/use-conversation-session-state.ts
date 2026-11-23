@@ -79,10 +79,11 @@ export function useConversationSessionState({
   const [deliveryRetrying, setDeliveryRetrying] = useState(false);
   /** 보낸 스킬 커맨드의 이름이 이 에이전트에 없었다. 입력창 아래에 알리고 다음 보내기를 시작하면 지운다 */
   const [unknownSkill, setUnknownSkill] = useState<string | null>(null);
-  /** `/` 목록에 띄울 스킬 이름과 그 목록을 읽은 에이전트다. 에이전트를 바꾸면 그 에이전트의 목록을 다시 읽는다 */
+  /** `/` 목록에 띄울 스킬 이름과 설명, 그 목록을 읽은 에이전트다. 에이전트를 바꾸면 그 에이전트의 목록을 다시 읽는다 */
   const [skillCommands, setSkillCommands] = useState<{
     agentCode: string;
     names: string[];
+    descriptions: Record<string, string>;
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
   /** 입력창이 보내기를 막고 있다. 빈 대화를 만들거나 사진을 올리는 중이면 추천 질문도 막는다 */

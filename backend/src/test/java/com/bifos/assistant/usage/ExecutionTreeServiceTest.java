@@ -191,6 +191,74 @@ class ExecutionTreeServiceTest {
 
 
     @Test
+    @DisplayName("맡기기 도구 사건에는 그 호출이 도는 동안 시작된 맡긴 자식의 에이전트 이름이 붙고, 거절돼 자식이 없는 호출에는 붙지 않는다")
+    void delegateToolEventsCarryDelegatedAgentName() {
+        Agent career = agents.findByCode("tree-career")
+            .orElseGet(() -> agents.save(Agent.of(
+                "tree-career", "트리 커리어", "career", "http://127.0.0.1:1/p/career", CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, OWNER_ID)));
+        AgentExecution root = execution(OWNER_ID, null, null);
+        Instant at = Instant.parse("2026-11-23T01:00:00Z");
+        timedEvent(root, 1, ExecutionEventType.TOOL_STARTED, "mcp__fos__agent_delegate", at);
+        timedEvent(root, 2, ExecutionEventType.TOOL_COMPLETED, "mcp__fos__agent_delegate", at.plusSeconds(1));
+        timedEvent(root, 3, ExecutionEventType.TOOL_STARTED, "mcp__fos__agent_delegate", at.plusSeconds(10));
+        timedEvent(root, 4, ExecutionEventType.TOOL_COMPLETED, "mcp__fos__agent_delegate", at.plusSeconds(12));
+        timedEvent(root, 5, ExecutionEventType.TOOL_STARTED, "web_search", at.plusSeconds(13));
+        executions.save(AgentExecution.builder()
+            .userId(OWNER_ID)
+            .conversationId(7L)
+            .agentId(career.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .profileName("career")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .delegationKey("tree-delegated-name-" + root.id())
+            .startedAt(at.plusSeconds(11))
+            .build());
+
+        ExecutionTree tree = trees.of(owner(), root.id());
+
+        assertThat(tree.root().events())
+            .extracting(ExecutionEventView::sequence, ExecutionEventView::delegatedAgentName)
+            .containsExactly(
+                tuple(1, null), tuple(2, null), tuple(3, "트리 커리어"), tuple(4, "트리 커리어"), tuple(5, null));
+    }
+
+
+    @Test
+    @DisplayName("거절된 맡기기 바로 뒤에 이어진 맡기기의 자식은 뒤 호출에만 이름이 붙고, 동시에 돈 호출은 어느 쪽인지 몰라 이름이 없다")
+    void delegatedAgentNameOnlyWhenPairIsCertain() {
+        Agent career = agents.findByCode("tree-career")
+            .orElseGet(() -> agents.save(Agent.of(
+                "tree-career", "트리 커리어", "career", "http://127.0.0.1:1/p/career", CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, OWNER_ID)));
+        AgentExecution root = execution(OWNER_ID, null, null);
+        Instant at = Instant.parse("2026-11-23T02:00:00Z");
+        String delegate = "mcp__fos__agent_delegate";
+        timedEvent(root, 1, ExecutionEventType.TOOL_STARTED, delegate, at);
+        timedEvent(root, 2, ExecutionEventType.TOOL_COMPLETED, delegate, at.plusMillis(1_000));
+        timedEvent(root, 3, ExecutionEventType.TOOL_STARTED, delegate, at.plusMillis(1_200));
+        timedEvent(root, 4, ExecutionEventType.TOOL_COMPLETED, delegate, at.plusMillis(3_000));
+        // 동시에 돈 두 호출과 그 사이에 시작한 자식 하나
+        timedEvent(root, 5, ExecutionEventType.TOOL_STARTED, delegate, at.plusSeconds(10));
+        timedEvent(root, 6, ExecutionEventType.TOOL_STARTED, delegate, at.plusSeconds(11));
+        timedEvent(root, 7, ExecutionEventType.TOOL_COMPLETED, delegate, at.plusSeconds(13));
+        timedEvent(root, 8, ExecutionEventType.TOOL_COMPLETED, delegate, at.plusSeconds(14));
+        delegatedChild(root, career, "after-refusal", at.plusMillis(1_500));
+        delegatedChild(root, career, "concurrent", at.plusMillis(12_000));
+
+        ExecutionTree tree = trees.of(owner(), root.id());
+
+        assertThat(tree.root().events())
+            .extracting(ExecutionEventView::sequence, ExecutionEventView::delegatedAgentName)
+            .containsExactly(
+                tuple(1, null), tuple(2, null), tuple(3, "트리 커리어"), tuple(4, "트리 커리어"),
+                tuple(5, null), tuple(6, null), tuple(7, null), tuple(8, null));
+    }
+
+
+    @Test
     @DisplayName("자식 실행의 에이전트 행이 없어도 트리가 나오고 그 노드의 에이전트 칸이 비어 있다")
     void treeComesOutWithEmptyAgentColumnWhenChildAgentRowIsMissing() {
         AgentExecution root = execution(OWNER_ID, null, null);
@@ -570,6 +638,33 @@ class ExecutionTreeServiceTest {
             .toolName(toolName)
             .detail(detail)
             .occurredAt(Instant.now())
+            .build());
+    }
+
+
+    private void delegatedChild(AgentExecution root, Agent agent, String key, Instant startedAt) {
+        executions.save(AgentExecution.builder()
+            .userId(OWNER_ID)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .profileName(agent.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .delegationKey("tree-" + key + "-" + root.id())
+            .startedAt(startedAt)
+            .build());
+    }
+
+
+    private void timedEvent(AgentExecution execution, int sequence, ExecutionEventType type, String toolName, Instant at) {
+        events.save(ExecutionEvent.builder()
+            .executionId(execution.id())
+            .sequence(sequence)
+            .eventType(type)
+            .toolName(toolName)
+            .occurredAt(at)
             .build());
     }
 

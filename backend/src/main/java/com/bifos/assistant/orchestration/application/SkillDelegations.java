@@ -30,6 +30,7 @@ import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,9 +85,9 @@ public class SkillDelegations {
             if (!DelegatedSkillCommand.readsBack(agent.name()) || sameName.get(agent.name()) > 1) {
                 continue;
             }
-            List<String> names;
+            List<SkillDelegationTarget.Skill> names;
             try {
-                names = listedNames(skillService.commandList(agent));
+                names = listedSkills(skillService.commandList(agent));
             } catch (RuntimeException ex) {
                 log.warn("맡길 스킬 목록을 읽지 못해 그 에이전트를 뺐다 agent={}", agent.code(), ex);
                 continue;
@@ -196,16 +197,16 @@ public class SkillDelegations {
 
 
     /** 화면 스킬 목록에 보이고 켜졌으며 커맨드로 부를 수 있는 이름이다. {@code skills} toolset 이 꺼졌으면 비어 있다. web 의 {@code commandSkillNames} 와 같다. */
-    private static List<String> listedNames(SkillList list) {
+    private static List<SkillDelegationTarget.Skill> listedSkills(SkillList list) {
         if (!list.skillsToolsetEnabled()) {
             return List.of();
         }
         return list.skills().stream()
             .filter(SkillListItem::enabled)
             .filter(item -> item.source() != SkillSource.HERMES)
-            .map(SkillListItem::name)
-            .filter(name -> SkillCommand.parse("/" + name).map(command -> command.name().equals(name)).orElse(false))
-            .sorted()
+            .filter(item -> SkillCommand.parse("/" + item.name()).map(command -> command.name().equals(item.name())).orElse(false))
+            .map(item -> new SkillDelegationTarget.Skill(item.name(), item.description()))
+            .sorted(Comparator.comparing(SkillDelegationTarget.Skill::name))
             .toList();
     }
 

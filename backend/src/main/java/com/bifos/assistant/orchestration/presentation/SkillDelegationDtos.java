@@ -4,7 +4,9 @@ import com.bifos.assistant.orchestration.application.dto.SkillDelegationStarted;
 import com.bifos.assistant.orchestration.application.dto.SkillDelegationTarget;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -34,11 +36,20 @@ public final class SkillDelegationDtos {
         }
     }
 
-    /** {@code /} 목록에 보일 에이전트 하나와 그 스킬이다. */
-    public record SkillDelegationTargetResponse(String agentCode, String agentName, List<String> skills) {
+    /**
+     * {@code /} 목록에 보일 에이전트 하나와 그 스킬이다.
+     *
+     * <p>{@code skills} 는 이름 글 그대로 두고 설명은 {@code skillDescriptions}(이름마다의 설명)로 따로 준다. 배포하는 동안 열려 있던
+     * 옛 화면이 새 응답을 받아도, 새 화면이 옛 응답을 받아도 맡기기가 깨지지 않게 하려는 것이다.
+     */
+    public record SkillDelegationTargetResponse(
+        String agentCode, String agentName, List<String> skills, Map<String, String> skillDescriptions) {
 
         public static SkillDelegationTargetResponse from(SkillDelegationTarget target) {
-            return new SkillDelegationTargetResponse(target.agentCode(), target.agentName(), target.skills());
+            Map<String, String> descriptions = new LinkedHashMap<>();
+            target.skills().forEach(skill -> descriptions.put(skill.name(), skill.description()));
+            return new SkillDelegationTargetResponse(target.agentCode(), target.agentName(),
+                target.skills().stream().map(SkillDelegationTarget.Skill::name).toList(), descriptions);
         }
     }
 }

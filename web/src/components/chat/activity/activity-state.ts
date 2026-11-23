@@ -37,6 +37,8 @@ export type ActivityItem = {
   delegated?: boolean;
   /** 맡긴 실행의 도구 줄이면 그 도우미 줄의 `pairKey`(맡은 실행 번호)다 */
   parent?: string;
+  /** `agent_delegate` 도구 줄의 맡은 에이전트 이름이다. Control Plane 이 보낸 맡김 줄이나 실행 트리에서 받는다 */
+  delegatedAgentName?: string;
 };
 
 export type ActivityState = {
@@ -48,7 +50,12 @@ export type ActivityState = {
 /** 항목이 화면에 보이는 문장이다. 도구는 그리는 때 정해 도는 중과 끝남의 말이 다르다. */
 export function activityLabel(item: ActivityItem): string {
   return item.kind === "tool"
-    ? toolLabel(item.name, item.state === "running", item.connector)
+    ? toolLabel(
+        item.name,
+        item.state === "running",
+        item.connector,
+        item.delegatedAgentName,
+      )
     : item.name;
 }
 
@@ -139,6 +146,7 @@ function finish(
       durationMs: event.durationMs ?? null,
       state: event.failed ? "failed" : "done",
       pairKey,
+      delegatedAgentName: event.delegatedAgentName ?? undefined,
     });
   }
   return items.map((item, position) =>
@@ -146,6 +154,8 @@ function finish(
       ? {
           ...item,
           connector: item.connector ?? event.connector ?? null,
+          delegatedAgentName:
+            item.delegatedAgentName ?? event.delegatedAgentName ?? undefined,
           // 끝 사건의 빈 `detail` 은 시작 사건의 대상(검색어)을 지우지 않는다.
           detail: kind === "tool" ? event.detail || item.detail : item.detail,
           model: event.model ?? item.model,
@@ -217,6 +227,7 @@ export function applyChatEvent(
           durationMs: null,
           state: "running",
           pairKey: name,
+          delegatedAgentName: event.delegatedAgentName ?? undefined,
         }),
       };
     if (event.phase === "completed")
@@ -305,6 +316,7 @@ export function fromTree(
               executionId: node.executionId,
               toolName: event.toolName,
               connector: event.connector ?? null,
+              delegatedAgentName: event.delegatedAgentName ?? null,
               detail: event.detail,
               durationMs: event.durationMs,
               failed: event.failed,
@@ -317,6 +329,7 @@ export function fromTree(
             type: "tool",
             toolName: event.toolName,
             connector: event.connector ?? null,
+            delegatedAgentName: event.delegatedAgentName ?? null,
             detail: event.detail,
             durationMs: event.durationMs,
             failed: event.failed,

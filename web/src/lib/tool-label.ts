@@ -3,6 +3,7 @@
  *
  * <p>도는 줄과 끝난 줄의 말이 다르다. 표에 없는 도구와 이름이 없는 도구는 일반 문장으로 보인다.
  * 플러그인 도구는 Control Plane 이 붙여 보낸 서비스 이름과 도구 제목(`connector`)으로 「서비스 이름 · 도구 제목」 이다.
+ * `agent_delegate` 는 Control Plane 이 맡김 대상에서 정한 에이전트 이름이 있으면 「이름에게 맡기고 있어요」 다. 모델이 준 인자는 쓰지 않는다.
  * 이 파일은 다른 모듈을 부르지 않는다. 단위 테스트가 `node --test` 로 직접 불러서다.
  */
 
@@ -281,10 +282,15 @@ export function toolLabel(
   toolName: string | null,
   running: boolean,
   connector?: ConnectorToolName | null,
+  delegatedAgentName?: string | null,
 ): string {
   // 플러그인 도구는 도는 중이든 끝났든 같은 이름이다(spec REQ15).
   if (connector) return connectorLabel(connector);
   const name = bareName(toolName);
+  // 맡은 에이전트를 알면 그 이름을 쓴다(스펙 assistant-hub DECISION30). 모르면 아래 표의 문장이다.
+  const agent = delegatedAgentName?.trim();
+  if (name === "agent_delegate" && agent)
+    return running ? `${agent}에게 맡기고 있어요` : `${agent}에게 맡겼어요`;
   const label =
     name !== null && Object.hasOwn(LABELS, name)
       ? LABELS[name]!

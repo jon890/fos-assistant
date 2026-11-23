@@ -461,3 +461,36 @@ test("ADMIN 역할도 대화 화면에서는 도구 줄을 펼쳐도 원본 보�
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     .toBeLessThanOrEqual(0);
 });
+
+test("지난 답의 맡기기 도구 줄은 Control Plane 이 정한 맡은 에이전트 이름으로 보이고, 이름을 모르면 「다른 에이전트」 다", async ({
+  page,
+}) => {
+  const delegate = "mcp__fos__agent_delegate";
+  const event = (sequence: number, eventType: string, delegatedAgentName: string | null) => ({
+    sequence, eventType, toolName: delegate, subagentName: null, hermesSessionId: null, detail: null, model: null,
+    inputTokens: null, outputTokens: null, durationMs: eventType === "TOOL_COMPLETED" ? 1_000 : null,
+    failed: eventType === "TOOL_COMPLETED" ? false : null, occurredAt: "2026-11-23T00:00:01Z", delegatedAgentName,
+  });
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: {
+    truncated: false,
+    root: { truncated: false, executionId: 970, agentCode: "browser", agentName: "비서",
+      status: "SUCCEEDED", model: "example-model", inputTokens: 10, outputTokens: 20,
+      estimatedCostMicros: null, latencyMs: 500, startedAt: "2026-11-23T00:00:00Z", children: [],
+      events: [
+        event(1, "TOOL_STARTED", "커리어"),
+        event(2, "TOOL_COMPLETED", "커리어"),
+        event(3, "TOOL_STARTED", null),
+        event(4, "TOOL_COMPLETED", null),
+      ],
+    },
+  } }));
+  await send(page, "맡긴 에이전트 이름 검사");
+  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+  await block.getByTestId("activity-toggle").click();
+
+  const rows = block.locator(`[data-tool="${delegate}"]`);
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("커리어에게 맡겼어요");
+  await expect(rows.nth(1)).toContainText("다른 에이전트에게 맡겼어요");
+});
