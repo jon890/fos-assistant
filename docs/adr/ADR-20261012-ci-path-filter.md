@@ -287,3 +287,19 @@ main 의 세 검사가 깨진 것을 고치는 PR(#689)에서 두 빈틈이 드�
 - 경로 삭제 규칙(`removesRoute`)과 달리 수정만 해도 돈다. 지침 절을 더하는 것이 곧 #676 의 실수였기 때문이다.
 - 남은 빈틈: 지침을 만드는 다른 파일(새 지침 상수를 `context.application` 밖이나 `*Instructions` 가 아닌 이름의 클래스에 두는 경우)은 `GUIDE_FILES` 에 더해야 잡힌다. 지침이 어디서 만들어지는지는 파일 목록으로 고정했고, 위치가 바뀌면 이 표와 상수를 함께 고친다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
 - 되돌릴 때는 `ci-paths.mjs` 의 `touchesGuide` 호출 인자를 빼고 `GUIDE_FILES` 를 지운다. `e2e-failures` 는 `ci.yml` 에서 job 을 지우고 `e2e-tests` 의 실패 기록 단계를 함께 뺀다.
+
+### Hermes toolset 목록을 바꾸는 PR 은 라벨 없이도 브라우저와 E2E 를 돌린다 (2026-11-23)
+
+PR 874 가 상품 페이지 toolset(`fos-product-page`)을 `web` 과 함께 Hermes 에 쓰도록 바꿨다.
+PR CI 는 브라우저와 E2E 를 건너뛰었고, 가짜 Hermes 가 그 이름을 모르는 이름으로 400 을 돌려줘 도구 켜기 검사가 main 에서 깨졌다.
+도구 목록의 쓰기는 Control Plane 과 가짜 Hermes 가 맞물려야 하는데, 그 어긋남은 E2E 와 브라우저 검사에서만 드러난다.
+
+| PR 이 바꾼 파일(추가, 수정, 삭제 모두) | 결과 |
+| --- | --- |
+| `AgentToolPolicy.java`, `AgentToolService.java`, `AgentDefaultToolsets.java`, `HttpHermesToolsetClient.java` | 라벨 없이 `browser`, `e2e` 도 돈다 |
+| `test/e2e/fake-hermes/dashboard.ts`, `runtime-fixtures.ts`(가짜 Hermes 의 목록 검사와 toolset 목록) | 같다 |
+
+- 판정은 `ci-paths.mjs` 의 `TOOLSET_FILES` 와 `touchesToolsets` 가 갖고, 지시문 규칙과 합친 `slowJobsToKeep` 이 `withoutSlow` 의 `keep` 을 정한다.
+- Hermes 의 대시보드 plugin(`toolconfig.py`)은 넣지 않았다. 브라우저와 E2E 는 실제 plugin 이 아니라 가짜 Hermes 를 쓰고, plugin 의 목록 검사는 hermes 검사가 본다.
+- 남은 빈틈: 목록을 만드는 새 클래스를 다른 이름으로 두면 `TOOLSET_FILES` 에 더해야 잡힌다. 그런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
+- 되돌릴 때는 `slowJobsToKeep` 에서 `touchesToolsets` 줄을 빼고 `TOOLSET_FILES` 를 지운다.
