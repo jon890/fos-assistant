@@ -1,6 +1,7 @@
 "use client";
 
 import type { DelegationLine } from "@/lib/delegation";
+import type { ChatEvent } from "@/lib/chat-event";
 import { useRef, useState, useEffect, useLayoutEffect } from "react";
 import { usePendingQueue } from "@/components/chat/use-pending-queue";
 import { useMemoryCaptures } from "./use-memory-captures";
@@ -38,6 +39,8 @@ export function useConversationSessionState({
   // 옆 패널은 한 번에 하나다. 작업 과정과 결과물을 한 상태에 담아 둘이 같이 열리지 않게 한다.
   const [panelTarget, setPanelTarget] = useState<SidePanelTarget | null>(null);
   const currentExecutionId = useRef<number | null>(null);
+  /** 도는 답의 실행 번호가 정해지기 전에 온 맡긴 실행의 도구 사건이다. `started` 를 받으면 그 답의 것만 넣는다 */
+  const heldDelegationActivity = useRef<ChatEvent[]>([]);
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
   /** `delegation` 사건으로 받은 맡긴 줄이다. 대화가 바뀌면 이 상태째 새로 만든다 */
@@ -161,6 +164,7 @@ export function useConversationSessionState({
     panelTarget,
     setPanelTarget,
     currentExecutionId,
+    heldDelegationActivity,
     executionId,
     setExecutionId,
     stopRequested,

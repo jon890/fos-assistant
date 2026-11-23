@@ -106,3 +106,40 @@ function item(
     ...fields,
   };
 }
+
+/** 실행 번호가 정해지기 전에 붙잡아 두는 사건 수의 상한이다. 넘으면 오래된 것부터 버린다 */
+const HELD_MAX = 100;
+
+/**
+ * 맡긴 실행의 도구 사건을 지금 도는 답에 넣을지 정한다. 넣을 사건이면 돌려주고 아니면 null 이다.
+ *
+ * <p>사건의 맡긴 답(`delegation.parentExecutionId`)이 지금 도는 답의 실행 번호와 같을 때만 넣는다. 실행 번호가 아직 정해지지
+ * 않았으면 `held` 에 붙잡아 두고 {@link takeHeldDelegationActivity} 가 `started` 뒤에 꺼낸다. 앞 답이 맡겨 둔 실행의 사건이
+ * 새 답에 섞이지 않게 하려는 것이다.
+ */
+export function routeDelegationActivity(
+  held: ChatEvent[],
+  running: number | null,
+  event: ChatEvent,
+): ChatEvent | null {
+  const parent = event.delegation?.parentExecutionId ?? null;
+  if (running === null) {
+    held.push(event);
+    if (held.length > HELD_MAX) held.splice(0, held.length - HELD_MAX);
+    return null;
+  }
+  return parent === running ? event : null;
+}
+
+/** 실행 번호가 정해진 뒤 붙잡아 둔 사건 가운데 그 답의 것만 차례로 꺼내고 나머지는 버린다 */
+export function takeHeldDelegationActivity(
+  held: ChatEvent[],
+  running: number | null,
+): ChatEvent[] {
+  const taken = held.filter(
+    (event) =>
+      running !== null && event.delegation?.parentExecutionId === running,
+  );
+  held.length = 0;
+  return taken;
+}

@@ -7,7 +7,10 @@ import { fetchLiveImages, openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
-import { applyDelegationActivity } from "./activity/activity-delegation";
+import {
+  applyDelegationActivity,
+  routeDelegationActivity,
+} from "./activity/activity-delegation";
 import { parseLiveImages } from "./artifact/live-images";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
@@ -28,6 +31,7 @@ type Context = Pick<
   | "stopRequested"
   | "setTurns"
   | "setActivity"
+  | "heldDelegationActivity"
 > &
   Pick<ConversationSessionProps, "conversationId"> &
   Pick<
@@ -48,6 +52,7 @@ export function useConversationEffects({
   stopRequested,
   setTurns,
   setActivity,
+  heldDelegationActivity,
   conversationId,
   runConversationTask,
   resumeAfterReconnect,
@@ -124,19 +129,18 @@ export function useConversationEffects({
               return;
             }
             // 맡긴 실행의 도구 사건은 도는 답의 작업 과정에 바로 넣는다. 도는 답이 없으면 버리고 끝난 뒤에는 트리가 그린다.
-            // 앞 답이 맡겨 둔 실행의 사건은 지금 도는 다른 답에 넣지 않는다.
+            // 앞 답이 맡겨 둔 실행의 사건은 지금 도는 다른 답에 넣지 않는다. 실행 번호가 정해지기 전이면 붙잡아 둔다.
             if (event.type === "delegation_activity") {
-              const running = currentExecutionId.current;
-              if (
-                running !== null &&
-                event.delegation &&
-                event.delegation.parentExecutionId !== running
-              )
-                return;
-              setActivity(
-                (previous) =>
-                  previous && applyDelegationActivity(previous, event),
+              const routed = routeDelegationActivity(
+                heldDelegationActivity.current,
+                currentExecutionId.current,
+                event,
               );
+              if (routed)
+                setActivity(
+                  (previous) =>
+                    previous && applyDelegationActivity(previous, routed),
+                );
               return;
             }
             // 맡긴 줄도 보류하지 않는다. 위임은 보낸 turn 이 도는 중에 시작하고, 끝난 줄은 이력이 아직 모른다.

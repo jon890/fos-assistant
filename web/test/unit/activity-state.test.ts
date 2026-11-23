@@ -4,7 +4,9 @@ import {
   activityLabel, activityOutcome, activityUses, applyChatEvent, emptyActivity, failActivity, fromTree,
 } from "../../src/components/chat/activity/activity-state.ts";
 import { formatSeconds } from "../../src/lib/format.ts";
-import { applyDelegationActivity } from "../../src/components/chat/activity/activity-delegation.ts";
+import {
+  applyDelegationActivity, routeDelegationActivity, takeHeldDelegationActivity,
+} from "../../src/components/chat/activity/activity-delegation.ts";
 import type { ChatEvent } from "../../src/lib/chat-event.ts";
 import type {
   ExecutionEventView,
@@ -289,4 +291,36 @@ test("끝난 답을 트리로 그리면 도는 맡긴 자식은 맡겨 둠, 끝�
 test("답이 끝난 뒤에 온 맡긴 도구 사건은 버린다", () => {
   const ended = applyChatEvent(emptyActivity(0), { type: "done" });
   assert.equal(applyDelegationActivity(ended, delegatedTool("started", "web_search", "운동화")), ended);
+});
+
+
+function toolCompleted(sequence: number, toolName: string): ExecutionEventView {
+  return { ...toolStarted(sequence, toolName), eventType: "TOOL_COMPLETED", durationMs: 300, failed: false };
+}
+
+test("트리로 그릴 때 맡긴 실행의 도구는 그 도우미 아래에 두고 부모의 같은 이름 도구를 끝내지 않는다", () => {
+  const child = { ...node(2, "SUCCEEDED", [toolStarted(1, "web_search"), toolCompleted(2, "web_search")]), delegated: true };
+  const items = fromTree(
+    { truncated: false, root: node(1, "RUNNING", [toolStarted(1, "web_search")], [child]) },
+    { running: true },
+  );
+
+  assert.deepEqual(items.map((item) => [item.kind, item.name, item.state, item.parent ?? null]), [
+    ["tool", "web_search", "running", null],
+    ["subagent", "에이전트 2", "done", null],
+    ["tool", "web_search", "done", "2"],
+  ]);
+});
+
+test("실행 번호가 정해지기 전에 온 맡긴 도구 사건은 붙잡았다가 그 답의 것만 꺼내고 다른 답의 것은 버린다", () => {
+  const held: ChatEvent[] = [];
+  const mine = delegatedTool("started", "web_search", "운동화");
+  const older = { ...mine, delegation: { ...mine.delegation!, parentExecutionId: 77 } };
+
+  assert.equal(routeDelegationActivity(held, null, mine), null);
+  assert.equal(routeDelegationActivity(held, null, older), null);
+  assert.deepEqual(takeHeldDelegationActivity(held, 90), [mine]);
+  assert.equal(held.length, 0);
+  assert.equal(routeDelegationActivity(held, 90, older), null);
+  assert.equal(routeDelegationActivity(held, 90, mine), mine);
 });

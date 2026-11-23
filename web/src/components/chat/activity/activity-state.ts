@@ -7,6 +7,7 @@ import { subagentLabel } from "../../../lib/format.ts";
 import { toolLabel, type ConnectorToolName } from "../../../lib/tool-label.ts";
 import type { ActivityOutcome, ActivityUse } from "../../../lib/tool-kind.ts";
 import { interimKey } from "../turn-stream-text.ts";
+import { applyDelegationActivity } from "./activity-delegation.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "interim";
 export type ActivityItemState =
@@ -290,12 +291,28 @@ export function fromTree(
                   ? "stopped"
                   : "running",
           pairKey: `${node.executionId}`,
+          delegated: node.delegated === true ? true : undefined,
         }),
       };
     for (const event of node.events) {
       switch (event.eventType) {
         case "TOOL_STARTED":
         case "TOOL_COMPLETED":
+          // 맡긴 실행의 도구 줄은 그 도우미 아래에 두고 같은 실행 안에서만 시작과 끝을 짝짓는다
+          if (!isRoot && node.delegated === true) {
+            state = applyDelegationActivity(state, {
+              type: "delegation_activity",
+              executionId: node.executionId,
+              toolName: event.toolName,
+              connector: event.connector ?? null,
+              detail: event.detail,
+              durationMs: event.durationMs,
+              failed: event.failed,
+              phase:
+                event.eventType === "TOOL_STARTED" ? "started" : "completed",
+            });
+            break;
+          }
           state = applyChatEvent(state, {
             type: "tool",
             toolName: event.toolName,
