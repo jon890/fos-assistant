@@ -76,8 +76,10 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/orchestration/presentation/SkillDelegationDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskRunStarter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/DelegatedSkillCommandTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/SkillDelegationLimitTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/SkillDelegationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/task/TaskRunStarterTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/PrimaryAgentTestSupportController.java` | 수정 |
