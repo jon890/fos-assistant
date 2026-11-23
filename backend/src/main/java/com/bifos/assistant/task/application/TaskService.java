@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.turn.application.dto.DelegatedSkillCommand;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -248,6 +249,10 @@ public class TaskService {
      * 않는다.
      */
     private void requireRunnableCommand(Agent agent, String instruction) {
+        // 「/에이전트 이름 · 스킬」 은 발화 때 그 에이전트에게 맡기고 거기서 판정한다(비서 중심 대화 스펙 DECISION27).
+        if (DelegatedSkillCommand.parse(instruction).isPresent()) {
+            return;
+        }
         SkillCommand.parse(instruction).ifPresent(command -> {
             if (!skillCommands.enabledNames(agent).contains(command.name())) {
                 throw new ApiException(

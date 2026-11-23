@@ -113,12 +113,23 @@ public class TurnCancellation {
     }
 
 
+    /** 자리 없이 대화 잠금만 잡는다. 예약 스킬 맡기기는 실행 줄이 한도를 세므로(ADR-069) 자리가 남았는지만 본다. 예외는 open 과 같다. */
+    public TurnHandle openLockOnly(Long userId, Long conversationId) {
+        if (!byConversation.containsKey(conversationId) && !limiter.hasTurnRoom(userId)) {
+            throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
+        }
+        return lock(userId, conversationId, null);
+    }
+
+
     /** 얻은 자리를 쥔 채 대화 잠금을 잡는다. 그 사이 다른 turn 이 잡았으면 자리를 돌려주고 거절한다. */
     private TurnHandle lock(Long userId, Long conversationId, TurnSlot slot) {
         TurnHandle handle = new TurnHandle(userId, conversationId);
         handle.slot = slot;
         if (byConversation.putIfAbsent(conversationId, handle) != null) {
-            slot.release();
+            if (slot != null) {
+                slot.release();
+            }
             throw conversationBusy();
         }
         return handle;

@@ -40,7 +40,10 @@ async function startWith(page: Page, agentCode: string, email?: string) {
   await openConversationWith(page, agentCode, email);
 }
 
-/** 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. */
+/**
+ * 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. 비서 대화의 `/` 목록에 붙는 맡길 스킬(스펙 assistant-hub REQ10)은 비워 이
+ * 에이전트의 목록만 보이게 한다.
+ */
 async function routeSkills(
   page: Page,
   body: {
@@ -48,6 +51,9 @@ async function routeSkills(
     skillsToolsetEnabled: boolean;
   },
 ) {
+  await page.route("**/api/chat/skill-delegations/targets", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
   await page.route("**/api/agents/*/skills", async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({

@@ -494,6 +494,29 @@ class RestartReconcilerTest {
 
 
     @Test
+    @DisplayName("기동 조회 뒤에 끝난 스킬 맡기기도 부모 대화를 잠그지 않고, 끝나면 결과를 그 대화에 한 번 전한다")
+    void deliversSkillDelegationFinishedAfterStartupLookup() {
+        AgentExecution row = skillDelegated();
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
+
+        reconciler.claim();
+        reconciler.reconcile(LONG_WAIT);
+        awaitLookups(row, 2);
+
+        assertThat(turns.markOf(conversation.id()).running())
+            .as("스킬 맡기기는 대화 잠금을 잡지 않는다")
+            .isFalse();
+
+        stub.willLookup(row.hermesRunId(), finished(row, "completed", "추천 결과"));
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        awaitUntil(() -> delivered(row), "스킬 맡기기의 결과가 대화에 전해지지 않았다");
+        awaitIdle(conversation.id());
+        assertThat(notices()).as("대화의 알림 줄").hasSize(1);
+    }
+
+
+    @Test
     @DisplayName("같은 줄에 잡기와 묻기를 두 번 해도 한 번만 묻고 한 번만 적는다")
     void claimingAndReconcilingTwiceAsksAndWritesOnce() throws InterruptedException {
         AgentExecution turn = chatTurn(conversation, chief);
@@ -852,6 +875,22 @@ class RestartReconcilerTest {
             .costMode(CostMode.SUBSCRIPTION)
             .status(ExecutionStatus.RUNNING)
             .startedAt(Instant.now().minus(Duration.ofMinutes(1)));
+    }
+
+
+    /** 비서 대화의 「/에이전트 · 스킬」 로 맡겨 아직 도는 실행이다. 부모 없이 위임 키만 있다. */
+    private AgentExecution skillDelegated() {
+        return executions.save(AgentExecution.builder()
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now())
+            .build());
     }
 
 

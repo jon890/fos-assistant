@@ -156,6 +156,12 @@ public class AgentDelegationService {
     }
 
 
+    /** 위임 실행과 전체 한도다. 스킬 맡기기({@link SkillDelegations})가 같은 한도를 쓴다. */
+    DelegationRuns runs() {
+        return runs;
+    }
+
+
     /** 이 서버가 돌리는 위임 실행이다. 없으면 null 이다. {@link DelegationWaiter} 가 끝나기를 기다릴 때 쓴다. */
     RunningDelegation running(Long executionId) {
         return runs.find(executionId);

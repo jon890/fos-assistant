@@ -6,11 +6,14 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
+import com.bifos.assistant.chat.turn.application.dto.DelegatedSkillCommand;
 import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.orchestration.application.SkillDelegations;
+import com.bifos.assistant.orchestration.application.dto.SkillDelegationRun;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
@@ -28,6 +31,7 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.user.application.port.SignInRevocation;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -65,6 +69,7 @@ public class TaskRunStarter {
     private final AgentService agents;
     private final ConversationRepository conversations;
     private final ChatService chat;
+    private final SkillDelegations skillDelegations;
     private final TurnCancellation turns;
     private final ConversationEventHub hub;
     private final TaskNotices notices;
@@ -114,7 +119,10 @@ public class TaskRunStarter {
         }
         TurnHandle handle;
         try {
-            handle = turns.open(prepared.owner().id(), prepared.conversationId());
+            // 「/에이전트 · 스킬」 은 맡긴 실행 줄이 사용자 한도를 세므로 대화 잠금만 잡는다.
+            handle = DelegatedSkillCommand.parse(prepared.instruction()).isPresent()
+                ? turns.openLockOnly(prepared.owner().id(), prepared.conversationId())
+                : turns.open(prepared.owner().id(), prepared.conversationId());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.CONVERSATION_BUSY || ex.code() == ErrorCode.USER_BUSY) {
                 // QUEUED 로 두고 다음 tick 에 다시 본다. 만든 대화는 줄에 남아 다시 쓴다.
@@ -366,6 +374,14 @@ public class TaskRunStarter {
     private void runTurn(Long runId, Prepared prepared, TurnHandle handle) {
         Long conversationId = prepared.conversationId();
         try {
+            if (DelegatedSkillCommand.parse(prepared.instruction()).isPresent()) {
+                // 「/에이전트 이름 · 스킬」 은 대화 turn 없이 그 에이전트에게 맡긴다. 결과는 turn 잠금이 풀린 뒤 깨우기가 전한다(스펙 DECISION27).
+                SkillDelegationRun delegated = skillDelegations.runScheduled(
+                    prepared.owner(), conversationId, "예약 작업 「" + prepared.title() + "」 을 시작했어요", prepared.instruction());
+                finishSafely(runId, delegated.executionId(), delegated.output(), delegated.status() == ExecutionStatus.CANCELLED,
+                    delegated.status() == ExecutionStatus.FAILED);
+                return;
+            }
             ChatTurn turn = chat.runScheduledTurn(
                 prepared.owner(),
                 conversationId,

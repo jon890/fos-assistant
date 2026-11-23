@@ -23,6 +23,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.application.SpecialistAgentCreator;
+import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
 import com.bifos.assistant.connector.connection.application.dto.SpecialistAgent;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
@@ -50,6 +51,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -145,6 +147,9 @@ class SpecialistAgentCreatorTest {
 
     @Autowired
     HermesProfileKeyStore keyStore;
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     private final List<String> createdProfiles = new ArrayList<>();
 
@@ -355,6 +360,21 @@ class SpecialistAgentCreatorTest {
 
         verifyNoInteractions(dashboard);
         assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(owner.id())).isEqualTo(5);
+    }
+
+
+    @Test
+    @DisplayName("배포 전부터 기본 비서에 붙은 연결은 「비서에서 떼고 맡기기」 로 새 전문 에이전트에 옮겨진다(스펙 assistant-hub DECISION7)")
+    void movesLegacyPrimaryConnectionToSpecialist() {
+        CurrentUser owner = member();
+        Agent primary = primaries.make(owner, plainAgent(owner, "비서"));
+        connect(owner, DEMO);
+        bindingService.bind(owner, primary.code(), DEMO);
+
+        SpecialistAgent made = creator.create(owner, DEMO, INTRODUCTION, true);
+
+        assertThat(made.detachedFrom()).extracting(BoundAgentSummary::agentCode).containsExactly(primary.code());
+        assertThat(bindingsOf(primary)).isEmpty();
     }
 
 

@@ -31,8 +31,9 @@ export function agentChoices(
   preferred: string | null,
 ): AgentChoice[] {
   const bound = new Set(bindings.map((binding) => binding.agentCode));
+  // 기본 비서에는 연결을 붙이지 않는다. 비서는 전문 에이전트에게 맡긴다(docs/features/assistant-hub/spec.md 의 REQ9).
   return agents
-    .filter((agent) => agent.ownedByMe)
+    .filter((agent) => agent.ownedByMe && agent.primary !== true)
     .map((agent): AgentChoice => {
       const state: AgentChoiceState = bound.has(agent.code)
         ? "BOUND"

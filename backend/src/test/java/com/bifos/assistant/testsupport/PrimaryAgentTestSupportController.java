@@ -2,6 +2,8 @@ package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
+import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,6 +48,8 @@ public class PrimaryAgentTestSupportController {
     private final CurrentUserProvider currentUser;
     private final AgentService agents;
     private final EntityManager entityManager;
+    /** 바인딩 서비스는 이 컨트롤러보다 늦게 만들어질 수 있어 부를 때 꺼낸다. */
+    private final ObjectProvider<ConnectorBindingService> bindings;
     /** 잠시 바꾼 허용 목록 줄의 처음 profile 이다. 줄이 없었으면 빈 값이다. 메일 주소로 찾는다 */
     private final Map<String, Optional<String>> originalProfiles = new ConcurrentHashMap<>();
     /** 잠시 넘긴 에이전트의 처음 주인이다. 주인이 없었으면 빈 값이다 */
@@ -132,6 +137,16 @@ public class PrimaryAgentTestSupportController {
             }
         });
         originalProfiles.clear();
+    }
+
+
+    /**
+     * 기본 비서에 연결을 붙인다. 화면의 붙이기는 기본 비서를 거절하므로(docs/features/assistant-hub/spec.md 의 REQ9) 배포 전부터 비서에
+     * 붙은 연결을 흉내 내는 시나리오가 쓴다. 검사는 화면의 붙이기와 같고 기본 비서인지만 보지 않는다.
+     */
+    @PutMapping("/legacy-connections/{agentCode}/{connectorId}")
+    public AgentConnectionView bindLegacy(@PathVariable String agentCode, @PathVariable String connectorId) {
+        return bindings.getObject().bind(currentUser.require(), agentCode, connectorId);
     }
 
 

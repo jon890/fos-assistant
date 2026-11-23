@@ -26,7 +26,8 @@ export type AgentConnectionView = {
 };
 
 /** 붙일 수 없는 에이전트의 까닭이다. 연결은 비공개 에이전트에만 붙인다. */
-export type AgentConnectionBlock = "AGENT_NOT_PRIVATE";
+/** 붙일 수 없는 까닭이다. 기본 비서는 연결을 붙이지 않고 떼기만 한다(docs/features/assistant-hub/spec.md 의 REQ9). */
+export type AgentConnectionBlock = "AGENT_NOT_PRIVATE" | "PRIMARY_AGENT";
 
 export type AgentConnectionsList = {
   connections: AgentConnectionView[];
