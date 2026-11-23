@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.presentation;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.chat.room.application.RoomConversations;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -26,6 +27,7 @@ public class RoomController {
     private final RoomConversations rooms;
     private final CurrentUserProvider currentUser;
     private final AgentService agents;
+    private final ConversationEntry entry;
 
 
     /** 요청자의 대화방을 찾고 없으면 기본 비서로 만든다. 기본 비서가 없으면 {@code AGENT_NOT_FOUND} 다. */
@@ -44,6 +46,7 @@ public class RoomController {
 
 
     private ConversationView viewOf(Conversation room) {
-        return ConversationView.of(room, agents.findById(room.agentId()).orElse(null), null);
+        return ConversationView.of(
+            room, agents.findById(room.agentId()).orElse(null), null, entry.writable(currentUser.require(), room));
     }
 }

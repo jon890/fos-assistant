@@ -11,6 +11,7 @@ import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
 import com.bifos.assistant.chat.conversation.application.port.ConversationTaskLabels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelTierOptions;
@@ -59,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,6 +96,7 @@ public class ChatController {
     private final AutoTurnNoticeStatuses noticeStatuses;
     private final GeneratedImageService generatedImages;
     private final ArtifactPutFiles putFiles;
+    private final ConversationEntry entry;
 
 
     @Autowired
@@ -109,7 +112,8 @@ public class ChatController {
         SourceReadSummaries sourceReads,
         AutoTurnNoticeStatuses noticeStatuses,
         GeneratedImageService generatedImages,
-        ArtifactPutFiles putFiles) {
+        ArtifactPutFiles putFiles,
+        ConversationEntry entry) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -122,6 +126,7 @@ public class ChatController {
         this.noticeStatuses = noticeStatuses;
         this.generatedImages = generatedImages;
         this.putFiles = putFiles;
+        this.entry = entry;
     }
 
 
@@ -176,6 +181,8 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
+        // 비서가 아닌 대화는 읽기 전용이다(스펙 REQ5). ChatService 가 파일 길이 상한에 닿아 여기서 막는다.
+        entry.requireWritable(user, id);
         return streams.open(
             send -> chat.regenerate(user, id, event -> event.forViewer(user).ifPresent(send)));
     }
@@ -189,6 +196,7 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
+        entry.requireWritable(user, id);
         return streams.open(send -> chat.retryDelivery(
             user, id, deliveryId, event -> event.forViewer(user).ifPresent(send)));
     }
@@ -211,7 +219,9 @@ public class ChatController {
     @GetMapping("/conversations")
     public ConversationPageView conversations(
         @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
-        ConversationPage page = chat.conversationsOf(currentUser.require(), cursor, limit);
+        CurrentUser user = currentUser.require();
+        ConversationPage page = chat.conversationsOf(user, cursor, limit);
+        Predicate<Conversation> writable = entry.writableFor(user);
         // 목록은 에이전트와 작업 이름을 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 그 칸만 비운다.
         Map<Long, Agent> byId = agents.byIds(page.items().stream().map(Conversation::agentId).toList());
         Map<Long, TaskLabel> labels = labelsOf(page.items().stream()
@@ -221,10 +231,11 @@ public class ChatController {
             .toList());
         return new ConversationPageView(
             page.items().stream()
-                .map(conversation -> viewOf(
+                .map(conversation -> ConversationView.of(
                     conversation,
                     byId.get(conversation.agentId()),
-                    conversation.taskId() == null ? null : labels.get(conversation.taskId())))
+                    conversation.taskId() == null ? null : labels.get(conversation.taskId()),
+                    writable.test(conversation)))
                 .toList(),
             page.nextCursor());
     }
@@ -302,7 +313,11 @@ public class ChatController {
     private ConversationView viewOf(Conversation conversation) {
         Long taskId = conversation.taskId();
         TaskLabel label = taskId == null ? null : labelsOf(List.of(taskId)).get(taskId);
-        return viewOf(conversation, agents.findById(conversation.agentId()).orElse(null), label);
+        return ConversationView.of(
+            conversation,
+            agents.findById(conversation.agentId()).orElse(null),
+            label,
+            entry.writable(currentUser.require(), conversation));
     }
 
 
@@ -314,11 +329,6 @@ public class ChatController {
         Map<Long, TaskLabel> labels = new HashMap<>();
         taskLabels.forEach(source -> labels.putAll(source.labelsOf(taskIds)));
         return labels;
-    }
-
-
-    private static ConversationView viewOf(Conversation conversation, Agent found, TaskLabel label) {
-        return ConversationView.of(conversation, found, label);
     }
 
 

@@ -120,7 +120,8 @@ class ChatTurnRouting {
      * 보내기 요청의 대화와 에이전트다.
      *
      * <p>{@code @} 로 다른 에이전트에게 바로 맡기는 길은 없앴다(비서 중심 대화 스펙 REQ6). 맡길 에이전트가 오면 아무것도 저장하기
-     * 전에 {@code VALIDATION_FAILED} 로 거절한다. 답장은 이어 쓰는 대화에서만 받는다.
+     * 전에 {@code VALIDATION_FAILED} 로 거절한다. 답장은 이어 쓰는 대화에서만 받는다. 기본 비서가 아닌 대화(읽기 전용)도
+     * {@code VALIDATION_FAILED} 다.
      */
     Routed routeSend(
         CurrentUser user,
@@ -136,7 +137,13 @@ class ChatTurnRouting {
         if (reply != null && conversationId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply needs an existing conversation");
         }
-        return route(user, conversationId, text, agentCode, attachmentIds, reply);
+        Routed routed = route(user, conversationId, text, agentCode, attachmentIds, reply);
+        // 비서가 아닌 대화는 읽기 전용이다(스펙 REQ5). route 는 자동 turn 과 예약 turn 도 쓰므로 사람의 보내기만 여기서 막는다.
+        // 이어 쓰는 대화의 route 는 아무것도 저장하지 않으므로 그 뒤에 본다. 지운 에이전트의 대화는 route 가 먼저 AGENT_NOT_FOUND 로 거절한다.
+        if (!routed.created() && !entry.writable(user, routed.conversation())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this conversation is read-only");
+        }
+        return routed;
     }
 
 

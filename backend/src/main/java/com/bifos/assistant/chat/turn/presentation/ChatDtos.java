@@ -281,6 +281,8 @@ public final class ChatDtos {
      * @param purpose 보통 대화인지 먼저 살펴보기의 점검 대화인지. 화면이 점검 대화를 알아보는 데 쓴다
      * @param taskId 이 대화를 만든 예약 작업의 공개 식별자. 작업이 만든 대화가 아니면 null
      * @param taskTitle 그 작업의 이름. 지운 작업도 이름을 싣는다. 작업이 만든 대화가 아니면 null
+     * @param writable 사람이 이어 쓸 수 있는 대화다. 대화의 에이전트가 요청자의 기본 비서가 아니면 거짓이다(비서 중심 대화 스펙
+     * REQ5). 점검 대화는 늘 참이다
      */
     public record ConversationView(
         UUID id,
@@ -294,13 +296,14 @@ public final class ChatDtos {
         ModelTier modelTier,
         ConversationPurpose purpose,
         UUID taskId,
-        String taskTitle) {
+        String taskTitle,
+        boolean writable) {
 
         /**
          * 에이전트 행이 없거나({@code found} 가 null) 지운 에이전트면 에이전트 칸만 비운 줄이다. 작업이 만든 대화가 아니거나 작업 행이
          * 없으면({@code label} 이 null) 작업 칸을 비운다.
          */
-        public static ConversationView of(Conversation conversation, Agent found, TaskLabel label) {
+        public static ConversationView of(Conversation conversation, Agent found, TaskLabel label, boolean writable) {
             Agent agent = found == null || found.isDeleted() ? null : found;
             return new ConversationView(
                 conversation.publicId(),
@@ -314,7 +317,8 @@ public final class ChatDtos {
                 conversation.modelTier(),
                 conversation.purpose(),
                 label == null ? null : label.taskId(),
-                label == null ? null : label.title());
+                label == null ? null : label.title(),
+                writable);
         }
     }
 
