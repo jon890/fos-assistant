@@ -1,0 +1,29 @@
+{
+  "name": "assistant-entry",
+  "description": "입구를 비서로 모은다(스펙 PR2 의 앞 절반): 새 대화는 늘 비서, @ 맡기기와 대화하기 단추 없앰, 바꾸기 부탁과 이름을 부른 부탁은 비서가 맡김",
+  "pr_scope": "새 대화가 늘 기본 비서를 쓰게 하고, @ 맡기기와 에이전트 고르기 화면, 「대화하기」 단추를 없애며, 지시문과 평가 세트를 맞춘다. 운영 코드 추정이 상한을 넘어 읽기 전용 대화와 예약 작업(REQ5, REQ7)은 다음 PR 로 나눴다.",
+  "deferred": [
+    {
+      "what": "비서가 아닌 지난 대화를 읽기 전용으로 막기, 예약 작업 만들기·고치기를 비서로 돌리기(스펙 REQ5, REQ7)",
+      "why": "PR 크기 상한. 설계 DECISION5",
+      "after": "이 PR 이 main 에 머지된 뒤"
+    },
+    {
+      "what": "연결은 전문 에이전트에만, 전문 에이전트의 스킬을 비서 대화의 / 로 맡기기(스펙 REQ9-REQ10, PR3)",
+      "why": "스펙 DECISION12",
+      "after": "PR2 의 두 PR 이 main 에 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-23",
+  "spec": "docs/features/assistant-hub/spec.md",
+  "design": "docs/features/assistant-hub/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ4", "REQ6", "REQ8"],
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ4", "REQ6", "REQ8"]},
+    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ4", "REQ6"]}
+  ]
+}
