@@ -335,10 +335,10 @@ public class RestartReconciler implements SmartLifecycle {
 
     /**
      * 그 대화의 Hermes session 으로 도는 루트 줄인지 본다.
-     * 위임 실행은 자기 session 으로 돌아 잠금을 잡지 않는다.
+     * 위임 실행은 자기 session 으로 돌아 잠금을 잡지 않는다. 부모 없는 스킬 맡기기도 위임 키가 있어 잡지 않는다.
      */
     private boolean holdsConversation(AgentExecution row) {
-        if (row.hermesRunId() == null || row.conversationId() == null) {
+        if (row.hermesRunId() == null || row.conversationId() == null || row.delegationKey() != null) {
             return false;
         }
         return row.parentExecutionId() == null;

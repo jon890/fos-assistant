@@ -178,7 +178,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /**
      * 그 대화에 아직 전하지 않은 끝난 위임 결과를 오래된 순으로 읽는다.
      *
-     * <p>대화 turn 이 직접 맡긴 실행만 낸다. 부모 실행이 다시 자식이면 손자 실행이라 빼고, 그 결과는 자식이
+     * <p>대화 turn 이 직접 맡긴 실행과 사람이 스킬을 맡긴 부모 없는 위임 실행(비서 중심 대화 스펙 REQ10)만 낸다. 손자 실행은 빼고 자식이
      * {@code agent_status} 로 읽는다. {@code CANCELLED} 는 사용자나 부모가 멈춘 것이라 전하지 않는다.
      */
     @Query("""
@@ -188,8 +188,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.status in (com.bifos.assistant.usage.execution.domain.type.ExecutionStatus.SUCCEEDED,
                     com.bifos.assistant.usage.execution.domain.type.ExecutionStatus.FAILED)
                 and e.resultDeliveredAt is null
-                and exists (select p.id from AgentExecution p
-                    where p.id = e.parentExecutionId and p.parentExecutionId is null)
+                and (e.parentExecutionId is null
+                    or exists (select p.id from AgentExecution p
+                        where p.id = e.parentExecutionId and p.parentExecutionId is null))
             order by e.id asc
             """)
     List<AgentExecution> findUndeliveredResults(@Param("conversationId") Long conversationId);
@@ -203,8 +204,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.status in (com.bifos.assistant.usage.execution.domain.type.ExecutionStatus.SUCCEEDED,
                     com.bifos.assistant.usage.execution.domain.type.ExecutionStatus.FAILED)
                 and e.resultDeliveredAt is null
-                and exists (select p.id from AgentExecution p
-                    where p.id = e.parentExecutionId and p.parentExecutionId is null)
+                and (e.parentExecutionId is null
+                    or exists (select p.id from AgentExecution p
+                        where p.id = e.parentExecutionId and p.parentExecutionId is null))
             """)
     List<Long> findConversationsWithUndeliveredResults();
 

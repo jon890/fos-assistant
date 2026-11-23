@@ -84,7 +84,10 @@ class MentionInputs {
      * 질문이 경계다. 맡김이 하나도 없는 대화는 줄을 읽지 않는다.
      */
     String carryOver(Conversation conversation) {
-        List<AgentExecution> mentions = mentionLines.of(conversation);
+        // 스킬 맡기기(위임 키가 있다)의 결과는 깨우기가 이미 입력에 넣는다(비서 중심 대화 스펙 REQ10). 다시 싣지 않는다.
+        List<AgentExecution> mentions = mentionLines.of(conversation).stream()
+            .filter(mention -> mention.delegationKey() == null)
+            .toList();
         if (mentions.isEmpty()) {
             return "";
         }

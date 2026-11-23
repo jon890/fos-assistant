@@ -97,4 +97,25 @@ public class ChildExecutionRunner {
             .result();
     }
 
+
+    /**
+     * 부모 없이 다른 에이전트의 실행 하나를 끝까지 돌린다. 사람이 {@code /} 목록으로 전문 에이전트의 스킬을 맡긴 길이다(비서 중심 대화 스펙
+     * REQ10). 대화 turn 을 열지 않고, 실행 줄은 지난 {@code @} 맡김과 같은 모양(부모 없음, 대화의 에이전트와 다름)에 위임 키를 적는다.
+     * 자식의 답처럼 {@code chat_message} 에 넣지 않고 그 결과는 깨우기가 대화에 전한다.
+     *
+     * @param agent {@link #startableAgent} 를 지난 에이전트
+     */
+    public ChildResult runUnparented(
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String task,
+        DelegationKey delegationKey,
+        Consumer<AgentExecution> onStarted,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled) {
+        return runner.run(
+            user, conversation, agent, task, null, null, RunSession.fresh(), onStarted, onSubmitted, cancelled, null, delegationKey)
+            .result();
+    }
 }
