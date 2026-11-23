@@ -316,6 +316,7 @@ export function fromTree(
               executionId: node.executionId,
               toolName: event.toolName,
               connector: event.connector ?? null,
+              delegatedAgentName: event.delegatedAgentName ?? null,
               detail: event.detail,
               durationMs: event.durationMs,
               failed: event.failed,

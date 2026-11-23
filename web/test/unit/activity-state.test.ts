@@ -325,21 +325,37 @@ test("실행 번호가 정해지기 전에 온 맡긴 도구 사건은 붙잡았
   assert.equal(routeDelegationActivity(held, 90, mine), mine);
 });
 
-test("도는 답의 맡긴 줄이 오면 이름 없는 첫 맡기기 도구 줄에 그 에이전트 이름이 붙고, 끝난 뒤에도 남는다", () => {
-  let state = emptyActivity(0);
-  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" });
-  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" });
+test("도는 답의 맡긴 줄이 오면 지금 도는 이름 없는 맡기기 도구 줄 하나에 그 에이전트 이름이 붙고, 끝난 뒤에도 남는다", () => {
+  const started: ChatEvent = { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" };
+  const completed: ChatEvent = { ...started, phase: "completed" };
+  let state = applyChatEvent(emptyActivity(0), started);
   assert.equal(activityLabel(state.items[0]!), "다른 에이전트에게 맡기고 있어요");
 
   state = applyDelegationName(state, "커리어");
-  state = applyDelegationName(state, "쇼핑 담당");
-  assert.deepEqual(state.items.map(activityLabel), ["커리어에게 맡기고 있어요", "쇼핑 담당에게 맡기고 있어요"]);
-
-  state = applyChatEvent(state, { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "completed" });
+  assert.equal(activityLabel(state.items[0]!), "커리어에게 맡기고 있어요");
+  state = applyChatEvent(state, completed);
   assert.equal(activityLabel(state.items[0]!), "커리어에게 맡겼어요");
-  // 이름 없는 줄이 없거나 이름이 비면 그대로다.
+  // 이름 없는 도는 줄이 없거나 이름이 비면 그대로다.
   assert.equal(applyDelegationName(state, "또 다른"), state);
   assert.equal(applyDelegationName(emptyActivity(0), null).items.length, 0);
+});
+
+test("앞 맡기기가 거절돼 끝난 뒤 다음 맡기기의 줄이 오면 도는 다음 줄에만 이름이 붙는다", () => {
+  const started: ChatEvent = { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" };
+  let state = applyChatEvent(emptyActivity(0), started);
+  state = applyChatEvent(state, { ...started, phase: "completed", failed: true });
+  state = applyChatEvent(state, started);
+
+  state = applyDelegationName(state, "커리어");
+
+  assert.deepEqual(state.items.map(activityLabel), ["다른 에이전트에게 맡겼어요", "커리어에게 맡기고 있어요"]);
+});
+
+test("맡기기 줄이 동시에 둘 이상 돌면 어느 쪽인지 몰라 이름을 붙이지 않는다", () => {
+  const started: ChatEvent = { type: "tool", toolName: "mcp__fos__agent_delegate", phase: "started" };
+  const state = applyChatEvent(applyChatEvent(emptyActivity(0), started), started);
+
+  assert.equal(applyDelegationName(state, "커리어"), state);
 });
 
 test("실행 트리의 맡기기 도구 사건은 Control Plane 이 정한 맡은 에이전트 이름으로 보인다", () => {
@@ -347,4 +363,12 @@ test("실행 트리의 맡기기 도구 사건은 Control Plane 이 정한 맡�
   const completed = { ...started, sequence: 2, eventType: "TOOL_COMPLETED" as const };
   const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [started, completed]) });
   assert.deepEqual(items.map(activityLabel), ["커리어에게 맡겼어요"]);
+});
+
+test("맡은 에이전트가 다시 맡긴 지난 도구 줄도 Control Plane 이 정한 이름으로 보인다", () => {
+  const started = { ...toolStarted(2, "mcp__fos__agent_delegate"), delegatedAgentName: "리서치" };
+  const completed = { ...started, sequence: 3, eventType: "TOOL_COMPLETED" as const };
+  const child = { ...node(2, "SUCCEEDED", [started, completed]), delegated: true };
+  const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [], [child]) });
+  assert.deepEqual(items.map(activityLabel), ["에이전트 2", "리서치에게 맡겼어요"]);
 });
