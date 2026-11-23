@@ -51,9 +51,9 @@ export type ScheduleRequest = {
   timeZone: string;
 };
 
+/** 작업을 만들거나 고치는 요청이다. 에이전트는 보내지 않고 Control Plane 이 기본 비서로 정한다(스펙 assistant-hub REQ7) */
 export type TaskRequest = {
   title: string;
-  agentCode: string;
   instruction: string;
   schedule: ScheduleRequest;
   conversationMode: ConversationMode;

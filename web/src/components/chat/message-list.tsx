@@ -41,7 +41,7 @@ type Props = {
   onRetry?(): void;
   selectedVersions: Record<number, number>;
   onVersionChange(slotId: number, index: number): void;
-  onRegenerate(): void;
+  onRegenerate?(): void;
   /** 마지막 답 끝의 질문에 답한다. 고른 답을 글로 만들어 다음 메시지로 보낸다 */
   onAnswer?(text: string): void;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
