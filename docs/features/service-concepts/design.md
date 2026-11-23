@@ -2,6 +2,8 @@
 
 스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1-REQ6), PR2(REQ7-REQ10), PR3(REQ11-REQ14), PR4(REQ15-REQ16)의 구조를 정한다.
 
+바뀐 결정(2026-11-23): [비서 중심 대화 스펙](../assistant-hub/spec.md) 의 DECISION9 가 REQ4 와 DECISION8 을 바꿨다. 아래 REQ4 줄, 개념 목록 표의 에이전트 고르기 줄, 링크가 새 탭에서 열린다는 줄의 `/new?agent=<code>` 안내는 지금 규칙이 아니다. 「블로그 비서로 바꿔 줘」 에 링크를 붙이지 않고 비서가 그 에이전트에게 맡겨 처리한다고 답한다.
+
 ## 요구사항 연결
 
 | ID | 해결 방법 |

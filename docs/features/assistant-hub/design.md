@@ -76,6 +76,7 @@
 - **같은 profile 의 호출이 멈춘다.** Hermes 는 profile 마다 Control Plane MCP 연결 하나를 잠금(`_rpc_lock`)으로 묶어 호출을 하나씩 보낸다. 기다리는 동안 같은 사용자의 비서로 도는 다른 실행의 Control Plane 도구 호출이 멈추고, 기다림이 줄을 서면 뒤 호출이 300초 제한에 걸릴 수 있다. 사용자가 이 위험을 받아들였다(스펙 DECISION28). 맡은 실행이 같은 profile 이면 그 실행이 끝날 수 없으므로 `DelegationWaiter` 가 기다리지 않는다.
 - 사건 스트림이 끊기거나 늦게 와도 자식의 끝은 `awaitCompletion` 이 정한다. 끝난 뒤 온 사건은 버린다(ADR-090 과 같다).
 - 배포 순서: PR1 은 Control Plane 과 웹만 바꾼다. 웹이 먼저 떠도 `delegation_activity` 를 받지 않을 뿐이고, Control Plane 이 먼저 떠도 웹이 모르는 사건을 버린다.
+- 배포 순서(PR2 앞 PR): 웹과 Control Plane 을 함께 배포한다. Control Plane 만 먼저 뜨거나 옛 화면 탭이 열린 채로 남으면, 옛 웹은 새로 고치기 전까지 새 대화를 목록의 첫 에이전트로 보낸다. 그 에이전트가 기본 비서가 아니면 `VALIDATION_FAILED` 로 거절되고, 옛 `@` 맡김 보내기도 거절된다. 저장되는 것은 없고 입력한 글은 입력창에 돌아온다.
 
 ## 검증 전략
 
