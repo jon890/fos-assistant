@@ -52,6 +52,8 @@ const MESSAGES: Record<string, string> = {
     "도구 설정을 적용하지 못했어요. 현재 목록을 다시 읽었어요.",
   AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   PRIMARY_AGENT_PROTECTED: "기본 비서는 지울 수 없어요.",
+  PRIMARY_AGENT_NO_CONNECTIONS:
+    "비서에는 연결을 붙이지 않아요. 연결은 전문 에이전트에 붙이고 비서가 맡겨요.",
   AGENT_SANDBOX_UNAVAILABLE:
     "격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.",
   AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF:
