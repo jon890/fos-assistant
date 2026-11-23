@@ -152,7 +152,7 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | 응답 | 더하는 칸 |
 | --- | --- |
 | 대화 스트림의 `tool` 사건 | `connector: { service, title }`. 플러그인 도구가 아니면 null |
-| 실행 트리의 도구 사건(`ExecutionEventView`) | 같은 `connector` |
+| 실행 트리의 도구 사건(`ExecutionEventView`) | 같은 `connector`. `agent_delegate` 사건에는 `delegatedAgentName`(아래 「맡기기 도구 줄」) |
 | 메시지 조회의 `activity` | `uses`: 그 답이 쓴 도구와 도우미를 처음 쓴 차례로, 같은 것은 한 번만. 줄마다 `kind`(`TOOL`, `SUBAGENT`), `toolName`, `connector` |
 
 `uses` 의 차례는 트리 안 사건의 `occurredAt`, 실행 번호, `sequence` 순이다. 자식 실행은 첫 사건의 때에 도우미 한 줄이다.
@@ -168,6 +168,13 @@ Auth.js 는 JWT 세션이라 쿠키를 지우면 그 브라우저만 풀린다. 
 | `connector` 가 없는 `mcp__` 도구 | 「연결된 서비스」 | 지금 문장(「연결된 서비스를 썼어요」) |
 | 그 밖 | 「그 밖의 도구」 | 지금 문장(「도구를 썼어요」) |
 | 하위 에이전트 | 「도우미」 | 지금 문장(목표) |
+
+**맡기기 도구 줄은 맡은 에이전트 이름을 쓴다**([비서 중심 대화 스펙](../assistant-hub/spec.md) DECISION30). `agent_delegate` 의 펼친 줄과 도는 줄은 이름을 알면 「<이름>에게 맡기고 있어요」, 「<이름>에게 맡겼어요」 이고 모르면 지금 문장이다. 모델이 준 인자는 쓰지 않는다.
+
+| 자리 | 이름을 얻는 곳 |
+| --- | --- |
+| 도는 답 | Control Plane 이 맡긴 실행을 만들며 보내는 맡긴 줄(`delegation` 사건)의 에이전트 이름을, 그 답의 이름 없는 맡기기 도구 줄 가운데 먼저 시작한 줄에 붙인다 |
+| 지난 답과 실행 상세 | `ExecutionTreeService` 가 실행 하나의 `agent_delegate` 시작·완료 사건을 차례로 짝짓고, 그 호출이 시작한 뒤 끝나기 전(앞뒤 2초 여유)에 시작한 맡긴 자식 실행의 에이전트 이름을 `delegatedAgentName` 칸에 넣는다. 거절돼 자식이 없는 호출은 null 이다 |
 
 접힌 줄은 끝난 모양(`done`, `stopped`, `failed`)의 머리말 뒤에 이름을 셋까지 가운뎃점으로 잇고 넷째부터 「외 N」 이다. `done` 은 머리말이 없고, 이름이 하나도 없으면 「차례로 정리했어요」 다.
 
