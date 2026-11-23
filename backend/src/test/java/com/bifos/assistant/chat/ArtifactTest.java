@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -161,6 +162,9 @@ class ArtifactTest {
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -1104,7 +1108,7 @@ class ArtifactTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             owner.id());
-        agents.save(agent);
+        primaries.make(owner, agents.save(agent));
     }
 
 

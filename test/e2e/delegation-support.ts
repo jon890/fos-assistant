@@ -4,7 +4,7 @@
  * <p>시나리오가 profile 플러그인 역할을 한다. 붙잡아 둔 turn 의 session 을 루트로 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
  */
 import { randomUUID } from "node:crypto";
-import { call, expect, expectStatus, fail, type Context } from "./harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, type Context } from "./harness.ts";
 import { readEventStream } from "../../web/src/lib/stream.ts";
 import { signedCallContext, type FosCallContext } from "./mcp-context.ts";
 
@@ -43,10 +43,12 @@ export async function openStream(
   agentCode: string,
   conversationId?: string,
 ): Promise<{ started: Promise<ChatEvent>; executionId: Promise<number>; completed: Promise<ChatEvent[]> }> {
+  // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+  const target = conversationId ?? (await seedConversation(context, context.tokens.dad, agentCode));
   const response = await fetch(`${context.api}/chat/messages/stream`, {
     method: "POST",
     headers: { Authorization: `Bearer ${context.tokens.dad}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, agentCode, conversationId }),
+    body: JSON.stringify({ text, conversationId: target }),
   });
   expect(response.status === 200, `검사 turn 의 스트림을 열지 못했다: ${response.status}`);
   const received: ChatEvent[] = [];

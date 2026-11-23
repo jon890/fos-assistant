@@ -5,7 +5,7 @@
  * 플러그인 서버에 닿는 호출 없이 그 에이전트의 답이 이어진다. 앞의 시나리오처럼 연결을 등록해 비공개 에이전트에 붙이고,
  * 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Response, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, type ConnectorToolCall } from "../fake-hermes.ts";
 import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
@@ -95,9 +95,10 @@ export const deliveryRetryScenario: Scenario = {
         await call(context, "/chat/messages", {
           method: "POST",
           token: context.tokens.dad,
+          // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
           body: {
+            conversationId: await seedConversation(context, context.tokens.dad, agent.code),
             text: `${CONNECTOR_TOOL_PROBE}\n${PREFIX}write_note ${JSON.stringify({ text: NOTE_TEXT })}`,
-            agentCode: agent.code,
           },
         }),
         200,

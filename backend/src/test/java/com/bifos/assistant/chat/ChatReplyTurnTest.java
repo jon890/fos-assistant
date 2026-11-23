@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -82,6 +83,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ChatReplyTurnTest {
     private static final Instant NOW = Instant.parse("2026-11-21T00:00:00Z");
     private static final String ANSWER = "MEDIA:/opt/data/cache/generated/images/a.png\n수채화 고양이를 그렸어요.\n창가에 앉아 있어요.\n\n셋째 줄";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -400,9 +404,9 @@ class ChatReplyTurnTest {
 
 
     private void agentOf(CurrentUser owner, String code) {
-        agents.save(Agent.of(
+        primaries.make(owner, agents.save(Agent.of(
             code, code, code, "http://agent-runtime.test/p/" + code,
-            CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id()));
+            CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id())));
     }
 
 

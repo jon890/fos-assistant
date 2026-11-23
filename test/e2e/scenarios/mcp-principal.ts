@@ -4,7 +4,7 @@
  * <p>MCP 토큰은 profile 만 증명한다. 두 사용자의 호출이 같은 토큰으로 오므로, 요청자는 서명한 `_fos_ctx` 의 루트
  * session 으로 찾은 도는 실행의 사용자여야 한다(ADR-032). 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import { MEMORY_READ_PROBE } from "../fake-hermes.ts";
 
 export const MCP_PRINCIPAL_PROFILE = "mcp-shared-group";
@@ -22,7 +22,8 @@ async function sendReadProbe(context: Context, token: string, memoryId: number):
     await call(context, "/chat/messages", {
       method: "POST",
       token,
-      body: { text: `${MEMORY_READ_PROBE} ${memoryId}`, agentCode: AGENT_CODE },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: { conversationId: await seedConversation(context, token, AGENT_CODE), text: `${MEMORY_READ_PROBE} ${memoryId}` },
     }),
     200,
     "Memory 읽기 검사 대화",

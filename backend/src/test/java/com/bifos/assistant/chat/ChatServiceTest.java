@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.MemorySummaryRows;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,6 +119,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ChatServiceTest {
 
     /** turn 을 열 때 낸 사건을 본다. 화면 넘기기 카드가 이 사건으로 닫힌다. */
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     ApplicationEvents recordedEvents;
 
@@ -273,7 +277,7 @@ class ChatServiceTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (profileName != null) {
-            agents.save(Agent.of(
+            primaries.make(user, agents.save(Agent.of(
                 profileName,
                 profileName,
                 profileName,
@@ -281,7 +285,7 @@ class ChatServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id())));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }

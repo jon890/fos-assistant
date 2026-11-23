@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -64,6 +65,9 @@ class UserExecutionLimitDelegationTest {
     private static final String CHILD_MARK = "맡긴 첫 일";
 
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     ChatService chat;
 
     @Autowired
@@ -120,7 +124,7 @@ class UserExecutionLimitDelegationTest {
         pool = Executors.newVirtualThreadPerTaskExecutor();
         AppUser user = users.save(AppUser.of("limit-dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        agents.save(agent("limit-chief"));
+        primaries.make(user, agents.save(agent("limit-chief")));
         agents.save(agent("limit-worker"));
     }
 

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -64,6 +65,9 @@ class ConversationEventControllerTest {
 
     private static final String COMMAND = "python3 run.py";
     private static final String SWITCHED_TO = "example-provider/example-model-small";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -266,7 +270,7 @@ class ConversationEventControllerTest {
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             name,
             name,
             name,
@@ -274,7 +278,7 @@ class ConversationEventControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;

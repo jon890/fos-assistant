@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -38,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 /** 보관 기간이 지나 사라진 사진은 다시 생성 Hermes 입력에 넣지 않는다. */
 @BackendIntegrationTest
 class RegenerateDeletedAttachmentTest {
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     HermesToolsetClient attachmentTools;
 
@@ -179,7 +183,7 @@ class RegenerateDeletedAttachmentTest {
 
     private CurrentUser member() {
         AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             "dad",
             "dad",
             "dad",
@@ -187,7 +191,7 @@ class RegenerateDeletedAttachmentTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

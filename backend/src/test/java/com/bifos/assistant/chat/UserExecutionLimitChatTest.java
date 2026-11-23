@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -91,6 +92,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class UserExecutionLimitChatTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -426,7 +430,7 @@ class UserExecutionLimitChatTest {
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             name,
             name,
             name,
@@ -434,7 +438,7 @@ class UserExecutionLimitChatTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

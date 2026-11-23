@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.nextturn.presentation.PendingMessageController;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +53,9 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @BackendIntegrationTest
 class PendingMessageControllerTest {
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     PendingMessageService pending;
@@ -248,7 +252,7 @@ class PendingMessageControllerTest {
     /** 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             name,
             name,
             name,
@@ -256,7 +260,7 @@ class PendingMessageControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         when(currentUser.require()).thenReturn(current);
         return current;

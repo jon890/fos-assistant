@@ -5,7 +5,7 @@
  * Control Plane 이 반영 지연 뒤 스스로 확인해 `READY` 로 만든다(ADR-20261007 / connector-live-reload). 값 교체처럼 재시작 대기가 된
  * 바인딩만 관리자인 dad 가 반영 완료를 눌러야 한다. 만든 것은 {@link ConnectorSetup} 이 적어 두고 시나리오 끝에서 되돌린다.
  */
-import { call, expect, expectStatus, fail, type Context } from "./harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, type Context } from "./harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "./fake-hermes.ts";
 
 export type BoundAgentView = { agentCode: string; agentName: string; status: string; restartRequired: boolean };
@@ -161,7 +161,11 @@ export async function probeTool(
     await call(context, "/chat/messages", {
       method: "POST",
       token,
-      body: { text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${argsJson}`, agentCode },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: {
+        conversationId: await seedConversation(context, token, agentCode),
+        text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${argsJson}`,
+      },
     }),
     200,
     `${hermesTool} 호출 대화`,

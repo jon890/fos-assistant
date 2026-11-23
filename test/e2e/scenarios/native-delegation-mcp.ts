@@ -5,7 +5,7 @@
  * 시나리오가 부른다. 자식 session 은 Control Plane 이 정한 값이 아니므로 등록이 없으면 요청자를 찾지 못한다(ADR-037).
  * 사용자가 turn 을 중지해 origin 실행이 `CANCELLED` 로 끝나면 그 자식의 호출도 거절된다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { SUBAGENT_MEMORY_PROBE } from "../fake-hermes.ts";
 
@@ -42,7 +42,8 @@ async function openStream(
   const response = await fetch(`${context.api}/chat/messages/stream`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, agentCode: AGENT_CODE }),
+    // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+    body: JSON.stringify({ conversationId: await seedConversation(context, token, AGENT_CODE), text }),
   });
   expect(response.status === 200, `중지할 스트림을 열지 못했다: ${response.status}`);
   const received: ChatEvent[] = [];
@@ -73,7 +74,11 @@ async function openStream(
 
 async function send(context: Context, token: string, body: Record<string, string>, what: string): Promise<Turn> {
   return expectStatus(
-    await call(context, "/chat/messages", { method: "POST", token, body: { ...body, agentCode: AGENT_CODE } }),
+    await call(context, "/chat/messages", {
+      method: "POST",
+      token,
+      body: { conversationId: body.conversationId ?? (await seedConversation(context, token, AGENT_CODE)), ...body },
+    }),
     200,
     what,
   ).json<Turn>();
