@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.domain;
+package com.bifos.assistant.runtime.domain;
 
 import java.time.Instant;
 import java.util.Set;

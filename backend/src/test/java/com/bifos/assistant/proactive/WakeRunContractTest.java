@@ -9,9 +9,9 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.TokenUsage;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.proactive.check.application.CheckFeedback;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckRecovery;
@@ -262,10 +262,10 @@ class WakeRunContractTest extends ProactiveTestSupport {
     }
 
 
-    private void streams(RunEvent... events) {
+    private void streams(HermesRunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
+            for (HermesRunEvent event : events) {
                 onEvent.accept(event);
             }
             return null;
@@ -275,12 +275,12 @@ class WakeRunContractTest extends ProactiveTestSupport {
     }
 
 
-    private static RunEvent[] toolEvents(int count) {
-        List<RunEvent> events = new ArrayList<>();
+    private static HermesRunEvent[] toolEvents(int count) {
+        List<HermesRunEvent> events = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            events.add(new RunEvent("tool.started", null, "web_search", "query-" + i, null, null));
+            events.add(new HermesRunEvent("tool.started", null, "web_search", "query-" + i, null, null));
         }
-        return events.toArray(RunEvent[]::new);
+        return events.toArray(HermesRunEvent[]::new);
     }
 
 

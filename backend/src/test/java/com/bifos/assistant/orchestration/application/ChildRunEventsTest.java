@@ -16,9 +16,12 @@ import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegatedRunActivity;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
-import com.bifos.assistant.hermes.infra.HermesRunEventStream;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
+import com.bifos.assistant.runtime.application.port.AgentRuntime;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
@@ -41,14 +44,16 @@ import org.springframework.context.ApplicationEventPublisher;
 class ChildRunEventsTest {
     private final AgentConnectorBindings bindings = mock(AgentConnectorBindings.class);
     private final ExecutionConnectorCalls connectorCalls = mock(ExecutionConnectorCalls.class);
-    private final HermesRunEventStream stream = mock(HermesRunEventStream.class);
+    private final AgentRuntimes runtimes = mock(AgentRuntimes.class);
+    private final AgentRuntime stream = mock(AgentRuntime.class);
+    private final RuntimeTarget target = mock(RuntimeTarget.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final ExecutionEventRecorder recorder = mock(ExecutionEventRecorder.class);
     private final ExecutionEventRepository repository = mock(ExecutionEventRepository.class);
     private final BackgroundTasks tasks = mock(BackgroundTasks.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final ChildRunEvents events = new ChildRunEvents(
-        bindings, connectorCalls, stream, executions, recorder, repository, tasks, publisher);
+        bindings, connectorCalls, runtimes, executions, recorder, repository, tasks, publisher);
     private final AgentExecution execution = mock(AgentExecution.class);
     private final Agent agent = mock(Agent.class);
     private final Conversation conversation = mock(Conversation.class);
@@ -66,14 +71,14 @@ class ChildRunEventsTest {
         when(execution.id()).thenReturn(11L);
         when(execution.treeRootId()).thenReturn(10L);
         when(agent.id()).thenReturn(5L);
-        when(agent.apiBaseUrl()).thenReturn("http://hermes");
-        when(agent.hermesProfile()).thenReturn("shopper");
+        when(agent.runtimeTarget()).thenReturn(target);
+        when(runtimes.of(target)).thenReturn(stream);
         when(conversation.id()).thenReturn(7L);
         when(bindings.connectorToolPrefixes(5L)).thenReturn(Set.of("mcp_naver_shopping_"));
         when(recorder.record(any(AgentExecution.class), any(ExecutionEventType.class), any(), anyInt()))
             .thenAnswer(call -> recorded(call.getArgument(1).toString(), call.getArgument(3)));
         when(recorder.record(any(AgentExecution.class), any(RunEvent.class), anyInt()))
-            .thenAnswer(call -> recorded(((RunEvent)call.getArgument(1)).type(), call.getArgument(2)));
+            .thenAnswer(call -> recorded(((RunEvent)call.getArgument(1)).kind().name(), call.getArgument(2)));
         // 스트림 스레드는 이 테스트에서 따로 띄우지 않는다. 시작한 작업을 붙잡아 두고 사건은 onEvent 로 흘린다.
         when(tasks.start(anyString(), any())).thenAnswer(call -> {
             Runnable task = call.getArgument(1);
@@ -82,14 +87,14 @@ class ChildRunEventsTest {
             return thread;
         });
         doAnswer(call -> {
-            onEvent = call.getArgument(3);
-            ((Consumer<Closeable>)call.getArgument(4)).accept(opened);
+            onEvent = call.getArgument(2);
+            ((Consumer<Closeable>)call.getArgument(3)).accept(opened);
             synchronized (this) {
                 notifyAll();
                 wait(5_000);
             }
             return null;
-        }).when(stream).open(anyString(), anyString(), anyString(), any(), any(), any(ToolDetailScope.class));
+        }).when(stream).openEvents(any(), anyString(), any(), any(), any(ToolDetailScope.class));
     }
 
 
@@ -101,13 +106,13 @@ class ChildRunEventsTest {
         events.relay(recording, agent, "run-1", conversation);
         awaitStreamOpened();
 
-        onEvent.accept(new RunEvent("tool.started", null, "web_search", "운동화", null, null));
-        onEvent.accept(new RunEvent("tool.completed", null, "web_search", "운동화", 300L, false));
+        onEvent.accept(tool(RunEventKind.TOOL_STARTED, "web_search", "운동화", null, null));
+        onEvent.accept(tool(RunEventKind.TOOL_COMPLETED, "web_search", "운동화", 300L, false));
         events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
-        onEvent.accept(new RunEvent("tool.started", null, "web_extract", "늦은 사건", null, null));
+        onEvent.accept(tool(RunEventKind.TOOL_STARTED, "web_extract", "늦은 사건", null, null));
         releaseStream();
 
-        assertThat(recorded).containsExactly("RUN_STARTED#1", "tool.started#2", "tool.completed#3", "RUN_COMPLETED#4");
+        assertThat(recorded).containsExactly("RUN_STARTED#1", "TOOL_STARTED#2", "TOOL_COMPLETED#3", "RUN_COMPLETED#4");
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
         verify(publisher, times(2)).publishEvent(published.capture());
         assertThat(published.getAllValues())
@@ -124,7 +129,7 @@ class ChildRunEventsTest {
         awaitStreamOpened();
 
         ArgumentCaptor<ToolDetailScope> scope = ArgumentCaptor.forClass(ToolDetailScope.class);
-        verify(stream).open(eq("http://hermes"), eq("shopper"), eq("run-1"), any(), any(), scope.capture());
+        verify(stream).openEvents(eq(target), eq("run-1"), any(), any(), scope.capture());
         assertThat(scope.getValue().hides("mcp_naver_shopping_search")).isTrue();
         assertThat(scope.getValue().hides("web_search")).isFalse();
         events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
@@ -139,11 +144,11 @@ class ChildRunEventsTest {
         events.relay(recording, agent, "run-1", null);
         awaitStreamOpened();
 
-        onEvent.accept(new RunEvent("tool.started", null, "web_search", "운동화", null, null));
+        onEvent.accept(tool(RunEventKind.TOOL_STARTED, "web_search", "운동화", null, null));
         events.end(recording, () -> execution, ExecutionEventType.RUN_FAILED, "X");
         releaseStream();
 
-        assertThat(recorded).containsExactly("tool.started#1", "RUN_FAILED#2");
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "RUN_FAILED#2");
         verify(publisher, never()).publishEvent(any());
     }
 
@@ -153,7 +158,7 @@ class ChildRunEventsTest {
     void recordsEndEvenWhenStreamFails() {
         doAnswer(call -> {
             throw new IllegalStateException("끊김");
-        }).when(stream).open(anyString(), anyString(), anyString(), any(), any(), any(ToolDetailScope.class));
+        }).when(stream).openEvents(any(), anyString(), any(), any(), any(ToolDetailScope.class));
         ChildRunRecording recording = events.start(execution);
         events.relay(recording, agent, "run-1", conversation);
 
@@ -173,8 +178,14 @@ class ChildRunEventsTest {
         events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
 
         verify(executions).finishEventObservation(execution, false);
-        verify(stream, never()).open(anyString(), anyString(), anyString(), any(), any(), any(ToolDetailScope.class));
+        verify(stream, never()).openEvents(any(), anyString(), any(), any(), any(ToolDetailScope.class));
         assertThat(recorded).containsExactly("RUN_COMPLETED#1");
+    }
+
+
+    private static RunEvent tool(RunEventKind kind, String name, String detail, Long durationMs, Boolean failed) {
+        return new RunEvent(kind, null, name, detail, durationMs, failed, null, null, null, null, null, null, null, null,
+            null, null, null);
     }
 
 

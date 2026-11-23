@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -58,12 +58,12 @@ class HermesRunTerminalStreamTest {
     void readsV023EventsAndKeepsTerminal() throws IOException {
         server = serve(V023_EVENTS);
         HermesRunTerminals terminals = new HermesRunTerminals();
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
 
         stream(terminals).open(baseUrl(), "test-profile", "run-one", events::add, opened -> {
         }, ToolDetailScope.NONE);
 
-        assertThat(events).extracting(RunEvent::type).containsExactly("tool.started", "tool.completed", "run.completed");
+        assertThat(events).extracting(HermesRunEvent::type).containsExactly("tool.started", "tool.completed", "run.completed");
         assertThat(events.get(1).durationMs()).isNull();
         HermesRunTerminal terminal = terminals.take("test-profile", "run-one").orElseThrow();
         assertThat(terminal.event()).isEqualTo("run.completed");

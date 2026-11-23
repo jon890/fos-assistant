@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.application.dto;
+package com.bifos.assistant.runtime.application.dto;
 
 /**
  * 세션 하나가 마지막으로 실제로 쓴 provider 와 모델이다.

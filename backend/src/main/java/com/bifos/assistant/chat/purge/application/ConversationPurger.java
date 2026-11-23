@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.purge.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.chat.purge.application.port.ConversationActionPurge;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
@@ -13,7 +14,7 @@ import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
@@ -75,7 +76,7 @@ public class ConversationPurger {
     private final ConversationPurgeWriter writer;
     private final ConversationExecutionPurge executions;
     private final AgentService agents;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore attachmentStore;
     private final ArtifactStore artifactStore;
@@ -211,7 +212,7 @@ public class ConversationPurger {
             for (String sessionId : new String[] {conversation.hermesSessionId(), conversation.hermesRootSessionId()}) {
                 if (sessionId != null && !sessionId.isBlank()) {
                     refs.add(new ExecutionSessionRef(
-                        conversationAgent.id(), conversationAgent.hermesProfile(), sessionId));
+                        conversationAgent.id(), conversationAgent.runtimeTarget().unit(), sessionId));
                 }
             }
         }
@@ -238,7 +239,8 @@ public class ConversationPurger {
 
     private void deleteSession(Agent agent, ExecutionSessionRef ref) {
         try {
-            hermes.deleteSession(agent.apiBaseUrl(), ref.profileName(), ref.sessionId());
+            RuntimeTarget target = agent.runtimeTargetOf(ref.profileName());
+            runtimes.of(target).deleteSession(target, ref.sessionId());
         } catch (ApiException ex) {
             // 지운 에이전트가 관리하던 profile 은 key 와 함께 통째로 지워졌다. 그 session 도 함께 사라졌다.
             if (ex.code() == ErrorCode.HERMES_PROFILE_KEY_MISSING && agent.isDeleted()) {

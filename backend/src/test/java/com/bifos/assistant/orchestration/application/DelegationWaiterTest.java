@@ -9,6 +9,8 @@ import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.orchestration.application.dto.DelegationWait;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
@@ -92,7 +94,7 @@ class DelegationWaiterTest {
     @Test
     @DisplayName("대화 turn 의 루트가 맡긴 실행이 끝나면 다시 읽은 줄을 전해도 된다고 돌려준다")
     void returnsDeliverableWhenChildEndsWithinBudget() {
-        RunningDelegation running = new RunningDelegation("http://hermes", "child");
+        RunningDelegation running = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "child"));
         running.markEnded();
         when(delegations.running(CHILD_ID)).thenReturn(running);
         AgentExecution ended = child(ExecutionStatus.SUCCEEDED);
@@ -107,7 +109,7 @@ class DelegationWaiterTest {
     @Test
     @DisplayName("실패로 끝나도 결과로 전한다")
     void deliversFailedResult() {
-        RunningDelegation running = new RunningDelegation("http://hermes", "child");
+        RunningDelegation running = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "child"));
         running.markEnded();
         when(delegations.running(CHILD_ID)).thenReturn(running);
         child(ExecutionStatus.FAILED);
@@ -119,7 +121,7 @@ class DelegationWaiterTest {
     @Test
     @DisplayName("상한이 0 이거나 손자 위임이거나 먼저 살펴보기 트리면 기다리지 않고 전하지 않는다")
     void doesNotWaitOutsideTarget() {
-        RunningDelegation running = new RunningDelegation("http://hermes", "child");
+        RunningDelegation running = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "child"));
         when(delegations.running(CHILD_ID)).thenReturn(running);
         child(ExecutionStatus.RUNNING);
 
@@ -142,7 +144,7 @@ class DelegationWaiterTest {
     @Test
     @DisplayName("맡은 실행이 비서와 같은 profile 이면 그 도구 호출이 기다림 뒤에 서므로 기다리지 않는다")
     void doesNotWaitForSameProfileChild() {
-        RunningDelegation running = new RunningDelegation("http://hermes", "assistant");
+        RunningDelegation running = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "assistant"));
         when(delegations.running(CHILD_ID)).thenReturn(running);
         AgentExecution child = child(ExecutionStatus.RUNNING);
         when(child.profileName()).thenReturn("assistant");
@@ -160,7 +162,7 @@ class DelegationWaiterTest {
     @Test
     @DisplayName("루트 turn 에 중지 표시가 서면 곧 풀리고, 끝난 결과도 전하지 않는다")
     void releasesAndDoesNotDeliverWhenRootStopped() {
-        RunningDelegation running = new RunningDelegation("http://hermes", "child");
+        RunningDelegation running = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "child"));
         running.markEnded();
         when(delegations.running(CHILD_ID)).thenReturn(running);
         child(ExecutionStatus.CANCELLED);
@@ -178,7 +180,7 @@ class DelegationWaiterTest {
     void returnsRunningWhenBudgetRunsOut() {
         waitMax = Duration.ofMillis(1);
         setUp();
-        when(delegations.running(CHILD_ID)).thenReturn(new RunningDelegation("http://hermes", "child"));
+        when(delegations.running(CHILD_ID)).thenReturn(new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://hermes", "child")));
         child(ExecutionStatus.RUNNING);
         clock.autoAdvance(Duration.ofMillis(5));
 

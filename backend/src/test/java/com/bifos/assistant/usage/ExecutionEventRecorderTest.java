@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
@@ -7,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -42,13 +43,13 @@ class ExecutionEventRecorderTest {
         .build();
 
 
-    private ExecutionEvent record(RunEvent event) {
-        return recorder.record(EXECUTION, event, 1);
+    private ExecutionEvent record(HermesRunEvent event) {
+        return recorder.record(EXECUTION, TestAgentRuntimes.event(event), 1);
     }
 
 
-    private static RunEvent hermes(String name, String toolName, String detail) {
-        return new RunEvent(name, null, toolName, detail, null, null);
+    private static HermesRunEvent hermes(String name, String toolName, String detail) {
+        return new HermesRunEvent(name, null, toolName, detail, null, null);
     }
 
 
@@ -68,8 +69,8 @@ class ExecutionEventRecorderTest {
 
 
     /** 사건 스트림이 가리기 전 미리보기에서 꺼낸 스킬 이름을 함께 실은 사건이다. */
-    private static RunEvent hermes(String name, String toolName, String detail, String skillName) {
-        return new RunEvent(
+    private static HermesRunEvent hermes(String name, String toolName, String detail, String skillName) {
+        return new HermesRunEvent(
             name, null, toolName, detail, null, null, null, null, null, null, null, null, null, skillName);
     }
 
@@ -109,7 +110,7 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("도구 호출이 끝난 사건에 걸린 시간을 채운다")
     void fillsElapsedTimeOnToolCallEndEvent() {
-        ExecutionEvent event = record(new RunEvent("tool.completed", null, "web_search", "done", 1500L, false));
+        ExecutionEvent event = record(new HermesRunEvent("tool.completed", null, "web_search", "done", 1500L, false));
 
         assertThat(event.eventType()).isEqualTo(ExecutionEventType.TOOL_COMPLETED);
         assertThat(event.toolName()).isEqualTo("web_search");
@@ -144,7 +145,7 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("하위 에이전트의 목표와 session과 모델과 토큰만 옮긴다")
     void carriesOnlySubagentGoalSessionModelAndTokens() {
-        RunEvent completed = new RunEvent(
+        HermesRunEvent completed = new HermesRunEvent(
             "subagent.complete",
             null,
             "researcher",
@@ -168,7 +169,7 @@ class ExecutionEventRecorderTest {
         assertThat(event.outputTokens()).isEqualTo(45L);
         assertThat(event.failed()).isFalse();
         assertThat(record(hermes("subagent.start", null, "preview")).detail()).isEqualTo("preview");
-        ExecutionEvent tool = record(new RunEvent(
+        ExecutionEvent tool = record(new HermesRunEvent(
             "tool.completed",
             null,
             "search",
@@ -216,9 +217,9 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("글자 조각과 추론 사건은 저장하지 않는다")
     void doesNotStoreTextChunkAndReasoningEvents() {
-        assertThat(record(new RunEvent("message.delta", "안녕", null, null, null, null)))
+        assertThat(record(new HermesRunEvent("message.delta", "안녕", null, null, null, null)))
             .isNull();
-        assertThat(record(new RunEvent("reasoning.available", "생각", null, null, null, null)))
+        assertThat(record(new HermesRunEvent("reasoning.available", "생각", null, null, null, null)))
             .isNull();
     }
 
@@ -226,7 +227,7 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("실패한 도구의 완료 사건은 실패로 저장한다")
     void storesCompletionEventOfFailedToolAsFailure() {
-        ExecutionEvent event = record(new RunEvent("tool.completed", null, "search", "실패", 5L, true));
+        ExecutionEvent event = record(new HermesRunEvent("tool.completed", null, "search", "실패", 5L, true));
 
         assertThat(event.failed()).isTrue();
     }

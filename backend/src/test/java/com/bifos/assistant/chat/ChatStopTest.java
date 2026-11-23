@@ -21,10 +21,10 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -117,10 +117,10 @@ class ChatStopTest {
     }
 
 
-    private void hermesStreams(RunEvent... events) {
+    private void hermesStreams(HermesRunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
+            for (HermesRunEvent event : events) {
                 onEvent.accept(event);
             }
             return null;
@@ -270,7 +270,7 @@ class ChatStopTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willAnswer(command -> HermesRunResult.of(
             "run-stop", command.sessionId(), "cancelled", "", "model", "provider", TokenUsage.empty()));
-        hermesStreams(new RunEvent("message.delta", "앞부분", null, null, null, null));
+        hermesStreams(new HermesRunEvent("message.delta", "앞부분", null, null, null, null));
         stub().beforeAwait(() -> chat.stop(dad, latestExecution(dad).id()));
 
         List<ChatEvent> relayed = new ArrayList<>();
@@ -388,12 +388,12 @@ class ChatStopTest {
             throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "stop failed");
         });
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
             assertThatThrownBy(() -> chat.stop(dad, latestExecution(dad).id()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException)ex).code())
                 .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
-            onEvent.accept(new RunEvent("message.delta", "조각", null, null, null, null));
+            onEvent.accept(new HermesRunEvent("message.delta", "조각", null, null, null, null));
             return null;
         })
             .when(eventStream)

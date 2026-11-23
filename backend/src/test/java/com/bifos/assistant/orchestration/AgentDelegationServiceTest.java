@@ -17,7 +17,7 @@ import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult;
 import com.bifos.assistant.orchestration.application.dto.DelegationStop;
@@ -349,6 +349,31 @@ class AgentDelegationServiceTest {
         assertThat(outputs.open(stopped.execution())).isEqualTo("끝난 답");
         assertThat(stopped.stopRequested()).as("끝난 실행은 멈추지 않는다").isFalse();
         assertThat(stub().stopped()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("끊긴 위임 실행의 profile 이 에이전트의 지금 profile 과 달라도 실행이 돈 profile 로 중지를 보낸다")
+    void stopsCutRunOnStoredProfileWhenAgentProfileDiffers() {
+        // 서버가 다시 떠 이 프로세스에 중지 표시가 없는 도는 위임 실행이다. 실행 기록의 profile 이 에이전트의 지금 값과 다르다.
+        String storedProfile = "moved-" + WORKER;
+        AgentExecution cut = executions.save(AgentExecution.builder()
+            .userId(user.id())
+            .conversationId(conversation.id())
+            .agentId(agents.findByCode(WORKER).orElseThrow().id())
+            .parentExecutionId(origin.id())
+            .rootExecutionId(origin.id())
+            .profileName(storedProfile)
+            .hermesRunId("run-moved-" + UUID.randomUUID())
+            .delegationKey("moved-" + UUID.randomUUID())
+            .costMode(CostMode.API)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.parse("2026-09-30T00:00:00Z"))
+            .build());
+
+        delegations.stop(user, origin, cut.id()).orElseThrow();
+
+        assertThat(stub().stoppedProfile(cut.hermesRunId())).isEqualTo(storedProfile);
     }
 
 

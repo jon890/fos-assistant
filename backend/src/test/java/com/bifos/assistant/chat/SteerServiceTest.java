@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
@@ -31,9 +32,9 @@ import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -379,7 +380,7 @@ class SteerServiceTest {
     @Test
     @DisplayName("설정이 꺼져 있으면 끼울 수 없다고 본다")
     void disabledSettingNeverSteers() {
-        SteerService disabled = new SteerService(new SteerProperties(false), turns, hermes, null, null);
+        SteerService disabled = new SteerService(new SteerProperties(false), turns, TestAgentRuntimes.hermes(hermes), null, null);
 
         assertThat(disabled.eligible(conversation, "글", true)).isFalse();
     }

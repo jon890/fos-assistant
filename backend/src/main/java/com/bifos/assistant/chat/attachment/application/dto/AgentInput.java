@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.attachment.application.dto;
 
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import java.util.List;
 
 /**
@@ -9,7 +9,7 @@ import java.util.List;
  * @param text 사진 안내 단락과 사용자가 쓴 글
  * @param images 화면 순서대로 실은 사진. 싣지 않았으면 비어 있다
  */
-public record AgentInput(String text, List<HermesImage> images) {
+public record AgentInput(String text, List<RunImage> images) {
 
     public AgentInput {
         images = images == null ? List.of() : List.copyOf(images);

@@ -16,7 +16,8 @@ import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.turn.application.DelegationLines;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.execution.application.port.ConnectorToolNames;
@@ -50,7 +51,7 @@ class DelegationActivityNotifierTest {
         when(conversations.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
         when(lines.directDelegation(CHILD_ID)).thenReturn(Optional.of(LINE));
 
-        notifier.onActivity(new DelegatedRunActivity(CONVERSATION_ID, 30L, CHILD_ID, tool("tool.completed", "web_search", "운동화")));
+        notifier.onActivity(new DelegatedRunActivity(CONVERSATION_ID, 30L, CHILD_ID, tool(RunEventKind.TOOL_COMPLETED, "web_search", "운동화")));
 
         ArgumentCaptor<ChatEvent> sent = ArgumentCaptor.forClass(ChatEvent.class);
         verify(hub).publish(eq(CONVERSATION_ID), sent.capture());
@@ -70,7 +71,7 @@ class DelegationActivityNotifierTest {
     void skipsGrandchildDelegation() {
         when(lines.directDelegation(CHILD_ID)).thenReturn(Optional.empty());
 
-        notifier.onActivity(new DelegatedRunActivity(CONVERSATION_ID, 30L, CHILD_ID, tool("tool.started", "web_search", "운동화")));
+        notifier.onActivity(new DelegatedRunActivity(CONVERSATION_ID, 30L, CHILD_ID, tool(RunEventKind.TOOL_STARTED, "web_search", "운동화")));
 
         verify(hub, never()).publish(any(), any());
     }
@@ -87,8 +88,9 @@ class DelegationActivityNotifierTest {
     }
 
 
-    private static RunEvent tool(String type, String toolName, String detail) {
-        return new RunEvent(type, null, toolName, detail, 300L, false);
+    private static RunEvent tool(RunEventKind kind, String toolName, String detail) {
+        return new RunEvent(kind, null, toolName, detail, 300L, false, null, null, null, null, null, null, null, null,
+            null, null, null);
     }
 
 

@@ -6,9 +6,9 @@ import com.bifos.assistant.chat.nextturn.application.dto.DelegatedRunActivity;
 import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.turn.application.DelegationLines;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
 import com.bifos.assistant.usage.execution.application.port.ConnectorToolNames;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -36,8 +36,7 @@ public class DelegationActivityNotifier {
             return;
         }
         RunEvent event = activity.event();
-        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
-        String phase = "tool.started".equals(type) ? ChatEvent.STARTED : ChatEvent.COMPLETED;
+        String phase = event.kind() == RunEventKind.TOOL_STARTED ? ChatEvent.STARTED : ChatEvent.COMPLETED;
         boolean started = ChatEvent.STARTED.equals(phase);
         try {
             lines.directDelegation(activity.executionId())

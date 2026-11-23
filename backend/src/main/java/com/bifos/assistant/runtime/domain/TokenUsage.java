@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.domain;
+package com.bifos.assistant.runtime.domain;
 
 /** Token counts reported by Hermes. Any field may be null when the provider omits it. */
 public record TokenUsage(

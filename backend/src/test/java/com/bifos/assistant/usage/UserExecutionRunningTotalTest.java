@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,7 +34,7 @@ class UserExecutionRunningTotalTest {
         UserExecutionLimiter limiter = new UserExecutionLimiter(
             LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(3, 0, null)),
             executions,
-            mock(HermesRunsClient.class),
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
             LiveProperties.fixed(
                 HermesProperties.class, new HermesProperties(null, null, null, null, null, null, null, null)),
             new VirtualThreadBackgroundTasks());

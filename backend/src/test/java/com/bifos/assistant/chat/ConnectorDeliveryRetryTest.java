@@ -43,7 +43,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.Sha256;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,7 +27,7 @@ import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.orchestration.application.dto.AgentRun;
@@ -40,9 +41,9 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.orchestration.application.ChildRunEvents;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import org.springframework.context.ApplicationEventPublisher;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
-import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
@@ -103,13 +104,13 @@ class AgentRunnerConnectorContextTest {
                 RUN_ID, "sess-1", "completed", ANSWER, "example-model", null, TokenUsage.empty()));
         runner = new AgentRunner(
             contextAssembler,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             mock(LostRunRelease.class),
             executions,
             new ChildRunEvents(
                 mock(AgentConnectorBindings.class),
                 mock(ExecutionConnectorCalls.class),
-                mock(HermesRunEventStream.class),
+                mock(AgentRuntimes.class),
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),

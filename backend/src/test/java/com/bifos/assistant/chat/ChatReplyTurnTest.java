@@ -38,12 +38,12 @@ import com.bifos.assistant.chat.turn.presentation.ChatDtos.ReplyImageView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ReplyView;
 import com.bifos.assistant.chat.turn.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -186,7 +186,7 @@ class ChatReplyTurnTest {
             });
 
         HermesRunCommand command = stub().received().getLast();
-        assertThat(command.images()).extracting(HermesImage::label).containsExactly("집은 그림 1");
+        assertThat(command.images()).extracting(RunImage::label).containsExactly("집은 그림 1");
         assertThat(command.images().getFirst().dataUrl()).startsWith("data:image/jpeg;base64,");
         String section = command.input().substring(command.input().indexOf("[사용자가 집은 메시지]"));
         assertThat(section).contains("generated:수채화 고양이", "입력 이미지 「집은 그림 1」").doesNotContain("수채화 강아지");
@@ -205,7 +205,7 @@ class ChatReplyTurnTest {
         });
 
         HermesRunCommand command = stub().received().getLast();
-        assertThat(command.images()).extracting(HermesImage::label).containsExactly("집은 그림 1", "집은 그림 2");
+        assertThat(command.images()).extracting(RunImage::label).containsExactly("집은 그림 1", "집은 그림 2");
         assertThat(command.input()).contains("먼저 되묻는다");
     }
 
@@ -223,7 +223,7 @@ class ChatReplyTurnTest {
         });
 
         HermesRunCommand command = stub().received().getLast();
-        assertThat(command.images()).extracting(HermesImage::label).containsExactly("집은 그림 1");
+        assertThat(command.images()).extracting(RunImage::label).containsExactly("집은 그림 1");
         assertThat(command.input()).contains("쓴 사람: 사용자", "1번째 사진(attachment:" + photo.id() + ")");
     }
 

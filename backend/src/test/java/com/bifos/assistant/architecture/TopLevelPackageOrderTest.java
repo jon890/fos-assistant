@@ -2,7 +2,6 @@ package com.bifos.assistant.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,15 +66,22 @@ class TopLevelPackageOrderTest {
     void allowsTopPackageToUseEveryOtherPackage() {
         List<String> others = TopLevelPackageOrder.ORDER.subList(0, TopLevelPackageOrder.ORDER.size() - 1);
 
-        assertThat(others).hasSize(23);
         assertThat(TopLevelPackageOrder.violations("admin", others)).isEmpty();
     }
 
 
     @Test
-    @DisplayName("층 순서는 겹치는 이름 없이 스물넷이다")
-    void orderHasTwentyFourDistinctPackages() {
-        assertThat(TopLevelPackageOrder.ORDER).hasSize(24);
-        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(24);
+    @DisplayName("층 순서에 겹치는 이름이 없다")
+    void orderHasNoDuplicatePackages() {
+        assertThat(TopLevelPackageOrder.ORDER).doesNotHaveDuplicates();
+    }
+
+
+    @Test
+    @DisplayName("hermes 는 runtime 을 쓰고 runtime 은 hermes 를 쓰지 못한다")
+    void runtimeSitsBelowHermes() {
+        assertThat(TopLevelPackageOrder.violations("hermes", List.of("runtime"))).isEmpty();
+        assertThat(TopLevelPackageOrder.violations("runtime", List.of("hermes")))
+            .containsExactly("runtime -> hermes 는 층 순서를 거스른다");
     }
 }

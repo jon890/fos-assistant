@@ -11,7 +11,7 @@ import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -348,10 +348,10 @@ public class AttachmentService {
             + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
             + "\n"
             + text;
-        List<HermesImage> hermesImages = Stream.concat(
+        List<RunImage> hermesImages = Stream.concat(
             photos.stream()
                 .filter(AgentPhoto::embedded)
-                .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl())),
+                .map(photo -> new RunImage(photo.ordinal() + "번째 사진", photo.dataUrl())),
             embedded.extraImages(labels).stream())
             .toList();
         MediaPipelineEvents.referenced(conversationId, pastIds);

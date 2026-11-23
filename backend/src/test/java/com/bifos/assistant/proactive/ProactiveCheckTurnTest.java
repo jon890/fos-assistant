@@ -29,11 +29,11 @@ import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
@@ -692,10 +692,10 @@ class ProactiveCheckTurnTest {
     void streamsToolEventsButNotDeltas() {
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
         hermesStreams(
-            new RunEvent("message.delta", "<fos-check-result>{\"version\"", null, null, null, null),
-            new RunEvent("tool.started", null, "web_search", "kafka", null, null),
-            new RunEvent("tool.started", null, "web_extract", "docs", null, null),
-            new RunEvent("run.completed", null, null, null, null, null));
+            new HermesRunEvent("message.delta", "<fos-check-result>{\"version\"", null, null, null, null),
+            new HermesRunEvent("tool.started", null, "web_search", "kafka", null, null),
+            new HermesRunEvent("tool.started", null, "web_extract", "docs", null, null),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
         Conversation existing = conversations.save(
             Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
         List<ChatEvent> published = new CopyOnWriteArrayList<>();
@@ -889,10 +889,10 @@ class ProactiveCheckTurnTest {
 
 
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
-    private void hermesStreams(RunEvent... events) {
+    private void hermesStreams(HermesRunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
+            Consumer<HermesRunEvent> onEvent = invocation.getArgument(3);
+            for (HermesRunEvent event : events) {
                 onEvent.accept(event);
             }
             return null;

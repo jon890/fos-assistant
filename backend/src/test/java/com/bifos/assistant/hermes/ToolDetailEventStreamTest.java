@@ -1,14 +1,14 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -60,9 +60,9 @@ class ToolDetailEventStreamTest {
         try {
             for (ToolDetailScope scope : List.of(
                 ToolDetailScope.NONE, ToolDetailScope.ALL, ToolDetailScope.prefixes(Set.of("mcp__demo__")))) {
-                List<RunEvent> events = read(server, scope);
+                List<HermesRunEvent> events = read(server, scope);
                 assertThat(events).isNotEmpty();
-                for (RunEvent event : events) {
+                for (HermesRunEvent event : events) {
                     if (!"mcp__demo__read".equals(event.toolName())) {
                         assertThat(event.detail()).isNull();
                         assertThat(event.text()).isNull();
@@ -138,9 +138,9 @@ class ToolDetailEventStreamTest {
     void preservesUuidLabelsAcrossStartedAndCompletedEvents() throws IOException {
         HttpServer server = startServer(RAW);
         try {
-            List<RunEvent> events = read(server, ToolDetailScope.NONE);
+            List<HermesRunEvent> events = read(server, ToolDetailScope.NONE);
 
-            assertThat(events).extracting(RunEvent::detail).containsExactly("[항목 1] [항목 2]", "[항목 2] [항목 1] [가림]");
+            assertThat(events).extracting(HermesRunEvent::detail).containsExactly("[항목 1] [항목 2]", "[항목 2] [항목 1] [가림]");
         } finally {
             server.stop(0);
         }
@@ -153,7 +153,7 @@ class ToolDetailEventStreamTest {
         HttpServer server = startServer(RAW);
         try {
             assertThat(read(server, ToolDetailScope.ALL))
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
@@ -166,14 +166,14 @@ class ToolDetailEventStreamTest {
     void hidesOtherToolDetailsAfterAttachedConnectorCall() throws IOException {
         HttpServer server = startServer(MIXED_RAW);
         try {
-            List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
+            List<HermesRunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
 
             assertThat(events)
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsExactly(
                     "호출-전-1180 [가림]", "[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 10자]", "[도구 내용 가림: 10자]");
             assertThat(events)
-                .extracting(RunEvent::toolName)
+                .extracting(HermesRunEvent::toolName)
                 .containsExactly(
                     "web_search",
                     "mcp__demo__list_notes",
@@ -191,19 +191,19 @@ class ToolDetailEventStreamTest {
     void keepsNameDurationAndFailureOfBoundConnectorToolInRealShape() throws IOException {
         HttpServer server = startServer(BOUND_TOOL_RAW);
         try {
-            List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
+            List<HermesRunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
 
             assertThat(events)
-                .extracting(RunEvent::type)
+                .extracting(HermesRunEvent::type)
                 .containsExactly("tool.started", "tool.completed", "tool.started", "tool.completed");
             assertThat(events)
-                .extracting(RunEvent::toolName)
+                .extracting(HermesRunEvent::toolName)
                 .containsExactly("mcp__demo__list_notes", "mcp__demo__list_notes", "terminal", "terminal");
             assertThat(events)
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 2자]", "[도구 내용 가림: 2자]");
-            assertThat(events).extracting(RunEvent::durationMs).containsExactly(null, 50L, null, 100L);
-            assertThat(events).extracting(RunEvent::failed).containsExactly(null, false, null, true);
+            assertThat(events).extracting(HermesRunEvent::durationMs).containsExactly(null, 50L, null, 100L);
+            assertThat(events).extracting(HermesRunEvent::failed).containsExactly(null, false, null, true);
         } finally {
             server.stop(0);
         }
@@ -241,11 +241,11 @@ class ToolDetailEventStreamTest {
         HttpServer server = startServer(raw);
         try {
             ToolDetailScope scope = ToolDetailScope.NONE.withTreeHistory(at -> !at.isBefore(Instant.ofEpochSecond(1001)));
-            List<RunEvent> events = read(server, scope);
-            assertThat(events).extracting(RunEvent::detail).containsExactly("호출 전", null, "[도구 내용 가림: 8자]");
+            List<HermesRunEvent> events = read(server, scope);
+            assertThat(events).extracting(HermesRunEvent::detail).containsExactly("호출 전", null, "[도구 내용 가림: 8자]");
             assertThat(events.get(1).goal()).isEqualTo("[도구 내용 가림: 8자]");
             assertThat(read(server, ToolDetailScope.NONE))
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsExactly("호출 전", null, "메일 본문 반환");
         } finally {
             server.stop(0);
@@ -259,7 +259,7 @@ class ToolDetailEventStreamTest {
         HttpServer server = startServer(MIXED_RAW);
         try {
             assertThat(read(server, ToolDetailScope.ALL))
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsOnly("[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
@@ -272,11 +272,11 @@ class ToolDetailEventStreamTest {
     void keepsOnlyArgumentsOfMemoryReadEvents() throws IOException {
         HttpServer server = startServer(MEMORY_READ_RAW);
         try {
-            List<RunEvent> events = read(server, ToolDetailScope.NONE);
+            List<HermesRunEvent> events = read(server, ToolDetailScope.NONE);
 
             // 가리는 쪽이 JSON 인자를 다시 직렬화해 공백이 빠진다
-            assertThat(events).extracting(RunEvent::detail).containsExactly("{\"id\":12}", null);
-            assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__memory_read");
+            assertThat(events).extracting(HermesRunEvent::detail).containsExactly("{\"id\":12}", null);
+            assertThat(events).extracting(HermesRunEvent::toolName).containsOnly("mcp__fos_assistant__memory_read");
         } finally {
             server.stop(0);
         }
@@ -288,10 +288,10 @@ class ToolDetailEventStreamTest {
     void keepsNoDetailOfFollowUpProposeEvents() throws IOException {
         HttpServer server = startServer(FOLLOW_UP_PROPOSE_RAW);
         try {
-            List<RunEvent> events = read(server, ToolDetailScope.NONE);
+            List<HermesRunEvent> events = read(server, ToolDetailScope.NONE);
 
-            assertThat(events).extracting(RunEvent::detail).containsExactly(null, null);
-            assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__follow_up_propose");
+            assertThat(events).extracting(HermesRunEvent::detail).containsExactly(null, null);
+            assertThat(events).extracting(HermesRunEvent::toolName).containsOnly("mcp__fos_assistant__follow_up_propose");
         } finally {
             server.stop(0);
         }
@@ -304,7 +304,7 @@ class ToolDetailEventStreamTest {
         HttpServer server = startServer(OTHER_TOOL_RAW);
         try {
             assertThat(read(server, ToolDetailScope.NONE))
-                .extracting(RunEvent::detail)
+                .extracting(HermesRunEvent::detail)
                 .containsExactly("[가림] 검색 결과");
         } finally {
             server.stop(0);
@@ -327,12 +327,12 @@ class ToolDetailEventStreamTest {
     }
 
 
-    private static List<RunEvent> read(HttpServer server, ToolDetailScope scope) {
+    private static List<HermesRunEvent> read(HttpServer server, ToolDetailScope scope) {
         HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
         when(keys.resolve("test-profile")).thenReturn("test-key");
         HermesProperties properties = new HermesProperties(null, null, null, null, null, null, null, null);
         HermesRunEventStream stream = new HermesRunEventStream(keys, properties, JsonMapper.builder().build());
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         stream.open(
             "http://127.0.0.1:" + server.getAddress().getPort(),
             "test-profile",

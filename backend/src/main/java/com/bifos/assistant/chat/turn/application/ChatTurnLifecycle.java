@@ -23,9 +23,9 @@ import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.context.application.dto.AssembledContext;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
-import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.dto.RunImage;
+import com.bifos.assistant.runtime.application.dto.RunCommand;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -79,7 +79,7 @@ class ChatTurnLifecycle {
         CurrentUser user,
         Routed routed,
         String text,
-        List<HermesImage> images,
+        List<RunImage> images,
         AssembledContext context,
         ExecutionContextSnapshot snapshot,
         ModelChoice choice,
@@ -91,9 +91,8 @@ class ChatTurnLifecycle {
         Agent agent = routed.agent();
         // 맡김은 대화의 session 을 잇지 않는다. 대화 에이전트의 session 에 다른 에이전트의 turn 이 섞이지 않게 한다.
         RunSession session = intent instanceof TurnIntent.Mention ? RunSession.fresh() : sessions.ensure(conversation);
-        HermesRunCommand command = new HermesRunCommand(
-            agent.hermesProfile(),
-            agent.apiBaseUrl(),
+        RunCommand command = new RunCommand(
+            agent.runtimeTarget(),
             text,
             turnInstructions(context.instructions(), intent),
             session.runtimeSessionId(),
@@ -174,7 +173,7 @@ class ChatTurnLifecycle {
     }
 
 
-    ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
+    ChatTurn finish(PendingTurn pending, RunResult result, ModelChoice requested) {
         Instant now = clock.instant();
         // 맡김은 새 session 으로 돌았다. 대화의 session 은 두고 바뀐 시각만 올린다.
         boolean mention = pending.intent() instanceof TurnIntent.Mention;
@@ -230,7 +229,7 @@ class ChatTurnLifecycle {
     }
 
 
-    ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
+    ChatTurn cancel(PendingTurn pending, RunResult result, ModelChoice requested) {
         AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, requested);
         String answer;
         synchronized (pending) {

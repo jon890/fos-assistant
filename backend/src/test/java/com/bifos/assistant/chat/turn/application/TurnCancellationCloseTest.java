@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -21,12 +22,12 @@ import org.junit.jupiter.api.Test;
 class TurnCancellationCloseTest {
 
     private final TurnCancellation turns = new TurnCancellation(
-        mock(HermesRunsClient.class),
+        TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
         Duration.ofSeconds(1),
         new UserExecutionLimiter(
             LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1000, 0, null)),
             mock(AgentExecutionRepository.class),
-            mock(HermesRunsClient.class),
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
             LiveProperties.fixed(
                 HermesProperties.class,
                 new HermesProperties(null, null, null, null, null, null, null, null)),

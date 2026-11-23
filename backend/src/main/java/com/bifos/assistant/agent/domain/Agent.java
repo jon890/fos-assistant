@@ -1,5 +1,7 @@
 package com.bifos.assistant.agent.domain;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.agent.domain.type.AgentColor;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -299,6 +301,22 @@ public class Agent extends AuditedEntity {
         this.enabled = enabled;
         this.visibility = visibility;
         this.ownerUserId = ownerUserId;
+    }
+
+
+    /** 이 에이전트의 새 실행이 도는 곳이다. */
+    public RuntimeTarget runtimeTarget() {
+        return new RuntimeTarget(RuntimeKind.HERMES, apiBaseUrl, hermesProfile);
+    }
+
+
+    /**
+     * 이미 보낸 실행이 돈 곳이다. 실행 기록에 저장된 격리 단위로 만든다.
+     *
+     * <p>에이전트의 격리 단위가 바뀐 뒤에도 그 실행의 조회, 중지, 삭제는 실행이 돈 곳으로 가야 한다.
+     */
+    public RuntimeTarget runtimeTargetOf(String storedUnit) {
+        return new RuntimeTarget(RuntimeKind.HERMES, apiBaseUrl, storedUnit);
     }
 
 

@@ -236,7 +236,7 @@ Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execu
 
 ### 도구 내용 가리기
 
-`HermesRunEventStream` 은 도구 설명을 가린 뒤 `RunEvent.detail` 에 넣는다.
+`HermesRunEventStream` 은 도구 설명을 가린 뒤 사건의 `detail` 에 넣고, `HermesAgentRuntime` 이 그 사건을 `RunEvent` 로 옮긴다.
 SSE 와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 이 실행 기록을 조회한다.
 근거는 [ADR-047](../../backend/docs/adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) 에 있다.
 비밀 키 이름, 토큰 접두, 글자 상한은 `ToolDetailRedactor` 가 갖는다.
@@ -276,7 +276,7 @@ SSE 와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도
 
 ### 세는 실행
 
-**Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit`(`POST /v1/runs`) 하나다.** 새 진입점도 이 길을 지나므로 아래 자리 가운데 하나로 센다.
+**Control Plane 이 런타임에 실행을 맡기는 길은 `AgentRuntime.submit` 하나다. Hermes 구현은 `HermesRunsClient.submit`(`POST /v1/runs`)을 부른다.** 새 진입점도 이 길을 지나므로 아래 자리 가운데 하나로 센다.
 
 | 자리의 종류 | 진입점 |
 | --- | --- |

@@ -1,6 +1,9 @@
 // 코드 규칙: rule-68. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -92,6 +95,9 @@ class AgentDelegationServiceRaceTest {
         Agent agent = mock(Agent.class);
         when(agent.apiBaseUrl()).thenReturn("http://agent-runtime.test/p/" + WORKER);
         when(agent.hermesProfile()).thenReturn(WORKER);
+        RuntimeTarget target = new RuntimeTarget(RuntimeKind.HERMES, "http://agent-runtime.test/p/" + WORKER, WORKER);
+        when(agent.runtimeTarget()).thenReturn(target);
+        when(agent.runtimeTargetOf(WORKER)).thenReturn(target);
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
         // 보통 turn 의 위임을 본다. 살펴보기 트리를 보는 검사만 참으로 바꾼다.
         when(checkGuard.isCheckTree(any())).thenReturn(false);
@@ -120,7 +126,7 @@ class AgentDelegationServiceRaceTest {
                 }
             },
             mock(TurnCancellation.class),
-            mock(HermesRunsClient.class),
+            TestAgentRuntimes.hermes(mock(HermesRunsClient.class)),
             events,
             checkGuard,
             Clock.systemUTC(),

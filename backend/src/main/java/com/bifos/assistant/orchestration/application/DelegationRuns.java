@@ -5,7 +5,7 @@ import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationStarted;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -24,7 +24,7 @@ final class DelegationRuns {
 
     private final ChildExecutionRunner children;
     private final TurnCancellation turns;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ApplicationEventPublisher events;
     private final ProactiveCheckGuard checkGuard;
 
@@ -42,12 +42,12 @@ final class DelegationRuns {
     DelegationRuns(
         ChildExecutionRunner children,
         TurnCancellation turns,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ApplicationEventPublisher events,
         ProactiveCheckGuard checkGuard) {
         this.children = children;
         this.turns = turns;
-        this.hermes = hermes;
+        this.runtimes = runtimes;
         this.events = events;
         this.checkGuard = checkGuard;
     }
@@ -101,7 +101,7 @@ final class DelegationRuns {
         boolean checkTree,
         Handoff handoff) {
         Long rootId = origin.treeRootId();
-        RunningDelegation delegation = new RunningDelegation(agent.apiBaseUrl(), agent.hermesProfile());
+        RunningDelegation delegation = new RunningDelegation(agent.runtimeTarget());
         RuntimeException failure = null;
         try {
             if (checkTree && !checkRunning(origin)) {
@@ -127,7 +127,7 @@ final class DelegationRuns {
                     if (delegation.attachRun(runId)) {
                         sendStop(delegation, runId);
                     }
-                    turns.trackRun(rootId, agent.apiBaseUrl(), agent.hermesProfile(), runId);
+                    turns.trackRun(rootId, agent.runtimeTarget(), runId);
                 },
                 () -> handoff.abandoned() || delegation.stopRequested() || rootTurnStopped(rootId));
         } catch (DataIntegrityViolationException ex) {
@@ -191,7 +191,7 @@ final class DelegationRuns {
     /** 중지를 보낸다. 보내지 못해도 중지 표시는 켜진 채라, 실행이 끝날 때 CANCELLED 로 적힌다. */
     void sendStop(RunningDelegation delegation, String runId) {
         try {
-            hermes.stop(delegation.apiBaseUrl(), delegation.profileName(), runId);
+            runtimes.of(delegation.target()).stop(delegation.target(), runId);
         } catch (RuntimeException ex) {
             log.warn("위임 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", delegation.executionId(), runId, ex);
         }

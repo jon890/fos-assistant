@@ -192,6 +192,35 @@ class ConversationPurgerTest {
 
 
     @Test
+    @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 실행이 돈 profile 의 session 을 지운다")
+    void deletesSessionOnStoredProfileWhenAgentProfileDiffers() throws Exception {
+        Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);
+        String storedProfile = "moved-" + agent.hermesProfile();
+        String storedSession = "moved-session-" + UUID.randomUUID();
+        executions.save(AgentExecution.builder()
+            .userId(owner.id())
+            .conversationId(filled.conversationId())
+            .agentId(agent.id())
+            .profileName(storedProfile)
+            .hermesSessionId(storedSession)
+            .costMode(CostMode.SUBSCRIPTION)
+            .model("example-model")
+            .status(ExecutionStatus.SUCCEEDED)
+            .tokens(10L, 0L, 20L, 30L)
+            .timing(NOW.minusSeconds(30), NOW.minusSeconds(20))
+            .build());
+        conversationWriter.deleteIfActive(filled.conversationId(), owner.id(), NOW.minusSeconds(60));
+
+        purger.purgeDue(NOW);
+
+        assertThat(hermes.deletedSessions())
+            .filteredOn(lookup -> storedSession.equals(lookup.sessionId()))
+            .extracting(StubHermesRunsClient.SessionLookup::profileName)
+            .containsExactly(storedProfile);
+    }
+
+
+    @Test
     @DisplayName("지우지 않은 대화는 건드리지 않는다")
     void leavesActiveConversationsAlone() throws Exception {
         Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);

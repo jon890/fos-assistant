@@ -6,7 +6,7 @@ import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -58,7 +58,7 @@ class ChatTurnStopper {
      * 실패해도 대기 줄은 멈춘다. 둘 다 turn 잠금을 풀기 전이다.
      */
     ChatTurn stoppedTurn(
-        TurnHandle handle, PendingTurn pending, HermesRunResult result, ModelChoice choice, Instant startedAt) {
+        TurnHandle handle, PendingTurn pending, RunResult result, ModelChoice choice, Instant startedAt) {
         try {
             return chatTurnLifecycle.recorded(chatTurnLifecycle.cancel(pending, result, choice), startedAt);
         } finally {
@@ -136,7 +136,7 @@ class ChatTurnStopper {
                 log.warn("에이전트 행이 없어 자식 run 을 함께 멈추지 못했다 executionId={} agentId={}", child.id(), child.agentId());
                 continue;
             }
-            turns.trackRun(executionId, childAgent.get().apiBaseUrl(), child.profileName(), child.hermesRunId());
+            turns.trackRun(executionId, childAgent.get().runtimeTargetOf(child.profileName()), child.hermesRunId());
         }
         boolean firstStopSent = hadRuns || turns.awaitFirstStop(handle);
         if (!firstStopSent && turns.isFinished(handle)) {

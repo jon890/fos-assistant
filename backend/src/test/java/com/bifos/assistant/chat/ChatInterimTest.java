@@ -18,10 +18,10 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -82,7 +82,7 @@ class ChatInterimTest {
 
     private List<ChatEvent> stream(String wire, String status, String output) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> consumer = invocation.getArgument(3);
+            Consumer<HermesRunEvent> consumer = invocation.getArgument(3);
             HermesInterimWire.read(wire, invocation.getArgument(5), consumer);
             return null;
         }).when(eventStream).open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));

@@ -1,15 +1,17 @@
 package com.bifos.assistant.usage.subagent.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.hermes.infra.ProfileModelDefaultsClient;
 import com.bifos.assistant.hermes.infra.SubagentProviderClient;
 import com.bifos.assistant.hermes.application.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.application.dto.SubagentProviderLookup;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
@@ -60,7 +62,7 @@ public class SubagentUsageReconciler {
     private final ExecutionEventRepository events;
     private final SubagentUsageJobRepository jobs;
     private final AgentService agents;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ProfileModelDefaultsClient defaults;
     private final SubagentProviderClient providers;
     private final CostEstimator estimator;
@@ -77,7 +79,7 @@ public class SubagentUsageReconciler {
         ExecutionEventRepository events,
         SubagentUsageJobRepository jobs,
         AgentService agents,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ProfileModelDefaultsClient defaults,
         SubagentProviderClient providers,
         CostEstimator estimator,
@@ -88,7 +90,7 @@ public class SubagentUsageReconciler {
             events,
             jobs,
             agents,
-            hermes,
+            runtimes,
             defaults,
             providers,
             estimator,
@@ -103,7 +105,7 @@ public class SubagentUsageReconciler {
         ExecutionEventRepository events,
         SubagentUsageJobRepository jobs,
         AgentService agents,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ProfileModelDefaultsClient defaults,
         SubagentProviderClient providers,
         CostEstimator estimator,
@@ -114,7 +116,7 @@ public class SubagentUsageReconciler {
         this.events = events;
         this.jobs = jobs;
         this.agents = agents;
-        this.hermes = hermes;
+        this.runtimes = runtimes;
         this.defaults = defaults;
         this.providers = providers;
         this.estimator = estimator;
@@ -198,7 +200,7 @@ public class SubagentUsageReconciler {
         Instant startedAt = clock.instant();
         SubagentSessionUsage read = job.expired(startedAt)
             ? null
-            : hermes.readSubagentUsage(job.apiBaseUrl(), job.profileName(), job.childSessionId());
+            : readUsage(job);
         // 대시보드 조회도 Hermes 조회처럼 트랜잭션 밖에서 한다.
         ProviderResolution resolution = resolveProvider(job, read);
         SubagentSessionUsage usage = resolution.usage();
@@ -257,6 +259,17 @@ public class SubagentUsageReconciler {
 
     /** 대시보드 조회를 반영한 자식 사용량과, 대시보드를 더 기다릴지다. */
     private record ProviderResolution(SubagentSessionUsage usage, boolean waitForProvider) {
+    }
+
+
+    /**
+     * 그 작업 줄에 저장한 주소와 격리 단위로 하위 에이전트 사용량을 읽는다.
+     *
+     * <p>에이전트의 지금 값이 아니라 부모 실행이 돈 곳으로 간다. 하위 에이전트 사용량은 Hermes 실행에만 있다.
+     */
+    private SubagentSessionUsage readUsage(SubagentUsageJob job) {
+        RuntimeTarget target = new RuntimeTarget(RuntimeKind.HERMES, job.apiBaseUrl(), job.profileName());
+        return runtimes.of(target).readSubagentUsage(target, job.childSessionId());
     }
 
 

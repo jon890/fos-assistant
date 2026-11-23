@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.chat.attachment.application.dto.EmbeddedImages;
 import com.bifos.assistant.chat.attachment.application.dto.ExtraImage;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,7 +37,7 @@ class AttachmentImagesTest {
         assertThat(embedded.extraDataUrls()).hasSize(2);
         assertThat(embedded.extraDataUrls().get(0)).startsWith("data:image/jpeg;base64,");
         assertThat(embedded.extraDataUrls().get(1)).isNull();
-        assertThat(embedded.extraImages(List.of("집은 그림 1", "집은 그림 2"))).extracting(HermesImage::label)
+        assertThat(embedded.extraImages(List.of("집은 그림 1", "집은 그림 2"))).extracting(RunImage::label)
             .containsExactly("집은 그림 1");
     }
 

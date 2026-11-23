@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.infra.HttpHermesRunsClient;

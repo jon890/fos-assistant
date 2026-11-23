@@ -1,12 +1,12 @@
 package com.bifos.assistant.usage.execution.application;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
 import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import java.time.Clock;
-import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,11 +49,11 @@ public class ExecutionEventRecorder {
      * <p>여기 없는 이름은 저장하지 않는다. {@code message.delta} 와 {@code reasoning.available} 과
      * {@code run.completed} 가 그렇다.
      */
-    private static final Map<String, ExecutionEventType> OUR_NAMES = Map.of(
-        "tool.started", ExecutionEventType.TOOL_STARTED,
-        "tool.completed", ExecutionEventType.TOOL_COMPLETED,
-        "subagent.start", ExecutionEventType.SUBAGENT_STARTED,
-        "subagent.complete", ExecutionEventType.SUBAGENT_COMPLETED);
+    private static final Map<RunEventKind, ExecutionEventType> OUR_NAMES = Map.of(
+        RunEventKind.TOOL_STARTED, ExecutionEventType.TOOL_STARTED,
+        RunEventKind.TOOL_COMPLETED, ExecutionEventType.TOOL_COMPLETED,
+        RunEventKind.SUBAGENT_STARTED, ExecutionEventType.SUBAGENT_STARTED,
+        RunEventKind.SUBAGENT_COMPLETED, ExecutionEventType.SUBAGENT_COMPLETED);
 
 
     /**
@@ -63,10 +63,9 @@ public class ExecutionEventRecorder {
      * 모르는 사건이 자주 오면 로그가 그것으로 차므로 {@code warn} 으로 올리지 않는다.
      */
     public ExecutionEvent record(AgentExecution execution, RunEvent event, int sequence) {
-        String hermesName = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
-        ExecutionEventType type = OUR_NAMES.get(hermesName);
+        ExecutionEventType type = OUR_NAMES.get(event.kind());
         if (type == null) {
-            log.debug("옮겨 적을 이름이 없어 Hermes 사건을 버린다 event={}", hermesName);
+            log.debug("옮겨 적을 종류가 없어 런타임 사건을 버린다 event={}", event.kind());
             return null;
         }
         if (type == ExecutionEventType.TOOL_STARTED && SKILL_VIEW_TOOL.equals(event.toolName())) {

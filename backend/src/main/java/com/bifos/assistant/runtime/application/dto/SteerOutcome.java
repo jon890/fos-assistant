@@ -1,4 +1,4 @@
-package com.bifos.assistant.hermes.application.dto;
+package com.bifos.assistant.runtime.application.dto;
 
 /**
  * 도는 실행에 글을 끼워 넣으라고 보낸 결과다({@code POST /v1/runs/{run_id}/steer}).

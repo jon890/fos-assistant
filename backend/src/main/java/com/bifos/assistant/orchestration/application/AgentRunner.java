@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.runtime.application.dto.RunOutcome;
 import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.ContextSourceRefs;
@@ -11,9 +12,9 @@ import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.context.application.dto.InstructionScope;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunCommand;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
@@ -63,7 +64,7 @@ public class AgentRunner {
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
 
     private final ContextAssembler contextAssembler;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final LostRunRelease lostRunRelease;
     private final ExecutionRecorder executions;
     private final ChildRunEvents childRunEvents;
@@ -151,9 +152,8 @@ public class AgentRunner {
                 childRunEvents.unobserved(execution), () -> executions.cancel(execution), ExecutionEventType.RUN_CANCELLED, null);
             return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
         }
-        HermesRunCommand command = new HermesRunCommand(
-            agent.hermesProfile(),
-            agent.apiBaseUrl(),
+        RunCommand command = new RunCommand(
+            agent.runtimeTarget(),
             task,
             turnInstructions(context.instructions(), instructionAddition, scope),
             session.runtimeSessionId(),
@@ -168,7 +168,7 @@ public class AgentRunner {
             executions.markSubmitted(execution);
             recording = childRunEvents.start(execution);
             lostRunRelease.beforeSubmit(command);
-            runId = hermes.submit(command);
+            runId = runtimes.of(command.target()).submit(command);
             executions.attachRunId(execution, runId);
             onSubmitted.accept(execution, runId);
             childRunEvents.append(recording, ExecutionEventType.RUN_STARTED, null);
@@ -180,18 +180,18 @@ public class AgentRunner {
                 stopSubmitted(agent, execution, runId);
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, true);
+                    user.id(), execution.id(), agent.runtimeTarget(), runId, true);
             }
             return fail(recording, execution, ex);
         }
 
-        HermesRunResult result;
+        RunResult result;
         try {
-            result = hermes.awaitCompletion(command, runId);
+            result = runtimes.of(command.target()).awaitCompletion(command, runId);
         } catch (RuntimeException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
-                user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                user.id(), execution.id(), agent.runtimeTarget(), runId, false);
             if (cancelled.getAsBoolean()) {
                 AgentExecution cancelledExecution = childRunEvents.end(
                     recording, () -> executions.cancel(execution), ExecutionEventType.RUN_CANCELLED, null);
@@ -200,7 +200,7 @@ public class AgentRunner {
             return fail(recording, execution, ex);
         }
 
-        if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
+        if (cancelled.getAsBoolean() || result.outcome() == RunOutcome.CANCELLED) {
             AgentExecution cancelledExecution = childRunEvents.end(
                 recording,
                 () -> delegationKey == null
@@ -216,7 +216,7 @@ public class AgentRunner {
             // 고른 모델의 provider 가 막힌 것은 보통 실패와 다른 코드로 남긴다. 다른 모델로 넘기지 않는다.
             String code = result.providerBlocked()
                 ? ErrorCode.PROVIDER_BLOCKED.name()
-                : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+                : result.statusLabel() == null ? "UNKNOWN" : result.statusLabel().toUpperCase();
             AgentExecution failed = childRunEvents.end(
                 recording, () -> executions.fail(execution, agent, result, choice, code), ExecutionEventType.RUN_FAILED, code);
             return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
@@ -245,7 +245,7 @@ public class AgentRunner {
     /** 제출한 뒤 실패로 끝내는 run 에 중지를 한 번 보낸다. 보내지 못해도 실패로 끝내는 것은 그대로라 로그만 남긴다. */
     private void stopSubmitted(Agent agent, AgentExecution execution, String runId) {
         try {
-            hermes.stop(agent.apiBaseUrl(), agent.hermesProfile(), runId);
+            runtimes.of(agent.runtimeTarget()).stop(agent.runtimeTarget(), runId);
         } catch (RuntimeException ex) {
             log.warn("실패로 끝내는 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", execution.id(), runId, ex);
         }

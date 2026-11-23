@@ -14,7 +14,7 @@ import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
+import com.bifos.assistant.runtime.domain.ToolDetailRedactor;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;

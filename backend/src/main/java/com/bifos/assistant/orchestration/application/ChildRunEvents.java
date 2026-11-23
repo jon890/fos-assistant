@@ -4,9 +4,10 @@ import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegatedRunActivity;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
-import com.bifos.assistant.hermes.infra.HermesRunEventStream;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEventKind;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
@@ -17,8 +18,6 @@ import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Locale;
-import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -42,12 +41,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 public class ChildRunEvents {
-    private static final Set<String> TOOL_EVENTS = Set.of("tool.started", "tool.completed");
-    private static final Set<String> TERMINAL_EVENTS = Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
-    private final HermesRunEventStream eventStream;
+    private final AgentRuntimes runtimes;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
@@ -138,9 +135,8 @@ public class ChildRunEvents {
             boolean[] terminalSeen = {false};
             boolean complete = false;
             try {
-                eventStream.open(
-                    agent.apiBaseUrl(),
-                    agent.hermesProfile(),
+                runtimes.of(agent.runtimeTarget()).openEvents(
+                    agent.runtimeTarget(),
                     runId,
                     event -> receive(recording, event, conversationId, terminalSeen),
                     stream -> attach(recording, stream),
@@ -173,18 +169,18 @@ public class ChildRunEvents {
 
 
     private void receive(ChildRunRecording recording, RunEvent event, Long conversationId, boolean[] terminalSeen) {
-        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
+        RunEventKind kind = event.kind();
         synchronized (recording) {
             if (recording.closed) {
                 return;
             }
-            if (TERMINAL_EVENTS.contains(type)) {
+            if (kind != null && kind.terminal()) {
                 terminalSeen[0] = true;
                 recording.terminalSeen = true;
             }
             store(recording, sequence -> eventRecorder.record(recording.execution, event, sequence));
         }
-        if (conversationId != null && TOOL_EVENTS.contains(type)) {
+        if (conversationId != null && (kind == RunEventKind.TOOL_STARTED || kind == RunEventKind.TOOL_COMPLETED)) {
             AgentExecution execution = recording.execution;
             try {
                 events.publishEvent(new DelegatedRunActivity(conversationId, execution.treeRootId(), execution.id(), event));

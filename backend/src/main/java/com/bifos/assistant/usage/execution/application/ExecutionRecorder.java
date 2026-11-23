@@ -2,7 +2,7 @@ package com.bifos.assistant.usage.execution.application;
 
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -347,7 +347,7 @@ public class ExecutionRecorder {
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution complete(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested) {
         return completion.complete(execution, agent, result, requested);
     }
 
@@ -361,7 +361,7 @@ public class ExecutionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution complete(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String outputText) {
         return completion.complete(execution, agent, result, requested, outputText);
     }
 
@@ -385,13 +385,13 @@ public class ExecutionRecorder {
 
     /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
     public AgentExecution fail(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String errorCode) {
         return completion.fail(execution, agent, result, requested, errorCode);
     }
 
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
-    public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+    public AgentExecution cancel(AgentExecution execution, Agent agent, RunResult result, ModelChoice requested) {
         return completion.cancel(execution, agent, result, requested);
     }
 
@@ -405,7 +405,7 @@ public class ExecutionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution cancel(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, RunResult result, ModelChoice requested, String outputText) {
         return completion.cancel(execution, agent, result, requested, outputText);
     }
 
@@ -421,7 +421,7 @@ public class ExecutionRecorder {
             .userId(user.id())
             .conversationId(conversation == null ? null : conversation.id())
             .agentId(agent.id())
-            .profileName(agent.hermesProfile())
+            .profileName(agent.runtimeTarget().unit())
             .costMode(agent.costMode())
             .startedAt(clock.instant());
     }

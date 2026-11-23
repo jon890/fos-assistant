@@ -1,7 +1,7 @@
 package com.bifos.assistant.usage.pricing.application;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.usage.pricing.domain.CatalogPrice;
 import com.bifos.assistant.usage.pricing.domain.EstimatedCost;
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;

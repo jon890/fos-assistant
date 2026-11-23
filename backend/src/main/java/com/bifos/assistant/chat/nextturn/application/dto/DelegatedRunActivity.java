@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.nextturn.application.dto;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.application.dto.RunEvent;
 
 /**
  * 다른 에이전트에게 맡긴 실행의 도구 사건 하나다. 대화 화면의 도는 답에 맡은 에이전트의 도구 줄로 그린다(스펙 assistant-hub REQ3).
