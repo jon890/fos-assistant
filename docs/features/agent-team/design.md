@@ -1020,7 +1020,7 @@ PR6 이 운영에 있어야 한다. PR6 전의 서버는 `/stop` 경로가 없�
 | 결정 | 종류 | ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | DECISION1 과 할 수 있는 일을 읽을 때 모으기 | architecture | [ADR-20261110 / agent-introduction](../../adr/ADR-20261110-agent-introduction.md). ADR-036 의 소개를 없앤 부분을 대체한다 | [에이전트 팀](../agent-team.md) 의 「소개와 할 수 있는 일」 |
-| DECISION18, DECISION19, DECISION21 | architecture | [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md). ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 | [에이전트 팀](../agent-team.md) 의 「`@` 로 바로 맡기기」 |
+| DECISION18, DECISION19, DECISION21 | architecture | [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md). ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 | [에이전트 팀](../agent-team.md) 의 「지난 `@` 맡김」 |
 | DECISION24 부터 DECISION31 | feature | 필요 없음. 대화 목적의 새 값과 실행 줄로 판정하는 규칙이라 기능 파일이 원본이고, 코드 한 곳(`RoomConversations`, `RoomContext`)을 바꾸면 되돌린다 | [에이전트 팀](../agent-team.md) 의 「대화방」 |
 | DECISION32 부터 DECISION40, DECISION45, DECISION46 | architecture | [ADR-20261117 / native-delegation-wake](../../adr/ADR-20261117-native-delegation-wake.md). ADR-040 의 깨우기를 Hermes 내장 위임으로 넓힌다 | 이 문서의 「PR6 내장 위임 결과」. 구현 PR 이 [에이전트 팀](../agent-team.md) 에 절을 더한다 |
 | DECISION42 부터 DECISION44 | feature | 필요 없음. 플러그인 한 파일(`subagent.py`)의 보내는 방식이고 그 파일을 되돌리면 된다. 끝 소식 계약은 [ADR-20261117 / native-delegation-wake](../../adr/ADR-20261117-native-delegation-wake.md) 가 갖는다 | fos-ctx [README](../../../hermes/plugins/fos-ctx/README.md) 의 「하위 에이전트 끝 소식 계약」 |

@@ -2,17 +2,17 @@
 
 사용자가 에이전트를 이름표와 소개로 구분해 보고, 기본 비서와 전문 에이전트가 나눠 일하는 기능이다. 합의한 변경과 단계는 [스펙](agent-team/spec.md)과 [설계](agent-team/design.md)가 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionLines.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionInputs.java`, `web/src/lib/mention.ts`, `web/src/components/chat/delegate-chip.tsx`, `backend/src/main/java/com/bifos/assistant/agent/application/PrimaryAgents.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomConversations.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomContext.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/RoomController.java`, `web/src/app/(home)/page.tsx`, `web/src/components/shell/room-link.tsx`, `web/src/lib/room.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java`
+covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionLines.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionInputs.java`, `web/src/lib/mention.ts`, `backend/src/main/java/com/bifos/assistant/agent/application/PrimaryAgents.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomConversations.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomContext.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/RoomController.java`, `web/src/app/(home)/page.tsx`, `web/src/components/shell/room-link.tsx`, `web/src/lib/room.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java`
 
 ## 요구
 
-- 에이전트마다 한 줄 소개, 아이콘, 색이 있다. 답, 대화 머리, 새 대화 카드, 에이전트 목록, `@` 목록이 같은 이름표를 그린다.
+- 에이전트마다 한 줄 소개, 아이콘, 색이 있다. 답, 대화 머리, 새 대화 화면, 에이전트 목록이 같은 이름표를 그린다.
 - 위임 도구 `agent_list` 가 소개와 할 수 있는 일을 실어, 맡기는 에이전트가 그것을 보고 고른다([에이전트와 스킬](agent-skill.md) 의 「다른 에이전트에게 맡기기」).
 - 대화 turn 의 지시문에도 같은 값으로 맡길 수 있는 다른 에이전트를 넣어, `agent_list` 를 부르지 않아도 뗀 서비스의 일을 맡긴다. 아래 「비서에서 뗀 서비스 맡기기」.
 - 첫 로그인에 만든 에이전트가 그 사용자의 기본 비서이고 이름은 「비서」 다([사용자](users.md) 의 「첫 에이전트의 기본 도구」).
 - 서비스를 처음 연결하면 그 연결 하나만 맡는 전문 에이전트를 만들자고 제안하고, 받으면 한 번에 만든다. 에이전트 목록의 「전문 에이전트 만들기」 로도 만든다. 아래 「전문 에이전트 만들기」.
 - 대화의 turn 이 다른 에이전트에게 맡기면 그 답 아래에 맡긴 줄이 보이고, 결과 도착 줄과 위임 자식의 승인 카드에 맡은 에이전트의 이름표가 붙는다. 아래 「대화 안의 협업」.
-- 메시지가 있는 대화에서 입력창의 `@` 로 고른 에이전트에게 바로 맡기고, 그 답이 맡은 에이전트 이름표로 대화에 남는다. 대화의 에이전트는 다음 turn 에 그 주고받음을 받는다. 아래 「`@` 로 바로 맡기기」.
+- `@` 로 바로 맡기는 길은 없앴고, 그 전에 남은 맡김의 줄과 답은 맡은 에이전트 이름표로 보인다. 대화의 에이전트는 다음 turn 에 그 주고받음을 받는다. 아래 「지난 `@` 맡김」.
 - 사용자마다 기본 비서와 늘 이어지는 대화방이 하나 있고 `/` 가 그 방을 연다. 날이 바뀐 첫 메시지에서 앞 맥락을 요약해 새 session 으로 잇는다. 기본 비서는 지울 수 없다. 아래 「대화방」.
 
 ## 소개와 할 수 있는 일
@@ -28,8 +28,8 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 | 자리 | 무엇을 보이나 |
 | --- | --- |
 | 답과 대화 머리 | 그 대화의 에이전트 아이콘·색·이름. 값은 대화 줄(`ConversationView` 의 `agentIcon`, `agentColor`)에서 온다. 이름표는 늘 지금 값이다. 좁은 화면의 잠긴 대화는 이름 대신 이름표만 보인다 |
-| 새 대화 카드, 에이전트 목록 | 이름표, 이름, 소개 한 줄과 그 아래 할 수 있는 일. 소개가 없으면 할 수 있는 일만 보인다 |
-| `@` 목록 | 이름표와 이름, 소개 한 줄 |
+| 에이전트 목록 | 이름표, 이름, 소개 한 줄과 그 아래 할 수 있는 일. 소개가 없으면 할 수 있는 일만 보인다 |
+| 새 대화 화면 | 기본 비서의 이름표와 이름 |
 | 아이콘이나 색을 고르지 않았다 | 이름 첫 글자와 `code` 로 정한 자동 색 |
 
 
@@ -63,25 +63,22 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 중지한 답이 맡긴 하위 작업의 결과는 자동 답 대신 사용자의 다음 메시지 turn 입력에 한 번 들어간다([스펙](agent-team/spec.md) DECISION34).
 
 결과 줄의 이름표와 상태는 이력 API 의 `nativeResult` 가 주고, 자동 답이 도는 동안은 `system` 사건이 같은 칸을 넣는다. 새로 고치거나 결과를 다시 전달해도 같은 줄이 보인다.
-대화 turn 이 직접 맡긴 최상위 하위 작업만 대상이다. `@` 맡김 turn, 맡긴 에이전트의 실행, 먼저 살펴보기 대화는 열지 않는다.
+대화 turn 이 직접 맡긴 최상위 하위 작업만 대상이다. 지난 `@` 맡김 turn, 맡긴 에이전트의 실행, 먼저 살펴보기 대화는 열지 않는다.
 끝난 뒤 사용자가 다음 메시지를 보냈어도 자동 답은 한 번 열린다. 이름을 붙인 Hermes profile 은 결과를 대화 이력에 남기지 않아 그 답이 결과를 읽지 못하기 때문이다. 대기 글이 먼저 가고 자동 답은 그 뒤다.
 맡긴 에이전트의 결과와 같은 설정 `assistant.delegation-wake.enabled` 하나로 함께 끄고 켠다. 끝 소식은 fos-ctx 1.12.0 부터 보낸다. 그 전의 fos-ctx 가 등록한 하위 작업에는 아무 일도 일어나지 않는다.
 
-## `@` 로 바로 맡기기
+## 지난 `@` 맡김
 
-메시지가 하나라도 있는 대화에서 입력창에 `@` 를 치면 요청자가 쓸 수 있고 켜진 에이전트 가운데 대화의 에이전트를 뺀 목록이 뜬다. 고르면 친 글자가 지워지고 입력창 위에 「{이름}에게 맡기기」 칩이 놓인다. 보내면 Control Plane 이 모델 판단 없이 그 에이전트로 turn 하나를 돌린다([ADR-20261112 / mention-delegation](../adr/ADR-20261112-mention-delegation.md)).
+**입력창의 `@` 로 다른 에이전트에게 바로 맡기는 길은 없앴다**([비서 중심 대화](assistant-hub.md) 의 「입구를 비서로 모으기」). 보내기 요청의 `delegateTo` 는 `VALIDATION_FAILED` 이고, 입력창의 `@` 는 목록을 띄우지 않는다. 다른 에이전트의 일은 비서가 맡긴다.
+그 전에 남은 맡김은 지금처럼 보이고 대화의 에이전트에게 전한다([ADR-20261112 / mention-delegation](../adr/ADR-20261112-mention-delegation.md)).
 
 | 자리 | 무엇을 하나 |
 | --- | --- |
-| 보내기 요청 | `delegateTo` 에 에이전트 코드를 싣는다. 새 대화, 메시지가 없는 대화, 사진을 함께 보낸 요청, 대화의 에이전트 자신은 `VALIDATION_FAILED` 다. 쓸 수 없는 에이전트는 `AGENT_NOT_FOUND`, 꺼진 에이전트는 `AGENT_DISABLED` 다 |
-| 맡은 에이전트의 run | 새 Hermes session 이다. 대화의 session 은 읽지도 바꾸지도 않는다. 입력은 출처 머리줄 아래 `<external-data>` 로 감싼 대화의 최근 6줄과 「[맡긴 일]」 아래 사용자 글이다 |
 | 질문 아래 | 「(이름표) 나 → {이름}에게 맡김 · 진행 중·끝남·실패·멈춤」. 이력의 `delegatedTo` 로 그린다 |
 | 답 | 맡은 에이전트의 이름표다. 이력의 `answeredBy` 로 그리고, 다시 생성 단추가 없다 |
-| 대화 에이전트의 다음 turn | 지난 자기 turn 뒤의 맡김을 「@ 로 맡긴 일」 머리줄(`ResultHeader`)과 질문, 감싼 답으로 입력 앞에 싣는다. 사용자가 보낸 turn, 자동 결과 전달 turn, 예약 turn 이 싣고 한 번 실은 것은 다시 싣지 않는다. 경계는 대화 에이전트의 앞 답이나 질문이다 |
+| 대화 에이전트의 다음 turn | 지난 자기 turn 뒤의 맡김을 「@ 로 맡긴 일」 머리줄(`ResultHeader`)과 질문, 감싼 답으로 입력 앞에 넣는다. 사용자가 보낸 turn, 자동 결과 전달 turn, 예약 turn 이 넣고 한 번 넣은 것은 다시 넣지 않는다. 경계는 대화 에이전트의 앞 답이나 질문이다 |
 
-**맡김 실행은 대화의 실행 가운데 부모가 없고 에이전트가 대화의 에이전트와 다른 실행이다.** 칸을 두지 않는다. `delegation_key` 가 없어 자동 결과 전달을 타지 않으므로 대화의 에이전트는 그사이 답하지 않는다. 판정과 읽기는 `MentionLines`, 입력 단락은 `MentionInputs` 가 갖는다.
-답이 도는 동안에는 `@` 목록을 띄우지 않는다. 대기 메시지는 글만 받아 대화의 에이전트에게 간다.
-맡은 에이전트가 승인을 요청하면 위 「대화 안의 협업」 의 승인 카드 줄(`requestedBy`)이 그 카드에 붙는다. 대화의 에이전트와 다른 에이전트가 요청한 카드이기 때문이다.
+**맡김 실행은 대화의 실행 가운데 부모가 없고 에이전트가 대화의 에이전트와 다른 실행이다.** 칸을 두지 않는다. 판정과 읽기는 `MentionLines`, 입력 단락은 `MentionInputs` 가 갖는다.
 서버가 다시 떠 기동 정리가 맡김을 마무리할 때도 대화의 session 은 적지 않는다.
 
 ## 대화방
@@ -91,7 +88,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 | 자리 | 무엇을 하나 |
 | --- | --- |
 | `/` | 서버가 `POST /api/v1/chat/conversations/room` 으로 대화방을 열고 `/chat/{id}` 로 넘긴다. 처음 열면 기본 비서의 빈 방을 만들고, 지난 대화를 옮기지 않는다. 기본 비서가 없으면(`AGENT_NOT_FOUND`) 새 대화 화면 `/new` 로 간다 |
-| 새 대화 화면 | `/new` 다. 「새 대화」 단추, 단축키, 「<에이전트>와 대화하기」(`/new?agent=<code>`)가 이리 온다. 앱 이름(홈)은 `/` 로 간다 |
+| 새 대화 화면 | `/new` 다. 「새 대화」 단추와 단축키가 이리 온다. 늘 기본 비서와 시작한다. 앱 이름(홈)은 `/` 로 간다 |
 | 사이드바 | 「새 대화」 위에 대화방 줄(`room-link`)이 고정이다. 이름표와 에이전트 이름을 `GET /api/v1/chat/conversations/room` 으로 읽고, 아직 열지 않았으면 「비서」 로 보인다. 대화 목록 API 는 대화방을 빼므로 목록 줄의 이름 바꾸기·지우기 메뉴가 없다 |
 | 이름 바꾸기, 지우기 | 서버도 대화방이면 `VALIDATION_FAILED` 로 거절한다 |
 | 제목 | 고정 글 「대화방」. 첫 메시지가 제목을 채우지 않는다 |
@@ -104,7 +101,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 
 ### 날이 바뀐 첫 메시지
 
-대화방에서 사용자가 보낸 turn 이 질문을 저장하기 전에 `RoomContext` 가 판정한다. 다시 만들기, `@` 맡김, 자동 결과 전달, 예약 turn 은 판정하지 않는다.
+대화방에서 사용자가 보낸 turn 이 질문을 저장하기 전에 `RoomContext` 가 판정한다. 다시 만들기, 자동 결과 전달, 예약 turn 은 판정하지 않는다.
 
 1. 대화의 지금 루트 session 으로 돈 루트 실행 가운데 가장 이른 `started_at` 의 Asia/Seoul 날짜가 오늘보다 앞이면 날을 넘었다. 실행이 없으면 넘지 않았다
 2. 넘었으면 대화의 에이전트와 대화가 고른 모델로 옛 보낼 session 에 요약 요청(첫 줄 `[대화 요약 요청]`)을 보낸다. 대화 밖 실행으로 남겨 그 대화의 `memory_remember` 바로 저장 판정([기억](memory.md) 의 「바로 저장 판정」 5)에 걸리지 않는다. 옛 루트에 성공한 실행이 없으면 앞 요약도 요청에 함께 넣는다
