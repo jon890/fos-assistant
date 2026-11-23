@@ -60,12 +60,11 @@ const TARGETS = [
   {
     agentCode: "career",
     agentName: "커리어",
-    skills: [
-      { name: "position-recommender", description: "공고를 골라요" },
-      { name: "resume-review", description: "" },
-    ],
+    skills: ["position-recommender", "resume-review"],
+    skillDescriptions: { "position-recommender": "공고를 골라요", "resume-review": "" },
   },
-  { agentCode: "gmail", agentName: "Gmail 담당", skills: [{ name: "mail-digest", description: "메일을\n  요약해요" }] },
+  // 설명 칸이 없는 옛 응답도 이름과 맡기기는 그대로다.
+  { agentCode: "gmail", agentName: "Gmail 담당", skills: ["mail-digest"] },
 ];
 
 test("/ 목록의 설명은 비서 스킬은 이름, 맡길 스킬은 「에이전트 · 스킬」 을 키로 두고, 줄바꿈과 겹친 공백은 한 칸으로 줄인다", () => {
@@ -78,7 +77,7 @@ test("/ 목록의 설명은 비서 스킬은 이름, 맡길 스킬은 「에이�
   assert.deepEqual(delegationDescriptions(TARGETS), {
     "커리어 · position-recommender": "공고를 골라요",
     "커리어 · resume-review": "",
-    "Gmail 담당 · mail-digest": "메일을\n  요약해요",
+    "Gmail 담당 · mail-digest": "",
   });
   assert.equal(skillDescriptionLine("메일을\n  요약해요 "), "메일을 요약해요");
   assert.equal(skillDescriptionLine(undefined), "");

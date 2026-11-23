@@ -93,7 +93,9 @@ export function skillOptionId(listId: string, index: number): string {
 export type SkillDelegationTarget = {
   agentCode: string;
   agentName: string;
-  skills: { name: string; description: string }[];
+  skills: string[];
+  /** 스킬 이름마다의 설명이다. 이 칸이 없는 옛 응답이면 목록에 이름만 보인다 */
+  skillDescriptions?: Record<string, string>;
 };
 
 /**
@@ -104,7 +106,7 @@ export function delegationLabels(
   targets: readonly SkillDelegationTarget[],
 ): string[] {
   return targets.flatMap((target) =>
-    target.skills.map((skill) => `${target.agentName} · ${skill.name}`),
+    target.skills.map((skill) => `${target.agentName} · ${skill}`),
   );
 }
 
@@ -115,8 +117,8 @@ export function delegationDescriptions(
   return Object.fromEntries(
     targets.flatMap((target) =>
       target.skills.map((skill) => [
-        `${target.agentName} · ${skill.name}`,
-        skill.description,
+        `${target.agentName} · ${skill}`,
+        target.skillDescriptions?.[skill] ?? "",
       ]),
     ),
   );
@@ -141,9 +143,7 @@ export function delegatedTargetOf(
   const skill = match[2]!;
   return (
     targets.find(
-      (target) =>
-        target.agentName === name &&
-        target.skills.some((candidate) => candidate.name === skill),
+      (target) => target.agentName === name && target.skills.includes(skill),
     ) ?? null
   );
 }

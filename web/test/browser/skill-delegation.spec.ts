@@ -93,7 +93,7 @@ test("맡기기를 받아들이기 전에 다시 눌러도 한 번만 보내고,
   // 목록과 맡기기 응답만 바꾼다. 실제 맡기기는 위 검사와 Control Plane 테스트가 본다.
   await page.route("**/api/chat/skill-delegations/targets", (route) =>
     route.fulfill({
-      json: [{ agentCode: "career-fake", agentName: "커리어", skills: [{ name: SKILL, description: "" }] }],
+      json: [{ agentCode: "career-fake", agentName: "커리어", skills: [SKILL] }],
     }),
   );
   let posts = 0;
