@@ -3,7 +3,11 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
@@ -32,6 +36,7 @@ import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -107,6 +112,10 @@ class ReadOnlyConversationTest {
     @Autowired
     HermesRunsClient hermes;
 
+    /** 시험 설정의 대역이다. 읽기 전용 거절이 스킬 목록을 읽기 전에 나는지 본다. */
+    @Autowired
+    HermesSkillClient skillClient;
+
     private CurrentUser dad;
     private Agent primary;
     private Agent shopper;
@@ -171,6 +180,21 @@ class ReadOnlyConversationTest {
         assertRejected(() -> pendingController.send(past.publicId()));
 
         assertThat(messages.count()).isEqualTo(saved);
+        assertThat(stub().received()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("쇼핑 담당 대화에 /이름 을 보내도 스킬 목록을 읽기 전에 같은 VALIDATION_FAILED 로 거절한다")
+    void rejectsSkillCommandBeforeReadingSkills() {
+        Conversation past = conversations.save(Conversation.startedBy(dad.id(), "지난 대화", shopper.id(), Instant.now()));
+        clearInvocations(skillClient);
+
+        assertRejected(() -> chat.send(dad, past.id(), "/shop-deals 운동화", null));
+        assertRejected(() -> chat.stream(dad, past.id(), "/shop-deals 운동화", null, event -> {
+        }));
+
+        verify(skillClient, never()).list(anyString());
         assertThat(stub().received()).isEmpty();
     }
 
