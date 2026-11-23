@@ -59,7 +59,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * 대화의 에이전트가 기본 비서가 아닌 대화는 읽기 전용이다(docs/features/assistant-hub/spec.md 의 REQ5).
  *
- * <p>사람이 쓰는 길(보내기, 흐르는 보내기, 다시 생성, 결과 다시 전달, 대기 메시지)만 막고 예약 turn 은 막지 않는다. 점검 대화는 이
+ * <p>사람이 쓰는 길(보내기, 흐르는 보내기, 다시 생성, 결과 다시 전달, 대기 메시지와 끼우기)만 막고 예약 turn 은 막지 않는다. 점검 대화는 이
  * 규칙 밖이다. 쇼핑 담당과의 지난 대화는 새 대화로 만들 수 없어 저장소로 바로 만든다.
  */
 @BackendIntegrationTest
@@ -167,6 +167,7 @@ class ReadOnlyConversationTest {
         assertRejected(() -> controller.regenerate(past.publicId()));
         assertRejected(() -> controller.retryDelivery(past.publicId(), 1L));
         assertRejected(() -> pendingController.enqueue(past.publicId(), new ChatDtos.PendingMessageRequest("운동화", false)));
+        assertRejected(() -> pendingController.enqueue(past.publicId(), new ChatDtos.PendingMessageRequest("운동화", true)));
         assertRejected(() -> pendingController.send(past.publicId()));
 
         assertThat(messages.count()).isEqualTo(saved);
