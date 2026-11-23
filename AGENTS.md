@@ -184,7 +184,7 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 Draft CI 가 통과하면 검증을 받고, 통과해야 Ready 로 올린다. main 은 충돌이 났거나 머지 큐·코디네이터가 요청할 때만 합친다. 머지 직전 최신화는 큐가 한다. 별도 리뷰 에이전트는 띄우지 않는다.
 독립 verify(대화를 모르는 하위 에이전트)는 기능 루프를 쓴 PR(확인받은 스펙이 있는 PR)과 위험 라벨이 하나라도 붙은 PR 만 받는다. 작성자는 Draft 에서 변경 파일을 `scripts/pr/pr-risk-labels.sh` 에 넘겨 나온 위험 라벨을 붙인다. 위험 라벨은 머지 규칙을 바꾸지 않는다. 근거와 버린 대안은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 의 4절이 갖는다(사용자 결정 2026-11-02, 2026-11-03). 그 밖의 PR 은 구현한 세션이 verify 절차(인수 조건 대조, 검사 재실행, diff 읽기)를 스스로 하고 PR 본문에 「같은 세션 검증」 이라고 적는다.
 인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
-Ready 뒤에는 Codex 클라우드 코드 리뷰가 한 번 더 본다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
+Ready 로 올린 뒤 PR 에 `@codex review` 댓글을 한 번 단다. 리뷰 반영 뒤에는 다시 부르지 않는다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
 **리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
 verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전체를 다시 돌리지 않는다. 바뀐 범위의 개발 테스트와 CI 만 다시 통과시킨다.
 등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
@@ -198,6 +198,7 @@ GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `sc
 
 ## Code Review Rules
 
+작성자는 위 「머지는 PR 로 한다」에 따라 Ready 뒤 `@codex review`로 리뷰를 한 번 요청한다.
 상세 등급 기준은 [코드 리뷰 프롬프트](.github/workflows/code-review-prompt.txt)의 「등급」을 따른다.
 Codex 기본 범위인 P0·P1보다 넓게 본다. 이 저장소의 P1부터 P5까지 보고하며 P1과 P2는 머지를 막는다.
 

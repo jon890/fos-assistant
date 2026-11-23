@@ -86,9 +86,10 @@ docs-consolidate 는 채택한 공통 규칙을 「기존 계약 또는 `docs/co
 2. Draft CI 가 통과한다. main 은 충돌이 났거나 머지 큐·코디네이터가 요청할 때만 합친다.
 3. 위 표대로 검증한다. 독립 verify 는 인수 조건별 증거와 코드, 문서 검토를 받는다. 이것이 Draft 의 독립 리뷰이고 별도 리뷰 에이전트는 띄우지 않는다.
 4. 검증을 통과해야 Ready 로 올린다.
-5. Ready 뒤 Codex 클라우드 코드 리뷰가 한 번 더 본다. 그 지적은 한 번에 반영한다.
+5. Ready 로 올린 뒤 PR 에 `@codex review` 댓글을 한 번 단다. 지적은 한 번에 반영하고 리뷰를 다시 부르지 않는다.
 
 Claude 리뷰 토큰 만료로 자동 리뷰가 계속 실패해 Codex 클라우드 코드 리뷰로 바꾼다(사용자 결정 2026-11-23).
+Codex 자동 리뷰가 PR을 열 때 실행되도록 설정돼 있어도 Draft에서 Ready로 바꾼 최근 PR에는 리뷰가 달리지 않아 댓글로 요청한다.
 Codex는 루트 `AGENTS.md`의 「Code Review Rules」에 따라 지적과 머지 큐가 읽는 판정 줄을 남긴다.
 Claude 워크플로는 GitHub Actions에서 수동 실행하거나 PR에 `/review` 댓글을 달 때 실행한다.
 
