@@ -9,9 +9,9 @@ import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
 import {
   applyDelegationActivity,
+  applyDelegationName,
   routeDelegationActivity,
 } from "./activity/activity-delegation";
-import { applyDelegationName } from "./activity/activity-state";
 import { parseLiveImages } from "./artifact/live-images";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";

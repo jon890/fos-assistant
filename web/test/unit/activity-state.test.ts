@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  activityLabel, activityOutcome, activityUses, applyChatEvent, applyDelegationName, emptyActivity, failActivity, fromTree,
+  activityLabel, activityOutcome, activityUses, applyChatEvent, emptyActivity, failActivity, fromTree,
 } from "../../src/components/chat/activity/activity-state.ts";
 import { formatSeconds } from "../../src/lib/format.ts";
 import {
-  applyDelegationActivity, routeDelegationActivity, takeHeldDelegationActivity,
+  applyDelegationActivity, applyDelegationName, routeDelegationActivity, takeHeldDelegationActivity,
 } from "../../src/components/chat/activity/activity-delegation.ts";
 import type { ChatEvent } from "../../src/lib/chat-event.ts";
 import type {

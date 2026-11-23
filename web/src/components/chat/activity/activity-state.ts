@@ -4,11 +4,7 @@ import type {
   ExecutionTreeResponse,
 } from "@/components/execution/execution-tree";
 import { subagentLabel } from "../../../lib/format.ts";
-import {
-  bareName,
-  toolLabel,
-  type ConnectorToolName,
-} from "../../../lib/tool-label.ts";
+import { toolLabel, type ConnectorToolName } from "../../../lib/tool-label.ts";
 import type { ActivityOutcome, ActivityUse } from "../../../lib/tool-kind.ts";
 import { interimKey } from "../turn-stream-text.ts";
 import { applyDelegationActivity } from "./activity-delegation.ts";
@@ -170,34 +166,6 @@ function finish(
         }
       : item,
   );
-}
-
-/**
- * 도는 답이 맡긴 줄(`delegation` 사건)을 받으면 아직 이름이 없는 맡기기 도구 줄 가운데 가장 먼저 시작한 줄에 맡은 에이전트 이름을 붙인다.
- *
- * <p>맡기기 도구가 도는 동안 맡긴 실행이 생기고 Control Plane 이 그 에이전트로 맡긴 줄을 보낸다. 이름은 모델의 인자가 아니라 그 줄에서
- * 받는다(스펙 assistant-hub DECISION30). 이름이 없는 줄이 없으면 그대로다.
- */
-export function applyDelegationName(
-  state: ActivityState,
-  agentName: string | null | undefined,
-): ActivityState {
-  const name = agentName?.trim();
-  if (!name) return state;
-  const index = state.items.findIndex(
-    (item) =>
-      item.kind === "tool" &&
-      item.parent === undefined &&
-      bareName(item.name) === "agent_delegate" &&
-      item.delegatedAgentName === undefined,
-  );
-  if (index < 0) return state;
-  return {
-    ...state,
-    items: state.items.map((item, position) =>
-      position === index ? { ...item, delegatedAgentName: name } : item,
-    ),
-  };
 }
 
 export function applyChatEvent(
