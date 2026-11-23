@@ -49,3 +49,37 @@ App Router는 Next.js가 묶어 넣은 React를 쓴다. `package.json`의 React�
 서버가 답했는데 화면 갱신이 멎으면 빌드한 서버에서 재현하고, 응답 도착과 화면 반영을 나눠 확인한다.
 trace의 헤더 수신 시간이나 검사 종료 때의 `ERR_ABORTED`만으로 서버 응답이 끊겼다고 결론 내리지 않는다.
 프레임워크를 고쳤으면 기본 화면 전환을 켠 상태에서 반복 검사를 통과시킨다.
+
+## 승인·거절 탐색 QA
+
+승인 대기 중에 새로고침하거나 승인 버튼을 연달아 눌렀을 때 대화와 도구 호출이 어떻게 바뀌는지 확인한다.
+저장소 루트에서 의존성과 Chromium 을 준비한다.
+
+```bash
+pnpm --dir web install --frozen-lockfile
+pnpm --dir web exec playwright install chromium
+```
+
+실행마다 새 임시 폴더를 만들어 증거를 모은다.
+
+```bash
+qa_dir="$(mktemp -d)"
+TMPDIR="$qa_dir" BROWSER_CONNECTOR_CALLS_LOG="$qa_dir/connector-calls.json" \
+  ASSISTANT_CONNECTOR_BINDING_APPLY_DELAY=3s \
+  ASSISTANT_CONNECTOR_BINDING_APPLY_CRON='* * * * * *' \
+  pnpm --dir web test:browser approval-exploration.spec.ts --trace on --output "$qa_dir/playwright"
+```
+
+[탐색 시나리오](approval-exploration.spec.ts)가 합성 사용자와 비공개 에이전트를 만들고 가짜 Hermes 의 「검사용 메모」를 붙인다.
+반영이 끝나면 [플러그인 도구 검사](../../../test/e2e/fake-hermes/scenario-fixtures.ts) 입력을 대화에서 보내 승인 대기 줄을 만든다.
+모바일·데스크톱 폭에서 각각 새 대화를 사용한다.
+
+| 경로 | 화면과 저장 상태 | 가짜 Hermes 의 도구 호출 |
+| --- | --- | --- |
+| 새로고침 뒤 승인 연속 클릭 | 같은 승인 카드와 인자가 보인다. 승인 요청은 한 번 나가고 카드는 닫힌다. 저장 상태는 `SUCCEEDED` 이고 완료 알림 줄이 보인다 | 해당 메모 인자로 `via: "execute"` 한 건 |
+| 새로고침 뒤 거절 | 같은 승인 카드와 인자가 보인다. 거절 요청은 한 번 나가고 카드는 닫힌다. 저장 상태는 `REJECTED` 이고 거절 알림 줄이 보인다 | 해당 메모 인자로 남은 호출 0건 |
+
+임시 폴더의 `playwright` 아래에서 새로고침 직후의 카드, 처리 뒤의 대화, Playwright trace 를 확인한다.
+같은 폴더의 `connector-calls.json` 에서 화면의 합성 메모와 `argsJson` 의 글을 비교해 표의 호출 수를 확인한다.
+`hook` 으로 메모 호출이 기록되면 승인 전에 도구가 실행된 것이다.
+실패하거나 실행하지 못한 경우에는 실패 단계와 기대·실제 결과를 적고 trace 나 터미널 출력을 함께 보관한다.
