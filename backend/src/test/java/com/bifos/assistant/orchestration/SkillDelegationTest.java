@@ -113,6 +113,8 @@ class SkillDelegationTest {
     JdbcTemplate jdbc;
 
     private final CountDownLatch careerRelease = new CountDownLatch(1);
+    /** 비서 답을 붙잡을 때만 센다. 기본은 붙잡지 않는다. */
+    private volatile CountDownLatch primaryRelease = new CountDownLatch(0);
     private CurrentUser dad;
     private Agent primary;
     private Agent career;
@@ -132,6 +134,9 @@ class SkillDelegationTest {
         stub().willAnswer(command -> {
             if (command.profileName().equals("career")) {
                 await(careerRelease);
+            }
+            if (command.profileName().equals("dad")) {
+                await(primaryRelease);
             }
             return HermesRunResult.of(
                 "run-" + command.profileName(), command.sessionId(), "completed", command.profileName() + " 의 답", "model", "provider",
@@ -154,6 +159,7 @@ class SkillDelegationTest {
     @AfterEach
     void tearDown() {
         careerRelease.countDown();
+        primaryRelease.countDown();
         awaitTrue(() -> executions.findAll().stream().noneMatch(row -> row.status() == ExecutionStatus.RUNNING), "도는 실행");
         clean();
     }
@@ -203,6 +209,23 @@ class SkillDelegationTest {
             .singleElement()
             .satisfies(command -> assertThat(command.input())
                 .contains("skill_view(name=\"position-recommender\")", "이번 주 공고"));
+    }
+
+
+    @Test
+    @DisplayName("비서 답이 도는 동안에도 대기 줄 없이 바로 맡긴다")
+    void delegatesWhilePrimaryAnswerRuns() throws Exception {
+        Long conversationId = chat.startEmpty(dad, null).id();
+        primaryRelease = new CountDownLatch(1);
+        Thread answering = Thread.ofVirtual().start(() -> chat.send(dad, conversationId, "긴 질문", null));
+        awaitTrue(() -> turns.markOf(conversationId).running(), "도는 비서 답");
+
+        SkillDelegationStarted started = delegations.delegate(dad, conversationId, "career", TEXT);
+
+        assertThat(executions.findById(started.executionId()).orElseThrow().agentId()).isEqualTo(career.id());
+        primaryRelease.countDown();
+        careerRelease.countDown();
+        answering.join(WAIT_LIMIT.toMillis());
     }
 
 
