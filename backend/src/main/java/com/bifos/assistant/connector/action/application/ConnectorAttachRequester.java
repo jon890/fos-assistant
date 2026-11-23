@@ -16,11 +16,11 @@ import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.mcp.application.port.ConnectorAttachRequests;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,17 +71,22 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
                 "이 서비스의 계정 연결이 아직 준비되지 않았다. 카드를 띄우지 않았다. link 의 화면에서 계정을 연결하라고 안내한다.", screen);
         }
         Optional<String> primary = primaryAgents.of(user).map(Agent::code);
-        Set<String> bound = summary.bindings().stream().map(BoundAgentSummary::agentCode).collect(Collectors.toSet());
-        // 요청자가 쓸 수 있고 켜진 에이전트만 본다. 맡기기(agent_list)와 같은 기준이다.
+        Map<String, BoundAgentSummary> bound = summary.bindings().stream()
+            .collect(Collectors.toMap(BoundAgentSummary::agentCode, binding -> binding, (first, second) -> first));
+        // 요청자가 쓸 수 있고 켜진 에이전트만 본다. 맡기기(agent_list)와 같은 기준이다. 지금 쓸 수 있는 붙임을 먼저 고른다.
         Optional<Agent> specialist = agents.readableBy(user).stream()
-            .filter(agent -> bound.contains(agent.code()))
+            .filter(agent -> bound.containsKey(agent.code()))
             .filter(agent -> primary.filter(agent.code()::equals).isEmpty())
-            .findFirst();
+            .min(Comparator.comparing(agent -> !ready(bound.get(agent.code()))));
         if (specialist.isPresent()) {
-            Map<String, Object> body = result(SPECIALIST_ATTACHED,
-                "이 서비스는 이미 전문 에이전트에 붙어 있다. 카드를 띄우지 않았다. agent_delegate 로 agent_code 의 에이전트에게 맡긴다.", null);
+            boolean ready = ready(bound.get(specialist.get().code()));
+            Map<String, Object> body = result(SPECIALIST_ATTACHED, ready
+                ? "이 서비스는 이미 전문 에이전트에 붙어 있다. 카드를 띄우지 않았다. agent_delegate 로 agent_code 의 에이전트에게 맡긴다."
+                : "이 서비스는 이미 전문 에이전트에 붙었고 반영을 기다리는 중이다. 카드를 띄우지 않았다. 아직 맡기지 말고 조금 뒤에 쓸 수 있다고 알린다.",
+                null);
             body.put("agent_code", specialist.get().code());
             body.put("agent_name", specialist.get().name());
+            body.put("agent_status", ready ? "ready" : "pending");
             return body;
         }
         Optional<BoundAgentSummary> onPrimary = summary.bindings().stream()
@@ -89,7 +94,7 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
             .findFirst();
         if (onPrimary.isPresent()) {
             // 기본 비서에 붙어 있다. 배포 전부터 붙은 연결은 그대로 쓴다(DECISION7).
-            boolean ready = onPrimary.get().status() == BindingStatus.READY && !onPrimary.get().restartRequired();
+            boolean ready = ready(onPrimary.get());
             Map<String, Object> body = result(ALREADY_ATTACHED,
                 ready ? "이미 이 에이전트에 붙어 있고 지금 쓸 수 있다. 카드를 띄우지 않았다."
                     : "이미 이 에이전트에 붙어 있고 반영을 기다리는 중이다. 카드를 띄우지 않았다. 조금 뒤에 쓸 수 있다고 알린다.",
@@ -150,5 +155,11 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
             body.put("link", link);
         }
         return body;
+    }
+
+
+    /** 그 붙임을 지금 쓸 수 있는지 본다. 반영을 기다리거나 다시 시작해야 하면 거짓이다. */
+    private static boolean ready(BoundAgentSummary binding) {
+        return binding.status() == BindingStatus.READY && !binding.restartRequired();
     }
 }

@@ -251,7 +251,8 @@ class McpConnectorAttachToolTest {
 
         JsonNode again = call(DEMO);
         assertThat(isError(again)).as(text(again)).isFalse();
-        assertThat(text(again)).contains("specialist_attached", "agent_delegate", specialist.code());
+        // 준비에서 붙이기가 profile 다시 읽기를 기다리게 두어 아직 쓸 수 없다.
+        assertThat(text(again)).contains("specialist_attached", specialist.code(), "\"agent_status\":\"pending\"");
         assertThat(actions.findAll()).hasSize(1);
     }
 
@@ -270,11 +271,14 @@ class McpConnectorAttachToolTest {
             "attach-other-agent", "메모 담당", PROFILE + "-2", "http://runtime.test/p/" + PROFILE + "-2", CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
         bindingService.bind(current(dad), shopper.code(), DEMO);
+        // profile 다시 읽기가 끝나 지금 쓸 수 있는 붙임으로 둔다.
+        jdbc.update("UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE WHERE agent_id = ?", shopper.id());
 
         JsonNode specialist = call(DEMO);
 
         assertThat(isError(specialist)).as(text(specialist)).isFalse();
-        assertThat(text(specialist)).contains("specialist_attached", "\"agent_code\":\"" + shopper.code() + "\"", "메모 담당");
+        assertThat(text(specialist)).contains(
+            "specialist_attached", "\"agent_code\":\"" + shopper.code() + "\"", "메모 담당", "\"agent_status\":\"ready\"", "agent_delegate");
         assertThat(actions.findAll()).isEmpty();
 
         bindingService.unbind(current(dad), agent.code(), DEMO);
@@ -289,7 +293,7 @@ class McpConnectorAttachToolTest {
 
 
     @Test
-    @DisplayName("재시작이 필요한 붙이기는 관리자 확인 뒤에 쓸 수 있다고 알린다")
+    @DisplayName("재시작이 필요한 붙이기는 관리자 확인 뒤에 쓸 수 있다고 알리고, 그동안 다시 부르면 카드 없이 반영 대기를 알린다")
     void tellsRestart() throws Exception {
         connect();
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
@@ -299,6 +303,12 @@ class McpConnectorAttachToolTest {
 
         actionService.approve(current(dad), actions.findAll().getFirst().publicId(), null, false);
         assertThat(notices()).containsExactly("「검사용 메모 담당」 를 만들어 「검사용 메모」 를 붙였어요. 관리자가 반영을 확인하면 쓸 수 있어요");
+
+        JsonNode waiting = call(DEMO);
+
+        assertThat(isError(waiting)).as(text(waiting)).isFalse();
+        assertThat(text(waiting)).contains("specialist_attached", "검사용 메모 담당", "\"agent_status\":\"pending\"", "아직 맡기지 말고");
+        assertThat(actions.findAll()).hasSize(1);
     }
 
 
