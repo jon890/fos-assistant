@@ -47,7 +47,7 @@ public class SkillDelegationQuestions {
      * 사람이 보낸 질문을 남긴다. 대화 번호가 없으면 기본 비서와 새 대화를 만든다.
      *
      * @throws com.bifos.assistant.shared.error.ApiException 남의 대화나 지운 대화면 {@code CONVERSATION_NOT_FOUND}, 기본 비서의 대화가
-     *     아니면(읽기 전용) {@code VALIDATION_FAILED}
+     * 아니면(읽기 전용) {@code VALIDATION_FAILED}
      */
     public SkillDelegationQuestion ask(CurrentUser user, Long conversationId, String text) {
         Conversation conversation;

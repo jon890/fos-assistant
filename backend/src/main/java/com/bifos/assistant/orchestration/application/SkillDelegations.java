@@ -152,7 +152,7 @@ public class SkillDelegations {
      *
      * @return 끝난 실행의 상태와 답
      * @throws ApiException 에이전트가 없으면 {@code AGENT_NOT_FOUND}, 스킬이 켜져 있지 않으면 {@code SKILL_COMMAND_UNKNOWN}. 발화가
-     *     실패로 닫힌다
+     * 실패로 닫힌다
      */
     public SkillDelegationRun runScheduled(CurrentUser user, Long conversationId, String notice, String text) {
         DelegatedSkillCommand command = DelegatedSkillCommand.parse(text)
