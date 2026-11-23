@@ -14,10 +14,13 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.TurnCancellation;
+import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.SkillDelegations;
+import com.bifos.assistant.orchestration.application.dto.SkillDelegationRun;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -61,6 +64,9 @@ class SkillDelegationLimitTest {
 
     @Autowired
     ChatService chat;
+
+    @Autowired
+    TurnCancellation turns;
 
     @Autowired
     SkillService skillService;
@@ -140,6 +146,39 @@ class SkillDelegationLimitTest {
             .isEqualTo(ErrorCode.USER_BUSY);
         assertThat(messages.count()).isEqualTo(saved);
         assertThat(executions.findAll()).hasSize(2);
+    }
+
+
+    @Test
+    @DisplayName("예약 작업의 스킬 맡기기는 대화 잠금만 잡고 맡긴 실행 하나만 세어, 다른 대화가 한 자리를 쓰는 중에도 남은 한 자리로 돈다")
+    void scheduledDelegationTakesOneSlot() {
+        Long busyConversationId = chat.startEmpty(dad, null).id();
+        Long taskConversationId = chat.startEmpty(dad, null).id();
+        careerRelease.countDown();
+        TurnHandle busy = turns.open(dad.id(), busyConversationId);
+        try {
+            // TaskRunStarter 가 「/에이전트 · 스킬」 지시에서 잡는 잠금이다.
+            TurnHandle lock = turns.openLockOnly(dad.id(), taskConversationId);
+            try {
+                SkillDelegationRun run = delegations.runScheduled(dad, taskConversationId, "예약 작업을 시작했어요", TEXT);
+
+                assertThat(run.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+            } finally {
+                turns.close(lock);
+            }
+            TurnHandle filler = turns.open(dad.id(), chat.startEmpty(dad, null).id());
+            try {
+                assertThatThrownBy(() -> turns.openLockOnly(dad.id(), taskConversationId))
+                    .as("자리가 모두 찼으면 잠금을 잡지 않는다")
+                    .isInstanceOf(ApiException.class)
+                    .extracting(ex -> ((ApiException)ex).code())
+                    .isEqualTo(ErrorCode.USER_BUSY);
+            } finally {
+                turns.close(filler);
+            }
+        } finally {
+            turns.close(busy);
+        }
     }
 
 
