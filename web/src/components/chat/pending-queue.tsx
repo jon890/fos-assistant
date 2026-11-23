@@ -8,7 +8,8 @@ import { visiblePendingItems, type PendingQueue } from "@/lib/pending-messages";
 type Props = {
   queue: PendingQueue;
   onCancel(pendingId: number): void;
-  onRelease(): void;
+  /** 멈춘 대기 줄을 보낸다. 읽기 전용 대화는 넘기지 않아 「보내기」 를 그리지 않고 취소만 남긴다 */
+  onRelease?(): void;
   /** 취소나 보내기 요청이 도는 중이다. 그동안 단추를 잠가 같은 요청이 두 번 나가지 않게 한다 */
   busy: boolean;
 };
@@ -34,7 +35,7 @@ export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
             ? "중지해서 보내지 않았어요."
             : "답이 끝나면 이어서 보내요."}
         </p>
-        {queue.held ? (
+        {queue.held && onRelease ? (
           <Button
             data-testid="pending-release"
             aria-label="대기 메시지 보내기"

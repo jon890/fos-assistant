@@ -123,3 +123,50 @@ test("지난 전문 에이전트 대화의 실패한 결과 전달은 상태만 
     await removeAgent(page, code);
   }
 });
+
+test("지난 전문 에이전트 대화에 배포 전에 쌓인 대기 메시지는 보이고 취소할 수 있지만 보내기는 없다", async ({
+  page,
+}) => {
+  let code: string | undefined;
+  try {
+    const past = await pastConversation(page);
+    code = past.code;
+    // 배포 전에 멈춰 둔 대기 줄을 흉내 낸다. 지금은 읽기 전용 대화에 대기 메시지를 넣을 수 없다.
+    let cancelled = false;
+    await page.route(
+      `**/api/chat/conversations/${past.conversationId}/pending`,
+      (route: Route) =>
+        route.fulfill({
+          json: {
+            held: true,
+            items: cancelled
+              ? []
+              : [
+                  {
+                    id: 93_000_001,
+                    text: "배포 전에 쌓인 글",
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+          },
+        }),
+    );
+    await page.route(
+      `**/api/chat/conversations/${past.conversationId}/pending/93000001`,
+      (route: Route) => {
+        cancelled = true;
+        return route.fulfill({ status: 204, body: "" });
+      },
+    );
+
+    await page.goto(`/chat/${past.conversationId}`);
+    await expect(page.getByTestId("read-only-notice")).toBeVisible();
+    await expect(page.getByTestId("pending-item")).toHaveText("배포 전에 쌓인 글");
+    await expect(page.getByTestId("pending-release")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "대기 메시지 취소" }).click();
+    await expect(page.getByTestId("pending-item")).toHaveCount(0);
+  } finally {
+    await removeAgent(page, code);
+  }
+});

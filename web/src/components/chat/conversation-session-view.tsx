@@ -277,12 +277,22 @@ export function ConversationSessionView({
             refreshKey={approvalRefresh}
           />
           {readOnly ? (
-            <ReadOnlyNotice
-              canStop={executionId !== null && !stopRequested}
-              onStop={() => {
-                void stop();
-              }}
-            />
+            <>
+              {/* 배포 전에 쌓인 대기 메시지는 보이고 취소할 수 있게 둔다. 보내기는 서버가 거절하므로 그리지 않는다. */}
+              <PendingQueueView
+                queue={pending.queue}
+                onCancel={(pendingId) => {
+                  void cancelPendingMessage(pendingId);
+                }}
+                busy={pendingBusy}
+              />
+              <ReadOnlyNotice
+                canStop={executionId !== null && !stopRequested}
+                onStop={() => {
+                  void stop();
+                }}
+              />
+            </>
           ) : (
             <>
               <PendingQueueView
