@@ -24,8 +24,8 @@ public enum MemoryRememberOutcome {
     COLLECTION_NOT_ALLOWED,
     /** 고칠 항목을 찾지 못했다. 없거나, 남의 것이거나, 이 에이전트가 받지 않거나, 승인 전이거나, 민감 항목이다. */
     UPDATE_TARGET_NOT_FOUND,
-    /** 바로 저장 조건이 아니라 기존 항목을 고치지 않았다. 사용자에게 확인해야 한다. */
-    UPDATE_NEEDS_CONFIRMATION,
+    /** 바로 저장 조건이 아니라 기존 항목을 고치지 않고, 받아들이면 그 항목을 대신할 제안으로 남겼다. */
+    UPDATE_PROPOSED,
     /** 민감 제안을 암호화할 key 가 없다. */
     ENCRYPTION_UNAVAILABLE
 }
