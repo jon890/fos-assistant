@@ -79,6 +79,60 @@ test("/ 목록에 「에이전트 · 스킬」 이 보이고, 골라 보내면 �
   }
 });
 
+test("맡기기를 받아들이기 전에 다시 눌러도 한 번만 보내고, 답장을 집은 채 보내면 맡기지 않고 칩을 남긴다", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "답장은 마우스 사례라 넓은 화면에서 본다");
+  const created = await page.request.post("/api/chat", {
+    data: { text: `맡기기 중복 검사 ${Date.now()}`, agentCode: "browser" },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { conversationId } = (await created.json()) as { conversationId: string };
+  // 목록과 맡기기 응답만 바꾼다. 실제 맡기기는 위 검사와 Control Plane 테스트가 본다.
+  await page.route("**/api/chat/skill-delegations/targets", (route) =>
+    route.fulfill({ json: [{ agentCode: "career-fake", agentName: "커리어", skills: [SKILL] }] }),
+  );
+  let posts = 0;
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/chat/skill-delegations", async (route) => {
+    posts += 1;
+    await held;
+    await route.fulfill({ status: 202, json: {} });
+  });
+  try {
+    await page.goto(`/chat/${conversationId}`);
+    const input = page.getByRole("textbox", { name: "메시지" });
+    // 맡길 목록을 읽은 뒤에 보낸다. 읽기 전의 글은 보통 보내기로 간다.
+    await input.fill("/커리");
+    await expect(
+      page.getByRole("listbox", { name: "스킬 고르기" }).getByRole("option", { name: `/커리어 · ${SKILL}` }),
+    ).toBeVisible();
+    await input.fill(`/커리어 · ${SKILL} 공고`);
+    await input.press("Enter");
+    await expect.poll(() => posts).toBe(1);
+    await input.press("Enter");
+    release();
+    await expect(input).toHaveValue("");
+    expect(posts).toBe(1);
+
+    const answer = page.getByTestId("assistant-message").first();
+    await answer.hover();
+    await answer.getByRole("button", { name: "답장", exact: true }).click();
+    await input.fill(`/커리어 · ${SKILL} 이것도`);
+    await input.press("Enter");
+    await expect(page.getByText("답장은 맡길 때 함께 보낼 수 없어요. 답장을 빼고 보내 주세요.")).toBeVisible();
+    await expect(page.getByTestId("reply-chip")).toBeVisible();
+    await expect(input).toHaveValue(`/커리어 · ${SKILL} 이것도`);
+    expect(posts).toBe(1);
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
+
 test("작업 화면의 지시 칸 아래에 /스킬 과 /에이전트 이름 · 스킬 안내가 있다", async ({ page }) => {
   await page.goto("/tasks/new");
   await expect(page.locator("#task-instruction-hint")).toContainText("/에이전트 이름 · 스킬");

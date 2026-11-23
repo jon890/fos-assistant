@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReplyTarget } from "@/lib/reply";
 import { describeError } from "@/components/error-message";
 import {
   fetchSkillDelegationTargets,
@@ -28,7 +29,8 @@ type Context = Pick<
  *
  * <p>글이 목록의 「에이전트 · 스킬」 로 시작하면 보통 보내기와 대기 줄 대신 맡기기 API 로 보낸다. 대화 turn 을 열지 않으므로 답이 도는
  * 동안에도 바로 보낸다. 받아들여지면 입력창을 비우고, 답이 돌고 있지 않으면 이력을 다시 읽어 질문 아래 맡김 줄을 보인다. 답이 돌고
- * 있으면 그 답이 끝날 때 다시 읽는다.
+ * 있으면 그 답이 끝날 때 다시 읽는다. 첫 응답이 오기 전에 다시 보내면 무시해 같은 맡기기가 두 번 돌지 않게 한다. 답장과 사진은 함께 맡기지
+ * 못해 보내지 않는다.
  */
 export function useSkillDelegation({
   draft,
@@ -42,6 +44,7 @@ export function useSkillDelegation({
   submit,
 }: Context) {
   const [targets, setTargets] = useState<SkillDelegationTarget[]>([]);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     if (!primary) return;
@@ -67,10 +70,12 @@ export function useSkillDelegation({
    * 맡기기면 보내고 받아들여졌는지 돌려준다. 맡기기가 아니면 null 이고 부르는 쪽이 보통 보내기로 간다.
    *
    * @param replacementText 질문 카드처럼 입력창과 무관한 글. 없으면 입력창의 글이다
+   * @param reply 집은 답장 대상. 맡기기는 받지 못해 있으면 거절하고, 부르는 쪽이 칩을 되돌린다
    */
   async function delegate(
     attachmentIds: number[],
     replacementText?: string,
+    reply?: ReplyTarget,
   ): Promise<boolean | null> {
     const visible = primary ? targets : [];
     const text = (replacementText ?? draft).trim();
@@ -80,6 +85,13 @@ export function useSkillDelegation({
       setError("사진은 맡길 때 함께 보낼 수 없어요. 사진을 빼고 보내 주세요.");
       return false;
     }
+    if (reply) {
+      setError("답장은 맡길 때 함께 보낼 수 없어요. 답장을 빼고 보내 주세요.");
+      return false;
+    }
+    // 맡기기를 받아들였다는 응답이 오기 전까지 입력창의 글이 그대로라 다시 누르면 같은 글이 또 간다.
+    if (inFlight.current) return false;
+    inFlight.current = true;
     const version = selectionVersion.current;
     setError(null);
     try {
@@ -107,6 +119,8 @@ export function useSkillDelegation({
       if (selectionVersion.current === version)
         setError(reason instanceof Error ? reason.message : "맡기지 못했어요.");
       return false;
+    } finally {
+      inFlight.current = false;
     }
   }
 
@@ -117,7 +131,7 @@ export function useSkillDelegation({
     attachments,
     reply,
   ) =>
-    (await delegate(attachmentIds, replacementText)) ??
+    (await delegate(attachmentIds, replacementText, reply)) ??
     submit(attachmentIds, replacementText, attachments, reply);
 
   return {
