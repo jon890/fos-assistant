@@ -86,9 +86,9 @@ export function ConversationSession(props: ConversationSessionProps) {
   const selectedAgent = currentConversation
     ? agentLabel(currentConversation.agentName)
     : agents.find((agent) => agent.code === agentCode)?.name;
-  useShellTitle(selectedAgent ?? null);
   const startScreen =
     freshStart && turns.length === 0 && !sending && outgoing === null;
+  useShellTitle(startScreen ? null : (selectedAgent ?? null));
   const currentAgent = agentMissing
     ? undefined
     : agents.find((agent) => agent.code === agentCode);

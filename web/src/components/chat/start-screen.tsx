@@ -1,14 +1,11 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { primaryCode, type AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useShellTitleSlot } from "@/components/shell/title-slot";
-import { AgentBadge } from "@/components/agent/agent-badge";
 import { AttentionLine } from "./attention-line";
 
 /*
@@ -30,8 +27,7 @@ export const PRIMARY_UNAVAILABLE_NOTICE =
   "비서를 쓸 수 없어요. 관리자에게 알려 주세요";
 
 /**
- * 입력창 위에 그리는 인사다. 에이전트는 화면 위쪽 이름표에 보이므로 여기에는 카드가 없다. 목록을 읽지 못했거나
- * 기본 비서가 없을 때의 안내만 남는다.
+ * 입력창 위에 인사를 그린다. 목록을 읽지 못했거나 기본 비서가 없으면 인사 아래에 안내를 보인다.
  */
 export function StartScreenHeader({
   displayName,
@@ -68,65 +64,6 @@ export function StartScreenHeader({
       ) : null}
     </div>
   );
-}
-
-type AgentTagProps = {
-  agents: AgentView[];
-  loading: boolean;
-  agentsError: boolean;
-  selectedCode: string;
-};
-
-/**
- * 새 대화 화면의 에이전트 이름표다. 새 대화는 늘 기본 비서와 시작하므로 고르는 목록 없이 이름만 보인다
- * (docs/features/assistant-hub/spec.md 의 REQ4). 넓은 화면은 대화 영역 맨 위 머리 줄, 휴대폰은 위 막대 가운데다.
- * 폭은 CSS 로만 나눈다. 머리 줄은 좁은 폭에서 숨고 위 막대는 넓은 폭에서 숨으므로 한 번에 하나만 보인다.
- */
-export function StartAgentTag({
-  agents,
-  loading,
-  agentsError,
-  selectedCode,
-}: AgentTagProps) {
-  const current = agents.find((agent) => agent.code === selectedCode);
-  // 이름표가 없으면 위 막대 가운데 자리를 차지하지 않는다. 그 자리의 홈 링크가 그대로 남는다.
-  if (agentsError || (!loading && current === undefined)) return null;
-  const tag = current ? (
-    <span
-      data-testid="start-agent-tag"
-      className="flex h-9 min-w-0 items-center gap-2 px-2"
-    >
-      <AgentBadge agent={current} size="sm" />
-      <span
-        data-testid="start-agent-name"
-        className="truncate text-sm font-medium"
-      >
-        {current.name}
-      </span>
-    </span>
-  ) : (
-    <div role="status" className="flex h-9 items-center">
-      <span className="sr-only">에이전트를 읽는 중</span>
-      <Skeleton className="h-7 w-32 rounded-full" />
-    </div>
-  );
-  return (
-    <>
-      <div
-        data-testid="start-agent-header"
-        className="hidden min-w-0 items-center md:flex"
-      >
-        {tag}
-      </div>
-      <TitleSlotPortal>{tag}</TitleSlotPortal>
-    </>
-  );
-}
-
-/** 휴대폰 위 막대 가운데 자리를 차지하고 그 안에 그린다. 그릴 것이 있을 때만 이 부품을 둔다 */
-function TitleSlotPortal({ children }: { children: React.ReactNode }) {
-  const titleSlot = useShellTitleSlot();
-  return titleSlot ? createPortal(children, titleSlot) : null;
 }
 
 type PromptsProps = {

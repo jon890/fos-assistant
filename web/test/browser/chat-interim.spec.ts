@@ -1,5 +1,5 @@
 import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
-import { expectStartAgent } from "./helpers.ts";
+import { waitForStartComposer } from "./helpers.ts";
 import { interimWireEvents } from "../../../test/e2e/scenarios/interim.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
@@ -12,7 +12,7 @@ async function script(input: string, output: string, events: Record<string, unkn
 
 async function send(page: Page, text: string) {
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
 }

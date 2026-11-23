@@ -1,6 +1,6 @@
 import { FAKE_STARTER_PROMPTS } from "../../../test/e2e/fake-hermes.ts";
 import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
-import { expectStartAgent } from "./helpers.ts";
+import { waitForStartComposer } from "./helpers.ts";
 
 const STARTERS_PATTERN = "**/api/agents/*/starters";
 
@@ -58,7 +58,7 @@ test("추천이 나타나도 입력창이 움직이지 않는다", async ({ page
     return box!.y;
   };
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
 
   // 읽는 중일 때의 자리 표시가 보이는 동안의 위치를 기준으로 삼는다.
   await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toBeVisible();
