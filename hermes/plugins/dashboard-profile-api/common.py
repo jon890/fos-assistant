@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import re
+import stat
 import tempfile
 from typing import Optional
 
@@ -101,11 +102,23 @@ def _env_value(env_text: str, key: str) -> str:
 
 
 def _atomic_private_write(path: pathlib.Path, value: bytes) -> None:
+    try:
+        original = path.lstat()
+    except FileNotFoundError:
+        original = None
+
     fd, raw = tempfile.mkstemp(prefix=".connector-", dir=path.parent)
     temp = pathlib.Path(raw)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(value)
+            if original is not None and stat.S_ISREG(original.st_mode):
+                handle.flush()
+                current = os.fstat(fd)
+                if (current.st_uid, current.st_gid) != (original.st_uid, original.st_gid):
+                    os.fchown(fd, original.st_uid, original.st_gid)
+                # 쓰기나 소유자 변경이 특수 권한 비트를 지울 수 있어 권한은 마지막에 적용한다.
+                os.fchmod(fd, stat.S_IMODE(original.st_mode))
         os.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)
