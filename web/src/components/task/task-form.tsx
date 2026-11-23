@@ -212,8 +212,15 @@ export function TaskForm({
           required
           maxLength={INSTRUCTION_MAX}
           value={instruction}
+          aria-describedby="task-instruction-hint"
           onChange={(event) => setInstruction(event.target.value)}
         />
+        {/* 지시 맨 앞을 글자 그대로 읽는다. 고르는 목록은 두지 않는다(docs/features/assistant-hub/spec.md 의 DECISION27). */}
+        <p id="task-instruction-hint" className="text-xs text-muted-foreground">
+          맨 앞에 <code>/스킬</code> 을 쓰면 비서가 그 스킬로,{" "}
+          <code>/에이전트 이름 · 스킬</code> 을 쓰면 그 에이전트가 그 스킬로
+          해요.
+        </p>
       </Field>
       <Field id="task-kind" label="시각">
         <NativeSelect

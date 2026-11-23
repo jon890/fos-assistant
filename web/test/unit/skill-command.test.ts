@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   commandSkillNames,
+  delegatedTargetOf,
+  delegationLabels,
+  filterSkillNames,
   findSkillQuery,
   parseSkillCommand,
   withSkillCommand,
@@ -49,3 +52,28 @@ test("커맨드로 부를 이름은 켜진 스킬 가운데 점과 밑줄이 없
   assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: true, uploadLimit: 30 }), ["weekly-plan"]);
   assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: false, uploadLimit: 30 }), []);
 });
+
+const TARGETS = [
+  { agentCode: "career", agentName: "커리어", skills: ["position-recommender", "resume-review"] },
+  { agentCode: "gmail", agentName: "Gmail 담당", skills: ["mail-digest"] },
+];
+
+test("맡길 스킬은 「에이전트 이름 · 스킬」 로 붙고, 고르면 /에이전트 이름 · 스킬 이 들어가며 이름 일부로 걸러진다(스펙 assistant-hub REQ10)", () => {
+  const labels = delegationLabels(TARGETS);
+  assert.deepEqual(labels, ["커리어 · position-recommender", "커리어 · resume-review", "Gmail 담당 · mail-digest"]);
+  assert.deepEqual(filterSkillNames(["weekly-plan", ...labels], "커리"), ["커리어 · position-recommender", "커리어 · resume-review"]);
+  assert.deepEqual(withSkillCommand("/커리", "커리어 · position-recommender"), {
+    value: "/커리어 · position-recommender ",
+    caret: "/커리어 · position-recommender ".length,
+  });
+});
+
+test("목록에 있는 「에이전트 · 스킬」 로 시작하는 글만 맡기기이고, 비서의 /이름 과 목록에 없는 스킬은 아니다", () => {
+  assert.equal(delegatedTargetOf("/커리어 · position-recommender 이번 주", TARGETS)?.agentCode, "career");
+  assert.equal(delegatedTargetOf("/Gmail 담당 · mail-digest", TARGETS)?.agentCode, "gmail");
+  assert.equal(delegatedTargetOf("/weekly-plan 이번 주", TARGETS), null);
+  assert.equal(delegatedTargetOf("/커리어 · cooking", TARGETS), null);
+  assert.equal(delegatedTargetOf("/커리어·position-recommender", TARGETS), null);
+  assert.equal(delegatedTargetOf("커리어 · position-recommender", TARGETS), null);
+});
+

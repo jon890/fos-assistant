@@ -18,7 +18,9 @@ const LEADING_COMMAND_SPACE = /^[ \t\n\v\f\r]+/;
 const SKILL_COMMAND_PATTERN = /^\/([a-z0-9][a-z0-9-]{0,63})([ \t\n\v\f\r]|$)/;
 
 /** 메시지가 스킬 커맨드이면 그 이름과 이름 뒤의 글을 돌려준다. 이름 뒤 공백 하나는 뺀다 */
-export function parseSkillCommand(text: string): { name: string; rest: string } | null {
+export function parseSkillCommand(
+  text: string,
+): { name: string; rest: string } | null {
   const match = SKILL_COMMAND_PATTERN.exec(text);
   if (!match) return null;
   return { name: match[1]!, rest: text.slice(match[0].length) };
@@ -31,7 +33,9 @@ export function parseSkillCommand(text: string): { name: string; rest: string } 
  */
 export function commandSkillNames(list: SkillListView): string[] {
   if (!list.skillsToolsetEnabled) return [];
-  return list.skills.filter((skill) => skill.enabled && SKILL_NAME_PATTERN.test(skill.name)).map((skill) => skill.name);
+  return list.skills
+    .filter((skill) => skill.enabled && SKILL_NAME_PATTERN.test(skill.name))
+    .map((skill) => skill.name);
 }
 
 /**
@@ -52,13 +56,62 @@ export function filterSkillNames(names: string[], query: string): string[] {
 }
 
 /** 고른 이름으로 글의 첫 낱말을 바꾼다. 커서는 돌려준 글의 `/이름 ` 바로 뒤에 둔다 */
-export function withSkillCommand(value: string, name: string): { value: string; caret: number } {
+export function withSkillCommand(
+  value: string,
+  name: string,
+): { value: string; caret: number } {
   const tokenEnd = value.search(COMMAND_SPACE);
-  const rest = tokenEnd < 0 ? "" : value.slice(tokenEnd).replace(LEADING_COMMAND_SPACE, "");
+  const rest =
+    tokenEnd < 0
+      ? ""
+      : value.slice(tokenEnd).replace(LEADING_COMMAND_SPACE, "");
   const command = `/${name} `;
   return { value: command + rest, caret: command.length };
 }
 
 export function skillOptionId(listId: string, index: number): string {
   return `${listId}-option-${index}`;
+}
+
+/** 맡길 수 있는 전문 에이전트와 그 켜진 스킬이다. Control Plane 의 목록 API 가 준다(docs/features/assistant-hub/spec.md 의 REQ10). */
+export type SkillDelegationTarget = {
+  agentCode: string;
+  agentName: string;
+  skills: string[];
+};
+
+/**
+ * `/` 목록에 비서 스킬 뒤로 붙일 「에이전트 이름 · 스킬」 이다. 고르면 입력창에 `/에이전트 이름 · 스킬 ` 이 들어간다.
+ * 예약 작업 지시의 꼴과 같다.
+ */
+export function delegationLabels(
+  targets: readonly SkillDelegationTarget[],
+): string[] {
+  return targets.flatMap((target) =>
+    target.skills.map((skill) => `${target.agentName} · ${skill}`),
+  );
+}
+
+/** Control Plane 의 `DelegatedSkillCommand` 판별식과 같다. 이름에 줄바꿈과 가운뎃점이 없다. */
+const DELEGATED_PATTERN =
+  /^\/([^\n·]+?) · ([a-z0-9][a-z0-9-]{0,63})([ \t\n\v\f\r]|$)/;
+
+/**
+ * 글이 목록에 있는 「에이전트 · 스킬」 로 시작하면 맡을 에이전트를 돌려준다. 아니면 null 이고 보통 보내기로 간다.
+ *
+ * <p>같은 이름의 에이전트가 둘이면 그 스킬을 가진 첫 에이전트다.
+ */
+export function delegatedTargetOf(
+  text: string,
+  targets: readonly SkillDelegationTarget[],
+): SkillDelegationTarget | null {
+  const match = DELEGATED_PATTERN.exec(text);
+  if (!match) return null;
+  const name = match[1]!.trim();
+  const skill = match[2]!;
+  return (
+    targets.find(
+      (target) => target.agentName === name && target.skills.includes(skill),
+    ) ?? null
+  );
 }
