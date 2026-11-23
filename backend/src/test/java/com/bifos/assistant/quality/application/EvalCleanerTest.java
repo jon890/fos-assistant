@@ -2,6 +2,7 @@ package com.bifos.assistant.quality.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -56,6 +57,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class EvalCleanerTest {
 
     private static final Instant NOW = Instant.parse("2026-11-21T01:00:00Z");
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     EvalCleaner cleaner;
@@ -216,8 +220,8 @@ class EvalCleanerTest {
 
     private Agent agentOf(CurrentUser owner) {
         String code = "eval-" + UUID.randomUUID().toString().substring(0, 8);
-        return agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id()));
+        return primaries.ensure(owner, agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id())));
     }
 
 
@@ -227,7 +231,7 @@ class EvalCleanerTest {
 
 
     private static TaskInput input(String title, Agent agent, String instruction, ConversationMode mode) {
-        return new TaskInput(title, agent.code(), instruction, new ScheduleInput(TriggerType.CRON, "0 9 * * *", null, "Asia/Seoul"),
+        return new TaskInput(title, instruction, new ScheduleInput(TriggerType.CRON, "0 9 * * *", null, "Asia/Seoul"),
             mode, MissedPolicy.SKIP, NotifyPolicy.NEVER, null);
     }
 

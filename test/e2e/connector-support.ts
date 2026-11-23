@@ -5,7 +5,7 @@
  * Control Plane 이 반영 지연 뒤 스스로 확인해 `READY` 로 만든다(ADR-20261007 / connector-live-reload). 값 교체처럼 재시작 대기가 된
  * 바인딩만 관리자인 dad 가 반영 완료를 눌러야 한다. 만든 것은 {@link ConnectorSetup} 이 적어 두고 시나리오 끝에서 되돌린다.
  */
-import { call, expect, expectStatus, fail, seedConversation, type Context } from "./harness.ts";
+import { call, expect, expectStatus, fail, restorePrimaries, seedConversation, type Context } from "./harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "./fake-hermes.ts";
 
 export type BoundAgentView = { agentCode: string; agentName: string; status: string; restartRequired: boolean };
@@ -225,6 +225,10 @@ export class ConnectorSetup {
   /** 만든 것을 되돌린다. 시나리오가 이미 실패했으면 정리 실패로 그 실패를 가리지 않는다. */
   async cleanUp(failed: boolean): Promise<void> {
     const errors: string[] = [];
+    // test-support 대화 만들기가 잠시 둔 기본 비서는 지울 수 없다(PRIMARY_AGENT_PROTECTED). 지우기 전에 되돌린다.
+    if (this.agents.length > 0) {
+      await restorePrimaries(this.#context).catch((error: unknown) => errors.push(`기본 비서 되돌리기: ${String(error)}`));
+    }
     for (const agent of this.agents) {
       const deleted = await call(this.#context, `/agents/${agent.code}`, { method: "DELETE", token: this.#token })
         .catch((error: unknown) => ({ status: 0, body: String(error) }));

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,6 +73,9 @@ class SteerServiceTest {
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
 
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     HermesRunEventStream eventStream;
 
@@ -150,7 +154,7 @@ class SteerServiceTest {
         users.deleteAll();
 
         dad = signedUp("dad@example.com", "dad");
-        Agent chief = agents.save(agent("dad", "비서", dad.id()));
+        Agent chief = primaries.make(dad, agents.save(agent("dad", "비서", dad.id())));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         stub().willReturn(result("run", "답"));
         release = new CountDownLatch(1);

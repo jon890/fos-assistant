@@ -50,6 +50,8 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.TaskRunStarter;
 import com.bifos.assistant.task.application.TaskService;
+import com.bifos.assistant.task.application.dto.ScheduleInput;
+import com.bifos.assistant.task.application.dto.TaskInput;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.TaskRun;
@@ -64,6 +66,7 @@ import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.usage.execution.application.TurnSlot;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -141,6 +144,9 @@ class TaskRunStarterTest {
 
     @Autowired
     TaskService service;
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -712,6 +718,56 @@ class TaskRunStarterTest {
                 MessageRole.SYSTEM,
                 MessageRole.USER,
                 MessageRole.ASSISTANT);
+    }
+
+
+    @Test
+    @DisplayName("전문 에이전트의 SINGLE 작업은 그 대화에 이어 돌고, 화면 API 로 고친 뒤에는 기본 비서의 새 대화로 돌며 옛 대화는 그대로다")
+    void specialistSingleTaskMovesToPrimaryConversationAfterEdit() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
+        TaskRun first = queued(fixture, SCHEDULED, NOW);
+        starter.startQueued(NOW);
+        Long specialistConversation = awaitFinished(first).conversationId();
+        Instant secondMonth = Instant.parse("2026-12-01T00:00:00Z");
+        TaskRun second = queued(fixture, secondMonth, secondMonth);
+        starter.startQueued(secondMonth);
+        assertThat(awaitFinished(second).conversationId()).as("고치기 전 두 번째 발화의 대화").isEqualTo(specialistConversation);
+        int specialistMessages = messages.findByConversationIdOrderByIdAsc(specialistConversation).size();
+
+        String code = "primary-" + UUID.randomUUID().toString().substring(0, 8);
+        Agent primary = primaries.make(fixture.owner(), agents.save(Agent.of(
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            fixture.owner().id())));
+        service.update(currentUser(fixture.owner()), fixture.task().publicId(), new TaskInput(
+            TITLE,
+            INSTRUCTION,
+            new ScheduleInput(TriggerType.CRON, "0 8 1 * *", null, SEOUL.getId()),
+            ConversationMode.SINGLE,
+            MissedPolicy.RUN_ONCE,
+            NotifyPolicy.NEVER,
+            null));
+        Instant thirdMonth = Instant.parse("2027-01-01T00:00:00Z");
+        TaskRun third = queued(fixture, thirdMonth, thirdMonth);
+        starter.startQueued(thirdMonth);
+        TaskRun finished = awaitFinished(third);
+
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.conversationId()).as("고친 뒤 발화의 대화").isNotEqualTo(specialistConversation);
+        assertThat(conversations.findById(finished.conversationId()).orElseThrow().agentId())
+            .as("새 대화의 에이전트")
+            .isEqualTo(primary.id());
+        assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId())
+            .as("작업에 적은 대화")
+            .isEqualTo(finished.conversationId());
+        assertThat(messages.findByConversationIdOrderByIdAsc(specialistConversation))
+            .as("옛 대화의 메시지")
+            .hasSize(specialistMessages);
     }
 
 

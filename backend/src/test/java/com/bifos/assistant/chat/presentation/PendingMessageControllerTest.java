@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.nextturn.presentation.PendingMessageController;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos;
@@ -67,6 +68,9 @@ class PendingMessageControllerTest {
     ConversationAccess access;
 
     @Autowired
+    ConversationEntry conversationEntry;
+
+    @Autowired
     TurnCancellation turns;
 
     @Autowired
@@ -92,7 +96,7 @@ class PendingMessageControllerTest {
     @BeforeEach
     void setUp() {
         PendingQueueFixtures.clearAll(jdbc);
-        mvc = MockMvcBuilders.standaloneSetup(new PendingMessageController(pending, currentUser, access))
+        mvc = MockMvcBuilders.standaloneSetup(new PendingMessageController(pending, currentUser, access, conversationEntry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         dad = signedIn("pending-dad-" + UUID.randomUUID());

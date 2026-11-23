@@ -195,9 +195,10 @@ export async function usePrimary(context: Context, token: string, agentCode: str
 }
 
 /**
- * 기본 비서가 아닌 에이전트와의 빈 대화를 만들고 공개 식별자를 돌려준다. 그 전에 열어 둔 대화와 같다.
+ * 그 에이전트와의 빈 대화를 만들고 공개 식별자를 돌려준다. 그 에이전트를 부르는 사람의 기본 비서로 잠시 둔다.
  *
- * <p>새 대화는 기본 비서로만 열리므로 다른 에이전트의 실행을 보는 시나리오가 쓴다.
+ * <p>새 대화는 기본 비서로만 열리고 비서가 아닌 대화는 읽기 전용이라(docs/features/assistant-hub/spec.md 의 REQ4, REQ5) 다른
+ * 에이전트의 실행을 보는 시나리오가 쓴다. 러너가 시나리오마다 {@link restorePrimaries} 로 되돌린다.
  */
 export async function seedConversation(context: Context, token: string, agentCode: string): Promise<string> {
   return expectStatus(
@@ -210,4 +211,43 @@ export async function seedConversation(context: Context, token: string, agentCod
 /** 부르는 사람의 기본 비서를 없앤다. 기본 비서는 지울 수 없으므로 검사가 만든 에이전트를 지우기 전에 부른다. */
 export async function clearPrimary(context: Context, token: string): Promise<void> {
   expectStatus(await call(context, "/test-support/primary-agent", { method: "DELETE", token }), 200, "기본 비서 지우기");
+}
+
+/** 그 에이전트를 부르는 사람의 기본 비서로 잠시 둔다. 러너가 시나리오마다 {@link restorePrimaries} 로 되돌린다. */
+export async function usePrimaryTemporarily(context: Context, token: string, agentCode: string): Promise<void> {
+  expectStatus(
+    await call(context, `/test-support/primary-agent/${agentCode}/temporary`, { method: "PUT", token }),
+    200,
+    `기본 비서를 잠시 ${agentCode} 로 두기`,
+  );
+}
+
+/** test-support 가 메모리에 든 「잠시 바꾸기 전의 값」 이다. Control Plane 재기동 앞뒤로 옮긴다. */
+export type PrimaryOriginals = { profiles: Record<string, string | null>; owners: Record<string, number | null> };
+
+/** 잠시 바꾸기 전의 값을 읽는다. 재기동하면 잃으므로 러너가 내리기 전에 부른다. */
+export async function readPrimaryOriginals(context: Context): Promise<PrimaryOriginals> {
+  return expectStatus(
+    await call(context, "/test-support/primary-agent/originals", { token: context.tokens.dad }),
+    200,
+    "잠시 바꾸기 전의 기본 비서 읽기",
+  ).json<PrimaryOriginals>();
+}
+
+/** 읽어 둔 「잠시 바꾸기 전의 값」 을 다시 띄운 Control Plane 에 넣는다. */
+export async function rememberPrimaryOriginals(context: Context, originals: PrimaryOriginals): Promise<void> {
+  expectStatus(
+    await call(context, "/test-support/primary-agent/originals", { method: "PUT", token: context.tokens.dad, body: originals }),
+    200,
+    "잠시 바꾸기 전의 기본 비서 다시 넣기",
+  );
+}
+
+/** 잠시 바꾼 기본 비서와 에이전트 주인을 처음 값으로 되돌린다. 바꾼 것이 없으면 그대로다. */
+export async function restorePrimaries(context: Context): Promise<void> {
+  expectStatus(
+    await call(context, "/test-support/primary-agent/restore", { method: "POST", token: context.tokens.dad }),
+    200,
+    "잠시 바꾼 기본 비서 되돌리기",
+  );
 }

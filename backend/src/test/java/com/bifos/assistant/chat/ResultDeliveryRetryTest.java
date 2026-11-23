@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -92,6 +93,9 @@ class ResultDeliveryRetryTest {
 
     /** 결과 머리줄의 끝난 시각 형식이다. 기대값을 넣은 시각에서 따로 계산하려고 둔다. */
     private static final DateTimeFormatter SEOUL_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     HermesRunEventStream eventStream;
@@ -184,7 +188,7 @@ class ResultDeliveryRetryTest {
 
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = currentUser(user);
-        chief = agents.save(agent("dad", "비서", user.id()));
+        chief = primaries.make(user, agents.save(agent("dad", "비서", user.id())));
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()

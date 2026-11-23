@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -72,6 +73,9 @@ class PendingBeforeDelegationTest {
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
 
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     HermesRunEventStream eventStream;
 
@@ -156,7 +160,7 @@ class PendingBeforeDelegationTest {
 
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        Agent chief = agents.save(agent("dad", "비서", user.id()));
+        Agent chief = primaries.make(user, agents.save(agent("dad", "비서", user.id())));
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()

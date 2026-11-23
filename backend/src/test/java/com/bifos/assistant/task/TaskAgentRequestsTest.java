@@ -3,6 +3,7 @@ package com.bifos.assistant.task;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -62,6 +63,9 @@ class TaskAgentRequestsTest {
 
     /** 2026-11-20 서울 9시다. */
     private static final Instant NOW = Instant.parse("2026-11-20T00:00:00Z");
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     TestClock clock;
@@ -136,7 +140,7 @@ class TaskAgentRequestsTest {
 
 
     @Test
-    @DisplayName("맡긴 실행이 만든 작업은 맡겨진 에이전트로 돌고 매번 새 대화다")
+    @DisplayName("맡긴 실행이 만든 작업은 기본 비서로 돌고 매번 새 대화다")
     void delegatedRunCreatesPerRunTask() {
         CurrentUser owner = member();
         Agent parentAgent = agentOf(owner);
@@ -149,7 +153,8 @@ class TaskAgentRequestsTest {
 
         assertThat(result.error()).isFalse();
         Task task = only(owner);
-        assertThat(task.agentId()).isEqualTo(childAgent.id());
+        // 작업은 늘 기본 비서로 돈다(스펙 assistant-hub REQ7). 처음 만든 에이전트가 이 사용자의 기본 비서다.
+        assertThat(task.agentId()).isEqualTo(parentAgent.id());
         assertThat(task.conversationMode()).isEqualTo(ConversationMode.NEW_PER_RUN);
         assertThat(task.conversationId()).isNull();
     }
@@ -175,7 +180,7 @@ class TaskAgentRequestsTest {
 
 
     @Test
-    @DisplayName("고치기는 받은 칸만 바꾸고 에이전트, 모델 단계, 시간대, 대화 방식은 그대로다")
+    @DisplayName("고치기는 받은 칸만 바꾸고 모델 단계, 시간대, 대화 방식은 그대로다")
     void updatesOnlyGivenFields() {
         CurrentUser owner = member();
         Agent agent = agentOf(owner);
@@ -373,8 +378,8 @@ class TaskAgentRequestsTest {
 
     private Agent agentOf(CurrentUser owner) {
         String code = "ta-" + UUID.randomUUID().toString().substring(0, 8);
-        return agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id()));
+        return primaries.ensure(owner, agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id())));
     }
 
 

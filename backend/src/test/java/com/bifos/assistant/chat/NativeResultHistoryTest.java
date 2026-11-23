@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +61,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 class NativeResultHistoryTest {
     private static final String PROFILE = "native-history";
     private static final String EMAIL = "native-history@example.com";
+
+    @Autowired
+    ConversationEntry conversationEntry;
 
     @Autowired
     ChatService chat;
@@ -210,6 +214,6 @@ class NativeResultHistoryTest {
             List.of(),
             mock(SourceReadSummaries.class),
             noticeStatuses,
-            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class));
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), conversationEntry);
     }
 }

@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -58,6 +59,9 @@ class McpTaskToolsTest {
     int port;
 
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     AgentTokenService tokens;
 
     @Autowired
@@ -106,6 +110,10 @@ class McpTaskToolsTest {
         tokenRows.deleteAll();
         clean();
         dad = users.save(AppUser.of("task-dad-" + UUID.randomUUID() + "@example.com", "아빠", 1L, UserRole.MEMBER));
+        // 작업은 요청자의 기본 비서로 돈다(스펙 assistant-hub REQ7). 아빠의 기본 비서를 둔다.
+        String dadCode = "task-dad-" + UUID.randomUUID().toString().substring(0, 8);
+        primaries.make(dad, agents.save(Agent.of(dadCode, "아빠의 비서", dadCode, "http://runtime.test/p/" + dadCode,
+            CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id())));
         AppUser mom = users.save(AppUser.of("task-mom-" + UUID.randomUUID() + "@example.com", "엄마", 1L, UserRole.MEMBER));
         // 엄마가 그룹에 공개한 에이전트를 아빠가 쓴다. 검사 클래스들이 H2 하나를 함께 써서 앞 검사의 에이전트가 남으면 그것을 쓴다.
         momsAgent = agents.findAll().stream()

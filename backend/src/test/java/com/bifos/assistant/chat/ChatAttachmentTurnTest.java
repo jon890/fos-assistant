@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
@@ -95,6 +96,9 @@ import org.springframework.core.io.ByteArrayResource;
  */
 @BackendIntegrationTest
 class ChatAttachmentTurnTest {
+    @Autowired
+    ConversationEntry conversationEntry;
+
     @Autowired
     TestPrimaryAgents primaries;
 
@@ -918,7 +922,7 @@ class ChatAttachmentTurnTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class));
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), conversationEntry);
     }
 
 

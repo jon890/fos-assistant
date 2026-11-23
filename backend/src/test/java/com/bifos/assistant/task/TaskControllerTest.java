@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -54,6 +55,9 @@ class TaskControllerTest {
     private static final Instant BASE = Instant.parse("2026-10-04T00:00:00Z");
 
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     TaskService service;
 
     @Autowired
@@ -82,7 +86,7 @@ class TaskControllerTest {
         when(currentUser.require())
             .thenReturn(new CurrentUser(user.id(), user.email(), user.displayName(), 1L, UserRole.MEMBER));
         String code = "task-api-" + UUID.randomUUID().toString().substring(0, 8);
-        agent = agents.save(Agent.of(
+        agent = primaries.make(user, agents.save(Agent.of(
             code,
             "커리어 비서",
             code,
@@ -90,7 +94,7 @@ class TaskControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         mvc = MockMvcBuilders.standaloneSetup(new TaskController(currentUser, service))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -60,6 +61,9 @@ class NativeDelegationDeliveryTest {
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final String PROFILE = "native-wake";
     private static final String EMAIL = "native-wake@example.com";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ApplicationEventPublisher publisher;
@@ -124,9 +128,9 @@ class NativeDelegationDeliveryTest {
         });
         AppUser user = users.save(AppUser.of(EMAIL, "아빠", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        chief = agents.save(Agent.of(
+        chief = primaries.make(user, agents.save(Agent.of(
             "native-wake", "비서", "native-wake", "http://agent-runtime.test/p/native-wake", CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id())));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         origin = executions.save(AgentExecution.builder()
             .userId(dad.id())

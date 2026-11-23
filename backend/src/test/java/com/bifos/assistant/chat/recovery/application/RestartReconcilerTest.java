@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.recovery.application;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
 import com.bifos.assistant.chat.recovery.config.RestartReconcileProperties;
 import com.bifos.assistant.chat.turn.application.ChatService;
@@ -99,6 +100,9 @@ class RestartReconcilerTest {
 
     /** 대기 메시지 turn 과 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     ExecutionOutputs outputs;
 
     @Autowired
@@ -190,7 +194,7 @@ class RestartReconcilerTest {
 
         AppUser user = users.save(AppUser.of("reconcile-dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        chief = agents.save(agent("dad", "비서"));
+        chief = primaries.make(user, agents.save(agent("dad", "비서")));
         worker = agents.save(agent("worker", "조사원"));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
     }

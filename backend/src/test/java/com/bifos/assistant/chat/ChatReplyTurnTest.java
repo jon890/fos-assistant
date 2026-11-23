@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -83,6 +84,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ChatReplyTurnTest {
     private static final Instant NOW = Instant.parse("2026-11-21T00:00:00Z");
     private static final String ANSWER = "MEDIA:/opt/data/cache/generated/images/a.png\n수채화 고양이를 그렸어요.\n창가에 앉아 있어요.\n\n셋째 줄";
+
+    @Autowired
+    ConversationEntry conversationEntry;
 
     @Autowired
     TestPrimaryAgents primaries;
@@ -361,7 +365,7 @@ class ChatReplyTurnTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            images, mock(ArtifactPutFiles.class));
+            images, mock(ArtifactPutFiles.class), conversationEntry);
     }
 
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -71,6 +72,9 @@ class PendingMessageServiceTest {
     private static final Instant QUEUED_AT = Instant.parse("2026-09-30T00:00:00Z");
 
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     HermesRunEventStream eventStream;
 
@@ -147,7 +151,7 @@ class PendingMessageServiceTest {
         users.deleteAll();
 
         dad = signedUp("dad@example.com", "dad");
-        chief = agents.save(agent("dad", "비서", dad.id()));
+        chief = primaries.make(dad, agents.save(agent("dad", "비서", dad.id())));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         stub().willReturn(result("run", "답"));
     }

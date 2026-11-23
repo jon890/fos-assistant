@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -54,7 +55,7 @@ class SourceReadMessagesTest {
         List.of(),
         sourceReads,
         new AutoTurnNoticeStatuses(List.of()),
-        mock(GeneratedImageService.class), mock(ArtifactPutFiles.class));
+        mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), mock(ConversationEntry.class));
 
 
     @Test
