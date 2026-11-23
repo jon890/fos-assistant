@@ -78,6 +78,8 @@ class McpMemoryRememberToolTest {
     private static final String QUESTION = "우리 집   다른 사람은 홍길동이야. 기억해 줘";
     private static final String REMEMBERED = "기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다.";
     private static final String PROPOSED = "제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.";
+    private static final String UPDATE_PROPOSED = "지금은 기존 기억을 바로 고칠 수 없어 고치기 제안으로 남겼다. 사용자가 받아들이면 새 기억이 옛 기억을 대신한다. "
+        + "받아들인 새 기억에는 한 줄 요약이 없다. 같은 고치기를 다시 부르지 않고, 답에서 기억 화면이나 제안 카드에서 받아들여야 바뀐다고 알린다.";
 
     @LocalServerPort
     int port;
@@ -303,8 +305,8 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 확인하라고 답한다")
-    void refusesUpdateToSensitiveLookingContent() throws Exception {
+    @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 고치기 제안으로 남긴다")
+    void proposesUpdateToSensitiveLookingContent() throws Exception {
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", null));
         Long memoryId = onlyMemory().id();
@@ -313,9 +315,13 @@ class McpMemoryRememberToolTest {
 
         JsonNode result = call(arguments);
 
-        assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).startsWith("지금은 기존 기억을 고칠 수 없다");
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(text(result)).startsWith(UPDATE_PROPOSED);
         assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
+        assertThat(memoriesOfDad())
+            .filteredOn(memory -> !memory.id().equals(memoryId))
+            .extracting(Memory::status)
+            .containsExactly(MemoryStatus.PROPOSED);
     }
 
 
@@ -769,20 +775,174 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("바로 저장 조건이 아니면 기존 항목을 고치지 않고 사용자에게 확인하라고 답한다")
-    void refusesUpdateWithoutDirectConditions() throws Exception {
+    @DisplayName("바깥 글을 읽은 대화의 고치기는 고치기 제안으로 남고 사용자가 받아들이면 새 기억이 옛 기억을 대신한다")
+    void proposesUpdateWithoutDirectConditionsAndReplacesOnAccept() throws Exception {
+        // 운영에서 웹 검색을 한 대화의 「기억 #54 를 바꿔 줘」 가 「사용자에게 바꿀지 묻는다」 로 실패하고, 사용자가 바꿔 달라고 해도 같은 실패가 되풀이됐다
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 김철수다", "다른 사람은 홍길동이야"));
-        Long memoryId = onlyMemory().id();
+        Memory old = onlyMemory();
+        memoryService.update(currentDad(), old.id(), old.content(), true, null);
         ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", null);
-        arguments.put("memory_id", memoryId);
+        arguments.put("memory_id", old.id());
         toolStarted("web_search");
+
+        JsonNode result = call(arguments.deepCopy());
+        JsonNode again = call(arguments);
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(text(result)).isEqualTo(UPDATE_PROPOSED + " 옛 기억(번호 " + old.id() + ")을 받아들이면 대신한다.");
+        assertThat(text(again)).as("같은 고치기를 다시 불러도 제안을 하나만 두고 실패로 읽히지 않게 대신할 번호를 알린다")
+            .isEqualTo("같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다. 옛 기억(번호 " + old.id() + ")을 받아들이면 대신한다.");
+        assertThat(memories.findById(old.id()).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
+        List<Memory> proposals = memoriesOfDad().stream()
+            .filter(memory -> !memory.id().equals(old.id()))
+            .toList();
+        assertThat(proposals).hasSize(1);
+        Memory proposal = proposals.getFirst();
+        assertThat(proposal.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(proposal.retrieval()).as("사람이 켠 항상 싣기를 그대로 둔다").isEqualTo(MemoryRetrieval.ALWAYS);
+        assertThat(proposal.collection()).isEqualTo(old.collection());
+        assertThat(capturesOfDad())
+            .filteredOn(capture -> capture.memoryId().equals(proposal.id()))
+            .extracting(MemoryCapture::kind, MemoryCapture::externalRead, MemoryCapture::replacedMemoryIds)
+            .containsExactly(tuple(MemoryCaptureKind.PROPOSED, true, List.of(old.id())));
+
+        memoryService.accept(currentDad(), proposal.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isEqualTo(proposal.id());
+        assertThat(memories.findById(proposal.id()).orElseThrow().status()).isEqualTo(MemoryStatus.ACCEPTED);
+    }
+
+
+    @Test
+    @DisplayName("같은 글의 일반 제안이 먼저 있어도 고치기 제안을 따로 남겨 받아들이면 옛 기억을 대신한다")
+    void proposesUpdateEvenWhenSameGeneralProposalExists() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 김철수다", "다른 사람은 홍길동이야"));
+        Long old = onlyMemory().id();
+        toolStarted("web_search");
+        call(remember("다른 사람", "다른 사람은 홍길동이다", null));
+        ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", null);
+        arguments.put("memory_id", old);
 
         JsonNode result = call(arguments);
 
-        assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).isEqualTo("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.\n사용자에게 바로 알린다.");
-        assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
+        assertThat(text(result)).startsWith(UPDATE_PROPOSED);
+        MemoryCapture fix = capturesOfDad().stream()
+            .filter(capture -> capture.replacedMemoryIds().equals(List.of(old)))
+            .findFirst()
+            .orElseThrow();
+        memoryService.accept(currentDad(), fix.memoryId());
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old)).isEqualTo(fix.memoryId());
+    }
+
+
+    @Test
+    @DisplayName("고치기 제안 뒤 사람이 원본을 고쳤으면 옛 제안을 받아들이지 못하고 원본은 대체되지 않는다")
+    void refusesStaleUpdateProposal() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 김철수다", "다른 사람은 홍길동이야"));
+        Long old = onlyMemory().id();
+        toolStarted("web_search");
+        ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", null);
+        arguments.put("memory_id", old);
+        call(arguments);
+        Long proposal = memoriesOfDad().stream().map(Memory::id).filter(id -> !id.equals(old)).findFirst().orElseThrow();
+        memoryService.update(currentDad(), old, "다른 사람은 박영희다", false, null);
+
+        assertThatThrownBy(() -> memoryService.accept(currentDad(), proposal))
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
+
+        assertThat(memories.findById(proposal).orElseThrow().status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old)).isNull();
+        assertThat(memories.findById(old).orElseThrow().content()).isEqualTo("다른 사람은 박영희다");
+    }
+
+
+    @Test
+    @DisplayName("바로 고칠 수 없는 대화에서도 고칠 수 없는 번호는 제안 없이 찾지 못했다고 답한다")
+    void refusesUpdateProposalForUnreachableTargets() throws Exception {
+        AppUser mom = users.save(AppUser.of("mcp-memory-remember-" + UUID.randomUUID() + "@example.com", "엄마", 1L, UserRole.MEMBER));
+        CurrentUser currentMom = new CurrentUser(mom.id(), mom.email(), "엄마", 1L, UserRole.MEMBER);
+        Long others = memoryService.create(currentMom, MemoryScope.USER, "엄마 취미", "엄마는 등산을 좋아한다", false).id();
+        Long group = memoryService.create(currentDad(), MemoryScope.GROUP, "가족 규칙", "저녁은 7시에 먹는다", false).id();
+        Long deleted = memoryService.create(currentDad(), MemoryScope.USER, "옛 취미", "낚시를 한다", false).id();
+        memoryService.delete(currentDad(), deleted);
+        askedInThisTurn();
+        toolStarted("web_search");
+        call(remember("새 취미", "테니스를 친다", null));
+        Long proposed = memoriesOfDad().stream()
+            .filter(memory -> memory.status() == MemoryStatus.PROPOSED)
+            .findFirst()
+            .orElseThrow()
+            .id();
+        long before = memories.count();
+
+        for (Long target : List.of(others, group, proposed, deleted)) {
+            ObjectNode arguments = remember("바꾼 글", "바꾼 본문 " + target, null);
+            arguments.put("memory_id", target);
+            assertThat(text(call(arguments))).as("번호 %d", target).startsWith("고칠 기억을 찾지 못했다.");
+        }
+
+        assertThat(memories.count()).as("제안을 만들지 않는다").isEqualTo(before);
+        assertThat(memories.findById(others).orElseThrow().content()).isEqualTo("엄마는 등산을 좋아한다");
+        assertThat(memories.findById(group).orElseThrow().content()).isEqualTo("저녁은 7시에 먹는다");
+    }
+
+
+    @Test
+    @DisplayName("고치기 제안을 거절하면 원본은 그대로이고 원본이 지워진 뒤 받아들이면 새 기억만 남는다")
+    void keepsTargetOnRejectAndAcceptsAfterTargetDeleted() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 김철수다", "다른 사람은 홍길동이야"));
+        Long old = onlyMemory().id();
+        call(remember("사는 곳", "서울에 산다", "다른 사람은 홍길동이야"));
+        Long home = memoriesOfDad().stream().map(Memory::id).filter(id -> !id.equals(old)).findFirst().orElseThrow();
+        toolStarted("web_search");
+        ObjectNode first = remember("다른 사람", "다른 사람은 홍길동이다", null);
+        first.put("memory_id", old);
+        call(first);
+        ObjectNode second = remember("사는 곳", "부산에 산다", null);
+        second.put("memory_id", home);
+        // 한 실행의 상한(3)을 넘지 않게 다음 turn 에서 부른다
+        call(second, askedInNewRootRun());
+        Long rejected = proposalReplacing(old);
+        Long accepted = proposalReplacing(home);
+
+        memoryService.reject(currentDad(), rejected);
+        memoryService.delete(currentDad(), home);
+        memoryService.accept(currentDad(), accepted);
+
+        assertThat(memories.findById(old).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old)).isNull();
+        assertThat(memories.findById(accepted).orElseThrow().status()).isEqualTo(MemoryStatus.ACCEPTED);
+    }
+
+
+    private Long proposalReplacing(Long target) {
+        return capturesOfDad().stream()
+            .filter(capture -> capture.replacedMemoryIds().equals(List.of(target)))
+            .findFirst()
+            .orElseThrow()
+            .memoryId();
+    }
+
+
+    @Test
+    @DisplayName("기억 이전을 맡아 파일을 읽은 대화에서 남긴 본문은 바로 저장하지 않고 제안으로 남는다")
+    void proposesFileContentDuringMemoryMigration() throws Exception {
+        // 커리어 에이전트가 맥락 문서를 기억으로 옮길 때다. 도구 설명이 남겨도 된다고 알려도 판정은 실행의 출처로만 정한다
+        askedInThisTurn("작업 폴더의 맥락 문서를 기억으로 옮겨 줘");
+        toolStarted("read_file");
+
+        JsonNode result = call(remember("경력 요약", "백엔드 개발 8년, 결제와 정산 시스템을 맡았다", null)
+            .put("summary", "백엔드 8년, 결제와 정산"));
+
+        assertThat(text(result)).isEqualTo(PROPOSED);
+        Memory saved = onlyMemory();
+        assertThat(saved.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(onlyCapture().externalRead()).isTrue();
     }
 
 
