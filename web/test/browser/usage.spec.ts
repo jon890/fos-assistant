@@ -2,7 +2,7 @@
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
-import { filledTierProvider, isolatedUser, readGroupModelTiers, saveGroupModelTiers } from "./helpers.ts";
+import { clearPrimary, filledTierProvider, isolatedUser, readGroupModelTiers, saveGroupModelTiers, usePrimary } from "./helpers.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(): Promise<string> {
@@ -167,6 +167,8 @@ test("막힌 모델로 실행하면 모델을 쓸 수 없다는 응답을 받는
   const agent = await page.request.post("/api/agents", { data: { name: "사용량 막힘 비서" } });
   expect(agent.status()).toBe(201);
   const { code: agentCode } = (await agent.json()) as { code: string };
+  // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+  await usePrimary(isolatedMember.email, agentCode);
   try {
     const created = await page.request.post("/api/chat/conversations", { data: { agentCode } });
     expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
@@ -187,6 +189,7 @@ test("막힌 모델로 실행하면 모델을 쓸 수 없다는 응답을 받는
       await hermes.clearBlockedProviders();
     }
   } finally {
+    await clearPrimary(isolatedMember.email);
     const removed = await page.request.delete(`/api/agents/${agentCode}`);
     expect(removed.status()).toBe(204);
   }
@@ -386,6 +389,8 @@ test.describe("MEMBER 역할 사용자의 작업 과정", () => {
     await setSession(context, memberOf(testInfo.project.name));
     const response = await page.request.get("/api/agents");
     const mine = ((await response.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
+    // 기본 비서는 지울 수 없어 먼저 없앤다.
+    await clearPrimary(memberOf(testInfo.project.name).email);
     for (const agent of mine) {
       const deleted = await page.request.delete(`/api/agents/${agent.code}`);
       expect(deleted.status(), `검사가 만든 에이전트 ${agent.code} 를 지우지 못했다`).toBe(204);
@@ -402,10 +407,12 @@ test.describe("MEMBER 역할 사용자의 작업 과정", () => {
     await expect(page.getByRole("link", { name: "사용량", exact: true })).toHaveCount(0);
   });
 
-  test("대화의 작업 과정과 실행 상세에 내부 값이 없다", async ({ page }) => {
+  test("대화의 작업 과정과 실행 상세에 내부 값이 없다", async ({ page }, testInfo) => {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
     const agentCode = ((await created.json()) as { code: string }).code;
+    // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+    await usePrimary(memberOf(testInfo.project.name).email, agentCode);
 
     const sent = await page.request.post("/api/chat", {
       data: { text: "실행 상세 가림 검사", agentCode },
