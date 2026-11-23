@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, MessageSquare } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BoundAgent } from "@/lib/connection";
 import { boundReadiness } from "@/lib/connector-onboarding";
-import { withParticle } from "@/lib/korean-particle";
 import {
   createdMessage,
   type SpecialistAgentResult,
@@ -79,12 +77,6 @@ export function SpecialistAgentOffer({
             </span>
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button asChild>
-              <Link href={`/new?agent=${created.agentCode}`}>
-                <MessageSquare aria-hidden="true" />
-                {withParticle(created.agentName, "과", "와")} 대화하기
-              </Link>
-            </Button>
             <Button variant="outline" onClick={onClose}>
               닫기
             </Button>

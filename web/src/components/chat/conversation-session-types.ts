@@ -101,7 +101,6 @@ export type ConversationSessionProps = {
   agentsError: boolean;
   onRetryAgents(): void;
   agentCode: string;
-  onAgentCodeChange(code: string): void;
   /** `useConversation(conversationId)` 의 결과다 */
   currentConversation: ReturnType<typeof useConversation>;
 };

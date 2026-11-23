@@ -3,7 +3,6 @@
 import type { KeyboardEvent, RefObject } from "react";
 import type { useComposerOutgoing } from "./use-composer-outgoing";
 import { useLayoutEffect } from "react";
-import { filterAgents, findMention } from "./agent-mention";
 import {
   filterSkillNames,
   findSkillQuery,
@@ -22,33 +21,24 @@ type Context = { composing: RefObject<boolean> } & Pick<
     | "textareaRef"
     | "pendingCaretRef"
     | "caret"
-    | "dismissedMentionStart"
-    | "mentionIndex"
     | "skillDismissed"
     | "skillIndex"
-    | "setDismissedMentionStart"
     | "setSkillDismissed"
     | "setCaret"
-    | "setMentionIndex"
     | "setSkillIndex"
   > &
-  Pick<Props, "value" | "mention" | "skillNames" | "onChange">;
+  Pick<Props, "value" | "skillNames" | "onChange">;
 
 export function useComposerInput({
   textareaRef,
   pendingCaretRef,
   caret,
-  dismissedMentionStart,
-  mentionIndex,
   skillDismissed,
   skillIndex,
-  setDismissedMentionStart,
   setSkillDismissed,
   setCaret,
-  setMentionIndex,
   setSkillIndex,
   value,
-  mention,
   skillNames,
   onChange,
   composing,
@@ -72,17 +62,6 @@ export function useComposerInput({
     textarea.setSelectionRange(nextCaret, nextCaret);
   }, [value]);
 
-  const found = mention ? findMention(value, caret) : null;
-  const openMention =
-    found !== null && found.start !== dismissedMentionStart ? found : null;
-  const mentionMatches =
-    mention && openMention
-      ? filterAgents(mention.agents, openMention.query)
-      : [];
-  const activeMentionIndex = Math.min(
-    mentionIndex,
-    Math.max(0, mentionMatches.length - 1),
-  );
   const skillQuery =
     skillNames && !skillDismissed ? findSkillQuery(value, caret) : null;
   const skillMatches =
@@ -101,12 +80,8 @@ export function useComposerInput({
   );
 
   function changeValue(nextValue: string, nextCaret: number) {
-    const next = mention ? findMention(nextValue, nextCaret) : null;
-    if (next === null || next.start !== dismissedMentionStart)
-      setDismissedMentionStart(null);
     if (findSkillQuery(nextValue, nextCaret) === null) setSkillDismissed(false);
     setCaret(nextCaret);
-    setMentionIndex(0);
     setSkillIndex(0);
     onChange(nextValue);
   }
@@ -117,20 +92,10 @@ export function useComposerInput({
     changeValue(next.value, next.caret);
   }
 
-  function pickMention(code: string) {
-    if (!mention || !openMention) return;
-    const end = textareaRef.current?.selectionStart ?? caret;
-    pendingCaretRef.current = openMention.start;
-    mention.onPick(code);
-    changeValue(
-      value.slice(0, openMention.start) + value.slice(end),
-      openMention.start,
-    );
-  }
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const imeComposing = composing.current || event.nativeEvent.isComposing;
     if (skillMenuOpen && event.key === "Escape") {
-      // `@` 목록과 같다. 목록만 닫고 대화 화면의 중지나 패널 닫기로 넘기지 않는다.
+      // 목록만 닫고 대화 화면의 중지나 패널 닫기로 넘기지 않는다.
       event.preventDefault();
       event.stopPropagation();
       setSkillDismissed(true);
@@ -152,38 +117,6 @@ export function useComposerInput({
         return;
       }
     }
-    if (openMention && event.key === "Escape") {
-      // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
-      // 한글 조합 중에도 같다. 조합 중이라고 넘기면 목록이 떠 있는데 패널이 닫힌다.
-      event.preventDefault();
-      event.stopPropagation();
-      setDismissedMentionStart(openMention.start);
-      return;
-    }
-    if (openMention && !imeComposing) {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        if (mentionMatches.length > 0) {
-          const step = event.key === "ArrowDown" ? 1 : -1;
-          setMentionIndex(
-            (activeMentionIndex + step + mentionMatches.length) %
-              mentionMatches.length,
-          );
-        }
-        return;
-      }
-      if (
-        (event.key === "Enter" && !event.shiftKey) ||
-        (event.key === "Tab" && mentionMatches.length > 0)
-      ) {
-        // 목록이 떠 있는 동안의 Enter 는 고르기다. 맞는 것이 없어도 보내지 않는다.
-        // Shift+Enter 는 고르지 않고 평소처럼 줄을 바꾼다. 줄이 바뀌면 `@` 뒤에 공백이 생겨 목록이 닫힌다.
-        event.preventDefault();
-        const picked = mentionMatches[activeMentionIndex];
-        if (picked) pickMention(picked.code);
-        return;
-      }
-    }
     if (
       event.key !== "Enter" ||
       event.shiftKey ||
@@ -199,10 +132,6 @@ export function useComposerInput({
   return {
     changeValue,
     pickSkill,
-    pickMention,
-    openMention,
-    mentionMatches,
-    activeMentionIndex,
     skillQuery,
     skillMatches,
     skillMenuOpen,

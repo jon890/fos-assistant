@@ -1,4 +1,3 @@
-import type { AgentView } from "@/lib/agent";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { type ModelTierCode } from "@/lib/model-tiers";
 import type { MessageAttachment } from "./message-types";
@@ -30,16 +29,6 @@ export type Props = {
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
   canStop: boolean;
   onStop(): void;
-  /**
-   * 입력칸에 `@` 를 치면 에이전트를 고르는 목록을 띄운다. 새 대화에서는 대화의 에이전트를 고르고, 메시지가 있는
-   * 대화에서는 다음 보내기를 맡을 에이전트를 고른다. 대화의 에이전트는 첫 메시지가 정하고 그 뒤로 바뀌지 않는다.
-   */
-  mention?: { agents: AgentView[]; onPick(code: string): void };
-  /**
-   * 대화 중 `@` 로 고른, 다음 보내기를 맡을 에이전트다. 입력창 위에 「{이름}에게 맡기기」 칩을 그리고 지우기를 받는다.
-   * 고르지 않았으면 주지 않는다.
-   */
-  delegateTarget?: { agent: AgentView; onClear(): void };
   /** 답장으로 집은 것이다. 입력창 위에 작게 보이고 닫기를 받는다(스펙 chat-reference REQ4) */
   reply?: { target: ReplyTarget; onClear(): void };
   /**

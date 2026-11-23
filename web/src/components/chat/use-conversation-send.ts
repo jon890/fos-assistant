@@ -5,7 +5,6 @@ import { parseSkillCommand } from "./skill-command";
 import { emptyActivity, failActivity } from "./activity/activity-state";
 import { startChatStream } from "@/lib/chat-api";
 import { createPendingAnswer } from "./pending-answer";
-import { pendingMention } from "@/lib/mention";
 import { queueSourceOf } from "@/lib/pending-messages";
 import {
   TurnStreamState,
@@ -46,10 +45,8 @@ type Context = Pick<
   | "setTurns"
   | "conversationIdRef"
   | "refresh"
-  | "delegateTo"
-  | "setDelegateTo"
 > &
-  Pick<ConversationSessionProps, "conversationId" | "agentCode" | "agents"> &
+  Pick<ConversationSessionProps, "conversationId" | "agentCode"> &
   Pick<
     ConversationHistory,
     | "refreshMessages"
@@ -81,11 +78,8 @@ export function useConversationSend({
   setTurns,
   conversationIdRef,
   refresh,
-  delegateTo,
-  setDelegateTo,
   conversationId,
   agentCode,
-  agents,
   refreshMessages,
   settleInterruptedStream,
   queueMessage,
@@ -110,12 +104,6 @@ export function useConversationSend({
     )
       return false;
     const version = selectionVersion.current;
-    // `@` 로 고른 에이전트는 메시지가 있는 대화에서만 맡는다. 고른 값을 지금 읽고 비워, 다음 보내기에 남지 않게 한다.
-    const target =
-      delegateTo !== null && conversationIdRef.current !== null
-        ? (agents.find((agent) => agent.code === delegateTo) ?? null)
-        : null;
-    if (delegateTo !== null) setDelegateTo(null);
     let needsCreationRefresh = conversationIdRef.current === null;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
@@ -152,14 +140,12 @@ export function useConversationSend({
         senderName: null,
         attachments,
         reply,
-        delegatedTo: target ? pendingMention(target) : null,
       },
     ]);
     const restoreFailedMessage = () => {
       if (selectionVersion.current !== version) return;
       if (replacementText === undefined)
         setDraft((current) => (current.length === 0 ? text : current));
-      if (target) setDelegateTo(target.code);
       setTurns((previous) =>
         previous.filter(
           (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,
@@ -257,10 +243,8 @@ export function useConversationSend({
       code: string,
       message: string,
     ): Promise<boolean> => {
-      // 맡김은 대기 메시지로 넣지 않는다. 대기 메시지는 대화의 에이전트에게 간다.
       if (
         code === "CONVERSATION_BUSY" &&
-        target === null &&
         attachmentIds.length === 0 &&
         !reply &&
         conversationIdRef.current !== null
@@ -302,7 +286,6 @@ export function useConversationSend({
           text,
           agentCode,
           attachmentIds,
-          delegateTo: target?.code ?? null,
           reply: reply ? replyRequestOf(reply) : null,
         });
       } catch {

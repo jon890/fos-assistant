@@ -67,6 +67,14 @@ export function agentCodeParam(
 }
 
 /**
+ * 새 대화의 에이전트 코드다. 새 대화는 늘 요청자의 기본 비서와 시작한다(docs/features/assistant-hub/spec.md 의 REQ4).
+ * 목록은 켜진 에이전트만 담으므로 기본 비서가 꺼졌거나 없으면 빈 글이다.
+ */
+export function primaryCode(agents: AgentView[]): string {
+  return agents.find((agent) => agent.primary === true)?.code ?? "";
+}
+
+/**
  * 새 대화 화면에 보일 추천 질문이다. `GENERATING` 은 Control Plane 이 만드는 중이라 `prompts` 가 비어 있다.
  */
 export type StartersView = {

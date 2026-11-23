@@ -26,14 +26,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ConversationSession } from "./chat/conversation-session";
 import {
   useConversation,
   useConversations,
 } from "./shell/conversations-provider";
 import { fetchChatAgents } from "@/lib/chat-api";
-import { agentCodeParam, type AgentView } from "@/lib/agent";
+import { primaryCode, type AgentView } from "@/lib/agent";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
 export function ChatPanel({
@@ -42,9 +42,6 @@ export function ChatPanel({
   initialConversationId: string | null;
 }) {
   const pathname = usePathname();
-  // 「<에이전트>와 대화하기」 가 `/new?agent=<번호>` 로 연다. 목록에 있는 에이전트일 때만 그 에이전트를 고른다.
-  // 첫 메시지를 보내면 주소가 바뀌어 쿼리가 사라지므로, 처음 받은 값만 쓰고 목록을 다시 읽지 않는다.
-  const requestedAgent = useRef(agentCodeParam(useSearchParams().get("agent")));
   const { newConversationVersion } = useConversations();
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [agentsError, setAgentsError] = useState(false);
@@ -89,14 +86,9 @@ export function ChatPanel({
         if (!Array.isArray(data)) throw new Error("에이전트 목록 형식 오류");
         if (!valid()) return;
         setAgents(data);
-        if (activeConversationId.current === null) {
-          const requested = data.find(
-            (agent) => agent.code === requestedAgent.current,
-          );
-          setAgentCode((current) =>
-            data.length === 0 ? "" : current || requested?.code || data[0].code,
-          );
-        }
+        // 새 대화는 늘 기본 비서다(docs/features/assistant-hub/spec.md 의 REQ4). `?agent=` 는 읽지 않는다.
+        if (activeConversationId.current === null)
+          setAgentCode(primaryCode(data));
       })
       .catch(() => {
         if (valid()) setAgentsError(true);
@@ -133,7 +125,7 @@ export function ChatPanel({
       initialConversationId: null,
     }));
     setConversationId(null);
-    setAgentCode(agents[0]?.code ?? "");
+    setAgentCode(primaryCode(agents));
   }
 
   if (seenInitialId !== initialConversationId) {
@@ -172,7 +164,6 @@ export function ChatPanel({
       agentsError={agentsError}
       onRetryAgents={() => void readAgents()}
       agentCode={agentCode}
-      onAgentCodeChange={setAgentCode}
       currentConversation={currentConversation}
     />
   );

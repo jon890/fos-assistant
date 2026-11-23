@@ -18,7 +18,6 @@ type Context = Pick<
   | "sending"
   | "draft"
   | "setPendingBusy"
-  | "delegateTo"
 > &
   Pick<ConversationSend, "send">;
 
@@ -32,7 +31,6 @@ export function useConversationQueue({
   sending,
   draft,
   setPendingBusy,
-  delegateTo,
   send,
 }: Context) {
   /**
@@ -108,11 +106,6 @@ export function useConversationQueue({
     if (reply) {
       // 대기 메시지는 글만 받아 집은 것을 붙일 수 없다(스펙 chat-reference DECISION18).
       setError("답이 끝나면 답장을 보낼 수 있어요.");
-      return false;
-    }
-    if (delegateTo !== null) {
-      // 대기 메시지는 대화의 에이전트에게 가고 글만 받는다. 맡김을 그 줄에 넣지 않는다.
-      setError("답이 끝나고 대기 메시지를 보낸 뒤에 맡길 수 있어요.");
       return false;
     }
     if (attachmentIds.length > 0) {

@@ -48,8 +48,6 @@ export type Props = Pick<
   | "unknownSkill"
   | "composerBlocking"
   | "panelTarget"
-  | "delegateTo"
-  | "setDelegateTo"
 > &
   Pick<
     ConversationSessionProps,
@@ -60,7 +58,6 @@ export type Props = Pick<
     | "agentsLoading"
     | "agentsError"
     | "onRetryAgents"
-    | "onAgentCodeChange"
   > &
   Pick<ConversationHistory, "ensureConversation"> &
   Pick<

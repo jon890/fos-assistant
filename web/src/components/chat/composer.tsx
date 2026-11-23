@@ -5,8 +5,6 @@ import { ArrowUp, LoaderCircle, Plus, Square, X } from "lucide-react";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
-import { AgentMention, mentionOptionId } from "./agent-mention";
-import { DelegateChip } from "./delegate-chip";
 import { ReplyPreview } from "./reply-box";
 import { SkillCommandMenu } from "./skill-command-menu";
 import { skillOptionId } from "./skill-command";
@@ -28,7 +26,6 @@ export function Composer(props: Props) {
     onBlockingChange,
     disabled,
     running,
-    mention,
     skillNames,
     value,
     canQueue,
@@ -39,14 +36,12 @@ export function Composer(props: Props) {
     modelSelectionMode,
     modelTier,
     modelChoiceUnknown,
-    delegateTarget,
     reply,
   } = props;
   const {
     blocking,
     items,
     pickNotice,
-    mentionListId,
     skillListId,
     textareaRef,
     setCaret,
@@ -79,10 +74,6 @@ export function Composer(props: Props) {
   const {
     changeValue,
     pickSkill,
-    pickMention,
-    openMention,
-    mentionMatches,
-    activeMentionIndex,
     skillQuery,
     skillMatches,
     skillMenuOpen,
@@ -150,14 +141,6 @@ export function Composer(props: Props) {
         </div>
       ) : null}
 
-      {delegateTarget ? (
-        <DelegateChip
-          agent={delegateTarget.agent}
-          onClear={delegateTarget.onClear}
-          disabled={disabled || outgoing !== null}
-        />
-      ) : null}
-
       {reply ? (
         <div className="mb-2">
           <ReplyPreview
@@ -195,15 +178,6 @@ export function Composer(props: Props) {
           "rounded-2xl border border-input bg-card focus-within:border-ring",
         )}
       >
-        {mention && openMention ? (
-          <AgentMention
-            id={mentionListId}
-            agents={mention.agents}
-            query={openMention.query}
-            activeIndex={activeMentionIndex}
-            onPick={pickMention}
-          />
-        ) : null}
         {skillNames && skillMenuOpen && skillQuery !== null ? (
           <SkillCommandMenu
             id={skillListId}
@@ -218,19 +192,11 @@ export function Composer(props: Props) {
           rows={1}
           value={value}
           aria-label="메시지"
-          aria-controls={
-            openMention
-              ? mentionListId
-              : skillMenuOpen
-                ? skillListId
-                : undefined
-          }
+          aria-controls={skillMenuOpen ? skillListId : undefined}
           aria-activedescendant={
-            openMention && mentionMatches.length > 0
-              ? mentionOptionId(mentionListId, activeMentionIndex)
-              : skillMenuOpen && skillMatches.length > 0
-                ? skillOptionId(skillListId, activeSkillIndex)
-                : undefined
+            skillMenuOpen && skillMatches.length > 0
+              ? skillOptionId(skillListId, activeSkillIndex)
+              : undefined
           }
           onChange={(event) =>
             changeValue(event.target.value, event.target.selectionStart)
