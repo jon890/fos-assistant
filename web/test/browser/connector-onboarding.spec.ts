@@ -160,7 +160,6 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
   for (const picked of [code, groupCode]) {
     await page.goto(`/new?agent=${picked}`);
     await expect(page.getByTestId("primary-unavailable")).toBeVisible();
-    await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
   }
 });
 

@@ -30,8 +30,6 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
 test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 유지한다", async ({ page }, testInfo) => {
   await page.goto("/new");
   await expect(page).toHaveTitle("검사용 비서");
-  // 새 대화 화면은 좁은 폭 머리 가운데에 이름표를 두므로 머리의 이름은 제목을 정하지 않는 화면에서 본다.
-  await page.goto("/tasks");
 
   // 모바일 머리줄과 넓은 화면의 사이드바에서 홈 이름을 한 번만 읽는다.
   const home = page.getByRole("link", { name: "검사용 비서 홈", exact: true });

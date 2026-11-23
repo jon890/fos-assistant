@@ -1,9 +1,9 @@
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import { expectStartAgent, startAgentTag } from "./helpers.ts";
+import { waitForStartComposer } from "./helpers.ts";
 import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 /**
- * 입력창 안 아래 줄과 새 대화 화면의 이름표를 본다(docs/features/app-shell/spec.md 의 REQ8-REQ10).
+ * 입력창 안 아래 줄과 새 대화 및 대화 화면의 머리 줄을 본다(docs/features/app-shell/spec.md 의 REQ8-REQ10).
  *
  * <p>휴대폰 폭은 스펙이 정한 360px 로 줄여 본다. 프로젝트의 기본 폭은 그보다 넓다.
  */
@@ -21,7 +21,7 @@ async function box(locator: Locator) {
 test("입력창 아래 줄에 사진 단추와 모델 단계와 보내기가 테두리 안 한 줄에 겹치지 않게 있다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
 
   const shell = page.getByTestId("composer-shell");
   const attach = shell.getByRole("button", { name: "사진 첨부" });
@@ -53,26 +53,28 @@ test("입력창 아래 줄에 사진 단추와 모델 단계와 보내기가 테
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("새 대화 화면의 이름표는 기본 비서의 이름만 보이고 고르는 목록이 없다", async ({ page }, testInfo) => {
+test("새 대화 화면에 비서 아이콘과 이름이 없고 휴대폰에서는 앱 홈 링크가 보인다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
+
+  await expect(page.getByRole("main").getByTestId("agent-badge")).toHaveCount(0);
+  await expect(page.getByRole("main").getByText("브라우저 비서", { exact: true })).toHaveCount(0);
   if (testInfo.project.name === "mobile") {
-    // 휴대폰은 위 막대 가운데 자리다. 그 자리의 홈 링크는 이름표로 바뀐다.
-    await expect(page.getByTestId("shell-title-slot").getByTestId("start-agent-tag")).toBeVisible();
-  } else {
-    await expect(page.getByTestId("start-agent-header").getByTestId("start-agent-tag")).toBeVisible();
+    const banner = page.getByRole("banner");
+    const home = banner.getByRole("link", { name: /홈$/ });
+    await expect(home).toHaveText("검사용 비서");
+    await expect(home).toBeVisible();
+    await expect(home).toHaveAttribute("href", "/");
+    await expect(banner.getByText("브라우저 비서", { exact: true })).toHaveCount(0);
+    await expect(banner.getByTestId("agent-badge")).toHaveCount(0);
   }
-  // 새 대화는 늘 기본 비서다(스펙 assistant-hub REQ4). 이름표는 단추가 아니라 눌러도 목록이 열리지 않는다.
-  await expect(startAgentTag(page).getByRole("button")).toHaveCount(0);
-  await startAgentTag(page).click();
-  await expect(page.getByRole("menuitemradio")).toHaveCount(0);
 });
 
-test("새 대화에서 보내면 기본 비서의 대화가 시작되고 이름표는 머리 줄의 이름으로 바뀐다", async ({ page }, testInfo) => {
+test("새 대화에서 보내면 기본 비서의 대화가 시작되고 머리 줄에 비서 이름이 보인다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
 
   await page.getByRole("textbox", { name: "메시지" }).fill(`기본 비서 대화 ${testInfo.project.name}`);
   await page.getByRole("button", { name: "보내기" }).click();
@@ -80,7 +82,6 @@ test("새 대화에서 보내면 기본 비서의 대화가 시작되고 이름�
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 
   // 메시지가 있는 대화는 머리 줄에 그 대화의 이름표만 있고 목록을 여는 단추가 없다(app-shell 스펙의 REQ10).
-  await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
   if (testInfo.project.name === "mobile") {
     const home = page.getByRole("banner").getByRole("link", { name: /홈$/ });
     await expect(home).toHaveText("브라우저 비서");
@@ -95,7 +96,7 @@ test("새 대화에서 보내면 기본 비서의 대화가 시작되고 이름�
 test("「＋」 를 누르면 메뉴 없이 사진을 고르는 창이 바로 열리고 고른 사진이 붙는다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
 
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
@@ -127,5 +128,4 @@ test("에이전트 목록을 읽지 못하면 휴대폰 위 막대 가운데에 
 
   await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
   await expect(page.getByRole("banner").getByRole("link", { name: /홈$/ })).toBeVisible();
-  await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
 });

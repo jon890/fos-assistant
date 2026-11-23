@@ -1,0 +1,64 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createServer, type AddressInfo } from "node:net";
+import { once } from "node:events";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { pickAppPort } from "../port-guard.ts";
+
+for (const host of ["127.0.0.1", "::"]) {
+  test(`${host} 포트가 사용 중이면 명시한 포트는 실패하고 기본 포트는 경고한 뒤 바꾼다`, async (t) => {
+    const originalPort = process.env.E2E_APP_PORT;
+    t.after(() => {
+      if (originalPort === undefined) delete process.env.E2E_APP_PORT;
+      else process.env.E2E_APP_PORT = originalPort;
+    });
+    const warn = t.mock.method(console, "warn", () => {});
+    const server = createServer();
+    server.listen(0, host);
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const conflict = new RegExp(`TCP 포트 ${port} 사용 중\\. PID ${process.pid} \\(.*node.*\\)`);
+      process.env.E2E_APP_PORT = String(port);
+      await assert.rejects(pickAppPort(port), conflict);
+      assert.equal(warn.mock.callCount(), 0);
+
+      delete process.env.E2E_APP_PORT;
+      const fallback = await pickAppPort(port);
+      assert.notEqual(fallback, port);
+      assert.equal(warn.mock.callCount(), 1);
+      assert.match(warn.mock.calls[0].arguments[0], conflict);
+      assert.match(warn.mock.calls[0].arguments[0], new RegExp(`빈 포트 ${fallback}에서 계속합니다`));
+      assert.ok(server.listening);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    process.env.E2E_APP_PORT = String(port);
+    assert.equal(await pickAppPort(port), port);
+  });
+}
+
+test("lsof가 없어도 러너는 명시한 포트를 열 수 없으면 서버 기동 전에 멈춘다", async () => {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+
+  try {
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("../run.ts", import.meta.url))], {
+      env: { ...process.env, PATH: "", E2E_APP_PORT: String(port) },
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    assert.ifError(run.error);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, new RegExp(`TCP 포트 ${port} 사용 중`));
+    assert.match(run.stderr, /PID와 명령 줄을 확인하지 못했습니다/);
+    assert.doesNotMatch(run.stdout, /Hermes 기동|Control Plane 기동/);
+    assert.ok(server.listening);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
