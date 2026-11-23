@@ -79,8 +79,7 @@ import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { userExecutionLimitScenario } from "./scenarios/user-execution-limit.ts";
 import { deployCheckScenario, E2E_QUALITY_FEATURE_TIMEOUT } from "./scenarios/deploy-check.ts";
 import { E2E_QUALITY_EVAL_TIMEOUT, evalRunScenario } from "./scenarios/eval-run.ts";
-import { pickPort } from "../support/pick-port.ts";
-import { assertPortAvailable } from "./port-guard.ts";
+import { pickAppPort } from "./port-guard.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_APP_PORT = 18_080;
@@ -411,8 +410,7 @@ async function main(): Promise<void> {
   let scenarioStartedAt = performance.now();
 
   try {
-    await assertPortAvailable(Number(process.env.E2E_APP_PORT || DEFAULT_APP_PORT));
-    const appPort = pickPort("E2E_APP_PORT", DEFAULT_APP_PORT);
+    const appPort = await pickAppPort(DEFAULT_APP_PORT);
     const skillRoot = await makeSkillRoot(work);
     console.log("== fake Hermes 기동");
     hermes = await startFakeHermes({

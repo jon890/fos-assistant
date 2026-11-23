@@ -2,24 +2,38 @@ import assert from "node:assert/strict";
 import { createServer, type AddressInfo } from "node:net";
 import { once } from "node:events";
 import { test } from "node:test";
-import { assertPortAvailable } from "../port-guard.ts";
+import { pickAppPort } from "../port-guard.ts";
 
 for (const host of ["127.0.0.1", "::"]) {
-  test(`${host}에서 듣는 서버의 PID와 명령 줄을 알리고, 닫은 포트는 통과한다`, async () => {
+  test(`${host} 포트가 사용 중이면 명시한 포트는 실패하고 기본 포트는 경고한 뒤 바꾼다`, async (t) => {
+    const originalPort = process.env.E2E_APP_PORT;
+    t.after(() => {
+      if (originalPort === undefined) delete process.env.E2E_APP_PORT;
+      else process.env.E2E_APP_PORT = originalPort;
+    });
+    const warn = t.mock.method(console, "warn", () => {});
     const server = createServer();
     server.listen(0, host);
     await once(server, "listening");
     const { port } = server.address() as AddressInfo;
 
     try {
-      await assert.rejects(assertPortAvailable(port), (error: Error) => {
-        assert.match(error.message, new RegExp(`TCP 포트 ${port} 사용 중\\. PID ${process.pid} \\(.*node.*\\)`));
-        assert.match(error.message, /앞 e2e 실행이 남긴 프로세스일 수 있습니다/);
-        return true;
-      });
+      const conflict = new RegExp(`TCP 포트 ${port} 사용 중\\. PID ${process.pid} \\(.*node.*\\)`);
+      process.env.E2E_APP_PORT = String(port);
+      await assert.rejects(pickAppPort(port), conflict);
+      assert.equal(warn.mock.callCount(), 0);
+
+      delete process.env.E2E_APP_PORT;
+      const fallback = await pickAppPort(port);
+      assert.notEqual(fallback, port);
+      assert.equal(warn.mock.callCount(), 1);
+      assert.match(warn.mock.calls[0].arguments[0], conflict);
+      assert.match(warn.mock.calls[0].arguments[0], new RegExp(`빈 포트 ${fallback}에서 계속합니다`));
+      assert.ok(server.listening);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
-    await assertPortAvailable(port);
+    process.env.E2E_APP_PORT = String(port);
+    assert.equal(await pickAppPort(port), port);
   });
 }
