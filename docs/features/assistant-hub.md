@@ -28,3 +28,7 @@ covers: `backend/src/main/java/com/bifos/assistant/orchestration/application/Del
 맡긴 실행도 Hermes 사건 스트림을 열어 그 실행 줄에 도구 사건을 남긴다(`ChildRunEvents`, [실행 기록](execution.md) 의 「사건 옮겨 적기」).
 대화의 turn 이 바로 맡긴 실행의 도구 사건은 대화 단위 SSE 의 `delegation_activity` 로 가고([대화와 대기열](chat.md) 의 「화면으로 보내는 사건」), 화면은 도는 답의 작업 과정에 맡은 에이전트의 도우미 줄을 두고 그 아래 도구 줄을 들여 보인다.
 답이 끝날 때 아직 도는 맡긴 실행은 「맡겨 둠」 이고 답을 실패로 세지 않는다. 실행 트리의 노드는 `delegated` 칸으로 맡긴 실행을 알려 새로 고쳐도 같게 그린다.
+
+## 배포 뒤 확인
+
+Hermes 와 주고받는 것을 바꿨으므로 배포한 뒤 평가 계정으로 한 번씩 왕복한다. 항목과 통과 기준은 [스펙](assistant-hub/spec.md) 의 「배포 뒤 왕복 확인」 이 갖고, 실행 방법과 운영 값은 `fos-home-infra` 가 갖는다.
