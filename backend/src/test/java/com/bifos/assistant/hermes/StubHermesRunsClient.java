@@ -312,7 +312,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
-        stoppedProfiles.put(runId, profileName);
+        if (runId != null && profileName != null) {
+            stoppedProfiles.put(runId, profileName);
+        }
         stopped.add(runId);
         onStop.accept(runId);
     }
@@ -331,7 +333,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
-        lookupProfiles.put(runId, profileName);
+        if (runId != null && profileName != null) {
+            lookupProfiles.put(runId, profileName);
+        }
         lookups.add(runId);
         LookupFailure failure = lookupFailures.get(runId);
         if (failure != null && failure.remaining().getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
@@ -374,7 +378,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
-        sessionRuntimeProfiles.put(sessionId, profileName);
+        if (sessionId != null && profileName != null) {
+            sessionRuntimeProfiles.put(sessionId, profileName);
+        }
         sessionLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
         return sessionRuntime;
     }
