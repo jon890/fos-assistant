@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { MessageSquare } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { describeError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
 import { PageFrame } from "@/components/ui/page-frame";
@@ -60,8 +57,6 @@ type Props = {
   listHref: string;
   /** 관리자 영역에서 그리면 참이다. 관리자 영역은 화면 머리 틀을 쓰지 않고 지금 폭으로 감싼다. */
   admin: boolean;
-  /** 이 에이전트와 새 대화를 여는 주소다. 요청자가 대화할 수 있는 에이전트일 때만 있다. */
-  chatHref?: string | null;
   /** 「소개」 절의 처음 값이다. 목록에서 찾지 못하면 없고 절을 그리지 않는다. */
   introduction?: AgentIntroductionValue;
 };
@@ -106,7 +101,6 @@ export function AgentDetailBody({
   adminError,
   listHref,
   admin,
-  chatHref = null,
   introduction,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
@@ -273,16 +267,6 @@ export function AgentDetailBody({
     <PageFrame
       title={name}
       back={{ href: listHref, label: PAGE_HEADS.agents.title }}
-      action={
-        chatHref ? (
-          <Button asChild variant="outline" size="sm">
-            <Link href={chatHref}>
-              <MessageSquare aria-hidden="true" />
-              대화하기
-            </Link>
-          </Button>
-        ) : null
-      }
     >
       {sections}
     </PageFrame>

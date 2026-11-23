@@ -1,6 +1,6 @@
 // 코드 규칙: rule-47. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 /** 실행할 profile 은 요청자가 고른 에이전트에서만 나온다는 것을 본다. */
-import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, step, usePrimary, type Scenario } from "../harness.ts";
 
 /** 사용량 시나리오가 기대하는 provider 와 모델이다. 에이전트는 모델을 갖지 않아 가짜 Hermes 의 기본 런타임 값과 같게 둔다. */
 export const DAD_BINDING = {
@@ -48,6 +48,9 @@ export const bindingScenario: Scenario = {
       200,
       "에이전트 등록",
     );
+
+    step("그 에이전트가 dad 의 기본 비서가 된다");
+    await usePrimary(context, context.tokens.dad, "dad");
 
     step("member 는 admin 전용 엔드포인트를 쓰지 못한다");
     expectStatus(

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +47,9 @@ import org.springframework.data.domain.PageRequest;
 @BackendIntegrationTest
 class ChatInterimTest {
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     ChatService chat;
     @Autowired
     ConversationAccess access;
@@ -74,9 +78,9 @@ class ChatInterimTest {
         agentCode = "interim-" + UUID.randomUUID().toString().substring(0, 8);
         var saved = users.save(AppUser.of(agentCode + "@example.com", "안내 검사", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
-        agents.save(Agent.of(agentCode, agentCode, agentCode, "http://agent-runtime.test",
+        primaries.make(saved, agents.save(Agent.of(agentCode, agentCode, agentCode, "http://agent-runtime.test",
             CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
     }
 
 

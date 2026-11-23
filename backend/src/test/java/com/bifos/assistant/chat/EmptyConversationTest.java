@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -33,6 +34,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** 사진을 먼저 올리거나 모델을 먼저 고르려고 메시지 없이 만드는 대화와, 그 대화의 제목을 첫 메시지가 정하는 것을 확인한다. */
 @BackendIntegrationTest
 class EmptyConversationTest {
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -103,19 +107,20 @@ class EmptyConversationTest {
 
 
     @Test
-    @DisplayName("읽을 수 없거나 꺼진 에이전트는 새 대화를 만들 때와 같은 오류다")
-    void unreadableOrDisabledAgentGivesSameErrorAsCreatingNewConversation() {
+    @DisplayName("다른 에이전트를 고르거나 기본 비서가 꺼졌으면 새 대화를 만들 때와 같은 오류다")
+    void otherAgentOrDisabledPrimaryGivesSameErrorAsCreatingNewConversation() {
         CurrentUser dad = member("dad@example.com");
         CurrentUser kid = member("kid@example.com");
         agentOf(kid, "kid");
+        // dad 의 첫 에이전트라 기본 비서다
         Agent off = agentOf(dad, "off");
         off.changeAccess(false, AgentVisibility.PRIVATE, dad.id());
         agents.save(off);
 
         assertSameCode(
-            () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.AGENT_NOT_FOUND);
+            () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.VALIDATION_FAILED);
         assertSameCode(
-            () -> chat.startEmpty(dad, "off"), () -> chat.send(dad, null, "안녕", "off"), ErrorCode.AGENT_DISABLED);
+            () -> chat.startEmpty(dad, null), () -> chat.send(dad, null, "안녕", null), ErrorCode.AGENT_DISABLED);
         assertThat(chat.conversationsOf(dad, null, 100).items()).isEmpty();
     }
 
@@ -127,7 +132,7 @@ class EmptyConversationTest {
 
 
     private Agent agentOf(CurrentUser owner, String code) {
-        Agent saved = agents.save(Agent.of(
+        Agent saved = primaries.make(owner, agents.save(Agent.of(
             code,
             code,
             code,
@@ -135,7 +140,7 @@ class EmptyConversationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id()));
+            owner.id())));
         return saved;
     }
 

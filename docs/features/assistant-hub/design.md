@@ -52,12 +52,21 @@
 - 맡겨 둔 도우미: 답이 끝날 때 아직 도는 맡긴 실행의 도우미 줄은 지금 규칙대로면 「결과를 받지 못함」 이 되고 접힌 줄이 「끝까지 하지 못했어요」 로 바뀐다. 맡긴 실행(자식 실행 번호를 열쇠로 둔 줄)은 새 상태 「맡겨 둠」 으로 남기고 답의 실패 판정에서 뺀다. 트리(`fromTree`)도 위임 키가 있는 도는 자식을 같은 상태로 그린다. 문장은 「끝나면 이어서 알려 드려요」 이고 `docs/features/execution.md` 의 하위 에이전트 상태 표에 더한다.
 - 새 표와 칸은 없다. 사건은 기존 `execution_event` 에 자식 실행 번호로 쌓인다.
 
-### PR2, PR3
+### PR2 입구를 비서로 모으기
 
-- 새 대화: `POST /conversations` 와 보내기의 에이전트 입력을 받지 않거나 무시하지 않고, 기본 비서가 아니면 `VALIDATION_FAILED` 로 거절한다. 웹이 먼저 바뀌어도 서버가 막는다.
-- 읽기 전용: 대화 응답에 `writable` 을 더한다. 판정은 `PrimaryAgents` 로 지금 기본 비서인지다(스펙 DECISION22). 점검 대화(`purpose = CHECK`)는 판정 밖이다.
+운영 코드가 PR 하나의 상한을 넘어 둘로 나눈다(DECISION5). 앞 PR 은 새 대화와 `@`, 「대화하기」, 지시문과 평가 세트(REQ4, REQ6, REQ8)이고, 뒤 PR 은 읽기 전용 대화와 예약 작업(REQ5, REQ7)이다. 앞 PR 만 배포된 동안 지난 전문 에이전트 대화는 지금처럼 이어 쓸 수 있다.
+
+- **새 대화의 에이전트**: `chat.conversation.application` 의 새 `ConversationEntry` 가 요청자의 기본 비서(`PrimaryAgents.of`)를 정한다. 새 대화를 만드는 두 길(`ChatTurnRouting.route` 의 새 대화, `ChatConversationManagement.startEmpty`)이 이것만 쓴다. 요청의 `agentCode` 가 비었으면 기본 비서이고, 기본 비서와 다른 코드면 `VALIDATION_FAILED` 다. 기본 비서가 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED` 다. 웹이 먼저 바뀌어도 서버가 막는다.
+- **읽기 전용**: 같은 클래스의 `writable(user, conversation)` 이 대화의 에이전트가 지금 기본 비서인지 본다(스펙 DECISION22). 점검 대화(`purpose = CHECK`)는 늘 참이다(DECISION16). 사람이 쓰는 네 길이 `requireWritable` 로 막는다: 보내기(`ChatTurnRouting.route`), 다시 생성과 결과 다시 전달(`ChatController`, `ChatService` 가 파일 길이 상한에 닿아 컨트롤러에서 본다), 대기 메시지(`PendingMessageController`). 거절은 `VALIDATION_FAILED` 다. 자동 turn, 예약 turn, 위임 결과는 막지 않는다. 대화 응답(`ConversationView`)에 `writable` 을 더한다.
+- **`@` 맡기기**: 보내기 요청의 `delegateTo` 가 있으면 `VALIDATION_FAILED` 다. `TurnIntent.Mention` 과 `ChatTurnRouting.routeMention` 을 지운다. 지난 맡김을 그리는 `MentionLines` 와 다음 turn 입력에 넣는 `MentionInputs` 는 남긴다. [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md) 은 새로 맡기는 부분만 대체되어 파일은 옮기지 않고 그 머리와 목록에 적는다(일부만 대체된 ADR 은 옮기지 않는다는 `docs/adr/INDEX.md` 규칙).
+- **예약 작업**: 사람의 입구 둘이 에이전트를 기본 비서로 정한다. 화면 API(`TaskController` 의 만들기·고치기)는 요청의 `agentCode` 를 받지 않고, 에이전트 도구(`TaskAgentRequests` 의 만들기·고치기)는 실행의 에이전트 대신 기본 비서를 쓴다. 매일 깨우기와 이벤트 감시처럼 `TaskService` 를 바로 부르는 내부 길은 그대로다. 멈추기·다시 켜기는 에이전트를 바꾸지 않는다(DECISION23).
+- **지시문**: `ServiceConceptsInstructions` 의 에이전트 고르기 줄을 「대화의 에이전트는 바뀌지 않고 그 에이전트의 일은 내가 맡겨 처리한다, 링크를 붙이지 않는다」 로 바꾼다. `DelegationTargetsInstructions` 머리에 「사용자가 아래 에이전트의 이름을 말하며 맡기라고 하면 그 에이전트에게 맡긴다」 를 더한다. 평가 세트(`test/model-eval/concepts/questions.json`)의 바꾸기 문항은 링크가 없는 답을 기대하고, 이름으로 맡기는 문항은 `agent_delegate` 를 기대한다.
+- **테스트 준비**: 기본 비서는 허용 목록 줄로만 찾는데 테스트 사용자는 그 줄 없이 만든다. backend 통합 테스트는 `testsupport.TestPrimaryAgents` 로 대화할 에이전트를 그 사용자의 기본 비서로 두고 검사마다 지운다. e2e 와 브라우저 테스트는 test-support API(`/api/v1/test-support/primary-agent`, `/api/v1/test-support/chat/conversations`)로 기본 비서를 정하거나 다른 에이전트와의 지난 대화를 만든다. 다른 에이전트의 실행 자체를 보는 시나리오는 지난 대화로 보낸다.
+- **웹**: 새 대화 화면은 목록의 `primary` 에이전트로 고정하고 이름표 목록과 `@` 고르기를 그리지 않는다. `?agent=` 는 읽지 않는다. 에이전트 상세, 전문 에이전트 만들기 제안, 연결 뒤 고르기의 「대화하기」 를 지운다. 대화 응답의 `writable` 이 거짓이면 입력창 대신 안내 줄과 대화방 링크를 보이고 다시 생성과 다시 전달 단추를 그리지 않는다. 작업 화면의 에이전트 칸을 지운다.
+
+### PR3
+
 - 스킬 맡기기: 보내기 요청에 `skillAgent`(에이전트 코드)와 스킬 커맨드를 받는다. 칸 이름과 예약 작업 지시의 글 꼴은 PR3 설계에서 정한다.
-- [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md) 은 PR2 가 대체한다. 그 PR 에서 status 를 바꾸고 `archive/` 로 옮긴다.
 
 ## 실패와 일관성
 
@@ -67,6 +76,7 @@
 - **같은 profile 의 호출이 멈춘다.** Hermes 는 profile 마다 Control Plane MCP 연결 하나를 잠금(`_rpc_lock`)으로 묶어 호출을 하나씩 보낸다. 기다리는 동안 같은 사용자의 비서로 도는 다른 실행의 Control Plane 도구 호출이 멈추고, 기다림이 줄을 서면 뒤 호출이 300초 제한에 걸릴 수 있다. 사용자가 이 위험을 받아들였다(스펙 DECISION28). 맡은 실행이 같은 profile 이면 그 실행이 끝날 수 없으므로 `DelegationWaiter` 가 기다리지 않는다.
 - 사건 스트림이 끊기거나 늦게 와도 자식의 끝은 `awaitCompletion` 이 정한다. 끝난 뒤 온 사건은 버린다(ADR-090 과 같다).
 - 배포 순서: PR1 은 Control Plane 과 웹만 바꾼다. 웹이 먼저 떠도 `delegation_activity` 를 받지 않을 뿐이고, Control Plane 이 먼저 떠도 웹이 모르는 사건을 버린다.
+- 배포 순서(PR2 앞 PR): 웹과 Control Plane 을 함께 배포한다. Control Plane 만 먼저 뜨거나 옛 화면 탭이 열린 채로 남으면, 옛 웹은 새로 고치기 전까지 새 대화를 목록의 첫 에이전트로 보낸다. 그 에이전트가 기본 비서가 아니면 `VALIDATION_FAILED` 로 거절되고, 옛 `@` 맡김 보내기도 거절된다. 저장되는 것은 없고 입력한 글은 입력창에 돌아온다.
 
 ## 검증 전략
 
@@ -76,7 +86,11 @@
 | REQ2 | 상한 0 이면 지금과 같은 결과 | backend 테스트 |
 | REQ3 | 자식 실행에 도구 사건이 저장되고 트리 API 에 보이는 e2e, `delegation_activity` 의 가리기 단위 테스트, 도는 답의 블록에 도우미 아래 도구 줄이 보이는 브라우저 테스트 | `test/e2e/`, `web/test/browser/` |
 | REQ1-REQ3 | 배포 뒤 왕복(스펙 「배포 뒤 왕복 확인」) | 운영, 평가 계정 |
-| REQ4-REQ10 | PR2, PR3 설계 때 정한다 | |
+| REQ4 | 새 대화와 빈 대화가 늘 기본 비서로 생기고 다른 코드는 거절하는 통합 테스트(`ConversationEntryTest`), `/new` 와 `?agent=` 가 비서만 보이는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
+| REQ6 | `delegateTo` 거절(`MentionDelegationTest`), `@` 고르기가 없는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
+| REQ6, REQ8 | 평가 세트의 데이터와 채점 테스트, 배포 뒤 운영 모델로 서비스 개념 묶음 | `test/model-eval/`, 운영 평가 계정 |
+| REQ5, REQ7 | PR2 의 뒤 PR 계획 때 정한다 | |
+| REQ9, REQ10 | PR3 설계 때 정한다 | |
 
 ## 결정
 
@@ -86,6 +100,7 @@
 | DECISION2 | 예산을 두는 곳 | 루트 실행별 메모리 맵 | 작성자 | 표를 늘리지 않는다. 루트 잠금과 중지 표시도 서버 하나를 전제로 메모리에 있다 |
 | DECISION3 | 자식 사건의 실시간 중계 | 새 SSE 사건 `delegation_activity` 를 대화 단위 SSE 로 보낸다. 웹이 트리를 주기적으로 읽지 않는다 | 작성자 | 도는 답은 흘러온 사건으로 그리는 지금 규칙(`docs/features/execution.md` 「작업 과정 패널」)과 맞다. 맡긴 줄도 같은 길(`DelegationLineNotifier`)로 간다 |
 | DECISION4 | 장기 결정 기록 | [ADR-20261121 / delegate-wait](../../../backend/docs/adr/ADR-20261121-delegate-wait.md) 를 남기고 ADR-017 「`agent_delegate` 는 기다리지 않는다」 와 ADR-040 「부모는 맡긴 뒤 기다리지 않는다」 를 대화 turn 에서 대체한다 | 작성자 | 되돌리면 도구 계약과 결과 전달 규칙을 함께 바꿔야 한다 |
+| DECISION5 | PR2 나눔 | 앞 PR 은 REQ4, REQ6, REQ8, 뒤 PR 은 REQ5, REQ7 | 작성자 | 계획의 운영 코드 추정이 상한을 넘었다. 새 대화와 `@` 는 서버와 화면이 함께 바뀌어야 끊기지 않고, 읽기 전용과 예약 작업은 앞 PR 없이도 서로 독립이다 |
 
 ## 결정 기록 연결
 

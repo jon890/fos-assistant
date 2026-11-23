@@ -19,7 +19,8 @@
     {"id":"connection-known","tag":"connection","turns":[{"text":"{connectorTitle} 연결해 줘"}],"expect":{"tools":["connector_list"],"linkPrefixes":["/connections/{connectorId}"],"absent":["연결했어요","연결했습니다"]}},
     {"id":"connection-attach","tag":"connection","turns":[{"text":"{connectorTitle} 연결 마쳤어. 이 에이전트에서 쓰게 해 줘"}],"expect":{"linkPrefixes":["/connections/{connectorId}"],"absent":["연결했어요","연결했습니다","붙였어요","붙였습니다"]}},
     {"id":"connection-unknown","tag":"connection","turns":[{"text":"싸이월드 연결해 줘"}],"expect":{"links":["/connections"],"includes":["없"],"absent":["연결했어요","연결했습니다"]}},
-    {"id":"agent-switch","tag":"agent_pick","turns":[{"text":"{otherAgentName}로 바꿔 줘"}],"expect":{"links":["/new?agent={otherAgentCode}"],"absent":["바꿨어요","바꿨습니다"]}},
-    {"id":"agent-unknown","tag":"agent_pick","turns":[{"text":"우주여행 비서로 바꿔 줘"}],"expect":{"noLinkPrefixes":["/new?agent="],"absent":["바꿨어요","바꿨습니다"]}}
+    {"id":"agent-switch","tag":"agent_pick","turns":[{"text":"{otherAgentName}로 바꿔 줘"}],"expect":{"noLinkPrefixes":["/new?agent="],"includes":["맡"],"absent":["바꿨어요","바꿨습니다"]}},
+    {"id":"agent-delegate-by-name","tag":"agent_pick","turns":[{"text":"{otherAgentName}한테 맡겨서 지금 할 수 있는 일을 한 줄로 알려 달라고 해 줘"}],"expect":{"tools":["agent_delegate"],"noLinkPrefixes":["/new?agent="]}},
+    {"id":"agent-unknown","tag":"agent_pick","turns":[{"text":"우주여행 비서로 바꿔 줘"}],"expect":{"noLinkPrefixes":["/new?agent="],"includes":["{otherAgentName}"],"absent":["바꿨어요","바꿨습니다"]}}
   ]
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, MessageSquare } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { BindConfirm } from "@/components/agent/agent-connections-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import {
   boundReadiness,
   type AgentChoice,
 } from "@/lib/connector-onboarding";
-import { withParticle } from "@/lib/korean-particle";
 
 type Agents =
   | { kind: "loading" }
@@ -184,17 +183,11 @@ function BoundResult({
           className="mt-0.5 size-4 shrink-0 text-success"
         />
         <span>
-          이제 「{bound.choice.name}」 대화에서 「{title}」 도구를 써요.{" "}
-          {readiness}
+          이제 「{bound.choice.name}」 에이전트가 「{title}」 도구를 써요.
+          비서에게 부탁하면 이 에이전트에게 맡겨요. {readiness}
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button asChild>
-          <Link href={`/new?agent=${bound.choice.code}`}>
-            <MessageSquare aria-hidden="true" />
-            {withParticle(bound.choice.name, "과", "와")} 대화하기
-          </Link>
-        </Button>
         <Button variant="outline" onClick={onClose}>
           닫기
         </Button>
@@ -207,8 +200,8 @@ function BoundResult({
  * 연결을 마친 직후 같은 자리에서 그 연결을 쓸 에이전트를 고르게 한다.
  *
  * <p>고르면 바로 붙인다. 셸, 파일, 코드 실행 도구가 켜진 에이전트만 에이전트 화면과 같은 확인 창을 거친다. 그런
- * 도구가 연결의 비밀값에 닿거나 승인 없이 서비스를 부를 수 있기 때문이다(ADR-086). 붙이고 나면 그 에이전트와
- * 대화하기로 잇는다. 붙일 수 있는 에이전트가 없으면 에이전트를 만드는 길을 안내한다.
+ * 도구가 연결의 비밀값에 닿거나 승인 없이 서비스를 부를 수 있기 때문이다(ADR-086). 붙이고 나면 비서가 그
+ * 에이전트에게 맡긴다고 알린다(docs/features/assistant-hub/spec.md 의 REQ4). 붙일 수 있는 에이전트가 없으면 에이전트를 만드는 길을 안내한다.
  */
 export function ConnectorAgentChooser({
   connectorId,

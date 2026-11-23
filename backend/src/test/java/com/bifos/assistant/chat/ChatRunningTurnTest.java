@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -49,6 +50,9 @@ import org.springframework.data.domain.PageRequest;
  */
 @BackendIntegrationTest
 class ChatRunningTurnTest {
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -110,7 +114,7 @@ class ChatRunningTurnTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             user.id());
-        agents.save(agent);
+        primaries.make(user, agents.save(agent));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

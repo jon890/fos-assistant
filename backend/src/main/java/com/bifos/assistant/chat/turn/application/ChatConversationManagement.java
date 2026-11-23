@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.conversation.application.FoundLinks;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
@@ -34,6 +35,7 @@ class ChatConversationManagement {
     private final PendingMessageStore pendingMessages;
     private final FoundLinks foundLinks;
     private final DecisionFeedbackRecorder feedback;
+    private final ConversationEntry entry;
 
 
     /** 예약 작업 발화가 미리 만들었다가 쓰지 않은 대화만 부른다. 메시지가 있으면 지우지 않는다. */
@@ -103,12 +105,12 @@ class ChatConversationManagement {
     /**
      * 메시지 없이 제목이 빈 대화를 만든다.
      *
-     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 에이전트를 쓸 수 있는지
-     * 확인하며 사진을 받지 않는 에이전트는 보낼 때 거절한다.
+     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 에이전트는 보내기의 새 대화와 같게
+     * 요청자의 기본 비서다({@link ConversationEntry}). 사진을 받지 않는 에이전트는 보낼 때 거절한다.
      * 제목은 첫 메시지가 정한다.
      */
     Conversation startEmpty(CurrentUser user, String agentCode) {
-        Agent agent = agents.requireStartable(user, agentCode);
+        Agent agent = entry.startAgent(user, agentCode);
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
     }
 

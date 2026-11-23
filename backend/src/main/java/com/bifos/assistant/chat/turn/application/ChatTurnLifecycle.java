@@ -89,8 +89,7 @@ class ChatTurnLifecycle {
         Consumer<ChatEvent> onEvent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
-        // 맡김은 대화의 session 을 잇지 않는다. 대화 에이전트의 session 에 다른 에이전트의 turn 이 섞이지 않게 한다.
-        RunSession session = intent instanceof TurnIntent.Mention ? RunSession.fresh() : sessions.ensure(conversation);
+        RunSession session = sessions.ensure(conversation);
         RunCommand command = new RunCommand(
             agent.runtimeTarget(),
             text,
@@ -175,14 +174,10 @@ class ChatTurnLifecycle {
 
     ChatTurn finish(PendingTurn pending, RunResult result, ModelChoice requested) {
         Instant now = clock.instant();
-        // 맡김은 새 session 으로 돌았다. 대화의 session 은 두고 바뀐 시각만 올린다.
-        boolean mention = pending.intent() instanceof TurnIntent.Mention;
-        if (!mention) {
-            pending.conversation().rememberSession(result.sessionId(), now);
-        }
+        pending.conversation().rememberSession(result.sessionId(), now);
         conversationWriter.touchSession(
             pending.conversation().id(),
-            mention || result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
+            result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
             now);
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
@@ -192,10 +187,7 @@ class ChatTurnLifecycle {
             return finishCheck(pending, proactive.check(), execution.id(), answer);
         }
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
-        // 추천 질문은 대화 에이전트와의 이력으로 만든다. 맡김으로는 다시 만들지 않는다.
-        if (!mention) {
-            starterSuggestions.refreshIfStale(pending.user(), pending.agent());
-        }
+        starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
             pending.conversation().id(),
             pending.conversation().publicId(),
@@ -252,8 +244,7 @@ class ChatTurnLifecycle {
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null
             && result.sessionId() != null
-            && !result.sessionId().isBlank()
-            && !(pending.intent() instanceof TurnIntent.Mention)) {
+            && !result.sessionId().isBlank()) {
             Instant now = clock.instant();
             pending.conversation().rememberSession(result.sessionId(), now);
             conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), now);

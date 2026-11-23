@@ -30,14 +30,8 @@ export function useComposerState({ disabled, value }: Props) {
   const itemsRef = useRef<AttachmentItem[]>([]);
   /** 전송 요청에 실은 첨부다. 응답을 기다리는 동안에는 메시지에 묶일 수 있어 정리에서 지우지 않는다 */
   const sendingItemsRef = useRef<AttachmentItem[]>([]);
-  const mentionListId = useId();
-  /** 입력칸의 커서 자리다. `@` 목록은 커서 앞의 글만 본다 */
+  /** 입력칸의 커서 자리다. `/` 목록은 커서 앞의 글만 본다 */
   const [caret, setCaret] = useState(0);
-  /** `Esc` 로 닫은 `@` 의 자리다. 같은 `@` 뒤에 글을 더 쳐도 다시 띄우지 않는다 */
-  const [dismissedMentionStart, setDismissedMentionStart] = useState<
-    number | null
-  >(null);
-  const [mentionIndex, setMentionIndex] = useState(0);
   const skillListId = useId();
   /** `Esc` 로 `/` 목록을 닫았다. 첫 낱말을 다 치거나 `/` 를 지울 때까지 다시 띄우지 않는다 */
   const [skillDismissed, setSkillDismissed] = useState(false);
@@ -73,13 +67,8 @@ export function useComposerState({ disabled, value }: Props) {
     mountedRef,
     itemsRef,
     sendingItemsRef,
-    mentionListId,
     caret,
     setCaret,
-    dismissedMentionStart,
-    setDismissedMentionStart,
-    mentionIndex,
-    setMentionIndex,
     skillListId,
     skillDismissed,
     setSkillDismissed,

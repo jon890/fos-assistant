@@ -277,12 +277,30 @@
         "{otherAgentName}로 바꿔 줘"
       ],
       "expect": {
-        "links": [
-          "/new?agent={otherAgentCode}"
+        "noLinkPrefixes": [
+          "/new?agent="
+        ],
+        "includes": [
+          "맡"
         ],
         "absent": [
           "바꿨어요",
           "바꿨습니다"
+        ]
+      }
+    },
+    {
+      "id": "agent-delegate-by-name",
+      "concept": "agent_pick",
+      "messages": [
+        "{otherAgentName}한테 맡겨서 지금 할 수 있는 일을 한 줄로 알려 달라고 해 줘"
+      ],
+      "expect": {
+        "tools": [
+          "agent_delegate"
+        ],
+        "noLinkPrefixes": [
+          "/new?agent="
         ]
       }
     },
@@ -295,6 +313,9 @@
       "expect": {
         "noLinkPrefixes": [
           "/new?agent="
+        ],
+        "includes": [
+          "{otherAgentName}"
         ],
         "absent": [
           "바꿨어요",

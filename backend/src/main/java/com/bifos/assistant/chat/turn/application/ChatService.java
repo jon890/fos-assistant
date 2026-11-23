@@ -99,11 +99,11 @@ public class ChatService {
     }
 
 
-    /** {@code delegateTo} 가 있으면 그 에이전트에게 바로 맡긴다(ADR-20261112 / mention-delegation). */
+    /** {@code delegateTo} 가 있으면 거절한다. {@code @} 맡기기는 없앴다(비서 중심 대화 스펙 REQ6). */
     public ChatTurn send(
         CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds, String delegateTo) {
         Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo, null);
-        return chatTurnRunner.runTurn(user, routed, text, TurnIntent.forSend(delegateTo), event -> {
+        return chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {
         }, false, null);
     }
 
@@ -123,7 +123,7 @@ public class ChatService {
         List<Long> attachmentIds, String delegateTo, ReplyPick reply,
         Consumer<ChatEvent> onEvent) {
         Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo, reply);
-        TurnIntent intent = TurnIntent.forSend(delegateTo);
+        TurnIntent intent = new TurnIntent.Fresh();
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
         TurnHandle handle = chatTurnRouting.openTurn(user, routed);

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -67,6 +68,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @BackendIntegrationTest
 class ChatRegenerateTest {
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -424,7 +428,7 @@ class ChatRegenerateTest {
 
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             profileName,
             profileName,
             profileName,
@@ -432,7 +436,7 @@ class ChatRegenerateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

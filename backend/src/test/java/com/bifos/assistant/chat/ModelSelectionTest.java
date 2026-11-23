@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -109,6 +110,9 @@ class ModelSelectionTest {
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
 
     @Autowired
+    TestPrimaryAgents primaries;
+
+    @Autowired
     ChatService chat;
 
     @Autowired
@@ -179,7 +183,7 @@ class ModelSelectionTest {
 
         AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
-        agents.save(Agent.of(
+        primaries.make(saved, agents.save(Agent.of(
             AGENT_CODE,
             "고름",
             AGENT_CODE,
@@ -187,7 +191,7 @@ class ModelSelectionTest {
             CostMode.API,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            saved.id()));
+            saved.id())));
     }
 
 

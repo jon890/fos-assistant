@@ -3,7 +3,7 @@
  *
  * <p>만든 에이전트는 지운 상태로 남는다. 뒤의 시나리오가 목록을 셀 때 섞이지 않게 한다.
  */
-import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 
 type AgentView = { code: string; name: string; visibility: string; editable: boolean; ownedByMe: boolean };
 type AdminAgentView = { code: string; hermesProfile: string };
@@ -41,7 +41,8 @@ export const agentLifecycleScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.kid,
-        body: { text: question, agentCode: created.code },
+        // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+        body: { conversationId: await seedConversation(context, context.tokens.kid, created.code), text: question },
       }),
       200,
       "만든 에이전트와 대화",

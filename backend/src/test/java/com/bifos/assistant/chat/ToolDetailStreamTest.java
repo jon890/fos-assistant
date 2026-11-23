@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -178,6 +179,9 @@ class ToolDetailStreamTest {
     private static final String QUERY = "제주 날씨";
     private static final String GOAL = "숙소를 찾는다";
     private static final String SUBAGENT_MODEL = "example-model-small";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -453,7 +457,7 @@ class ToolDetailStreamTest {
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             name,
             name,
             name,
@@ -461,7 +465,7 @@ class ToolDetailStreamTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;

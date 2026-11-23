@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent;
 
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,6 +58,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class AgentLifecycleFlagsTest {
 
     private static final Instant DELETED_AT = Instant.parse("2026-09-29T00:00:00Z");
+
+    @Autowired
+    ConversationRepository conversations;
 
     @Autowired
     AgentService agentService;
@@ -138,8 +142,9 @@ class AgentLifecycleFlagsTest {
     @DisplayName("지운 에이전트의 기존 대화에 보내면 없는 에이전트이고 Hermes 를 부르지 않는다")
     void sendingToConversationOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
-        agents.save(privateAgentOf(helper, owner));
-        Conversation conversation = chat.startEmpty(owner, helper);
+        // 새 대화는 기본 비서로만 열리므로 전문 에이전트와의 지난 대화를 바로 저장한다(스펙 assistant-hub REQ4).
+        Agent saved = agents.save(privateAgentOf(helper, owner));
+        Conversation conversation = conversations.save(Conversation.startedBy(owner.id(), "", saved.id(), Instant.now()));
         Agent agent = agents.findByCode(helper).orElseThrow();
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
@@ -154,8 +159,9 @@ class AgentLifecycleFlagsTest {
     @DisplayName("지운 에이전트의 답을 다시 만들면 없는 에이전트이고 Hermes 를 부르지 않는다")
     void regeneratingReplyOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
-        agents.save(privateAgentOf(helper, owner));
-        Conversation conversation = chat.startEmpty(owner, helper);
+        // 새 대화는 기본 비서로만 열리므로 전문 에이전트와의 지난 대화를 바로 저장한다(스펙 assistant-hub REQ4).
+        Agent saved = agents.save(privateAgentOf(helper, owner));
+        Conversation conversation = conversations.save(Conversation.startedBy(owner.id(), "", saved.id(), Instant.now()));
         messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), "오늘 숙제가 뭐였지?", Instant.now()));
         Agent agent = agents.findByCode(helper).orElseThrow();
         agent.markDeleted(DELETED_AT);

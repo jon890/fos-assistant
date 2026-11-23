@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -60,6 +61,7 @@ class ChatTurnRouting {
     private final ChatConversationQueries chatConversationQueries;
     private final TurnSteerLedger steerLedger;
     private final ReplyTargets replyTargets;
+    private final ConversationEntry entry;
 
 
     /**
@@ -68,7 +70,7 @@ class ChatTurnRouting {
      * <p>첨부 판정을 메시지를 저장하기 전에 모두 끝낸다. 첨부는 대화에 올리므로 첨부가 있으면 대화
      * 번호도 있어야 하고, 그것을 대화를 만들기 전에 본다. 거절은 모두 {@code VALIDATION_FAILED} 다.
      *
-     * <p>에이전트를 새 대화를 저장하기 전에 정한다. 새 대화는 {@code agentCode} 의 에이전트, 이어 쓰는 대화는
+     * <p>에이전트를 새 대화를 저장하기 전에 정한다. 새 대화는 요청자의 기본 비서({@link ConversationEntry}), 이어 쓰는 대화는
      * 그 대화의 에이전트다. 스킬 커맨드의 이름이 그 에이전트의 켜진 스킬이 아니면 대화를 만들기 전에
      * {@code SKILL_COMMAND_UNKNOWN} 으로 거절한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다.
      *
@@ -89,7 +91,7 @@ class ChatTurnRouting {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "attachments need an existing conversation");
         }
         Conversation existing = conversationId == null ? null : access.requireOwn(user, conversationId);
-        Agent agent = existing == null ? agents.requireStartable(user, agentCode) : agents.requireById(existing.agentId());
+        Agent agent = existing == null ? entry.startAgent(user, agentCode) : agents.requireById(existing.agentId());
         // 지운 에이전트의 대화는 읽기만 된다. 꺼진 것보다 먼저 봐야 없는 에이전트로 알린다.
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -114,7 +116,12 @@ class ChatTurnRouting {
     }
 
 
-    /** 보내기 요청의 대화와 에이전트다. 맡길 에이전트가 있으면 {@link #routeMention}, 없으면 {@link #route} 다. */
+    /**
+     * 보내기 요청의 대화와 에이전트다.
+     *
+     * <p>{@code @} 로 다른 에이전트에게 바로 맡기는 길은 없앴다(비서 중심 대화 스펙 REQ6). 맡길 에이전트가 오면 아무것도 저장하기
+     * 전에 {@code VALIDATION_FAILED} 로 거절한다. 답장은 이어 쓰는 대화에서만 받는다.
+     */
     Routed routeSend(
         CurrentUser user,
         Long conversationId,
@@ -123,51 +130,13 @@ class ChatTurnRouting {
         List<Long> attachmentIds,
         String delegateTo,
         ReplyPick reply) {
-        boolean delegating = delegateTo != null && !delegateTo.isBlank();
-        // 답장은 이어 쓰는 대화에서만 받고 맡김과 함께 받지 않는다. 맡김은 사진을 받지 않는다(설계 chat-reference DECISION8).
-        if (reply != null && (conversationId == null || delegating)) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply needs an existing conversation without a delegation");
+        if (delegateTo != null && !delegateTo.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "delegating with @ is no longer supported");
         }
-        if (!delegating) {
-            return route(user, conversationId, text, agentCode, attachmentIds, reply);
+        if (reply != null && conversationId == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply needs an existing conversation");
         }
-        return routeMention(user, conversationId, delegateTo, attachmentIds);
-    }
-
-
-    /**
-     * 사용자가 {@code @} 로 고른 에이전트에게 바로 맡길 turn 의 대화와 에이전트를 정한다(ADR-20261112 / mention-delegation).
-     *
-     * <p>맡김은 메시지가 하나라도 있는 대화에서만 받는다(spec DECISION21). 맡을 에이전트는 요청자가 쓸 수 있고 켜진 에이전트만
-     * 받는다. 요청 본문이 고르지만 새 대화의 {@code agentCode} 와 같은 판정이다. 사진은 함께 받지 않고, 글은 스킬 커맨드로
-     * 판별하지 않는다. 거절은 모두 아무것도 저장하기 전에 한다.
-     *
-     * @throws ApiException {@code VALIDATION_FAILED}(대화가 없거나 비었다, 사진이 있다, 대화의 에이전트 자신이다),
-     * {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_NOT_FOUND}
-     */
-    Routed routeMention(
-        CurrentUser user, Long conversationId, String delegateTo, List<Long> attachmentIds) {
-        Instant requestReceivedAt = clock.instant();
-        if (conversationId == null) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs an existing conversation");
-        }
-        if (attachmentIds != null && !attachmentIds.isEmpty()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation does not take attachments");
-        }
-        Conversation conversation = access.requireOwn(user, conversationId);
-        Agent own = agents.requireById(conversation.agentId());
-        // 지운 에이전트의 대화는 읽기만 된다. 보통 보내기와 같은 오류다.
-        if (own.isDeleted()) {
-            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
-        }
-        if (!messages.existsByConversationId(conversation.id())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs a conversation with messages");
-        }
-        Agent target = agents.requireStartable(user, delegateTo);
-        if (Objects.equals(target.id(), conversation.agentId())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs another agent");
-        }
-        return new Routed(conversation, target, List.of(), null, requestReceivedAt, false);
+        return route(user, conversationId, text, agentCode, attachmentIds, reply);
     }
 
 
@@ -308,16 +277,13 @@ class ChatTurnRouting {
         if (intent instanceof TurnIntent.Regenerate regenerate) {
             return regenerate.question() == null ? null : regenerate.question().id();
         }
-        if (!(intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Mention)) {
+        if (!(intent instanceof TurnIntent.Fresh fresh)) {
             return null;
         }
-        // 맡김 질문은 사용자가 바로 보낸 질문과 같게 저장한다. 대기 줄에서 꺼내지 않는다.
-        List<Long> pendingIds = intent instanceof TurnIntent.Fresh fresh ? fresh.pendingIds() : List.of();
+        List<Long> pendingIds = fresh.pendingIds();
         // 이미 대화에 보인 steer 말풍선은 새 메시지로 다시 남기지 않고 「다음 차례로 넘어감」 으로 바꾼다(ADR-20261116 / run-steer).
-        List<Long> carriedIds = intent instanceof TurnIntent.Fresh fresh ? fresh.carriedMessageIds() : List.of();
-        String questionText = intent instanceof TurnIntent.Fresh fresh && fresh.questionText() != null
-            ? fresh.questionText()
-            : text;
+        List<Long> carriedIds = fresh.carriedMessageIds();
+        String questionText = fresh.questionText() != null ? fresh.questionText() : text;
         boolean newQuestion = !questionText.isEmpty();
         ChatMessage question = transactions.execute(status -> {
             ChatMessage saved = null;

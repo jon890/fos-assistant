@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -72,6 +73,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.time.Instant;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
@@ -93,6 +95,9 @@ import org.springframework.core.io.ByteArrayResource;
  */
 @BackendIntegrationTest
 class ChatAttachmentTurnTest {
+    @Autowired
+    TestPrimaryAgents primaries;
+
     @Autowired
     HermesToolsetClient attachmentTools;
 
@@ -826,11 +831,12 @@ class ChatAttachmentTurnTest {
     @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
     void groupAgentOwnedByAnotherUserRejectsPhotos() {
         CurrentUser mom = member("mom@example.com");
-        Agent shared = agentOf(dad, "shared");
+        Agent shared = otherAgentOf(dad, "shared");
         shared.changeAccess(true, AgentVisibility.GROUP, dad.id());
         agents.save(shared);
         assertThat(shared.acceptsAttachments()).isFalse();
-        Long conversationId = chat.startEmpty(mom, "shared").id();
+        // 새 대화는 기본 비서로만 열리므로 그룹 에이전트와의 지난 대화를 바로 저장한다(스펙 assistant-hub REQ4).
+        Long conversationId = conversations.save(Conversation.startedBy(mom.id(), "", shared.id(), Instant.now())).id();
         ChatAttachment photo = upload(mom, conversationId, "b.png");
 
         assertRejected(() -> chat.send(mom, conversationId, "사진 봐", null, List.of(photo.id())));
@@ -1011,8 +1017,15 @@ class ChatAttachmentTurnTest {
     }
 
 
+    /** 그 사용자의 기본 비서를 만든다. */
     private Agent agentOf(CurrentUser owner, String code) {
-        Agent saved = agents.save(Agent.of(
+        return primaries.make(owner, otherAgentOf(owner, code));
+    }
+
+
+    /** 기본 비서가 아닌 그 사용자의 에이전트를 만든다. */
+    private Agent otherAgentOf(CurrentUser owner, String code) {
+        return agents.save(Agent.of(
             code,
             code,
             code,
@@ -1021,7 +1034,6 @@ class ChatAttachmentTurnTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             owner.id()));
-        return saved;
     }
 
 

@@ -1,5 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import { isolatedUser } from "./helpers.ts";
+import { isolatedUser, seedConversation } from "./helpers.ts";
 
 test("대역의 장애와 쓰지 않은 보류를 다음 검사에 남기지 않는다", async ({
   hermes,
@@ -26,8 +26,15 @@ test("검사 전용 사용자는 다른 폭과 반복의 대화가 없는 상태
   expect(created.status()).toBe(201);
   const { code } = await created.json();
   try {
+    // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+    const me = (await (await page.request.get("/api/me")).json()) as {
+      email: string;
+    };
     const sent = await page.request.post("/api/chat", {
-      data: { text: "격리된 대화 검사", agentCode: code },
+      data: {
+        conversationId: await seedConversation(code, me.email),
+        text: "격리된 대화 검사",
+      },
     });
     expect(sent.ok()).toBeTruthy();
     await page.goto(`/agents/${code}`);

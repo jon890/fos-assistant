@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -45,6 +46,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 class SandboxFileSpaceTurnTest {
 
     private static final String QUESTION = "메모를 md 로 만들어 내 파일 공간에 넣어 줘";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -156,7 +160,7 @@ class SandboxFileSpaceTurnTest {
 
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             profileName,
             profileName,
             profileName,
@@ -164,7 +168,7 @@ class SandboxFileSpaceTurnTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 }

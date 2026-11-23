@@ -1,11 +1,11 @@
 import { expect, test } from "./fixtures.ts";
-import { pickAgent } from "./helpers.ts";
+import { expectStartAgent } from "./helpers.ts";
 import { LONG_ACTIVITY_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 async function send(page: Page, text: string) {
   await page.goto("/new");
-  await pickAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }

@@ -15,7 +15,6 @@ class TurnIntentScopeTest {
     void conversationTurns() {
         assertThat(TurnIntent.scope(new TurnIntent.Fresh())).isEqualTo(InstructionScope.CONVERSATION);
         assertThat(TurnIntent.scope(new TurnIntent.Regenerate(null, null))).isEqualTo(InstructionScope.CONVERSATION);
-        assertThat(TurnIntent.scope(new TurnIntent.Mention())).isEqualTo(InstructionScope.CONVERSATION);
         assertThat(TurnIntent.scope(new TurnIntent.DelegationResults(null, false, List.of())))
             .isEqualTo(InstructionScope.CONVERSATION);
         assertThat(TurnIntent.scope(new TurnIntent.DelegationResults(null, true, List.of())))

@@ -38,9 +38,11 @@ test("없어야 할 말은 완료를 말하는 꼴이라 바른 거절을 미달
       assert.match(word, /(?:어요|습니다)$/, `${question.id} 의 「${word}」`);
 });
 
-test("꼭 있어야 할 문항이 있다: 없는 에이전트, 없는 서비스, 연결했다고 말하지 않기", () => {
+test("꼭 있어야 할 문항이 있다: 없는 에이전트, 이름으로 맡기기, 없는 서비스, 연결했다고 말하지 않기", () => {
   const byConcept = (concept: string) => file.questions.filter((question) => question.concept === concept);
-  assert.ok(byConcept("agent_pick").some((question) => question.expect.noLinkPrefixes?.includes("/new?agent=")), "없는 에이전트 문항");
+  // 새 대화의 에이전트 고르기가 없어져 바꾸기 부탁도 링크 없이 맡긴다(스펙 assistant-hub REQ6, REQ8)
+  assert.ok(byConcept("agent_pick").every((question) => question.expect.noLinkPrefixes?.includes("/new?agent=")), "에이전트 링크를 붙이지 않기");
+  assert.ok(byConcept("agent_pick").some((question) => question.expect.tools?.includes("agent_delegate")), "이름으로 맡기기 문항");
   assert.ok(byConcept("connection").some((question) => question.expect.links?.includes("/connections") && question.expect.includes), "없는 서비스 문항");
   assert.ok(byConcept("connection").every((question) => question.expect.absent?.some((word) => word.startsWith("연결했"))), "연결했다고 말하지 않기");
   assert.equal(byConcept("model_tier").length, 0, "모델 단계는 대화로 평가하지 않는다(사용자 결정 2026-11-21)");

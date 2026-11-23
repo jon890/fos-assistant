@@ -180,3 +180,34 @@ export function expectStatus(
   }
   return response;
 }
+
+/**
+ * 부르는 사람의 기본 비서를 그 에이전트로 둔다. 새 대화는 기본 비서로만 열린다(docs/features/assistant-hub/spec.md 의 REQ4).
+ *
+ * <p>검사 사용자는 허용 목록 없이 토큰으로 들어와 기본 비서가 없다. 테스트 전용 API 로 허용 목록 줄을 쓴다.
+ */
+export async function usePrimary(context: Context, token: string, agentCode: string): Promise<void> {
+  expectStatus(
+    await call(context, `/test-support/primary-agent/${agentCode}`, { method: "PUT", token }),
+    200,
+    `기본 비서를 ${agentCode} 로 두기`,
+  );
+}
+
+/**
+ * 기본 비서가 아닌 에이전트와의 빈 대화를 만들고 공개 식별자를 돌려준다. 그 전에 열어 둔 대화와 같다.
+ *
+ * <p>새 대화는 기본 비서로만 열리므로 다른 에이전트의 실행을 보는 시나리오가 쓴다.
+ */
+export async function seedConversation(context: Context, token: string, agentCode: string): Promise<string> {
+  return expectStatus(
+    await call(context, "/test-support/chat/conversations", { method: "POST", token, body: { agentCode } }),
+    200,
+    `${agentCode} 와의 대화 만들기`,
+  ).json<{ conversationId: string }>().conversationId;
+}
+
+/** 부르는 사람의 기본 비서를 없앤다. 기본 비서는 지울 수 없으므로 검사가 만든 에이전트를 지우기 전에 부른다. */
+export async function clearPrimary(context: Context, token: string): Promise<void> {
+  expectStatus(await call(context, "/test-support/primary-agent", { method: "DELETE", token }), 200, "기본 비서 지우기");
+}

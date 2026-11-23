@@ -6,7 +6,7 @@
  * 재시작한 뒤 반영 완료를 눌러야 한다. 대역이 그 profile 의 hook 처럼 도구 호출마다 Control Plane 에 판정을 묻는다. 연결의 주인은
  * 관리자가 아닌 kid 다. 관리자인 dad 가 남의 에이전트에 붙이거나 떼지 못하는 것을 함께 보기 위해서다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import {
   CONNECTOR_ARGUMENT_SAMPLE,
   CONNECTOR_RESULT_SAMPLE,
@@ -291,7 +291,9 @@ export const connectorBindingScenario: Scenario = {
       step("붙은 에이전트가 한 번에 받는 경로로 도구를 부르면 작업 과정에 그 호출이 남고 내용은 실리지 않는다");
       const once = expectStatus(
         await call(context, "/chat/messages", {
-          method: "POST", token: owner, body: { text: boundToolInput(), agentCode: agent.code },
+          method: "POST", token: owner,
+          // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+          body: { conversationId: await seedConversation(context, owner, agent.code), text: boundToolInput() },
         }),
         200,
         "한 번에 받는 도구 호출 대화",
@@ -310,7 +312,8 @@ export const connectorBindingScenario: Scenario = {
       step("스트림으로 받는 경로도 같은 호출을 같은 모양으로 남기고 외부 서비스의 값을 보내지 않는다");
       const streamed = expectStatus(
         await call(context, "/chat/messages/stream", {
-          method: "POST", token: owner, body: { text: boundToolInput(), agentCode: agent.code },
+          method: "POST", token: owner,
+          body: { conversationId: await seedConversation(context, owner, agent.code), text: boundToolInput() },
         }),
         200,
         "스트림 도구 호출 대화",

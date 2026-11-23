@@ -4,7 +4,7 @@
  * <p>대역이 그 에이전트 profile 의 hook 처럼 도구 호출마다 판정을 묻고, 허용된 호출만 플러그인 서버에 닿은 것으로 친다.
  * 시작에서 연결을 등록하고 비공개 에이전트에 붙여 반영 완료까지 한 뒤, 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import {
   AGENDA_CONNECTOR,
   CONNECTOR_TOOL_PROBE,
@@ -40,7 +40,11 @@ async function probeIn(context: Context, agentCode: string, hermesTool: string, 
     await call(context, "/chat/messages", {
       method: "POST",
       token: context.tokens.dad,
-      body: { text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${argsJson}`, agentCode },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: {
+        conversationId: await seedConversation(context, context.tokens.dad, agentCode),
+        text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${argsJson}`,
+      },
     }),
     200,
     `${hermesTool} 호출 대화`,

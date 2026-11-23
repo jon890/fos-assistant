@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import { expectPickedAgent } from "./helpers.ts";
+import { openConversationWith } from "./helpers.ts";
 import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
@@ -60,7 +60,7 @@ test.afterEach(async ({ context, page }, testInfo) => {
   }
 });
 
-test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전트와 대화가 끝난다", async ({ page }) => {
+test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전트와 대화가 끝난다", async ({ page }, testInfo) => {
   // 다른 검사가 남긴 그룹 공개 에이전트가 목록에 있을 수 있어 빈 상태 문구는 보지 않는다.
   await page.goto("/agents");
   await expect(page.getByRole("button", { name: "새 에이전트", exact: true })).toBeVisible();
@@ -92,12 +92,12 @@ test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전�
   await expect(page.getByRole("textbox", { name: `${NAME} 성격` })).toBeVisible();
   await expect(accessSection(page).getByText("나만", { exact: true })).toBeVisible();
 
-  // 상세의 「대화하기」 가 그 에이전트를 고른 새 대화 화면을 열고, 그 에이전트로 보낸 질문이 답으로 끝난다.
-  const code = new URL(page.url()).pathname.split("/").at(-1);
+  // 새 대화는 기본 비서로만 열려 상세에 「대화하기」 가 없다(스펙 assistant-hub REQ4). 이 에이전트와의 지난 대화로 보낸 질문이
+  // 답으로 끝난다.
+  const code = new URL(page.url()).pathname.split("/").at(-1)!;
   const question = "받아쓰기 연습을 도와줘";
-  await page.getByRole("link", { name: "대화하기", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/new\\?agent=${code}$`));
-  await expectPickedAgent(page, NAME);
+  await expect(page.getByRole("link", { name: "대화하기", exact: true })).toHaveCount(0);
+  await openConversationWith(page, code, ownerOf(testInfo.project.name).email);
   await page.getByRole("textbox", { name: "메시지" }).fill(question);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);

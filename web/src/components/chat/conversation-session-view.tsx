@@ -5,7 +5,7 @@ import { useReplyTarget } from "./use-reply-target";
 import { Composer } from "./composer";
 import { ConversationHeader } from "./conversation-header";
 import {
-  StartAgentSwitcher,
+  StartAgentTag,
   StartScreenHeader,
   StarterPrompts,
 } from "./start-screen";
@@ -16,7 +16,7 @@ import { ActivityPanel } from "./activity/activity-panel";
 import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Notice } from "@/components/ui/notice";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
-import { useDelegateTarget } from "./use-delegate-target";
+import { primaryCode } from "@/lib/agent";
 import { useConversationTodo } from "./use-conversation-todo";
 import type { Props } from "./conversation-session-view-types";
 
@@ -66,7 +66,6 @@ export function ConversationSessionView({
   agentsLoading,
   agentsError,
   onRetryAgents,
-  onAgentCodeChange,
   ensureConversation,
   submit,
   cancelPendingMessage,
@@ -83,28 +82,8 @@ export function ConversationSessionView({
   skillCommandsEnabled,
   skillNames,
   starters,
-  delegateTo,
-  setDelegateTo,
 }: Props) {
   const { replyTo, replyRef, setReplyTo } = useReplyTarget();
-  // 맡김은 사진을 받지 않아 집은 것과 함께 보내지 않는다. 나중에 고른 것이 남는다(설계 chat-reference DECISION8).
-  const pickDelegate = (code: string | null) => {
-    setDelegateTo(code);
-    if (code !== null) setReplyTo(null);
-  };
-  // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 훅이라 이른 반환보다 앞에 둔다.
-  const { delegateAgents, delegating, delegateAgent } = useDelegateTarget({
-    agents,
-    conversationAgentCode: currentConversation?.agentCode ?? agentCode,
-    enabled:
-      !startScreen &&
-      conversationId !== null &&
-      !sending &&
-      !agentMissing &&
-      !pending.queue.held,
-    delegateTo,
-    setDelegateTo,
-  });
   const todo = useConversationTodo({
     conversationId,
     refreshKey: approvalRefresh,
@@ -141,13 +120,11 @@ export function ConversationSessionView({
       {startScreen ? null : <h1 className="sr-only">대화</h1>}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {startScreen ? (
-          <StartAgentSwitcher
+          <StartAgentTag
             agents={agents}
             loading={agentsLoading}
             agentsError={agentsError}
             selectedCode={agentCode}
-            onSelect={onAgentCodeChange}
-            locked={agentLocked}
           />
         ) : (
           <ConversationHeader
@@ -233,10 +210,7 @@ export function ConversationSessionView({
             onAnswer={(text) => {
               void submit([], text);
             }}
-            onReply={(target) => {
-              setReplyTo(target);
-              setDelegateTo(null);
-            }}
+            onReply={setReplyTo}
           />
         )}
 
@@ -313,13 +287,11 @@ export function ConversationSessionView({
                 : undefined
             }
             onOutgoingChange={setOutgoing}
-            disabled={conversationId === null && agents.length === 0}
+            // 새 대화는 기본 비서와만 시작한다. 비서가 없으면 보내지 못한다(스펙 assistant-hub REQ4).
+            disabled={conversationId === null && primaryCode(agents) === ""}
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
-            // 맡김은 사진을 함께 보내지 않는다(design.md 의 DECISION22).
-            acceptsAttachments={
-              (currentAgent?.acceptsAttachments ?? false) && !delegateAgent
-            }
+            acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
             ensureConversation={ensureConversation}
             running={sending}
             // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
@@ -328,20 +300,7 @@ export function ConversationSessionView({
             onStop={() => {
               void stop();
             }}
-            mention={
-              startScreen && !agentLocked && agents.length > 0
-                ? { agents, onPick: onAgentCodeChange }
-                : delegating
-                  ? { agents: delegateAgents, onPick: pickDelegate }
-                  : undefined
-            }
-            delegateTarget={
-              delegateAgent
-                ? { agent: delegateAgent, onClear: () => setDelegateTo(null) }
-                : undefined
-            }
-            // 맡길 에이전트를 골랐으면 대화 에이전트의 스킬을 띄우지 않는다. 맡김 글은 커맨드로 판별하지 않는다.
-            skillNames={delegateAgent ? undefined : skillNames}
+            skillNames={skillNames}
             onBlockingChange={setComposerBlocking}
             modelChoiceUnknown={
               conversationId !== null && currentConversation === undefined

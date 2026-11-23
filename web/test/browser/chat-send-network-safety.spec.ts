@@ -1,10 +1,5 @@
-import {
-  conversationIdOf,
-  expect,
-  setAgentVisibility,
-  setSession,
-  test,
-} from "./fixtures.ts";
+import { conversationIdOf, expect, setSession, test } from "./fixtures.ts";
+import { clearPrimary, usePrimary } from "./helpers.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 type LossMode = "before" | "accepted" | "headers" | "started";
@@ -131,11 +126,26 @@ async function stored(page: Page, id: string) {
   };
 }
 
-test.beforeAll(async () => {
-  await setAgentVisibility("browser", "GROUP", null);
+/**
+ * 검사 사용자가 만든 에이전트를 그 사용자의 기본 비서로 둔다. 새 대화는 기본 비서로만 열리고(스펙 assistant-hub REQ4), 검사
+ * 사용자는 허용 목록 없이 들어와 기본 비서가 없다.
+ */
+let ownAgent = "";
+test.beforeEach(async ({ context, page, isolatedMember }) => {
+  await setSession(context, isolatedMember);
+  const created = await page.request.post("/api/agents", {
+    data: { name: "전송 안전 비서" },
+  });
+  expect(created.status()).toBe(201);
+  ownAgent = ((await created.json()) as { code: string }).code;
+  await usePrimary(isolatedMember.email, ownAgent);
 });
-test.afterAll(async () => {
-  await setAgentVisibility("browser", "PRIVATE", "browser@example.com");
+test.afterEach(async ({ context, page, isolatedMember }) => {
+  await setSession(context, isolatedMember);
+  await clearPrimary(isolatedMember.email);
+  expect(
+    (await page.request.delete(`/api/agents/${ownAgent}`)).status(),
+  ).toBe(204);
 });
 
 for (const existing of [false, true]) {
@@ -150,7 +160,7 @@ for (const existing of [false, true]) {
       let id: string | null = null;
       if (existing) {
         const created = await page.request.post("/api/chat/conversations", {
-          data: { agentCode: "browser" },
+          data: { agentCode: ownAgent },
         });
         expect(created.ok()).toBeTruthy();
         id = (await created.json()).conversationId;

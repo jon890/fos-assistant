@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { createPortal } from "react-dom";
-import type { AgentView } from "@/lib/agent";
+import { primaryCode, type AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useShellTitleSlot } from "@/components/shell/title-slot";
-import { AgentSwitcher, AgentSwitcherSkeleton } from "./agent-switcher";
+import { AgentBadge } from "@/components/agent/agent-badge";
 import { AttentionLine } from "./attention-line";
 
 /*
@@ -26,9 +25,13 @@ type HeaderProps = {
   onRetryAgents(): void;
 };
 
+/** 기본 비서가 꺼졌거나 없을 때 새 대화 화면에 보이는 안내다(docs/features/assistant-hub/spec.md 의 REQ4) */
+export const PRIMARY_UNAVAILABLE_NOTICE =
+  "비서를 쓸 수 없어요. 관리자에게 알려 주세요";
+
 /**
- * 입력창 위에 그리는 인사다. 에이전트는 화면 위쪽 이름표로 고르므로 여기에는 카드가 없다
- * (docs/features/app-shell/spec.md 의 REQ9). 목록을 읽지 못했거나 비었을 때의 안내만 남는다.
+ * 입력창 위에 그리는 인사다. 에이전트는 화면 위쪽 이름표에 보이므로 여기에는 카드가 없다. 목록을 읽지 못했거나
+ * 기본 비서가 없을 때의 안내만 남는다.
  */
 export function StartScreenHeader({
   displayName,
@@ -53,55 +56,59 @@ export function StartScreenHeader({
             action={<Button onClick={onRetryAgents}>다시 읽기</Button>}
           />
         </div>
-      ) : agents.length === 0 ? (
-        // 사용자는 자기 에이전트를 직접 만들 수 있다. 관리자에게 미루지 않고 만드는 길로 보낸다.
-        <div className="flex flex-col items-center gap-3">
-          <Notice variant="info" className="text-center">
-            아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수
-            있어요.
-          </Notice>
-          <Button asChild>
-            <Link href="/agents?new=1">에이전트 만들기</Link>
-          </Button>
-        </div>
+      ) : primaryCode(agents) === "" ? (
+        // 새 대화는 기본 비서와만 시작한다. 비서를 끄는 것은 관리자뿐이라 관리자에게 알리게 한다(스펙 assistant-hub DECISION15).
+        <Notice
+          variant="info"
+          data-testid="primary-unavailable"
+          className="text-center"
+        >
+          {PRIMARY_UNAVAILABLE_NOTICE}
+        </Notice>
       ) : null}
     </div>
   );
 }
 
-type SwitcherProps = {
+type AgentTagProps = {
   agents: AgentView[];
   loading: boolean;
   agentsError: boolean;
   selectedCode: string;
-  onSelect(code: string): void;
-  locked: boolean;
 };
 
 /**
- * 새 대화 화면의 이름표 단추를 두 자리에 둔다. 넓은 화면은 대화 영역 맨 위 머리 줄, 휴대폰은 위 막대 가운데다
- * (docs/features/app-shell/spec.md 의 REQ9). 폭은 CSS 로만 나눈다. 머리 줄은 좁은 폭에서 숨고 위 막대는 넓은
- * 폭에서 숨으므로 한 번에 하나만 보인다.
+ * 새 대화 화면의 에이전트 이름표다. 새 대화는 늘 기본 비서와 시작하므로 고르는 목록 없이 이름만 보인다
+ * (docs/features/assistant-hub/spec.md 의 REQ4). 넓은 화면은 대화 영역 맨 위 머리 줄, 휴대폰은 위 막대 가운데다.
+ * 폭은 CSS 로만 나눈다. 머리 줄은 좁은 폭에서 숨고 위 막대는 넓은 폭에서 숨으므로 한 번에 하나만 보인다.
  */
-export function StartAgentSwitcher({
+export function StartAgentTag({
   agents,
   loading,
   agentsError,
   selectedCode,
-  onSelect,
-  locked,
-}: SwitcherProps) {
+}: AgentTagProps) {
+  const current = agents.find((agent) => agent.code === selectedCode);
   // 이름표가 없으면 위 막대 가운데 자리를 차지하지 않는다. 그 자리의 홈 링크가 그대로 남는다.
-  if (agentsError || (!loading && agents.length === 0)) return null;
-  const switcher = loading ? (
-    <AgentSwitcherSkeleton />
+  if (agentsError || (!loading && current === undefined)) return null;
+  const tag = current ? (
+    <span
+      data-testid="start-agent-tag"
+      className="flex h-9 min-w-0 items-center gap-2 px-2"
+    >
+      <AgentBadge agent={current} size="sm" />
+      <span
+        data-testid="start-agent-name"
+        className="truncate text-sm font-medium"
+      >
+        {current.name}
+      </span>
+    </span>
   ) : (
-    <AgentSwitcher
-      agents={agents}
-      selectedCode={selectedCode}
-      onSelect={onSelect}
-      locked={locked}
-    />
+    <div role="status" className="flex h-9 items-center">
+      <span className="sr-only">에이전트를 읽는 중</span>
+      <Skeleton className="h-7 w-32 rounded-full" />
+    </div>
   );
   return (
     <>
@@ -109,9 +116,9 @@ export function StartAgentSwitcher({
         data-testid="start-agent-header"
         className="hidden min-w-0 items-center md:flex"
       >
-        {switcher}
+        {tag}
       </div>
-      <TitleSlotPortal>{switcher}</TitleSlotPortal>
+      <TitleSlotPortal>{tag}</TitleSlotPortal>
     </>
   );
 }

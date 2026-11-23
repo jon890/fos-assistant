@@ -4,7 +4,7 @@
  * <p>원고는 REST 로 만들고, MCP 는 붙잡아 둔 실행의 session 으로 서명해 부른다. 시작은 job 마다 한 번 이하여야 하고, 응답 유실·시작 전
  * 거절·재기동·재승인·재조회가 시작을 늘리지 않아야 한다. 계약은 `docs/features/content-draft.md` 의 「승인 snapshot과 저장 job」 이 갖는다.
  */
-import { call, expect, expectStatus, fail, step, upload, type Context, type Response, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, upload, type Context, type Response, type Scenario } from "../harness.ts";
 import { callTool, contextFor, within, type ToolResult } from "../delegation-support.ts";
 import { ConnectorSetup } from "../connector-support.ts";
 import { SNAPSHOT_CONNECTOR } from "../fake-hermes.ts";
@@ -48,8 +48,8 @@ export const contentSnapshotSaveScenario: Scenario = {
       const issued = expectStatus(await call(context, "/admin/agent-tokens", { method: "POST", token: context.tokens.dad,
         body: { profileName: agent.profile, label: "snapshot-e2e" } }), 200, "MCP 토큰 발급").json<{ id: number; token: string }>();
       tokenId = issued.id;
-      const conversationId = expectStatus(await call(context, "/chat/conversations", { method: "POST", token: owner,
-        body: { agentCode: agent.code } }), 200, "대화 시작").json<{ conversationId: string }>().conversationId;
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      const conversationId = await seedConversation(context, owner, agent.code);
 
       step("합성 사진 두 장을 보내 한 장만 원고에 쓴다");
       const photo = async (name: string) => expectStatus(await upload(context, `/chat/conversations/${conversationId}/attachments`, {

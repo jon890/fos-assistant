@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -70,6 +71,9 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @BackendIntegrationTest
 class ConversationPublicIdTest {
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -147,7 +151,7 @@ class ConversationPublicIdTest {
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(
+        primaries.make(user, agents.save(Agent.of(
             name,
             name,
             name,
@@ -155,7 +159,7 @@ class ConversationPublicIdTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id()));
+            user.id())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

@@ -7,7 +7,7 @@
  *
  * <p>기본 한도 하나만 잰다. `E2E_MEASURE_USER_LIMITS=2,6` 처럼 주면 그 한도들을 더 잰다.
  */
-import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
+import { call, clearPrimary, expect, expectStatus, step, usePrimary, type Context, type Scenario } from "../harness.ts";
 
 /** 설정의 기본값이다. 이 값은 환경 변수를 주지 않고 잰다. */
 const DEFAULT_LIMIT = 4;
@@ -170,6 +170,8 @@ export const userExecutionLimitScenario: Scenario = {
       201,
       "아이의 에이전트 만들기",
     ).json<AgentView>();
+    // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 아이는 허용 목록 없이 들어와 기본 비서가 없다.
+    await usePrimary(context, context.tokens.kid, kidAgent.code);
 
     context.hermes.slowRuns(RUN_DELAY_MS);
     try {
@@ -187,6 +189,8 @@ export const userExecutionLimitScenario: Scenario = {
       const restoreDefault = process.env[LIMIT_ENV] !== undefined;
       delete process.env[LIMIT_ENV];
       if (restoreDefault) await context.restartControlPlane();
+      // 기본 비서는 지울 수 없어 먼저 기본 비서를 없앤다.
+      await clearPrimary(context, context.tokens.kid);
       await call(context, `/agents/${kidAgent.code}`, { method: "DELETE", token: context.tokens.kid });
     }
   },

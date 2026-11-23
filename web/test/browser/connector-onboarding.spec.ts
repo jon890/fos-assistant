@@ -7,7 +7,6 @@ import {
 } from "./fixtures.ts";
 import {
   clickAndWaitForResponse,
-  expectPickedAgent,
   isolatedUser,
 } from "./helpers.ts";
 import { DEMO_TOKEN_OK } from "../../../test/e2e/fake-hermes.ts";
@@ -101,7 +100,7 @@ test.afterEach(async ({ context, page }, testInfo) => {
   await disconnectDemoConnector(owner.email);
 });
 
-test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 그 에이전트와 대화로 이어진다", async ({
+test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 비서가 그 에이전트에게 맡긴다고 알린다", async ({
   page,
 }) => {
   const code = await createAgent(page, PRIVATE_NAME);
@@ -143,7 +142,7 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
     page.getByRole("heading", { name: `「${PRIVATE_NAME}」에 붙였어요` }),
   ).toBeVisible();
   await expect(page.getByTestId("connector-bound-result")).toContainText(
-    `이제 「${PRIVATE_NAME}」 대화에서 「${TITLE}」 도구를 써요. 몇 분 안에 자동으로 반영돼요.`,
+    `이제 「${PRIVATE_NAME}」 에이전트가 「${TITLE}」 도구를 써요. 비서에게 부탁하면 이 에이전트에게 맡겨요. 몇 분 안에 자동으로 반영돼요.`,
   );
   // 붙인 에이전트 목록도 다시 읽혀 이 에이전트가 보인다.
   await expect(page.getByTestId("connection-binding")).toContainText(
@@ -155,12 +154,14 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
     ),
   ).toBe(true);
 
-  await page.getByRole("link", { name: `${PRIVATE_NAME}와 대화하기` }).click();
-  await expect(page).toHaveURL(new RegExp(`/new\\?agent=${code}$`));
-  await expectPickedAgent(page, PRIVATE_NAME);
-  // 목록의 첫 에이전트라서 골라진 것이 아니라 주소가 고른 것임을 다른 에이전트로도 본다.
-  await page.goto(`/new?agent=${groupCode}`);
-  await expectPickedAgent(page, GROUP_NAME);
+  // 새 대화는 기본 비서로만 열려 「대화하기」 가 없고 주소의 `?agent=` 도 읽지 않는다(스펙 assistant-hub REQ4).
+  // 이 검사 사용자는 허용 목록 없이 들어와 기본 비서가 없으므로 새 대화 화면은 비서를 쓸 수 없다고 알린다.
+  await expect(page.getByRole("link", { name: `${PRIVATE_NAME}와 대화하기` })).toHaveCount(0);
+  for (const picked of [code, groupCode]) {
+    await page.goto(`/new?agent=${picked}`);
+    await expect(page.getByTestId("primary-unavailable")).toBeVisible();
+    await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
+  }
 });
 
 test("에이전트 화면에서 외부 서비스 연결하기로 가면 연결 뒤 그 에이전트를 먼저 권한다", async ({

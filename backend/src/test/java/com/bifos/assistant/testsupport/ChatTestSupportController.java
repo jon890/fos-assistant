@@ -1,5 +1,16 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import java.time.Clock;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -11,9 +22,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 브라우저 검사에서 옛 대화 주소를 만들 수 있게 대화 번호를 알려 준다.
+ * 브라우저와 e2e 검사가 대화를 준비하게 돕는다.
  *
- * <p>대화 번호는 주소와 API 에 나오지 않아 브라우저 검사가 얻을 길이 없다.
+ * <p>대화 번호는 주소와 API 에 나오지 않아 브라우저 검사가 얻을 길이 없다. 새 대화는 기본 비서로만 열리므로
+ * (docs/features/assistant-hub/spec.md 의 REQ4) 다른 에이전트의 실행을 보는 검사는 그 에이전트와의 지난 대화를 여기서 만든다.
  */
 @RestController
 @RequestMapping("/api/v1/test-support/chat")
@@ -22,6 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatTestSupportController {
 
     private final EntityManager entityManager;
+    private final CurrentUserProvider currentUser;
+    private final AgentService agents;
+    private final ConversationRepository conversations;
+    private final Clock clock;
 
 
     /**
@@ -42,6 +58,47 @@ public class ChatTestSupportController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+
+    /**
+     * 부르는 사람과 그 에이전트의 빈 대화를 만든다. 기본 비서가 아닌 에이전트와 그 전에 열어 둔 대화와 같다.
+     *
+     * <p>쓸 수 없거나 꺼진 에이전트는 운영의 시작 판정과 같은 오류다.
+     */
+    @PostMapping("/conversations")
+    public StartedConversation start(@RequestBody StartRequest request) {
+        CurrentUser user = currentUser.require();
+        Agent agent = agents.requireStartable(user, request.agentCode());
+        Conversation saved = conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
+        return new StartedConversation(saved.publicId());
+    }
+
+
+    /**
+     * 부르는 사람의 실행 하나를 그 에이전트가 돈 것으로 바꾼다. {@code @} 맡기기를 없애기 전에 남은 맡김과 같은 꼴을 만든다
+     * (docs/features/assistant-hub/spec.md 의 REQ6). 대화의 에이전트가 아닌 루트 실행이 맡김이다.
+     */
+    @PutMapping("/executions/{executionId}/agent/{agentCode}")
+    @Transactional
+    public ResponseEntity<Void> relabel(@PathVariable Long executionId, @PathVariable String agentCode) {
+        CurrentUser user = currentUser.require();
+        Agent agent = agents.requireReadable(user, agentCode);
+        int changed = entityManager
+            .createQuery("update AgentExecution e set e.agentId = :agentId where e.id = :id and e.userId = :userId")
+            .setParameter("agentId", agent.id())
+            .setParameter("id", executionId)
+            .setParameter("userId", user.id())
+            .executeUpdate();
+        return changed == 1 ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
+    }
+
+
+    /** 대화를 열 에이전트 코드다. */
+    public record StartRequest(String agentCode) {
+    }
+
+    /** 만든 대화의 공개 식별자다. */
+    public record StartedConversation(UUID conversationId) {
+    }
 
     /** 대화 표의 번호다. */
     public record ConversationNumber(Long number) {

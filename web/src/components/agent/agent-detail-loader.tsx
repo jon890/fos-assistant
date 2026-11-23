@@ -148,8 +148,6 @@ export async function loadAgentDetail(
         capabilities: listed?.capabilities,
       }
     : undefined;
-  // 일반 화면에서 내가 쓸 수 있는 목록에 든 에이전트만 대화를 연다.
-  const chatHref = !admin && listed !== undefined ? `/new?agent=${code}` : null;
 
   if (!personaResult.ok) {
     if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent) {
@@ -216,7 +214,6 @@ export async function loadAgentDetail(
       adminError={adminError}
       listHref={listHref}
       admin={admin}
-      chatHref={chatHref}
       introduction={introduction}
     />
   );

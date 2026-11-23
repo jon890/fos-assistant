@@ -293,6 +293,8 @@ function startControlPlane(
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       // 첫 로그인의 기본 도구는 backend 시험이 확인한다. 화면 시험의 도구 초기 상태를 바꾸지 않게 비운다.
       ASSISTANT_PEOPLE_DEFAULTTOOLSETS: "",
+      // 새 대화는 기본 비서로만 열린다. 기본 비서를 정하고 다른 에이전트와의 지난 대화를 만드는 테스트 전용 API 를 켠다.
+      ASSISTANT_TESTSUPPORT_ENABLED: "true",
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.

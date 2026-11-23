@@ -30,9 +30,9 @@ class ServiceConceptsInstructionsTest {
         String instructions = assembler.withResponseInstructions(AssembledContext.empty(), scope).instructions();
 
         assertThat(instructions)
-            .contains(HEADER, "파일 공간", "예약 작업", "기억", "할 일과 지금 볼 것", "외부 서비스 연결", "모델 단계", "에이전트 고르기")
-            .contains("/files", "/tasks/new", "/memory", "/now", "/connections", "/new?agent=<code>")
-            .doesNotContain("사용량", "/usage")
+            .contains(HEADER, "파일 공간", "예약 작업", "기억", "할 일과 지금 볼 것", "외부 서비스 연결", "모델 단계", "에이전트 바꾸기")
+            .contains("/files", "/tasks/new", "/memory", "/now", "/connections")
+            .doesNotContain("사용량", "/usage", "/new?agent=")
             .containsSubsequence("# 답변 형식", "# 도구 호출", HEADER);
     }
 
@@ -52,15 +52,16 @@ class ServiceConceptsInstructionsTest {
 
     @ParameterizedTest
     @EnumSource(InstructionScope.class)
-    @DisplayName("모델 단계와 에이전트는 바꾸지 않고 안내하며 도구가 없는 예약 작업은 만들었다고 말하지 않는다")
+    @DisplayName("모델 단계와 에이전트는 바꾸지 않고, 에이전트를 바꿔 달라면 링크 없이 맡기며, 도구가 없는 예약 작업은 만들었다고 말하지 않는다")
     void modelTierAndAgentPickAreGuidedNotChanged(InstructionScope scope) {
         String instructions = assembler.withResponseInstructions(AssembledContext.empty(), scope).instructions();
         String tierLine = lineStartingWith(instructions, "- 모델 단계");
-        String agentLine = lineStartingWith(instructions, "- 에이전트 고르기");
+        String agentLine = lineStartingWith(instructions, "- 에이전트 바꾸기");
         String scheduleLine = lineStartingWith(instructions, "- 예약 작업");
 
         assertThat(tierLine).contains("바꾸지 않는다", "입력창의 모델 단계 단추");
-        assertThat(agentLine).contains("바뀌지 않는다", "@", "/new?agent=<code>", "agent_list");
+        assertThat(agentLine).contains("바뀌지 않는다", "링크를 붙이지 않는다", "맡겨 처리한다", "agent_delegate", "agent_list")
+            .doesNotContain("@", "/new");
         assertThat(scheduleLine).contains("만들었다고 말하지 않고", "/tasks/new");
         assertThat(instructions).contains("했다고 말하지 않는다");
     }

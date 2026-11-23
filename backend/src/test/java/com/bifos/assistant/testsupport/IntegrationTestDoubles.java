@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
@@ -147,6 +148,12 @@ public class IntegrationTestDoubles {
     @Bean
     FakeLinkImageWeb fakeLinkImageWeb() {
         return new FakeLinkImageWeb();
+    }
+
+
+    @Bean
+    TestPrimaryAgents testPrimaryAgents(AllowedPersonRepository people) {
+        return new TestPrimaryAgents(people);
     }
 
 

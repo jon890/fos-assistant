@@ -4,8 +4,9 @@
 - Date: 2026-11-12
 - **decision-type**: `architecture`
 - **areas**: `product, runtime`
-- **현재 규칙의 원본**: [에이전트 팀](../features/agent-team.md) 의 「`@` 로 바로 맡기기」, 스펙 [`docs/features/agent-team/spec.md`](../features/agent-team/spec.md) 의 REQ7 과 DECISION9, DECISION20(사용자 확인 2026-11-10), DECISION21(작성자), 설계 [`design.md`](../features/agent-team/design.md) 의 「PR4 @ 멘션」
+- **현재 규칙의 원본**: [에이전트 팀](../features/agent-team.md) 의 「지난 `@` 맡김」, 스펙 [`docs/features/agent-team/spec.md`](../features/agent-team/spec.md) 의 REQ7 과 DECISION9, DECISION20(사용자 확인 2026-11-10), DECISION21(작성자), 설계 [`design.md`](../features/agent-team/design.md) 의 「PR4 @ 멘션」
 - [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 의 「무엇을 할지는 Hermes 가 정한다」 에 예외 하나를 둔다. 경계와 `agent_*` 도구의 결정은 그대로다.
+- `@` 로 새로 맡기는 길은 [비서 중심 대화 스펙](../features/assistant-hub/spec.md) 의 REQ6 이 없앴다(2026-11-23). 그 전에 남은 맡김을 보이고 대화 에이전트의 다음 turn 에 넣는 부분만 남아 옮기지 않는다.
 
 ### 결정
 

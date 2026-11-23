@@ -4,7 +4,7 @@ import { isoToSeoulInput } from "../../src/lib/attention.ts";
 import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET } from "./settings.ts";
 
-import { clickAndWaitForResponse, expectPickedAgent } from "./helpers.ts";
+import { clearPrimary, clickAndWaitForResponse, expectStartAgent, usePrimary } from "./helpers.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 // 할 일 동작 뒤에는 router.refresh() 가 서버 화면을 다시 받아야 바뀐다. CI 부하 아래에서는 기본 대기 5초를 넘은 적이 있다.
@@ -21,6 +21,8 @@ test.describe("지금 화면", () => {
     const listed = await page.request.get("/api/agents");
     expect(listed.ok()).toBeTruthy();
     const mine = ((await listed.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
+    // 기본 비서는 지울 수 없어 먼저 없앤다.
+    await clearPrimary(isolatedMember.email);
     for (const agent of mine) {
       expect((await page.request.delete(`/api/agents/${agent.code}`)).status()).toBe(204);
     }
@@ -34,7 +36,11 @@ test.describe("지금 화면", () => {
     if (mine) return mine.code;
     const created = await page.request.post("/api/agents", { data: { name: "장보기 비서" } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
-    return ((await created.json()) as { code: string }).code;
+    const code = ((await created.json()) as { code: string }).code;
+    // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 기본 비서가 없다.
+    const me = (await (await page.request.get("/api/me")).json()) as { email: string };
+    await usePrimary(me.email, code);
+    return code;
   }
 
   /** Hermes 가 붐비게 해 turn 하나를 실패시킨다. 대화를 주지 않으면 새 대화가 생긴다. */
@@ -568,7 +574,7 @@ test.describe("지금 화면", () => {
       await expect(composer).toBeVisible();
       await expect(page.getByTestId("attention-line")).toHaveCount(0);
       // 에이전트를 읽는 동안의 뼈대가 한 줄로 바뀌며 입력창이 움직인 값을 기준으로 삼지 않는다.
-      await expectPickedAgent(page, "장보기 비서");
+      await expectStartAgent(page, "장보기 비서");
       await expect(page.getByRole("status", { name: "에이전트를 읽는 중" })).toHaveCount(0);
       const before = (await composer.boundingBox())?.y;
       expect(before, "입력창의 자리를 읽지 못했다").toBeDefined();

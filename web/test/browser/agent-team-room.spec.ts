@@ -57,7 +57,7 @@ test("로그인 뒤 `/` 가 기본 비서의 대화방을 열고 사이드바 �
   await expect(
     page.getByRole("main").getByTestId("agent-badge").first(),
   ).toBeVisible();
-  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
+  await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
 
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("대화방에 처음 보내는 글");

@@ -1,6 +1,6 @@
 import { parseRgb } from "./color.ts";
 import { CONVERSATION_URL, expect, test, setSession } from "./fixtures.ts";
-import { filledTierProvider } from "./helpers.ts";
+import { clearPrimary, filledTierProvider, usePrimary } from "./helpers.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({
   page, context, isolatedMember,
@@ -10,6 +10,8 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   const created = await page.request.post("/api/agents", { data: { name: "대화 검사 비서" } });
   expect(created.status()).toBe(201);
   const agent = await created.json() as { code: string };
+  // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+  await usePrimary(isolatedMember.email, agent.code);
   try {
     await page.goto("/new");
 
@@ -43,6 +45,7 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
     await page.mouse.click(370, 400);
     await expect(drawer).toBeHidden();
   } finally {
+    await clearPrimary(isolatedMember.email);
     const removed = await page.request.delete(`/api/agents/${agent.code}`);
     expect(removed.status()).toBe(204);
   }
@@ -343,6 +346,8 @@ test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({
   });
   expect(agent.status()).toBe(201);
   const { code: agentCode } = (await agent.json()) as { code: string };
+  // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+  await usePrimary(isolatedMember.email, agentCode);
   try {
     const created = await page.request.post("/api/chat/conversations", {
       data: { agentCode },
@@ -379,6 +384,7 @@ test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({
     );
     await expect(page.getByTestId("provider-switched")).toHaveCount(0);
   } finally {
+    await clearPrimary(isolatedMember.email);
     const removed = await page.request.delete(`/api/agents/${agentCode}`);
     expect(removed.status()).toBe(204);
   }

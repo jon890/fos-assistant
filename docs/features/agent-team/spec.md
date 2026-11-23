@@ -2,6 +2,8 @@
 
 확인: 2026-11-10
 
+바뀐 결정(2026-11-23): [비서 중심 대화 스펙](../assistant-hub/spec.md) 의 REQ6 이 REQ7, DECISION9, DECISION20, DECISION21 의 `@` 로 바로 맡기기를 없앴다. 그 전에 남은 맡김의 줄과 답은 그대로 보인다.
+
 2026-11-12 사용자 확인: 연결 화면 제안의 떼기 칸 해석(DECISION7, REQ6)
 
 2026-11-17 사용자 확인: 내장 위임 결과(범위 6, REQ10~REQ14, DECISION26~DECISION42). 같은 날 DECISION40 의 기한 알림 줄 단위를 답마다로 다시 확인

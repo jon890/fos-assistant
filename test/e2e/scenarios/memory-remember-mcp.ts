@@ -6,7 +6,7 @@
  * `_fos_ctx` 로 찾은 origin 실행에서 정한다. 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
 import { randomUUID } from "node:crypto";
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import { signedCallContext } from "../mcp-context.ts";
 
 export const MEMORY_REMEMBER_MCP_PROFILE = "memory-remember-mcp";
@@ -34,7 +34,8 @@ async function send(context: Context, text: string, conversationId?: string): Pr
     await call(context, "/chat/messages", {
       method: "POST",
       token: context.tokens.dad,
-      body: conversationId === undefined ? { text, agentCode: AGENT_CODE } : { conversationId, text, agentCode: AGENT_CODE },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: { conversationId: conversationId ?? (await seedConversation(context, context.tokens.dad, AGENT_CODE)), text },
     }),
     200,
     `기억 검사 대화(${text})`,

@@ -4,7 +4,7 @@
  * <p>계약은 `docs/features/attention.md` 의 「제안 도구」 와 「제안 억제」 가 갖는다. 주인과 대화는 서명한 `_fos_ctx` 로 찾은
  * origin 실행에서 정한다(ADR-032). 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import { FOLLOW_UP_PROPOSE_PROBE } from "../fake-hermes.ts";
 
 export const FOLLOW_UP_MCP_PROFILE = "follow-up-mcp";
@@ -25,9 +25,8 @@ async function sendProposeProbe(context: Context, conversationId?: string): Prom
     await call(context, "/chat/messages", {
       method: "POST",
       token: context.tokens.dad,
-      body: conversationId === undefined
-        ? { text: PROBE, agentCode: AGENT_CODE }
-        : { conversationId, text: PROBE, agentCode: AGENT_CODE },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: { conversationId: conversationId ?? (await seedConversation(context, context.tokens.dad, AGENT_CODE)), text: PROBE },
     }),
     200,
     "할 일 제안 검사 대화",

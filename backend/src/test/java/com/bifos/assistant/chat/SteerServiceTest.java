@@ -319,13 +319,13 @@ class SteerServiceTest {
 
 
     @Test
-    @DisplayName("맡김 turn 이나 이미 정리한 turn 에는 끼우지 않는다")
-    void doesNotSteerIntoMentionOrSettledTurn() throws InterruptedException {
+    @DisplayName("예약 turn 이나 이미 정리한 turn 에는 끼우지 않는다")
+    void doesNotSteerIntoScheduledOrSettledTurn() throws InterruptedException {
         Thread running = startRunningTurn("질문");
         TurnHandle handle = handle();
 
-        turns.markIntent(handle, new TurnIntent.Mention());
-        pending.enqueue(dad, conversation.id(), "맡김 중 글", true);
+        turns.markIntent(handle, new TurnIntent.Scheduled("예약 작업"));
+        pending.enqueue(dad, conversation.id(), "예약 중 글", true);
         assertThat(stub().steered()).isEmpty();
         pending.cancel(dad, conversation.id(), pendingRows.read(conversation.id()).items().getFirst().id());
 

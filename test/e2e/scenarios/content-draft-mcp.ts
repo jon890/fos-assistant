@@ -1,7 +1,7 @@
 /** 실제 Control Plane MCP와 TX를 fake Hermes 실행의 서명으로 왕복한다. */
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import { call, expect, expectStatus, fail, step, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Scenario } from "../harness.ts";
 import { callTool, contextFor, within, type ToolResult } from "../delegation-support.ts";
 import { NEW_PERSON } from "./people.ts";
 
@@ -38,8 +38,8 @@ export const contentDraftMcpScenario: Scenario = {
         body: { profileName: CONTENT_DRAFT_PROFILE, label: "draft-e2e" } }), 200, "원고 토큰 발급").json<{ id: number; token: string }>();
       tokenId = issued.id;
       const token = issued.token;
-      conversationId = expectStatus(await call(context, "/chat/conversations", { method: "POST", token: ownerToken,
-        body: { agentCode: AGENT } }), 200, "원고 대화 시작").json<{ conversationId: string }>().conversationId;
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      conversationId = await seedConversation(context, ownerToken, AGENT);
       context.hermes.holdNextRun();
       const turn = call(context, "/chat/messages", { method: "POST", token: ownerToken,
         body: { conversationId, text: "원고 저장 검사", agentCode: AGENT } });

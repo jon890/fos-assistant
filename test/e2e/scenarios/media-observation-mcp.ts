@@ -17,6 +17,7 @@ import {
   expect,
   expectStatus,
   fail,
+  seedConversation,
   step,
   upload,
   type Scenario,
@@ -130,15 +131,8 @@ export const mediaObservationMcpScenario: Scenario = {
         }
         return originalFetch(input, init);
       };
-      conversationId = expectStatus(
-        await call(context, "/chat/conversations", {
-          method: "POST",
-          token: ownerToken,
-          body: { agentCode: AGENT },
-        }),
-        200,
-        "관찰 대화 시작",
-      ).json<{ conversationId: string }>().conversationId;
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      conversationId = await seedConversation(context, ownerToken, AGENT);
       const ids: number[] = [];
       const fixtures = createMediaFixture(fixtureDir, 30);
       expect(

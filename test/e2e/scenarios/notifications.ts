@@ -5,7 +5,7 @@
  * 완료까지 한 뒤, 끝에서 그 에이전트를 지우고 연결을 해제한다. 앞 시나리오가 남긴 알림이 있을 수 있어 수를 세지 않고 이
  * 시나리오가 만든 줄을 찾아 본다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR } from "../fake-hermes.ts";
 import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
@@ -34,7 +34,11 @@ async function requestApproval(context: Context, agentCode: string, text: string
     await call(context, "/chat/messages", {
       method: "POST",
       token: context.tokens.dad,
-      body: { text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${JSON.stringify({ text })}`, agentCode },
+      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
+      body: {
+        conversationId: await seedConversation(context, context.tokens.dad, agentCode),
+        text: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${JSON.stringify({ text })}`,
+      },
     }),
     200,
     "승인이 필요한 도구 호출 대화",

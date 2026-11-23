@@ -1,7 +1,7 @@
 /**
- * 대화 중 `@` 로 고른 에이전트에게 바로 맡기는 화면 값이다(docs/features/agent-team/design.md 의 「PR4 @ 멘션」).
+ * 지난 `@` 맡김을 그리는 화면 값이다(docs/features/agent-team/design.md 의 「PR4 @ 멘션」). `@` 로 새로 맡기는 길은 없앴고
+ * (docs/features/assistant-hub/spec.md 의 REQ6) 그 전에 남은 맡김의 줄과 답만 그린다.
  */
-import type { AgentView } from "./agent.ts";
 import type { AgentIdentity } from "@/components/agent/agent-badge";
 import {
   labelIdentity,
@@ -20,34 +20,6 @@ export type MentionDelegation = Omit<
   executionId: number | null;
   parentExecutionId: null;
 };
-
-/** `@` 목록에 넣을 에이전트다. 요청자가 쓸 수 있고 켜진 에이전트에서 대화의 에이전트를 뺀다(spec DECISION21) */
-export function mentionTargets(
-  agents: AgentView[],
-  conversationAgentCode: string,
-): AgentView[] {
-  return agents.filter((agent) => agent.code !== conversationAgentCode);
-}
-
-/** 보내는 중인 맡김 질문에 붙일 값이다. 서버가 실행 번호를 주기 전까지 진행 중으로 그린다 */
-export function pendingMention(agent: AgentView): MentionDelegation {
-  return {
-    executionId: null,
-    parentExecutionId: null,
-    status: "RUNNING",
-    agent: labelOf(agent),
-  };
-}
-
-/** 에이전트 목록의 한 줄을 이름표 값으로 바꾼다 */
-export function labelOf(agent: AgentView): AgentLabel {
-  return {
-    code: agent.code,
-    name: agent.name,
-    icon: agent.icon ?? null,
-    color: agent.color ?? null,
-  };
-}
 
 /**
  * 아직 저장되지 않은 답과 기다림 줄이 그릴 에이전트다. 답 줄을 빼고 마지막 줄이 맡김 질문이면 맡은 에이전트이고, 아니면 null 이라
