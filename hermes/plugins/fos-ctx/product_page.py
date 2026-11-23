@@ -22,6 +22,10 @@ MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 _SRCSET_URL = re.compile(r"[\s,]*([^\s,]\S*)")
 _DENSITY = re.compile(r"[0-9]{0,5}(?:\.[0-9]{1,5})?x")
 _LAYOUT_TAGS = frozenset({"header", "nav", "footer", "aside"})
+# 한 변이 이보다 작다고 알려진 본문 그림은 배지나 아이콘이라 상품 사진 후보에 넣지 않는다.
+MIN_PHOTO_SIDE = 200
+# 크기를 모르는 그림의 파일 이름이나 alt 가 배지, 아이콘, 로고, 스프라이트면 상품 사진이 아니다.
+_DECORATION = re.compile(r"(?i)(?:^|[^a-z])(?:badges?|icons?|favicon|logos?|sprites?)(?:[^a-z]|$)")
 SCHEMA = {
     "name": TOOL,
     "description": "웹 검색에서 찾은 상품 페이지를 한 번 읽고 상품 사진 후보를 확인한다. "
@@ -52,16 +56,33 @@ def _srcset(value):
         offset = end
 
 
-def _srcset_size(descriptor, width, height):
-    area = width * height or max(width, height)**2
+def _srcset_sides(descriptor, width, height):
+    """srcset 후보 하나의 가로와 세로다. 모르는 변은 0이고, 읽을 수 없는 표기면 None 이다."""
     if not descriptor:
-        return area
+        return width, height
     if descriptor.endswith("w") and (candidate_width := _size(descriptor[:-1])):
-        pixels = candidate_width**2
-        return pixels * height // width if width and height else pixels
+        return candidate_width, candidate_width * height // width if width and height else 0
     if descriptor != "x" and _DENSITY.fullmatch(descriptor):
-        return int(area * float(descriptor[:-1])**2)
+        density = float(descriptor[:-1])
+        return int(width * density), int(height * density)
     return None
+
+
+def _area(width, height):
+    return width * height or max(width, height)**2
+
+
+def _small(width, height):
+    return any(0 < side < MIN_PHOTO_SIDE for side in (width, height))
+
+
+def _decoration(url, alt, width, height):
+    """크기를 모르는 그림만 이름과 alt 로 본다. 크기가 알려진 큰 그림은 상품명에 logo 가 들어가도 남긴다."""
+    if width or height or not isinstance(url, str):
+        return False
+    # 깨진 주소에서도 예외 없이 파일 이름만 꺼낸다. 후보 하나 때문에 페이지 전체를 놓치지 않는다.
+    name = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+    return bool(_DECORATION.search(name) or _DECORATION.search(alt))
 
 
 def _nodes(value):
@@ -136,15 +157,21 @@ class _Photos(HTMLParser):
             self.script = None
 
     def _body_image(self, tag, fields):
+        """배지와 아이콘처럼 상품 사진이 아닌 그림은 후보에 넣지 않는다. 크기를 모르는 그림은 0으로 남긴다."""
         width, height = _size(fields.get("width")), _size(fields.get("height"))
+        if _small(width, height):
+            # 화면에 작게 보이는 그림은 srcset 에 고해상도 후보가 있어도 배지나 색 견본이다.
+            return
+        alt = fields.get("alt") or ""
         for key in ("data-srcset", "srcset"):
             for url, descriptor in _srcset(fields.get(key) or ""):
-                area = _srcset_size(descriptor, width, height)
-                if area is not None:
-                    self.add("body", url, area)
+                sides = _srcset_sides(descriptor, width, height)
+                if sides is not None and not _small(*sides) and not _decoration(url, alt, *sides):
+                    self.add("body", url, _area(*sides))
         if tag == "img":
             for key in ("data-src", "src"):
-                self.add("body", fields.get(key), width * height or max(width, height)**2)
+                if not _decoration(fields.get(key), alt, width, height):
+                    self.add("body", fields.get(key), _area(width, height))
 
 
 def photos(html):
