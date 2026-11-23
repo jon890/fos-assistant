@@ -17,7 +17,7 @@
 | REQ7 | PR2. 아래 「PR2 예약 작업 도구」. `mcp` 의 `task_create` 가 port `TaskRequests` 로 부르고 `task` 의 `TaskAgentRequests` 가 `TaskService.create` 와 같은 검사로 만든다 |
 | REQ8 | PR2. `task_list`, `task_update`, `task_set_state` 가 같은 port 로 부른다. 대상은 `task` 인자 하나(번호나 이름)로 찾고, 여럿이면 후보만 돌려준다 |
 | REQ9 | PR2. `task_delete` 는 지우지 않고 `connector_action` 에 Control Plane 승인 줄을 만든다(`ControlPlaneApprovals`, `connector.action`). 승인하면 port `ControlPlaneActionRunner` 를 `task` 가 구현해 지운다 |
-| REQ10 | PR2. 먼저 살펴보기에서 받는 조건은 `McpController` 가 정한다. 맡긴 실행의 대화와 에이전트는 origin 실행에서 정한다 |
+| REQ10 | PR2. 먼저 살펴보기에서 받는 조건은 `McpController` 가 정한다. 맡긴 실행의 대화는 origin 실행에서 정하고, 에이전트는 기본 비서다 |
 | REQ11 | PR3. 아래 「PR3 할 일과 기억 도구」. `follow_up_propose` 가 `requested` 인자와 실행 출처(`McpFollowUpTools.userDirected`)로 바로 챙기는 줄(`OPEN`)과 제안(`PROPOSED`)을 나눈다. 바로 만드는 일은 `followup` 의 `FollowUpAgentRequests` 가 한다 |
 | REQ12 | PR3. `follow_up_list` 가 챙기는 할 일을 주고 `follow_up_done` 이 `follow_up` 인자 하나(번호나 제목)로 찾아 끝낸다. 바로 끝내는 조건은 REQ11 과 같은 판정이다 |
 | REQ13 | PR3. `memory_forget` 은 지우지 않고 PR2 의 Control Plane 승인 줄을 만든다. `mcp` 의 port `MemoryForgetRequests` 를 `connector.action` 이 구현하고, 승인하면 `MemoryForgetRunner` 가 `memory` 의 `MemoryForgetting` 으로 지운다 |
@@ -125,8 +125,8 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 | 칸 | 값 |
 | --- | --- |
 | 주인 | 요청자(`McpCaller.user()`) |
-| 에이전트 | origin 실행의 에이전트. 맡긴 실행이면 맡겨진 에이전트다(DECISION27). 요청자가 대화를 시작할 수 없는 에이전트면 화면과 같이 거절한다 |
-| 대화 방식 | origin 실행이 맡긴 실행이 아니고 대화가 있으면 `SINGLE` 에 그 대화를 미리 적는다(DECISION29). 발화는 지금의 `SINGLE` 처리대로 그 대화가 지워지지 않았고 에이전트가 같으면 이어 쓴다. 맡긴 실행이거나 대화가 없으면 `NEW_PER_RUN` 이다 |
+| 에이전트 | 요청자의 기본 비서다. 화면과 같은 `TaskService` 가 정하고, 맡긴 실행도 맡겨진 에이전트가 아니라 기본 비서다([비서 중심 대화 스펙](../assistant-hub/spec.md) 의 REQ7 이 DECISION27 을 바꿨다). 고치기도 기본 비서로 바꾼다. 기본 비서가 없거나 쓸 수 없으면 `agent_unavailable` 이다 |
+| 대화 방식 | origin 실행이 맡긴 실행이 아니고 대화가 있으면 `SINGLE` 에 그 대화를 미리 적는다(DECISION29). 발화는 지금의 `SINGLE` 처리대로 그 대화가 지워지지 않았고 에이전트가 같으면 이어 쓴다. 그 대화의 에이전트가 기본 비서가 아니면 첫 발화가 기본 비서의 새 대화를 연다. 맡긴 실행이거나 대화가 없으면 `NEW_PER_RUN` 이다 |
 | 시간대, 놓친 실행, 모델 단계 | 화면 기본값(`Asia/Seoul`, `RUN_ONCE`), 모델 단계는 비움 |
 | 알림 | 인자가 없으면 화면 기본값(`ALWAYS`) |
 
