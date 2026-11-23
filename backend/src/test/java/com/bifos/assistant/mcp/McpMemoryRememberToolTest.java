@@ -814,6 +814,23 @@ class McpMemoryRememberToolTest {
 
 
     @Test
+    @DisplayName("기억 이전을 맡아 파일을 읽은 대화에서 남긴 본문은 바로 저장하지 않고 제안으로 남는다")
+    void proposesFileContentDuringMemoryMigration() throws Exception {
+        // 커리어 에이전트가 맥락 문서를 기억으로 옮길 때다. 도구 설명이 남겨도 된다고 알려도 판정은 실행의 출처로만 정한다
+        askedInThisTurn("작업 폴더의 맥락 문서를 기억으로 옮겨 줘");
+        toolStarted("read_file");
+
+        JsonNode result = call(remember("경력 요약", "백엔드 개발 8년, 결제와 정산 시스템을 맡았다", null)
+            .put("summary", "백엔드 8년, 결제와 정산"));
+
+        assertThat(text(result)).isEqualTo(PROPOSED);
+        Memory saved = onlyMemory();
+        assertThat(saved.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(onlyCapture().externalRead()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("한 실행에서 셋을 남기면 넷째는 저장하지 않는다")
     void limitsCapturesPerExecution() throws Exception {
         for (int i = 0; i < 3; i++) {
