@@ -831,7 +831,7 @@ class ChatAttachmentTurnTest {
     @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
     void groupAgentOwnedByAnotherUserRejectsPhotos() {
         CurrentUser mom = member("mom@example.com");
-        Agent shared = agentOf(dad, "shared");
+        Agent shared = otherAgentOf(dad, "shared");
         shared.changeAccess(true, AgentVisibility.GROUP, dad.id());
         agents.save(shared);
         assertThat(shared.acceptsAttachments()).isFalse();
@@ -1017,8 +1017,15 @@ class ChatAttachmentTurnTest {
     }
 
 
+    /** 그 사용자의 기본 비서를 만든다. */
     private Agent agentOf(CurrentUser owner, String code) {
-        Agent saved = primaries.make(owner, agents.save(Agent.of(
+        return primaries.make(owner, otherAgentOf(owner, code));
+    }
+
+
+    /** 기본 비서가 아닌 그 사용자의 에이전트를 만든다. */
+    private Agent otherAgentOf(CurrentUser owner, String code) {
+        return agents.save(Agent.of(
             code,
             code,
             code,
@@ -1026,8 +1033,7 @@ class ChatAttachmentTurnTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id())));
-        return saved;
+            owner.id()));
     }
 
 

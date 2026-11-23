@@ -6,6 +6,7 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.AppUser;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -39,10 +40,20 @@ public class TestPrimaryAgents {
     }
 
 
-    /** 그 사람의 줄이 이미 있으면 두지 않는다. 한 사람이 에이전트를 여럿 만들면 처음 것이 기본 비서다. */
+    /**
+     * 그 사람의 줄이 이미 같은 profile 이면 그대로 둔다. 다른 profile 이면 그 에이전트는 기본 비서가 되지 못하므로 바로 실패한다.
+     * 돌려준 에이전트로 새 대화를 열면 {@code VALIDATION_FAILED} 가 나서 원인을 찾기 어렵기 때문이다.
+     *
+     * @throws IllegalStateException 그 사람에게 다른 기본 비서가 이미 있을 때
+     */
     private Agent make(String email, String displayName, Agent agent) {
-        if (people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email)).isEmpty()) {
+        Optional<AllowedPerson> existing = people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email));
+        if (existing.isEmpty()) {
             saved.add(people.save(AllowedPerson.of(email, displayName, agent.hermesProfile())).id());
+        } else if (!existing.get().hermesProfile().equals(agent.hermesProfile())) {
+            throw new IllegalStateException(
+                email + " 에게는 이미 다른 기본 비서(" + existing.get().hermesProfile() + ")가 있어 " + agent.code()
+                    + " 를 기본 비서로 둘 수 없다");
         }
         return agent;
     }
