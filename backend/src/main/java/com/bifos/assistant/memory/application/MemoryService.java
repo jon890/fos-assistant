@@ -260,6 +260,9 @@ public class MemoryService {
     public Memory accept(CurrentUser user, Long id) {
         Memory memory = requireMemoryForUpdate(user, id);
         boolean proposal = memory.status() == MemoryStatus.PROPOSED;
+        if (proposal) {
+            replacements.requireUnchangedTarget(id);
+        }
         Instant now = clock.instant();
         memory.accept(user.id(), now);
         Memory accepted = memories.save(memory);

@@ -85,12 +85,13 @@ test("리뷰 진단과 위험 라벨은 기본 브랜치의 새 경로와 옛 �
   }
 });
 
-test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는 댓글은 리뷰한다", () => {
+test("Claude 리뷰는 수동 실행과 권한 있는 PR 댓글만 받는다", () => {
   const workflow = readFileSync(
     ".github/workflows/claude-code-review.yml",
     "utf8",
   );
-  assert.match(workflow, /types: \[opened, ready_for_review\]/);
+  assert.match(workflow, /^  workflow_dispatch:\n    inputs:\n      pr_number:/m);
+  assert.doesNotMatch(workflow, /^  pull_request:/m);
   const condition = workflow.split("    if: |\n")[1].split("    runs-on:")[0];
   const evaluate = new Function(
     "github",
@@ -109,14 +110,10 @@ test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는
       (value, prefix) => value.startsWith(prefix),
       (template, value) => template.replace("{0}", value),
     );
-  const pr = (draft = false, source = repository) => ({
-    pull_request: { draft, head: { repo: { full_name: source } } },
-  });
-  assert.equal(eligible("pull_request", pr(true)), false);
-  assert.equal(eligible("pull_request", pr()), true);
-  assert.equal(eligible("pull_request", pr(false, "fork/repo")), false);
-  assert.equal(eligible("pull_request", pr(), "dependabot[bot]"), false);
-  assert.equal(eligible("pull_request", pr(), "claude[bot]"), false);
+  assert.equal(eligible("pull_request", {}), false);
+  assert.equal(eligible("workflow_dispatch", {}), true);
+  assert.equal(eligible("workflow_dispatch", {}, "dependabot[bot]"), false);
+  assert.equal(eligible("workflow_dispatch", {}, "claude[bot]"), false);
   const comment = (body, author_association = "OWNER") => ({
     issue: { pull_request: {} },
     comment: { body, author_association },

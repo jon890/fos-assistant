@@ -86,11 +86,16 @@ docs-consolidate 는 채택한 공통 규칙을 「기존 계약 또는 `docs/co
 2. Draft CI 가 통과한다. main 은 충돌이 났거나 머지 큐·코디네이터가 요청할 때만 합친다.
 3. 위 표대로 검증한다. 독립 verify 는 인수 조건별 증거와 코드, 문서 검토를 받는다. 이것이 Draft 의 독립 리뷰이고 별도 리뷰 에이전트는 띄우지 않는다.
 4. 검증을 통과해야 Ready 로 올린다.
-5. Ready 뒤 GitHub 의 `claude-review` 가 한 번 더 본다. 그 지적은 한 번에 반영한다.
+5. Ready 로 올리면 Codex 가 자동 리뷰한다. 10분이 지나도 Codex 요약 댓글이 없을 때만 PR 에 `@codex review` 댓글을 한 번 단다. 지적은 한 번에 반영하고 리뷰를 다시 부르지 않는다.
+
+Claude 리뷰 토큰 만료로 자동 리뷰가 계속 실패해 Codex 클라우드 코드 리뷰로 바꾼다(사용자 결정 2026-11-23).
+Codex는 지적이 있으면 루트 `AGENTS.md`의 「Code Review Rules」에 따라 지적과 머지 큐가 읽는 판정 줄을 남긴다.
+지적이 없으면 Codex가 👍 반응과 `Codex Review: Didn't find any major issues.`가 담긴 댓글을 남긴다. 머지 큐는 이 댓글도 통과로 읽는다.
+Claude 워크플로는 GitHub Actions에서 수동 실행하거나 PR에 `/review` 댓글을 달 때 실행한다.
 
 이 순서는 2026-10-15 에 정한 「Ready 뒤 `claude-review` 만 독립 리뷰로 둔다」 를 바꾼다.
-위험 라벨은 정보용이라 머지 규칙은 바꾸지 않고, 독립 verify 를 받을 PR 을 가르는 데만 쓴다.
-라벨이 붙은 경로는 스크립트가 갖는다. 위험한 경로가 라벨에서 빠져 있으면 스크립트에 규칙을 더한다.
+위험 라벨은 독립 verify 가 필요한 PR 을 확인하는 데 쓰며, 머지 규칙은 그대로 둔다.
+Claude 자동 실행이 꺼지면 리뷰 워크플로의 위험 라벨 단계도 자동으로 돌지 않는다. 작성자는 Draft 에서 스크립트로 변경 파일을 확인하고 해당 라벨을 붙인다. 위험한 경로가 라벨에서 빠져 있으면 스크립트에 규칙을 더한다.
 
 **5. verify 뒤 코드가 바뀌면 바뀐 범위만 다시 본다.**
 리뷰 반영이나 main 합치기로 코드가 바뀌어도 verify 전체를 다시 돌리지 않는다.
@@ -103,7 +108,7 @@ fos-skills 의 spec 스킬은 스펙을 `docs/features/<feature-id>/spec.md` 에
 스펙의 다섯 절은 기능 파일의 구성(요구, 흐름, `covers:`)과 달라 기능 파일 안에 넣을 수 없다. 스펙만 새 기능 파일로 만들면 `covers:` 가 없어 `feature-covers.test.ts` 가 실패한다.
 
 리뷰 규칙도 세 곳이 서로 달랐다. `AGENTS.md` 는 Draft 독립 리뷰와 Ready 뒤 `claude-review` 를 둘 다 두었고, 코디네이터 쪽 규칙은 `claude-review` 하나만 두었다.
-`claude-review` 는 diff 와 그 diff 가 건드리는 지침을 읽는다. 요구사항마다 실행 증거를 대조하는 리뷰는 verify 뿐이다.
+당시 `claude-review`는 diff와 그 diff가 건드리는 지침을 읽었다. 요구사항마다 실행 증거를 대조하는 리뷰는 verify 뿐이다.
 또 스킬의 「코드가 바뀌면 verify 를 다시 거친다」 를 글자대로 따르면, worker 가 Draft CI 뒤 언제나 main 을 merge 하므로 모든 PR 이 verify 를 두 번 돈다.
 
 ### 대안 기각
