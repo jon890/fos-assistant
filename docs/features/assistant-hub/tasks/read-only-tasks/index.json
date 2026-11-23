@@ -1,0 +1,48 @@
+{
+  "name": "read-only-tasks",
+  "description": "지난 전문 에이전트 대화를 읽기 전용으로 두고 예약 작업을 기본 비서로 정한다(스펙 PR2 의 뒤 PR)",
+  "pr_scope": "기본 비서가 아닌 대화는 대화 응답에 writable 거짓을 내고 보내기, 다시 생성, 결과 다시 전달, 대기 메시지 넣기를 거절하며 화면은 입력창 대신 안내와 대화방 링크를 보인다. 예약 작업의 만들기와 고치기는 에이전트를 기본 비서로 정하고 작업 화면의 에이전트 칸을 지운다. 변경 파일 수가 많은 것은 대부분 테스트다. ChatController 와 PendingMessageController 의 생성자 인자, 테스트 사용자의 기본 비서 준비를 맞춘 같은 모양의 고침이라 나누지 않는다.",
+  "deferred": [
+    {
+      "what": "연결은 전문 에이전트에만, 전문 에이전트의 스킬을 비서 대화의 / 와 예약 작업 지시의 「에이전트 · 스킬」 로 맡기기(스펙 REQ9-REQ10, PR3)",
+      "why": "스펙 DECISION12",
+      "after": "이 PR 이 main 에 머지된 뒤"
+    },
+    {
+      "what": "블로그 사진 평가(test/model-eval/blog)를 비서를 거치게 고치기",
+      "why": "PR2 앞 PR 이 남긴 제약. 이 PR 범위 밖",
+      "after": "코디네이터가 정할 때"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-23",
+  "spec": "docs/features/assistant-hub/spec.md",
+  "design": "docs/features/assistant-hub/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ5",
+    "REQ7"
+  ],
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5",
+        "REQ7"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5",
+        "REQ7"
+      ]
+    }
+  ]
+}
