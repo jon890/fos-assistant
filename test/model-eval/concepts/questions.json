@@ -314,6 +314,9 @@
         "noLinkPrefixes": [
           "/new?agent="
         ],
+        "includes": [
+          "{otherAgentName}"
+        ],
         "absent": [
           "바꿨어요",
           "바꿨습니다"
