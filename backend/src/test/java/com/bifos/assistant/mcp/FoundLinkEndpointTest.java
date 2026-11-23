@@ -178,6 +178,28 @@ class FoundLinkEndpointTest {
 
 
     @Test
+    @DisplayName("작거나 크기를 모르는 본문 그림만 있으면 고르지 않고, 큰 본문 사진이 함께 있으면 그것을 고른다")
+    void doesNotSelectBadgeSizedBodyImage() throws Exception {
+        String badgeOnly = "https://shop.example.com/goods/badge";
+        String withPhoto = "https://shop.example.com/goods/boots";
+        String badge = "https://cdn.example.com/badges/cassidy-badge.png";
+        String unknown = "https://cdn.example.com/item/unknown.png";
+        String photo = "https://cdn.example.com/item/boots.png";
+        web.image(badge, "image/png", png(11));
+        web.image(unknown, "image/png", png(12));
+        web.image(photo, "image/png", png(13));
+        assertThat(report(root, page(null, badgeOnly, withPhoto)).statusCode()).isEqualTo(204);
+        reportPhotos(badgeOnly, badgeOnly, new Photo(badge, "body", 576), new Photo(unknown, "body", 0));
+        reportPhotos(withPhoto, withPhoto,
+            new Photo(badge, "body", 576), new Photo(unknown, "body", 0), new Photo(photo, "body", 640_000));
+
+        assertFailure("link:" + badgeOnly, 422, "IMAGE_SOURCE_LINK_NO_IMAGE");
+        assertThat(source(root, "link:" + withPhoto).body()).isEqualTo(png(13));
+        assertThat(web.requested()).containsExactly("cdn.example.com/item/boots.png");
+    }
+
+
+    @Test
     @DisplayName("읽은 주소 자체는 발견 기록이 아니고 선택한 사진도 그 페이지의 후보와 대화 기록에 있어야 한다")
     void cannotAuthorizePageOrAnUnreportedPhotoByReadingIt() throws Exception {
         String requested = "https://shop.example.com/goods/1";
