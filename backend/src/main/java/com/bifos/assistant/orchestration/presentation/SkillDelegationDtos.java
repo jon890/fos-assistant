@@ -34,11 +34,16 @@ public final class SkillDelegationDtos {
         }
     }
 
-    /** {@code /} 목록에 보일 에이전트 하나와 그 스킬이다. */
-    public record SkillDelegationTargetResponse(String agentCode, String agentName, List<String> skills) {
+    /** {@code /} 목록에 보일 에이전트 하나와 그 스킬이다. 스킬마다 목록 줄에 한 줄로 보일 설명이 있다. */
+    public record SkillDelegationTargetResponse(String agentCode, String agentName, List<SkillResponse> skills) {
 
         public static SkillDelegationTargetResponse from(SkillDelegationTarget target) {
-            return new SkillDelegationTargetResponse(target.agentCode(), target.agentName(), target.skills());
+            return new SkillDelegationTargetResponse(target.agentCode(), target.agentName(),
+                target.skills().stream().map(skill -> new SkillResponse(skill.name(), skill.description())).toList());
         }
+    }
+
+    /** 맡길 스킬 하나의 이름과 설명이다. */
+    public record SkillResponse(String name, String description) {
     }
 }

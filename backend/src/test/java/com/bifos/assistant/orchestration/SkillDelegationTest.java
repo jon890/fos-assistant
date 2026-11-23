@@ -177,7 +177,7 @@ class SkillDelegationTest {
 
         assertThat(delegations.targets(dad))
             .extracting(SkillDelegationTarget::agentCode, SkillDelegationTarget::agentName, SkillDelegationTarget::skills)
-            .containsExactly(tuple("career", "커리어", List.of("position-recommender")));
+            .containsExactly(tuple("career", "커리어", List.of(new SkillDelegationTarget.Skill("position-recommender", "공고를 골라요"))));
     }
 
 
@@ -275,7 +275,7 @@ class SkillDelegationTest {
                 ? new SkillListItem(name.substring(0, name.length() - 4), "", SkillSource.UPLOADED, false, null)
                 : name.endsWith(":hermes")
                     ? new SkillListItem(name.substring(0, name.length() - 7), "", SkillSource.HERMES, true, null)
-                    : new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
+                    : new SkillListItem(name, "position-recommender".equals(name) ? "공고를 골라요" : "", SkillSource.UPLOADED, true, null))
             .toList();
         doReturn(new SkillList(items, false, true, 30))
             .when(skillService)
