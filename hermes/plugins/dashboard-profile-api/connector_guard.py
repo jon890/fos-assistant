@@ -136,7 +136,6 @@ def _guard_instant(raw):
 
 def _guard_hide_financial(profile_dir, state):
     """소유한 서버의 금융 숨김만 복구한다. 현재 설치 기록은 바꾸지 않아 재설치가 필요하다."""
-    import stat
     import yaml
     from .common import _atomic_private_write
     from .connector_manifest import _connector_manifest
@@ -146,7 +145,6 @@ def _guard_hide_financial(profile_dir, state):
     if config_file.is_symlink():
         raise ValueError("profile 설정이 링크다")
     original = config_file.read_bytes()
-    mode = stat.S_IMODE(config_file.stat().st_mode)
     config = yaml.safe_load(original) or {}
     servers = config.get("mcp_servers", {})
     changed = False
@@ -167,7 +165,6 @@ def _guard_hide_financial(profile_dir, state):
         if config_file.is_symlink() or config_file.read_bytes() != original:
             raise ValueError("profile 설정이 확인 중 바뀌었다")
         _atomic_private_write(config_file, yaml.safe_dump(config, sort_keys=False, allow_unicode=True).encode("utf-8"))
-        os.chmod(config_file, mode)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

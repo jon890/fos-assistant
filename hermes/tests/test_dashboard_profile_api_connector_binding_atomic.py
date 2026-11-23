@@ -1,6 +1,10 @@
 """바인딩 설치의 부분 쓰기와 소유 기록 복구를 합성 오류로 검사한다."""
 
 import json
+import os
+import stat
+from types import SimpleNamespace
+from unittest.mock import patch
 from dashboard_profile_api_support import DEMO
 import dashboard_profile_api_support as support
 from plugin_loading import patch_plugin
@@ -19,9 +23,58 @@ class ProfileApiConnectorBindingAtomicTest(support.ProfileApiRouteTest):
                              "write_note": {"risk": "WRITE", "approval": "always"}}
         manifest.write_text(json.dumps(declared), encoding="utf-8")
 
+    def test_binding_preserves_config_metadata_and_creates_private_state(self):
+        self.bind_fixture()
+        config = self.root / "alice/config.yaml"
+        config.chmod(0o640)
+        original = config.stat()
+
+        self.assertEqual(self.bind().status_code, 200)
+
+        saved = config.stat()
+        self.assertNotEqual(saved.st_ino, original.st_ino)
+        self.assertEqual((saved.st_uid, saved.st_gid), (original.st_uid, original.st_gid))
+        self.assertEqual(stat.S_IMODE(saved.st_mode), 0o640)
+        state = config.with_name(".fos-connectors.json")
+        self.assertEqual(stat.S_IMODE(state.stat().st_mode), 0o600)
+
+    def test_replace_applies_existing_owner_and_group_to_temporary_file(self):
+        config = self.root / "owner/config.yaml"
+        original = config.stat()
+        temporary = SimpleNamespace(st_uid=original.st_uid + 1, st_gid=original.st_gid + 1)
+        replace = os.replace
+
+        with patch.object(os, "fstat", return_value=temporary), patch.object(os, "fchown") as chown:
+            def check_before_replace(source, target):
+                chown.assert_called_once()
+                fd, uid, gid = chown.call_args.args
+                self.assertIsInstance(fd, int)
+                self.assertEqual((uid, gid), (original.st_uid, original.st_gid))
+                self.assertEqual(source.read_bytes(), b"updated: true\n")
+                replace(source, target)
+
+            with patch.object(os, "replace", side_effect=check_before_replace):
+                self.plugin._atomic_private_write(config, b"updated: true\n")
+
+    def test_owner_change_failure_keeps_original_and_removes_temporary_file(self):
+        config = self.root / "owner/config.yaml"
+        original = config.read_bytes()
+        files = set(config.parent.iterdir())
+        metadata = config.stat()
+        temporary = SimpleNamespace(st_uid=metadata.st_uid + 1, st_gid=metadata.st_gid)
+
+        with patch.object(os, "fstat", return_value=temporary), patch.object(os, "fchown", side_effect=PermissionError):
+            with self.assertRaises(PermissionError):
+                self.plugin._atomic_private_write(config, b"updated: true\n")
+
+        self.assertEqual(config.read_bytes(), original)
+        self.assertEqual(set(config.parent.iterdir()), files)
+
     def test_state_write_failure_restores_config_and_retry_succeeds(self):
         """설정만 쓴 뒤 소유 기록 쓰기가 실패하면 이전 파일을 복원하고 재시도할 수 있다."""
         self.bind_fixture()
+        config = self.root / "alice/config.yaml"
+        config.chmod(0o640)
         before = self.files()
         write = self.plugin._atomic_private_write
         state = self.root / "alice/.fos-connectors.json"
@@ -34,6 +87,7 @@ class ProfileApiConnectorBindingAtomicTest(support.ProfileApiRouteTest):
         with patch_plugin(self.plugin, "_atomic_private_write", side_effect=fail):
             self.assertEqual(self.bind().status_code, 503)
         self.assertEqual(self.files(), before)
+        self.assertEqual(stat.S_IMODE(config.stat().st_mode), 0o640)
         self.assertEqual(self.bind().status_code, 200)
 
     def test_error_after_config_replace_restores_the_replaced_file(self):
