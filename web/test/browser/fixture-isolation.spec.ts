@@ -1,5 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import { isolatedUser, seedConversation } from "./helpers.ts";
+import { isolatedUser, restorePrimaries, seedConversation } from "./helpers.ts";
 
 test("대역의 장애와 쓰지 않은 보류를 다음 검사에 남기지 않는다", async ({
   hermes,
@@ -42,6 +42,8 @@ test("검사 전용 사용자는 다른 폭과 반복의 대화가 없는 상태
       page.getByRole("textbox", { name: "검사 비서 성격" }),
     ).toBeVisible();
   } finally {
+    // test-support 대화 만들기가 잠시 둔 기본 비서는 지울 수 없다(409). 지우기 전에 되돌린다.
+    await restorePrimaries();
     expect((await page.request.delete(`/api/agents/${code}`)).status()).toBe(
       204,
     );

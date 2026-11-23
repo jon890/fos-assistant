@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import { openConversationWith } from "./helpers.ts";
+import { openConversationWith, restorePrimaries } from "./helpers.ts";
 import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
@@ -52,6 +52,8 @@ test.beforeEach(async ({ context, page }, testInfo) => {
 
 test.afterEach(async ({ context, page }, testInfo) => {
   await setSession(context, ownerOf(testInfo.project.name));
+  // test-support 대화 만들기가 잠시 둔 기본 비서는 지울 수 없다(409). 지우기 전에 되돌린다.
+  await restorePrimaries();
   const response = await page.request.get("/api/agents");
   const mine = ((await response.json()) as Listed[]).filter((agent) => agent.ownedByMe);
   for (const agent of mine) {

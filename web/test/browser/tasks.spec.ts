@@ -27,7 +27,6 @@ async function createTaskByApi(page: Page, title: string): Promise<string> {
   const created = await page.request.post("/api/tasks", {
     data: {
       title,
-      agentCode: "browser",
       instruction: "오늘 할 일을 정리해 줘",
       schedule: { type: "CRON", cron: "0 9 * * *", timeZone: "Asia/Seoul" },
     },
@@ -47,26 +46,26 @@ test("메뉴의 예약 작업으로 가면 빈 목록 문구가 보인다", asyn
   await expect(page.getByText("아직 예약 작업이 없어요.")).toBeVisible();
 });
 
-test("작업 만들기의 에이전트 목록은 받은 에이전트를 모두 보인다", async ({ page }) => {
-  await page.route("**/api/agents", (route: Route) =>
-    route.fulfill({
-      json: [
-        { code: "delegated", name: "위임 도우미" },
-        { code: "browser", name: "예약 도우미" },
-        { code: "legacy", name: "기존 도우미" },
-      ],
-    }),
-  );
+test("작업 만들기에 에이전트 칸이 없고 저장한 작업은 기본 비서로 돈다", async ({ page }) => {
   await page.goto("/tasks/new");
-  const agents = page.getByLabel("에이전트", { exact: true });
-  await expect(agents.locator("option")).toHaveText(["위임 도우미", "예약 도우미", "기존 도우미"]);
-  await expect(agents).toHaveValue("delegated");
+  await expect(page.getByLabel("이름", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("에이전트", { exact: true })).toHaveCount(0);
+  await page.getByLabel("이름", { exact: true }).fill("비서 작업");
+  await page.getByLabel("지시", { exact: true }).fill("오늘 할 일을 정리해 줘");
+  await page.getByLabel("시각(시:분)").fill("09:00");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]{36}$/);
+
+  const id = page.url().split("/").pop();
+  const fetched = await page.request.get(`/api/tasks/${id}`);
+  expect(fetched.ok()).toBeTruthy();
+  // 검사 사용자의 기본 비서는 공통 fixture 가 둔 「browser」 다.
+  expect(((await fetched.json()) as { agentCode: string }).agentCode).toBe("browser");
 });
 
 test("새 작업을 저장하면 상세로 가고 목록에 시각이 사람 말로 보인다", async ({ page }) => {
   await page.goto("/tasks/new");
   await page.getByLabel("이름", { exact: true }).fill("월간 정리");
-  await page.getByLabel("에이전트", { exact: true }).selectOption("browser");
   await page.getByLabel("지시", { exact: true }).fill("이번 달 할 일을 정리해 줘");
   await page.getByLabel("시각", { exact: true }).selectOption({ label: "매달" });
   await page.getByLabel("날짜(일)").fill("1");
@@ -83,7 +82,6 @@ test("새 작업을 저장하면 상세로 가고 목록에 시각이 사람 말
 test("모델 단계를 골라 저장하면 상세와 API 에 그 단계가 남는다", async ({ page }) => {
   await page.goto("/tasks/new");
   await page.getByLabel("이름", { exact: true }).fill("깊은 정리");
-  await page.getByLabel("에이전트", { exact: true }).selectOption("browser");
   await page.getByLabel("지시", { exact: true }).fill("이번 주 할 일을 정리해 줘");
   await page.getByLabel("시각(시:분)").fill("09:00");
   const tier = page.getByLabel("모델 단계", { exact: true });
@@ -112,8 +110,9 @@ test("단계 목록을 읽지 못하면 모델 단계 선택지가 단계 이름
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) => route.fulfill({ status: 500, json: { code: "INTERNAL_ERROR" } }),
   );
+  const tiersRead = page.waitForResponse((response) => response.url().includes("/api/chat/model-tiers"));
   await page.goto("/tasks/new");
-  await expect(page.getByLabel("에이전트", { exact: true })).toHaveValue("browser");
+  await tiersRead;
 
   await expect(page.getByLabel("모델 단계", { exact: true }).locator("option")).toHaveText([
     "기본값",
