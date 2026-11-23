@@ -80,9 +80,10 @@ import { userExecutionLimitScenario } from "./scenarios/user-execution-limit.ts"
 import { deployCheckScenario, E2E_QUALITY_FEATURE_TIMEOUT } from "./scenarios/deploy-check.ts";
 import { E2E_QUALITY_EVAL_TIMEOUT, evalRunScenario } from "./scenarios/eval-run.ts";
 import { pickPort } from "../support/pick-port.ts";
+import { assertPortAvailable } from "./port-guard.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const APP_PORT = pickPort("E2E_APP_PORT", 18_080);
+const DEFAULT_APP_PORT = 18_080;
 const JWT_SECRET = "smoke-secret-smoke-secret-smoke-secret";
 const PROFILE_KEY = "dad-key";
 const HEALTH_TIMEOUT_MS = 90_000;
@@ -241,6 +242,7 @@ async function writeProfileKeys(work: string): Promise<string> {
 }
 
 function startControlPlane(
+  appPort: number,
   keyDir: string,
   dashboardBaseUrl: string,
   logPath: string,
@@ -260,7 +262,7 @@ function startControlPlane(
       DB_URL: `jdbc:h2:file:${databaseFile};MODE=MySQL;WRITE_DELAY=0`,
       DB_USERNAME: "sa",
       DB_PASSWORD: "",
-      SERVER_PORT: String(APP_PORT),
+      SERVER_PORT: String(appPort),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       // 관찰 본문 저장은 공개 검사 전용 KEK만 쓴다.
       ASSISTANT_DATA_ENCRYPTION_KEK_FILE: join(ROOT, "backend/src/test/resources/data-encryption/test-kek.keys"),
@@ -409,6 +411,8 @@ async function main(): Promise<void> {
   let scenarioStartedAt = performance.now();
 
   try {
+    await assertPortAvailable(Number(process.env.E2E_APP_PORT || DEFAULT_APP_PORT));
+    const appPort = pickPort("E2E_APP_PORT", DEFAULT_APP_PORT);
     const skillRoot = await makeSkillRoot(work);
     console.log("== fake Hermes 기동");
     hermes = await startFakeHermes({
@@ -444,9 +448,10 @@ async function main(): Promise<void> {
     const artifactRoot = await makeArtifactRoot(work);
     const attachmentRoot = await makeAttachmentRoot(work);
     const hermesBaseUrl = hermes.baseUrl;
-    const healthUrl = `http://127.0.0.1:${APP_PORT}/actuator/health`;
+    const healthUrl = `http://127.0.0.1:${appPort}/actuator/health`;
     const launch = (): ChildProcess =>
       startControlPlane(
+        appPort,
         keyDir,
         hermesBaseUrl,
         logPath,
@@ -457,12 +462,12 @@ async function main(): Promise<void> {
       );
     app = launch();
     await waitForHealth(healthUrl, logPath);
-    console.log(`   http://127.0.0.1:${APP_PORT}`);
+    console.log(`   http://127.0.0.1:${appPort}`);
 
     // 에이전트 등록 시나리오부터 참이다. 그 뒤로는 시나리오가 test-support 로 기본 비서를 잠시 바꿀 수 있다.
     let primariesInUse = false;
     const context: Context = {
-      api: `http://127.0.0.1:${APP_PORT}/api/v1`,
+      api: `http://127.0.0.1:${appPort}/api/v1`,
       tokens: {
         dad: mintToken("dad@example.com", JWT_SECRET),
         kid: mintToken("kid@example.com", JWT_SECRET),
