@@ -15,6 +15,9 @@ import java.time.Instant;
  *
  * <p>{@code connector} 는 플러그인 도구 사건에만 싣는 서비스 이름과 도구 제목이다. 플러그인 선언에 있는 공개 정보라 누구에게나
  * 싣는다(docs/features/app-shell/design.md 「작업 과정의 이름」).
+ *
+ * <p>{@code delegatedAgentName} 은 {@code agent_delegate} 도구 사건에만 넣는 맡은 에이전트의 이름이다. 모델이 준 인자가 아니라 그 호출이
+ * 도는 동안 시작된 맡긴 실행의 에이전트에서 정한다. 찾지 못하면 null 이고 화면은 「다른 에이전트」 로 보인다.
  */
 public record ExecutionEventView(
     int sequence,
@@ -30,7 +33,8 @@ public record ExecutionEventView(
     Long outputTokens,
     Instant occurredAt,
     String subagentUsageStatus,
-    ConnectorToolName connector) {
+    ConnectorToolName connector,
+    String delegatedAgentName) {
 
     /**
      * 사건 한 줄을 보는 사람에게 맞춰 옮긴다.
@@ -52,6 +56,13 @@ public record ExecutionEventView(
 
     public static ExecutionEventView from(
         ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus, ConnectorToolName connector) {
+        return from(event, viewer, subagentUsageStatus, connector, null);
+    }
+
+
+    public static ExecutionEventView from(
+        ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus, ConnectorToolName connector,
+        String delegatedAgentName) {
         boolean hidden = event.eventType().isTool() && !ToolDetailPolicy.visibleTo(viewer, event.toolName());
         boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionEventView(
@@ -68,6 +79,7 @@ public record ExecutionEventView(
             internal ? event.outputTokens() : null,
             event.occurredAt(),
             subagentUsageStatus,
-            connector);
+            connector,
+            delegatedAgentName);
     }
 }
