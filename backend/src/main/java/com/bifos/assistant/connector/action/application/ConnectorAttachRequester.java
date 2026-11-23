@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorToolSummary;
+import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.mcp.application.port.ConnectorAttachRequests;
@@ -83,11 +84,24 @@ class ConnectorAttachRequester implements ConnectorAttachRequests {
             body.put("agent_name", specialist.get().name());
             return body;
         }
-        if (!summary.bindings().isEmpty()) {
-            // 기본 비서에만 붙어 있다. 배포 전부터 붙은 연결은 그대로 쓴다(DECISION7).
-            Map<String, Object> body = result(ALREADY_ATTACHED, "이미 이 에이전트에 붙어 있다. 카드를 띄우지 않았다.", null);
-            body.put("thisAgent", "ready");
+        Optional<BoundAgentSummary> onPrimary = summary.bindings().stream()
+            .filter(binding -> primary.filter(binding.agentCode()::equals).isPresent())
+            .findFirst();
+        if (onPrimary.isPresent()) {
+            // 기본 비서에 붙어 있다. 배포 전부터 붙은 연결은 그대로 쓴다(DECISION7).
+            boolean ready = onPrimary.get().status() == BindingStatus.READY && !onPrimary.get().restartRequired();
+            Map<String, Object> body = result(ALREADY_ATTACHED,
+                ready ? "이미 이 에이전트에 붙어 있고 지금 쓸 수 있다. 카드를 띄우지 않았다."
+                    : "이미 이 에이전트에 붙어 있고 반영을 기다리는 중이다. 카드를 띄우지 않았다. 조금 뒤에 쓸 수 있다고 알린다.",
+                null);
+            body.put("thisAgent", ready ? "ready" : "pending");
             return body;
+        }
+        if (!summary.bindings().isEmpty()) {
+            return result("specialist_unavailable",
+                "이 서비스는 지금 쓸 수 없는 전문 에이전트(꺼졌거나 공개 범위가 바뀐 에이전트)에 붙어 있다. 카드를 띄우지 않았다. link 의 화면에서 "
+                    + "그 에이전트를 확인하라고 안내한다.",
+                screen);
         }
         String agentName = specialistName(summary.title());
         Map<String, String> args = new LinkedHashMap<>();

@@ -257,7 +257,7 @@ class McpConnectorAttachToolTest {
 
 
     @Test
-    @DisplayName("그 연결이 붙은 전문 에이전트가 있으면 카드 없이 그 에이전트를 알리고, 기본 비서에만 붙어 있으면 이미 붙은 것으로 답한다")
+    @DisplayName("기본 비서에만 붙어 있으면 이미 붙은 것으로, 전문 에이전트가 있으면 카드 없이 그 에이전트를, 그 에이전트가 꺼졌으면 카드 없이 연결 화면을 알린다")
     void pointsToAttachedSpecialistOrKeepsPrimary() throws Exception {
         connect();
         bindingService.bind(current(dad), agent.code(), DEMO);
@@ -275,6 +275,15 @@ class McpConnectorAttachToolTest {
 
         assertThat(isError(specialist)).as(text(specialist)).isFalse();
         assertThat(text(specialist)).contains("specialist_attached", "\"agent_code\":\"" + shopper.code() + "\"", "메모 담당");
+        assertThat(actions.findAll()).isEmpty();
+
+        bindingService.unbind(current(dad), agent.code(), DEMO);
+        jdbc.update("UPDATE agent SET enabled = false WHERE id = ?", shopper.id());
+
+        JsonNode disabled = call(DEMO);
+
+        assertThat(isError(disabled)).isTrue();
+        assertThat(text(disabled)).contains("specialist_unavailable", "\"link\":\"/connections/" + DEMO + "\"");
         assertThat(actions.findAll()).isEmpty();
     }
 
