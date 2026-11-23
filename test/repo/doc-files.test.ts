@@ -42,6 +42,8 @@ const OUTSIDE_DOCS = [
   /^hermes\/connectors\/[^/]+\/ICON-SOURCE\.md$/,
   /^tasks\//,
   /^\.claude\/spec-overlay\.md$/,
+  // verify 스킬은 저장소의 검증 환경과 실행 절차를 이 파일에서 읽는다.
+  /^\.claude\/verify-overlay\.md$/,
 ];
 
 /** 한 파일이 둘 수 있는 자리인지 판정한다. ADR 은 `adr-index.test.ts` 가 따로 본다. */
@@ -166,7 +168,7 @@ test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙
 });
 
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
-  for (const file of [".claude/spec-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "hermes/skill-packages/x/SKILL.md", "hermes/skill-packages/x/references/y.md", "tasks/plan1-x/phase-01.md"]) {
+  for (const file of [".claude/spec-overlay.md", ".claude/verify-overlay.md", "README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "hermes/skill-packages/x/SKILL.md", "hermes/skill-packages/x/references/y.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
 });
