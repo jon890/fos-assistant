@@ -64,6 +64,7 @@ scripts/dev/check-local.sh --fast
 | `web/src/components/chat/conversation-session-view.tsx` | 수정 |
 | `web/src/components/chat/message-list.tsx` | 수정 |
 | `web/src/components/chat/read-only-notice.tsx` | 신규 |
+| `web/src/components/chat/system-message.tsx` | 수정 |
 | `web/src/components/chat/use-conversation-todo.tsx` | 수정 |
 | `web/src/components/shell/conversations-provider.tsx` | 수정 |
 | `web/src/components/task/task-form.tsx` | 수정 |
