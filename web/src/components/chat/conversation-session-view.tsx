@@ -16,6 +16,7 @@ import { ActivityPanel } from "./activity/activity-panel";
 import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Notice } from "@/components/ui/notice";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
+import { ReadOnlyNotice } from "./read-only-notice";
 import { primaryCode } from "@/lib/agent";
 import { useConversationTodo } from "./use-conversation-todo";
 import type { Props } from "./conversation-session-view-types";
@@ -84,6 +85,8 @@ export function ConversationSessionView({
   starters,
 }: Props) {
   const { replyTo, replyRef, setReplyTo } = useReplyTarget();
+  // 대화의 에이전트가 기본 비서가 아닌 지난 대화는 읽기만 한다(스펙 assistant-hub REQ5). 서버도 쓰는 요청을 거절한다.
+  const readOnly = currentConversation?.writable === false;
   const todo = useConversationTodo({
     conversationId,
     refreshKey: approvalRefresh,
@@ -94,6 +97,7 @@ export function ConversationSessionView({
     selectedVersions,
     sending,
     activity,
+    readOnly,
   });
 
   if (notFound) {
@@ -188,15 +192,27 @@ export function ConversationSessionView({
                 [slotId]: index,
               }))
             }
-            onRegenerate={() => {
-              void regenerate();
-            }}
-            onRetry={() => {
-              void regenerate();
-            }}
-            onRetryDelivery={(deliveryId) => {
-              void retryDeliveryTurn(deliveryId);
-            }}
+            onRegenerate={
+              readOnly
+                ? undefined
+                : () => {
+                    void regenerate();
+                  }
+            }
+            onRetry={
+              readOnly
+                ? undefined
+                : () => {
+                    void regenerate();
+                  }
+            }
+            onRetryDelivery={
+              readOnly
+                ? undefined
+                : (deliveryId) => {
+                    void retryDeliveryTurn(deliveryId);
+                  }
+            }
             // 다른 turn 이 도는 동안에는 보내도 서버가 막으므로 단추도 막는다.
             deliveryRetrying={deliveryRetrying || sending}
             memoryCaptures={memoryCaptures.captures}
@@ -207,10 +223,14 @@ export function ConversationSessionView({
             }}
             memoryUses={memoryUses.uses}
             // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
-            onAnswer={(text) => {
-              void submit([], text);
-            }}
-            onReply={setReplyTo}
+            onAnswer={
+              readOnly
+                ? undefined
+                : (text) => {
+                    void submit([], text);
+                  }
+            }
+            onReply={readOnly ? undefined : setReplyTo}
           />
         )}
 
@@ -256,70 +276,93 @@ export function ConversationSessionView({
             conversationId={conversationId}
             refreshKey={approvalRefresh}
           />
-          <PendingQueueView
-            queue={pending.queue}
-            onCancel={(pendingId) => {
-              void cancelPendingMessage(pendingId);
-            }}
-            onRelease={() => {
-              void releasePendingMessages();
-            }}
-            busy={pendingBusy}
-          />
-          <Composer
-            value={draft}
-            onChange={setDraft}
-            onSend={async (attachmentIds, text, attachments, reply) => {
-              const sent = await submit(
-                attachmentIds,
-                text,
-                attachments,
-                reply,
-              );
-              // 받아들여지지 않았으면 그사이 새로 집은 것이 없을 때만 칩을 되돌린다(스펙 chat-reference REQ9).
-              if (!sent && reply && replyRef.current === null)
-                setReplyTo(reply);
-              return sent;
-            }}
-            reply={
-              replyTo
-                ? { target: replyTo, onClear: () => setReplyTo(null) }
-                : undefined
-            }
-            onOutgoingChange={setOutgoing}
-            // 새 대화는 기본 비서와만 시작한다. 비서가 없으면 보내지 못한다(스펙 assistant-hub REQ4).
-            disabled={conversationId === null && primaryCode(agents) === ""}
-            conversationId={conversationId}
-            agentCode={agentMissing ? "" : agentCode}
-            acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
-            ensureConversation={ensureConversation}
-            running={sending}
-            // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
-            canQueue={conversationId !== null && replyTo === null}
-            canStop={executionId !== null && !stopRequested}
-            onStop={() => {
-              void stop();
-            }}
-            skillNames={skillNames}
-            onBlockingChange={setComposerBlocking}
-            modelChoiceUnknown={
-              conversationId !== null && currentConversation === undefined
-            }
-            modelSelectionMode={currentConversation?.modelSelectionMode ?? null}
-            modelTier={currentConversation?.modelTier ?? null}
-            // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
-            onModelChoiceSaved={replace}
-          />
-          {unknownSkill ? (
-            <Notice
-              variant="error"
-              data-testid="skill-command-notice"
-              role="alert"
-              className="mx-auto mt-2 w-full max-w-3xl"
-            >
-              /{unknownSkill} 스킬이 이 에이전트에 없어요
-            </Notice>
-          ) : null}
+          {readOnly ? (
+            <>
+              {/* 배포 전에 쌓인 대기 메시지는 보이고 취소할 수 있게 둔다. 보내기는 서버가 거절하므로 그리지 않는다. */}
+              <PendingQueueView
+                queue={pending.queue}
+                onCancel={(pendingId) => {
+                  void cancelPendingMessage(pendingId);
+                }}
+                busy={pendingBusy}
+              />
+              <ReadOnlyNotice
+                canStop={executionId !== null && !stopRequested}
+                onStop={() => {
+                  void stop();
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <PendingQueueView
+                queue={pending.queue}
+                onCancel={(pendingId) => {
+                  void cancelPendingMessage(pendingId);
+                }}
+                onRelease={() => {
+                  void releasePendingMessages();
+                }}
+                busy={pendingBusy}
+              />
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSend={async (attachmentIds, text, attachments, reply) => {
+                  const sent = await submit(
+                    attachmentIds,
+                    text,
+                    attachments,
+                    reply,
+                  );
+                  // 받아들여지지 않았으면 그사이 새로 집은 것이 없을 때만 칩을 되돌린다(스펙 chat-reference REQ9).
+                  if (!sent && reply && replyRef.current === null)
+                    setReplyTo(reply);
+                  return sent;
+                }}
+                reply={
+                  replyTo
+                    ? { target: replyTo, onClear: () => setReplyTo(null) }
+                    : undefined
+                }
+                onOutgoingChange={setOutgoing}
+                // 새 대화는 기본 비서와만 시작한다. 비서가 없으면 보내지 못한다(스펙 assistant-hub REQ4).
+                disabled={conversationId === null && primaryCode(agents) === ""}
+                conversationId={conversationId}
+                agentCode={agentMissing ? "" : agentCode}
+                acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
+                ensureConversation={ensureConversation}
+                running={sending}
+                // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
+                canQueue={conversationId !== null && replyTo === null}
+                canStop={executionId !== null && !stopRequested}
+                onStop={() => {
+                  void stop();
+                }}
+                skillNames={skillNames}
+                onBlockingChange={setComposerBlocking}
+                modelChoiceUnknown={
+                  conversationId !== null && currentConversation === undefined
+                }
+                modelSelectionMode={
+                  currentConversation?.modelSelectionMode ?? null
+                }
+                modelTier={currentConversation?.modelTier ?? null}
+                // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
+                onModelChoiceSaved={replace}
+              />
+              {unknownSkill ? (
+                <Notice
+                  variant="error"
+                  data-testid="skill-command-notice"
+                  role="alert"
+                  className="mx-auto mt-2 w-full max-w-3xl"
+                >
+                  /{unknownSkill} 스킬이 이 에이전트에 없어요
+                </Notice>
+              ) : null}
+            </>
+          )}
           {startScreen ? (
             <StarterPrompts
               prompts={starters.prompts}

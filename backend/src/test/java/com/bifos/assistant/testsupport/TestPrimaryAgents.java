@@ -59,6 +59,18 @@ public class TestPrimaryAgents {
     }
 
 
+    /**
+     * 그 사용자에게 기본 비서가 아직 없을 때만 {@code agent} 를 기본 비서로 둔다. 한 사용자에게 에이전트를 여럿 만드는 도우미가
+     * 처음 것을 기본 비서로 두려고 쓴다. 이미 있으면 그대로 두고 {@code agent} 를 돌려주므로, 돌려준 값이 기본 비서라는 보장은 없다.
+     */
+    public Agent ensure(CurrentUser user, Agent agent) {
+        if (people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(user.email())).isEmpty()) {
+            make(user, agent);
+        }
+        return agent;
+    }
+
+
     /** 만든 허용 목록 줄을 지운다. 검사가 이미 지운 줄은 건너뛴다. */
     void reset() {
         people.deleteAll(people.findAllById(saved));

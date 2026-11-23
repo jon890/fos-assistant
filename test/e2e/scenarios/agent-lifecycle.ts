@@ -3,7 +3,7 @@
  *
  * <p>만든 에이전트는 지운 상태로 남는다. 뒤의 시나리오가 목록을 셀 때 섞이지 않게 한다.
  */
-import { call, expect, expectStatus, seedConversation, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, restorePrimaries, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 
 type AgentView = { code: string; name: string; visibility: string; editable: boolean; ownedByMe: boolean };
 type AdminAgentView = { code: string; hermesProfile: string };
@@ -71,6 +71,8 @@ export const agentLifecycleScenario: Scenario = {
     expect(!inDadList!.ownedByMe, "dad 가 kid 의 에이전트 주인으로 보인다");
 
     step("지우면 둘 다의 목록에서 빠지고 그 대화에 보내면 AGENT_NOT_FOUND 다");
+    // test-support 대화 만들기가 잠시 둔 기본 비서는 지울 수 없다(PRIMARY_AGENT_PROTECTED). 지우기 전에 되돌린다.
+    await restorePrimaries(context);
     expectStatus(
       await call(context, `/agents/${created.code}`, { method: "DELETE", token: context.tokens.kid }),
       204,

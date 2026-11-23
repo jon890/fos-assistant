@@ -2,6 +2,7 @@ package com.bifos.assistant.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -43,6 +44,9 @@ class TaskPlaintextBackfillTest {
     private static final String TITLE = "평문-표식-6621 월급 정리";
     private static final String INSTRUCTION = "평문-표식-6622 지난달 월급 입금 내역을 정리해 줘";
     private static final int ALL = 100_000;
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     TestClock clock;
@@ -193,7 +197,6 @@ class TaskPlaintextBackfillTest {
     private TaskInput input(String title, String instruction) {
         return new TaskInput(
             title,
-            agent.code(),
             instruction,
             new ScheduleInput(TriggerType.CRON, "0 9 1 * *", null, null),
             null,
@@ -212,7 +215,7 @@ class TaskPlaintextBackfillTest {
 
     private Agent agentOf(CurrentUser owner) {
         String code = "task-" + UUID.randomUUID().toString().substring(0, 8);
-        return agents.save(Agent.of(
+        return primaries.ensure(owner, agents.save(Agent.of(
             code,
             code,
             code,
@@ -220,7 +223,7 @@ class TaskPlaintextBackfillTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id()));
+            owner.id())));
     }
 
 

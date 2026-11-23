@@ -3,7 +3,7 @@ import {
   bindDemoConnector, connectDemoConnector, disconnectDemoConnector,
   expect, PERSONA_AGENT_CODE, setSession, test,
 } from "./fixtures.ts";
-import { openConversationWith } from "./helpers.ts";
+import { openConversationWith, restorePrimaries } from "./helpers.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
@@ -97,6 +97,8 @@ test("붙인 플러그인의 스킬이 슬래시 목록과 읽기 전용 설정�
     await expect(item.getByRole("switch")).toHaveCount(0);
   } finally {
     try {
+      // test-support 대화 만들기가 잠시 둔 기본 비서는 지울 수 없다(409). 지우기 전에 되돌린다.
+      await restorePrimaries();
       if (code) expect((await page.request.delete(`/api/agents/${code}`)).ok()).toBeTruthy();
     } finally {
       await disconnectDemoConnector(isolatedMember.email);

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
@@ -63,6 +64,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ConversationMissingAgentTest {
 
     @Autowired
+    ConversationEntry conversationEntry;
+
+    @Autowired
     ChatService chat;
 
     @Autowired
@@ -117,7 +121,7 @@ class ConversationMissingAgentTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class)))
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), conversationEntry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));

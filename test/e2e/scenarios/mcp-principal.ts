@@ -3,8 +3,13 @@
  *
  * <p>MCP 토큰은 profile 만 증명한다. 두 사용자의 호출이 같은 토큰으로 오므로, 요청자는 서명한 `_fos_ctx` 의 루트
  * session 으로 찾은 도는 실행의 사용자여야 한다(ADR-032). 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
+ *
+ * <p>에이전트가 기본 비서가 아닌 대화는 읽기 전용이고(스펙 assistant-hub REQ5), 한 profile 은 한 사람의 기본 비서만 될 수 있다.
+ * 그래서 두 사람의 turn 을 한꺼번에 시작하지 못한다. 앞 사람의 실행을 붙잡아 둔 채 기본 비서를 뒷사람으로 옮겨 보내, 뒷사람의
+ * 읽기는 두 실행이 함께 도는 동안 일어나게 한다.
  */
-import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, restorePrimaries, seedConversation, step, type Context, type Scenario } from "../harness.ts";
+import { within } from "../delegation-support.ts";
 import { MEMORY_READ_PROBE } from "../fake-hermes.ts";
 
 export const MCP_PRINCIPAL_PROFILE = "mcp-shared-group";
@@ -16,18 +21,48 @@ type MemoryView = { id: number };
 type Turn = { conversationId: string; executionId: number; assistantText: string };
 type ExecutionView = { id: number };
 
-/** 그 사용자가 GROUP 에이전트로 새 대화를 시작해 Memory 읽기 검사 글을 보낸다. */
-async function sendReadProbe(context: Context, token: string, memoryId: number): Promise<Turn> {
+type Probe = { token: string; memoryId: number };
+
+/** 그 사용자가 GROUP 에이전트와의 대화에 Memory 읽기 검사 글을 보낸다. */
+async function sendReadProbe(context: Context, probe: Probe, conversationId: string): Promise<Turn> {
   return expectStatus(
     await call(context, "/chat/messages", {
       method: "POST",
-      token,
-      // 새 대화는 기본 비서로만 열리므로 이 에이전트와의 지난 대화를 만들어 보낸다(스펙 assistant-hub REQ4).
-      body: { conversationId: await seedConversation(context, token, AGENT_CODE), text: `${MEMORY_READ_PROBE} ${memoryId}` },
+      token: probe.token,
+      body: { conversationId, text: `${MEMORY_READ_PROBE} ${probe.memoryId}` },
     }),
     200,
     "Memory 읽기 검사 대화",
   ).json<Turn>();
+}
+
+/**
+ * 두 사람이 같은 GROUP 에이전트로 검사 글을 보낸다. 앞 사람의 실행을 붙잡아 두고 뒷사람이 보내므로 뒷사람의 읽기는 두 실행이
+ * 함께 도는 동안 일어난다. test-support 대화 만들기가 그 에이전트를 잠시 그 사람의 기본 비서로 둔다.
+ */
+async function sendOverlapping(context: Context, first: Probe, second: Probe): Promise<[Turn, Turn]> {
+  const firstConversation = await seedConversation(context, first.token, AGENT_CODE);
+  context.hermes.holdNextRun();
+  const firstTurn = sendReadProbe(context, first, firstConversation);
+  let released = false;
+  try {
+    await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 앞 사람의 실행을 받지 않았다");
+    await restorePrimaries(context);
+    const secondTurn = await sendReadProbe(context, second, await seedConversation(context, second.token, AGENT_CODE));
+    released = true;
+    context.hermes.releaseHeldRun();
+    return [await firstTurn, secondTurn];
+  } finally {
+    if (!released) {
+      try {
+        context.hermes.releaseHeldRun();
+      } catch {
+        // 붙잡은 실행이 없으면 놓을 것도 없다. 원래 실패를 가리지 않는다.
+      }
+    }
+    await firstTurn.catch(() => undefined);
+    await restorePrimaries(context);
+  }
 }
 
 async function executionIds(context: Context, token: string): Promise<number[]> {
@@ -101,21 +136,23 @@ export const mcpPrincipalScenario: Scenario = {
       ).json<MemoryView>();
       memoryIds.push({ token: context.tokens.kid, id: kidMemory.id });
 
-      step("두 사용자가 나란히 같은 에이전트로 보내면 각자 자기 본문만 읽는다");
-      const [dadOwn, kidOwn] = await Promise.all([
-        sendReadProbe(context, context.tokens.dad, dadMemory.id),
-        sendReadProbe(context, context.tokens.kid, kidMemory.id),
-      ]);
+      step("두 사용자가 겹쳐 같은 에이전트로 보내면 각자 자기 본문만 읽는다");
+      const [dadOwn, kidOwn] = await sendOverlapping(
+        context,
+        { token: context.tokens.dad, memoryId: dadMemory.id },
+        { token: context.tokens.kid, memoryId: kidMemory.id },
+      );
       expect(dadOwn.assistantText.includes("아빠 공유 검사 본문") && !dadOwn.assistantText.includes("아이 공유 검사 본문"),
         `아빠의 답이 자기 본문만 담지 않는다: ${dadOwn.assistantText}`);
       expect(kidOwn.assistantText.includes("아이 공유 검사 본문") && !kidOwn.assistantText.includes("아빠 공유 검사 본문"),
         `아이의 답이 자기 본문만 담지 않는다: ${kidOwn.assistantText}`);
 
       step("상대의 Memory 번호로 보내면 읽을 수 없다고 답하고 상대 본문이 없다");
-      const [dadCross, kidCross] = await Promise.all([
-        sendReadProbe(context, context.tokens.dad, kidMemory.id),
-        sendReadProbe(context, context.tokens.kid, dadMemory.id),
-      ]);
+      const [kidCross, dadCross] = await sendOverlapping(
+        context,
+        { token: context.tokens.kid, memoryId: dadMemory.id },
+        { token: context.tokens.dad, memoryId: kidMemory.id },
+      );
       expect(dadCross.assistantText === NOT_READABLE && !dadCross.assistantText.includes("아이 공유 검사 본문"),
         `아빠가 아이의 Memory 를 읽었다: ${dadCross.assistantText}`);
       expect(kidCross.assistantText === NOT_READABLE && !kidCross.assistantText.includes("아빠 공유 검사 본문"),

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
@@ -65,6 +66,9 @@ class ConversationEventControllerTest {
 
     private static final String COMMAND = "python3 run.py";
     private static final String SWITCHED_TO = "example-provider/example-model-small";
+
+    @Autowired
+    ConversationEntry conversationEntry;
 
     @Autowired
     TestPrimaryAgents primaries;
@@ -186,7 +190,7 @@ class ConversationEventControllerTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class)))
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), conversationEntry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build()
             .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))

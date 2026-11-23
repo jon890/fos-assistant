@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -71,6 +72,9 @@ class FailedExecutionUsageRoutesTest {
     private static final String PROVIDER = "served-provider";
     private static final String MODEL = "served-model";
     private static final String PRICING_VERSION = "test-pricing@2026-10-01";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ChatService chat;
@@ -140,7 +144,7 @@ class FailedExecutionUsageRoutesTest {
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
             user.id());
-        agent = agents.save(agent);
+        agent = primaries.make(user, agents.save(agent));
         Conversation started = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
         // 요청한 모델과 실제로 돈 모델이 달라야 사용량과 비용이 실제 모델 기준임을 확인할 수 있다.
         // 요청 모델은 대화가 고른 칸이 정한다. 목록에 없어도 실행은 그 값으로 보낸다.

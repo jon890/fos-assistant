@@ -3,6 +3,7 @@ package com.bifos.assistant.task;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -61,6 +62,9 @@ class TaskServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-04T00:00:00.123456789Z");
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     TestClock clock;
@@ -191,17 +195,16 @@ class TaskServiceTest {
 
 
     @Test
-    @DisplayName("꺼진 에이전트는 AGENT_DISABLED, 남의 비공개 에이전트는 AGENT_NOT_FOUND 다")
-    void rejectsUnusableAgents() {
+    @DisplayName("기본 비서가 꺼졌으면 AGENT_DISABLED, 기본 비서가 없으면 AGENT_NOT_FOUND 다(스펙 assistant-hub REQ7)")
+    void rejectsWithoutUsablePrimary() {
         CurrentUser owner = member();
-        CurrentUser other = member();
         Agent off = agentOf(owner, AgentVisibility.PRIVATE);
         off.changeAccess(false, AgentVisibility.PRIVATE, owner.id());
         agents.save(off);
-        Agent othersPrivate = agentOf(other, AgentVisibility.PRIVATE);
+        CurrentUser stranger = member();
 
         assertCode(() -> service.create(owner, cron("꺼짐", off, "0 9 * * *")), ErrorCode.AGENT_DISABLED);
-        assertCode(() -> service.create(owner, cron("남의 것", othersPrivate, "0 9 * * *")), ErrorCode.AGENT_NOT_FOUND);
+        assertCode(() -> service.create(stranger, cron("기본 비서 없음", off, "0 9 * * *")), ErrorCode.AGENT_NOT_FOUND);
     }
 
 
@@ -426,7 +429,6 @@ class TaskServiceTest {
     private static TaskInput cron(String title, Agent agent, String cron) {
         return new TaskInput(
             title,
-            agent.code(),
             "지난달 기록을 보고 정리해 줘",
             new ScheduleInput(TriggerType.CRON, cron, null, null),
             null,
@@ -439,7 +441,6 @@ class TaskServiceTest {
     private static TaskInput once(String title, Agent agent, LocalDateTime fireAt) {
         return new TaskInput(
             title,
-            agent.code(),
             "알려 줘",
             new ScheduleInput(TriggerType.ONCE, null, fireAt, SEOUL.getId()),
             ConversationMode.SINGLE,
@@ -452,7 +453,6 @@ class TaskServiceTest {
     private static TaskInput withTier(TaskInput input, ModelTier tier) {
         return new TaskInput(
             input.title(),
-            input.agentCode(),
             input.instruction(),
             input.schedule(),
             input.conversationMode(),
@@ -471,7 +471,7 @@ class TaskServiceTest {
 
     private Agent agentOf(CurrentUser owner, AgentVisibility visibility) {
         String code = "task-" + UUID.randomUUID().toString().substring(0, 8);
-        return agents.save(Agent.of(
+        return primaries.ensure(owner, agents.save(Agent.of(
             code,
             code,
             code,
@@ -479,7 +479,7 @@ class TaskServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id()));
+            owner.id())));
     }
 
 

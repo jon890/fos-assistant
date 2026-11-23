@@ -80,7 +80,7 @@ public class McpTaskTools {
                     + "fire_at(한 번, 2026-11-21T07:00 꼴) 가운데 하나를 준다. 하루 발화가 너무 많은 주기는 거절된다. "
                     + "instruction 은 사용자가 한 말을 그대로 넣지 말고 대화 맥락으로 구체적으로 쓴다. 대상의 정확한 조건과 제외할 것, 확인 방법"
                     + "(검증하지 못한 후보는 빼기), 판단 기준, 알릴 때 담을 것, 이미 알린 것은 되풀이하지 않기, 새것이 없으면 알리지 않기, 사용자 상황을 담는다. "
-                    + "작업은 이 에이전트로 돌고 결과는 이 대화에 이어 쌓인다. 모델 단계는 사용자가 작업 화면에서 고른다. "
+                    + "작업은 사용자의 기본 비서로 돌고, 비서와의 대화에서 만들면 결과가 이 대화에 이어 쌓인다. 모델 단계는 사용자가 작업 화면에서 고른다. "
                     + "만든 뒤 답에 작업 이름, next_run, 지시문 요약, link 를 마크다운 링크로 적는다. " + FAILURE_RULE,
                 Map.of(
                     "title", Map.of("type", "string", "minLength", 1, "maxLength", TITLE_MAX),
@@ -91,7 +91,7 @@ public class McpTaskTools {
                 List.of("title", "instruction")),
             definition(UPDATE,
                 "사용자가 예약 작업의 이름, 할 일, 시각과 반복, 알림을 바꿔 달라고 하면 바로 고친다. 준 칸만 바뀐다. "
-                    + "에이전트, 모델 단계, 시간대, 대화 방식은 고치지 못하므로 /tasks/<id> 화면에서 바꾸라고 안내한다. "
+                    + "고치면 작업은 사용자의 기본 비서로 돈다. 모델 단계, 시간대, 대화 방식은 고치지 못하므로 /tasks/<id> 화면에서 바꾸라고 안내한다. "
                     + "instruction 을 고칠 때도 만들 때처럼 구체적으로 쓴다. " + FAILURE_RULE,
                 Map.of(
                     "task", Map.of("type", "string", "description", TASK_ARG),

@@ -38,6 +38,11 @@ export type Conversation = {
   purpose?: "CHAT" | "CHECK" | "ROOM";
   /** 예약 작업이 만든 대화면 그 작업이다. 아니면 null 이다 */
   taskId: string | null;
+  /**
+   * 사람이 이어 쓸 수 있는 대화다. 대화의 에이전트가 기본 비서가 아니면 거짓이다(docs/features/assistant-hub/spec.md 의 REQ5).
+   * 옛 응답과 `replace` 로 받은 줄은 비어 있을 수 있고, 비면 쓸 수 있다고 본다.
+   */
+  writable?: boolean;
   taskTitle: string | null;
 };
 

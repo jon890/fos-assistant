@@ -25,7 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
  * 브라우저와 e2e 검사가 대화를 준비하게 돕는다.
  *
  * <p>대화 번호는 주소와 API 에 나오지 않아 브라우저 검사가 얻을 길이 없다. 새 대화는 기본 비서로만 열리므로
- * (docs/features/assistant-hub/spec.md 의 REQ4) 다른 에이전트의 실행을 보는 검사는 그 에이전트와의 지난 대화를 여기서 만든다.
+ * (docs/features/assistant-hub/spec.md 의 REQ4) 다른 에이전트의 실행을 보는 검사는 그 에이전트와의 대화를 여기서 만든다. 비서가 아닌
+ * 대화는 읽기 전용이라(REQ5) 그 에이전트를 잠시 기본 비서로 두고, 검사가 끝나면 {@link PrimaryAgentTestSupportController#restore}
+ * 로 되돌린다.
  */
 @RestController
 @RequestMapping("/api/v1/test-support/chat")
@@ -38,6 +40,7 @@ public class ChatTestSupportController {
     private final AgentService agents;
     private final ConversationRepository conversations;
     private final Clock clock;
+    private final PrimaryAgentTestSupportController primaries;
 
 
     /**
@@ -60,7 +63,7 @@ public class ChatTestSupportController {
 
 
     /**
-     * 부르는 사람과 그 에이전트의 빈 대화를 만든다. 기본 비서가 아닌 에이전트와 그 전에 열어 둔 대화와 같다.
+     * 부르는 사람과 그 에이전트의 빈 대화를 만들고 그 에이전트를 잠시 기본 비서로 둔다.
      *
      * <p>쓸 수 없거나 꺼진 에이전트는 운영의 시작 판정과 같은 오류다.
      */
@@ -68,6 +71,8 @@ public class ChatTestSupportController {
     public StartedConversation start(@RequestBody StartRequest request) {
         CurrentUser user = currentUser.require();
         Agent agent = agents.requireStartable(user, request.agentCode());
+        // 비서가 아닌 대화는 읽기 전용이라(REQ5) 그 에이전트를 잠시 기본 비서로 둔다. 검사가 끝나면 restore 가 되돌린다.
+        primaries.useTemporarily(user, agent);
         Conversation saved = conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
         return new StartedConversation(saved.publicId());
     }

@@ -20,6 +20,9 @@ import { readFile } from "node:fs/promises";
 import {
   mintSignInToken,
   mintToken,
+  readPrimaryOriginals,
+  rememberPrimaryOriginals,
+  restorePrimaries,
   ScenarioFailure,
   type Context,
   type Scenario,
@@ -456,6 +459,8 @@ async function main(): Promise<void> {
     await waitForHealth(healthUrl, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);
 
+    // 에이전트 등록 시나리오부터 참이다. 그 뒤로는 시나리오가 test-support 로 기본 비서를 잠시 바꿀 수 있다.
+    let primariesInUse = false;
     const context: Context = {
       api: `http://127.0.0.1:${APP_PORT}/api/v1`,
       tokens: {
@@ -469,9 +474,12 @@ async function main(): Promise<void> {
       hermes,
       readBackendLog: () => readFile(logPath, "utf-8").catch(() => ""),
       restartControlPlane: async () => {
+        // 잠시 바꾼 기본 비서의 처음 값은 test-support 가 메모리에만 들고 있어 재기동하면 잃는다. 읽어 두었다가 다시 넣는다.
+        const originals = primariesInUse ? await readPrimaryOriginals(context) : undefined;
         if (app !== undefined) await killControlPlane(app);
         app = launch();
         await waitForHealth(healthUrl, logPath);
+        if (originals !== undefined) await rememberPrimaryOriginals(context, originals);
       },
     };
 
@@ -480,6 +488,12 @@ async function main(): Promise<void> {
       scenarioStartedAt = performance.now();
       console.log(`== ${scenario.name}`);
       await scenario.run(context);
+      // 시나리오가 잠시 바꾼 기본 비서를 되돌린다. 다음 시나리오의 dad 대화가 읽기 전용이 되지 않게 한다. 에이전트 등록 전에는
+      // dad 토큰으로 부르면 그때 사용자가 생겨 첫 사용자 판정이 바뀌므로 등록 시나리오부터 부른다.
+      if (scenario === bindingScenario || primariesInUse) {
+        primariesInUse = true;
+        await restorePrimaries(context);
+      }
     }
 
     console.log("\n모두 통과했다");

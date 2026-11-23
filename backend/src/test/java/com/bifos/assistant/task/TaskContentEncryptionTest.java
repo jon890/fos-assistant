@@ -2,6 +2,7 @@ package com.bifos.assistant.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -41,6 +42,9 @@ class TaskContentEncryptionTest {
     private static final Instant NOW = Instant.parse("2026-10-04T00:00:00Z");
     private static final String TITLE = "평문-표식-6612 월급 정리";
     private static final String INSTRUCTION = "평문-표식-6613 지난달 월급 입금 내역을 정리해 줘";
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     TestClock clock;
@@ -187,7 +191,6 @@ class TaskContentEncryptionTest {
     private TaskInput input(String title, String instruction) {
         return new TaskInput(
             title,
-            agent.code(),
             instruction,
             new ScheduleInput(TriggerType.CRON, "0 9 1 * *", null, null),
             null,
@@ -206,7 +209,7 @@ class TaskContentEncryptionTest {
 
     private Agent agentOf(CurrentUser owner) {
         String code = "task-" + UUID.randomUUID().toString().substring(0, 8);
-        return agents.save(Agent.of(
+        return primaries.ensure(owner, agents.save(Agent.of(
             code,
             code,
             code,
@@ -214,7 +217,7 @@ class TaskContentEncryptionTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id()));
+            owner.id())));
     }
 
 

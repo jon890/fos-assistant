@@ -31,7 +31,7 @@ import {
   TEST_EMAIL,
   WEB_BASE_URL,
 } from "./settings.ts";
-import { isolatedUser } from "./helpers.ts";
+import { isolatedUser, restorePrimaries } from "./helpers.ts";
 
 const { expect, test: base } = playwright;
 
@@ -780,6 +780,8 @@ export const test = base.extend<{
         await use();
       } finally {
         await hermes.resetControls();
+        // 대화를 만들며 잠시 바꾼 기본 비서를 되돌린다(스펙 assistant-hub REQ5).
+        await restorePrimaries();
       }
     },
     { auto: true },

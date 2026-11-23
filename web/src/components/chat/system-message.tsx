@@ -68,16 +68,19 @@ export function SystemMessage({
               ? "결과를 정리하지 못했어요"
               : "결과 정리를 중지했어요"}
           </span>
-          <Button
-            type="button"
-            variant={delivery.status === "FAILED" ? "outline" : "ghost"}
-            size="xs"
-            data-testid="delivery-retry"
-            disabled={deliveryRetrying}
-            onClick={() => onRetryDelivery?.(delivery.id)}
-          >
-            결과 다시 전달
-          </Button>
+          {/* 읽기 전용 대화는 다시 전달을 넘기지 않는다. 상태만 보이고 단추를 그리지 않는다. */}
+          {onRetryDelivery ? (
+            <Button
+              type="button"
+              variant={delivery.status === "FAILED" ? "outline" : "ghost"}
+              size="xs"
+              data-testid="delivery-retry"
+              disabled={deliveryRetrying}
+              onClick={() => onRetryDelivery(delivery.id)}
+            >
+              결과 다시 전달
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </li>

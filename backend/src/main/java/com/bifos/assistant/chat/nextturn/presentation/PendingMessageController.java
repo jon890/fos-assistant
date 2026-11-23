@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.nextturn.presentation;
 
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.PendingMessageRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.PendingQueueView;
@@ -28,6 +29,7 @@ public class PendingMessageController {
     private final PendingMessageService pending;
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
+    private final ConversationEntry entry;
 
 
     @GetMapping
@@ -42,7 +44,10 @@ public class PendingMessageController {
     public PendingQueueView enqueue(
         @PathVariable UUID conversationId, @Valid @RequestBody PendingMessageRequest request) {
         CurrentUser user = currentUser.require();
-        return PendingQueueView.from(pending.enqueue(user, access.requireOwnId(user, conversationId), request.text(), Boolean.TRUE.equals(request.steer())));
+        Long id = access.requireOwnId(user, conversationId);
+        // 비서가 아닌 대화는 읽기 전용이다(스펙 REQ5). 이미 쌓인 대기 줄의 실행은 막지 않는다.
+        entry.requireWritable(user, id);
+        return PendingQueueView.from(pending.enqueue(user, id, request.text(), Boolean.TRUE.equals(request.steer())));
     }
 
 
@@ -58,6 +63,8 @@ public class PendingMessageController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public PendingQueueView send(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
-        return PendingQueueView.from(pending.release(user, access.requireOwnId(user, conversationId)));
+        Long id = access.requireOwnId(user, conversationId);
+        entry.requireWritable(user, id);
+        return PendingQueueView.from(pending.release(user, id));
     }
 }

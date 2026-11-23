@@ -120,7 +120,8 @@ class ChatTurnRouting {
      * 보내기 요청의 대화와 에이전트다.
      *
      * <p>{@code @} 로 다른 에이전트에게 바로 맡기는 길은 없앴다(비서 중심 대화 스펙 REQ6). 맡길 에이전트가 오면 아무것도 저장하기
-     * 전에 {@code VALIDATION_FAILED} 로 거절한다. 답장은 이어 쓰는 대화에서만 받는다.
+     * 전에 {@code VALIDATION_FAILED} 로 거절한다. 답장은 이어 쓰는 대화에서만 받는다. 기본 비서가 아닌 대화(읽기 전용)도
+     * {@code VALIDATION_FAILED} 다.
      */
     Routed routeSend(
         CurrentUser user,
@@ -136,7 +137,24 @@ class ChatTurnRouting {
         if (reply != null && conversationId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a reply needs an existing conversation");
         }
+        if (conversationId != null) {
+            requireWritable(user, access.requireOwn(user, conversationId));
+        }
         return route(user, conversationId, text, agentCode, attachmentIds, reply);
+    }
+
+
+    /**
+     * 비서가 아닌 대화는 읽기 전용이다(스펙 REQ5). {@link #route} 는 자동 turn 과 예약 turn 도 쓰므로 사람의 보내기만 여기서 막는다.
+     *
+     * <p>주인과 지움을 확인한 바로 뒤, 에이전트 판정과 스킬 목록 조회보다 먼저 본다. 그래야 글이 평문이든 {@code /이름} 이든 같은
+     * {@code VALIDATION_FAILED} 로 거절하고 Hermes 를 부르지 않는다. 지운 에이전트의 대화는 지금처럼 {@link #route} 가
+     * {@code AGENT_NOT_FOUND} 로 거절하게 건너뛴다.
+     */
+    private void requireWritable(CurrentUser user, Conversation conversation) {
+        if (!entry.writable(user, conversation) && !agents.requireById(conversation.agentId()).isDeleted()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this conversation is read-only");
+        }
     }
 
 

@@ -5,7 +5,7 @@
  * <p>승인이 필요한 플러그인 도구는 플러그인 도구 정책 시나리오와 같은 방법으로 부른다. 시작에서 연결을 등록해 비공개 에이전트에
  * 붙이고 반영 완료까지 한 뒤, 끝에서 작업과 그 에이전트를 지우고 연결을 해제한다. 발화기는 `run.ts` 가 1초마다 돌게 해 두었다.
  */
-import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, step, usePrimaryTemporarily, type Context, type Scenario } from "../harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR } from "../fake-hermes.ts";
 import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
 
@@ -57,6 +57,8 @@ export const scheduledTaskScenario: Scenario = {
       const agentCode = (await setup.attachedAgent("예약 시험 비서")).code;
 
       step("연결을 붙인 그 에이전트로 쓰기 도구를 부르는 한 번 도는 작업을 3초 뒤로 만든다");
+      // 작업은 기본 비서로 돈다(스펙 assistant-hub REQ7). 연결을 붙인 에이전트를 잠시 dad 의 기본 비서로 둔다.
+      await usePrimaryTemporarily(context, context.tokens.dad, agentCode);
       const hermesTool = `${PREFIX}write_note`;
       const created = expectStatus(
         await call(context, "/tasks", {
@@ -64,7 +66,6 @@ export const scheduledTaskScenario: Scenario = {
           token: context.tokens.dad,
           body: {
             title: TITLE,
-            agentCode,
             instruction: `${CONNECTOR_TOOL_PROBE}\n${hermesTool} ${JSON.stringify({ text: "예약으로 남길 글" })}`,
             schedule: { type: "ONCE", fireAt: utcLocalDateTimeAfter(3), timeZone: "UTC" },
           },

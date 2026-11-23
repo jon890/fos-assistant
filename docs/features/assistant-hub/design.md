@@ -57,12 +57,17 @@
 운영 코드가 PR 하나의 상한을 넘어 둘로 나눈다(DECISION5). 앞 PR 은 새 대화와 `@`, 「대화하기」, 지시문과 평가 세트(REQ4, REQ6, REQ8)이고, 뒤 PR 은 읽기 전용 대화와 예약 작업(REQ5, REQ7)이다. 앞 PR 만 배포된 동안 지난 전문 에이전트 대화는 지금처럼 이어 쓸 수 있다.
 
 - **새 대화의 에이전트**: `chat.conversation.application` 의 새 `ConversationEntry` 가 요청자의 기본 비서(`PrimaryAgents.of`)를 정한다. 새 대화를 만드는 두 길(`ChatTurnRouting.route` 의 새 대화, `ChatConversationManagement.startEmpty`)이 이것만 쓴다. 요청의 `agentCode` 가 비었으면 기본 비서이고, 기본 비서와 다른 코드면 `VALIDATION_FAILED` 다. 기본 비서가 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED` 다. 웹이 먼저 바뀌어도 서버가 막는다.
-- **읽기 전용**: 같은 클래스의 `writable(user, conversation)` 이 대화의 에이전트가 지금 기본 비서인지 본다(스펙 DECISION22). 점검 대화(`purpose = CHECK`)는 늘 참이다(DECISION16). 사람이 쓰는 네 길이 `requireWritable` 로 막는다: 보내기(`ChatTurnRouting.route`), 다시 생성과 결과 다시 전달(`ChatController`, `ChatService` 가 파일 길이 상한에 닿아 컨트롤러에서 본다), 대기 메시지(`PendingMessageController`). 거절은 `VALIDATION_FAILED` 다. 자동 turn, 예약 turn, 위임 결과는 막지 않는다. 대화 응답(`ConversationView`)에 `writable` 을 더한다.
+- **읽기 전용**(뒤 PR): `ConversationEntry` 의 `writable` 이 대화의 에이전트가 지금 요청자의 기본 비서인지 본다(스펙 DECISION22). 점검 대화(`purpose = CHECK`)는 늘 참이다(DECISION16). 목록처럼 여러 줄을 볼 때는 기본 비서를 한 번만 읽는 판정(`writableFor(user)`)을 쓴다. 사람이 쓰는 길만 `requireWritable` 로 막고 거절은 `VALIDATION_FAILED` 다.
+  - 보내기와 흐르는 보내기: `ChatTurnRouting.routeSend` 가 이어 쓰는 대화의 주인과 지움을 확인한 바로 뒤, 에이전트 판정과 스킬 목록 조회보다 먼저 본다. `/이름` 도 평문과 같은 오류로 거절하고 Hermes 를 부르지 않는다. 지운 에이전트의 대화는 건너뛰어 `AGENT_NOT_FOUND` 로 둔다. `route` 는 예약 turn, 먼저 살펴보기, 대기 메시지 실행, 결과 전달이 함께 쓰므로 거기서 막지 않는다.
+  - 다시 생성과 결과 다시 전달: `ChatController` 가 SSE 를 열기 전에 본다. `ChatService` 가 파일 길이 상한(500줄)에 닿아 있다.
+  - 대기 메시지 넣기와 끼우기, 바로 보내기: `PendingMessageController` 가 본다. 이미 쌓인 대기 줄의 실행과 취소는 막지 않는다.
+  - 대화 응답(`ConversationView`)에 `writable` 을 더한다. 목록, 한 줄 읽기, 이름 바꾸기, 모델 단계 고르기, 대화방(`RoomController`, 늘 참)이 모두 낸다.
+  - 자동 결과 전달 turn, 예약 turn, 먼저 살펴보기는 막지 않는다. 그 대화에 맡겨 둔 일의 결과와 그 에이전트의 예약 작업 결과는 지금처럼 쌓인다.
 - **`@` 맡기기**: 보내기 요청의 `delegateTo` 가 있으면 `VALIDATION_FAILED` 다. `TurnIntent.Mention` 과 `ChatTurnRouting.routeMention` 을 지운다. 지난 맡김을 그리는 `MentionLines` 와 다음 turn 입력에 넣는 `MentionInputs` 는 남긴다. [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md) 은 새로 맡기는 부분만 대체되어 파일은 옮기지 않고 그 머리와 목록에 적는다(일부만 대체된 ADR 은 옮기지 않는다는 `docs/adr/INDEX.md` 규칙).
-- **예약 작업**: 사람의 입구 둘이 에이전트를 기본 비서로 정한다. 화면 API(`TaskController` 의 만들기·고치기)는 요청의 `agentCode` 를 받지 않고, 에이전트 도구(`TaskAgentRequests` 의 만들기·고치기)는 실행의 에이전트 대신 기본 비서를 쓴다. 매일 깨우기와 이벤트 감시처럼 `TaskService` 를 바로 부르는 내부 길은 그대로다. 멈추기·다시 켜기는 에이전트를 바꾸지 않는다(DECISION23).
+- **예약 작업**(뒤 PR): `TaskService` 의 만들기와 고치기가 에이전트를 요청자의 기본 비서(`PrimaryAgents`)로 정한다. 기본 비서가 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED` 다. 작업 입력(`TaskInput`, 화면 요청 `TaskRequest`)의 `agentCode` 칸을 지운다. 옛 화면이 보내도 JSON 의 모르는 칸이라 버린다. 화면 API 와 `task_` 도구(`TaskAgentRequests`)와 배포 뒤 확인이 모두 이 길을 쓴다. 멈추기·다시 켜기는 에이전트를 바꾸지 않는다(DECISION23). 고쳐 비서로 바뀐 `SINGLE` 작업은 발화 때 대화의 에이전트가 작업의 에이전트와 다르면 새 대화를 여는 지금 규칙(`TaskRunStarter`)으로 새 비서 대화에 쌓인다. 지시 맨 앞의 `/이름` 은 지금처럼 그 작업의 에이전트(비서)의 스킬로 읽는다. 만들거나 고칠 때 그 이름이 기본 비서의 켜진 스킬이 아니면 저장하지 않고 `SKILL_COMMAND_UNKNOWN` 이다(`SkillCommandCatalog`). 전문 에이전트에만 있던 스킬을 부르는 작업은 시각만 고쳐도 비서로 바뀌어 다음 발화가 실패하기 때문이다. 「에이전트 · 스킬」 꼴은 PR3(REQ10, DECISION27)이다.
 - **지시문**: `ServiceConceptsInstructions` 의 에이전트 고르기 줄을 「대화의 에이전트는 바뀌지 않고 그 에이전트의 일은 내가 맡겨 처리한다, 링크를 붙이지 않는다」 로 바꾼다. `DelegationTargetsInstructions` 머리에 「사용자가 아래 에이전트의 이름을 말하며 맡기라고 하면 그 에이전트에게 맡긴다」 를 더한다. 평가 세트(`test/model-eval/concepts/questions.json`)의 바꾸기 문항은 링크가 없는 답을 기대하고, 이름으로 맡기는 문항은 `agent_delegate` 를 기대한다.
-- **테스트 준비**: 기본 비서는 허용 목록 줄로만 찾는데 테스트 사용자는 그 줄 없이 만든다. backend 통합 테스트는 `testsupport.TestPrimaryAgents` 로 대화할 에이전트를 그 사용자의 기본 비서로 두고 검사마다 지운다. e2e 와 브라우저 테스트는 test-support API(`/api/v1/test-support/primary-agent`, `/api/v1/test-support/chat/conversations`)로 기본 비서를 정하거나 다른 에이전트와의 지난 대화를 만든다. 다른 에이전트의 실행 자체를 보는 시나리오는 지난 대화로 보낸다.
-- **웹**: 새 대화 화면은 목록의 `primary` 에이전트로 고정하고 이름표 목록과 `@` 고르기를 그리지 않는다. `?agent=` 는 읽지 않는다. 에이전트 상세, 전문 에이전트 만들기 제안, 연결 뒤 고르기의 「대화하기」 를 지운다. 대화 응답의 `writable` 이 거짓이면 입력창 대신 안내 줄과 대화방 링크를 보이고 다시 생성과 다시 전달 단추를 그리지 않는다. 작업 화면의 에이전트 칸을 지운다.
+- **테스트 준비**: 기본 비서는 허용 목록 줄로만 찾는데 테스트 사용자는 그 줄 없이 만든다. backend 통합 테스트는 `testsupport.TestPrimaryAgents` 로 대화할 에이전트를 그 사용자의 기본 비서로 두고 검사마다 지운다. e2e 와 브라우저 테스트는 test-support API(`/api/v1/test-support/primary-agent`, `/api/v1/test-support/chat/conversations`)로 기본 비서를 정하거나 다른 에이전트와의 지난 대화를 만든다. 다른 에이전트의 실행 자체를 보는 시나리오는 test-support 로 그 에이전트와 대화를 만든다. 지난 대화가 읽기 전용이 된 뒤로는 대화를 만들 때 그 에이전트를 잠시 기본 비서로 두고(`PrimaryAgentTestSupportController.useTemporarily`), e2e 는 시나리오마다, 브라우저 테스트는 검사마다 `/api/v1/test-support/primary-agent/restore` 로 되돌린다. 기본 비서는 지울 수 없으므로(409) 검사가 만든 에이전트를 지우기 전에도 되돌린다. 바꾸기 전의 값은 test-support 가 메모리에만 들고 있어, e2e 가 Control Plane 을 다시 띄울 때는 그 값을 읽어 두었다가 다시 넣는다(`/api/v1/test-support/primary-agent/originals`). 한 profile 은 한 사람의 기본 비서만 될 수 있어(`allowed_person` 의 profile 유일 제약) 같은 GROUP 에이전트로 두 사람이 보내는 시나리오는 차례로 보낸다.
+- **웹**: 새 대화 화면은 목록의 `primary` 에이전트로 고정하고 이름표 목록과 `@` 고르기를 그리지 않는다. `?agent=` 는 읽지 않는다. 에이전트 상세, 전문 에이전트 만들기 제안, 연결 뒤 고르기의 「대화하기」 를 지운다. 대화 응답의 `writable` 이 거짓이면 입력창 대신 안내 줄과 대화방 링크를 보이고 다시 생성과 다시 전달 단추를 그리지 않는다. 이미 쌓인 대기 메시지는 보이고 취소할 수 있게 두고 「보내기」 만 그리지 않는다. 작업 화면의 에이전트 칸을 지운다.
 
 ### PR3
 
@@ -77,6 +82,7 @@
 - 사건 스트림이 끊기거나 늦게 와도 자식의 끝은 `awaitCompletion` 이 정한다. 끝난 뒤 온 사건은 버린다(ADR-090 과 같다).
 - 배포 순서: PR1 은 Control Plane 과 웹만 바꾼다. 웹이 먼저 떠도 `delegation_activity` 를 받지 않을 뿐이고, Control Plane 이 먼저 떠도 웹이 모르는 사건을 버린다.
 - 배포 순서(PR2 앞 PR): 웹과 Control Plane 을 함께 배포한다. Control Plane 만 먼저 뜨거나 옛 화면 탭이 열린 채로 남으면, 옛 웹은 새로 고치기 전까지 새 대화를 목록의 첫 에이전트로 보낸다. 그 에이전트가 기본 비서가 아니면 `VALIDATION_FAILED` 로 거절되고, 옛 `@` 맡김 보내기도 거절된다. 저장되는 것은 없고 입력한 글은 입력창에 돌아온다.
+- 배포 순서(PR2 뒤 PR): 웹과 Control Plane 을 함께 배포한다. 옛 화면 탭에서 비서가 아닌 대화에 보내면 `VALIDATION_FAILED` 로 거절되고 글은 입력창에 돌아온다. 옛 작업 화면이 보내는 `agentCode` 는 버리고 기본 비서로 저장한다.
 
 ## 검증 전략
 
@@ -89,7 +95,8 @@
 | REQ4 | 새 대화와 빈 대화가 늘 기본 비서로 생기고 다른 코드는 거절하는 통합 테스트(`ConversationEntryTest`), `/new` 와 `?agent=` 가 비서만 보이는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
 | REQ6 | `delegateTo` 거절(`MentionDelegationTest`), `@` 고르기가 없는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
 | REQ6, REQ8 | 평가 세트의 데이터와 채점 테스트, 배포 뒤 운영 모델로 서비스 개념 묶음 | `test/model-eval/`, 운영 평가 계정 |
-| REQ5, REQ7 | PR2 의 뒤 PR 계획 때 정한다 | |
+| REQ5 | 사람이 쓰는 길의 거절과 자동·예약 turn 이 막히지 않는 통합 테스트, 대화 응답의 `writable`, 읽기 전용 대화를 여는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
+| REQ7 | 화면 API 와 `task_` 도구로 만들고 고치면 기본 비서이고 멈추기·다시 켜기는 그대로인 통합 테스트, 작업 화면에 에이전트 칸이 없는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
 | REQ9, REQ10 | PR3 설계 때 정한다 | |
 
 ## 결정

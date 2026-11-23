@@ -7,6 +7,7 @@ import com.bifos.assistant.task.domain.type.NotifyPolicy;
 
 /**
  * 작업을 만들거나 고칠 때 받는 값이다. {@code conversationMode}, {@code missedPolicy}, {@code notifyPolicy} 는 비면 기본값이다.
+ * 에이전트는 받지 않는다. 작업은 늘 요청자의 기본 비서로 돈다(비서 중심 대화 스펙 REQ7).
  *
  * @param title 앞뒤 공백을 떼고 저장한다
  * @param notifyPolicy 알림 설정. {@code Object.notify()} 와 겹치지 않게 이름을 달리한다
@@ -14,7 +15,6 @@ import com.bifos.assistant.task.domain.type.NotifyPolicy;
  */
 public record TaskInput(
     String title,
-    String agentCode,
     String instruction,
     ScheduleInput schedule,
     ConversationMode conversationMode,

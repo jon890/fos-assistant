@@ -6,7 +6,7 @@
  * 도는 동안 맡긴 실행도 함께 멈춘다(ADR-017).
  */
 import { randomUUID } from "node:crypto";
-import { call, expect, expectStatus, fail, step, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
 import { awaitStatus, callTool, contextFor, openStream as openChatStream, parsed, tree, within, type Status, type Tree, type ToolResult } from "../delegation-support.ts";
 import { AGENT_TOOLS_PROFILE } from "./agent-tools.ts";
 
@@ -17,6 +17,17 @@ const AGENT_CODE = "delegation";
 const INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다";
 
 const openStream = (context: Parameters<Scenario["run"]>[0], text: string) => openChatStream(context, text, AGENT_CODE);
+
+/** 그 자식 노드에 그 사건이 남을 때까지 실행 트리를 다시 읽는다. */
+async function waitForChildEvent(context: Context, rootExecutionId: number, childId: number, eventType: string): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const node = (await tree(context, rootExecutionId)).root.children.find((child) => child.executionId === childId);
+    if (node?.events?.some((event) => event.eventType === eventType)) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  fail(`자식 ${childId} 에 ${eventType} 사건이 5초 안에 남지 않았다`);
+}
 
 export const delegationScenario: Scenario = {
   name: "다른 에이전트에게 맡기기",
@@ -120,6 +131,9 @@ export const delegationScenario: Scenario = {
       expect(firstStatus.status === "RUNNING", `붙잡은 자식의 상태가 RUNNING 이 아니다: ${JSON.stringify(firstStatus)}`);
 
       step("자식을 끝내면 agent_status 가 SUCCEEDED 와 답을 준다");
+      // 가짜 Hermes 는 붙잡은 자식의 도구 사건을 바로 보내지만 Control Plane 은 스트림을 따로 읽는다. 실제 Hermes 처럼 도구가 끝난
+      // 사건을 받은 뒤에 실행을 끝내야 한다. 먼저 끝내면 끝 사건 뒤에 온 도구 사건은 버리므로(ChildRunEvents) 느린 러너에서 빠진다.
+      await waitForChildEvent(context, rootExecutionId, first.execution_id, "TOOL_COMPLETED");
       context.hermes.releaseHeldRun();
       const finished = await awaitStatus(() => status(first.execution_id), (value) => value.status !== "RUNNING", "첫째 자식");
       expect(finished.status === "SUCCEEDED", `첫째 자식이 SUCCEEDED 가 아니다: ${JSON.stringify(finished)}`);

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.conversation.application.ConversationEntry;
 import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
@@ -92,6 +93,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class UserExecutionLimitChatTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
+
+    @Autowired
+    ConversationEntry conversationEntry;
 
     @Autowired
     TestPrimaryAgents primaries;
@@ -194,7 +198,7 @@ class UserExecutionLimitChatTest {
             List.of(),
             mock(SourceReadSummaries.class),
             new AutoTurnNoticeStatuses(List.of()),
-            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class)))
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class), conversationEntry))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         stub().willAnswer(command -> {

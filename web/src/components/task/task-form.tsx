@@ -75,8 +75,6 @@ export function TaskForm({
   const router = useRouter();
   const initial = task ? choiceOf(task.schedule) : null;
   const [title, setTitle] = useState(task?.title ?? "");
-  const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [agentCode, setAgentCode] = useState(task?.agentCode ?? "");
   const [instruction, setInstruction] = useState(task?.instruction ?? "");
   const [kind, setKind] = useState<ScheduleChoice["kind"]>(
     initial?.kind ?? "daily",
@@ -120,8 +118,6 @@ export function TaskForm({
       .then((response) => (response.ok ? response.json() : []))
       .then((data: AgentOption[]) => {
         if (cancelled) return;
-        setAgents(data);
-        setAgentCode((current) => current || data[0]?.code || "");
         // 단계 정의는 그룹의 값이라 어느 에이전트로 읽어도 같다. 작업의 에이전트는 꺼져 있을 수 있어, 대화를 시작할 수
         // 있는 첫 에이전트로 한 번만 읽는다. 읽지 못하면 단계 이름만 보인다.
         const first = data[0]?.code;
@@ -137,21 +133,12 @@ export function TaskForm({
         });
       })
       .catch(() => {
-        if (!cancelled) setAgents([]);
+        // 읽지 못하면 단계 이름만 보인다.
       });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  // 지금 작업의 에이전트가 목록에 없어도(이름이 바뀌었거나 읽지 못했을 때) 고른 값이 사라지지 않게 한다.
-  const options =
-    task?.agentCode && !agents.some((agent) => agent.code === task.agentCode)
-      ? [
-          { code: task.agentCode, name: task.agentName ?? task.agentCode },
-          ...agents,
-        ]
-      : agents;
 
   function choice(): ScheduleChoice {
     switch (kind) {
@@ -173,7 +160,6 @@ export function TaskForm({
     if (saving) return;
     const body: TaskRequest = {
       title: title.trim(),
-      agentCode,
       instruction,
       schedule: scheduleRequestOf(choice(), timeZone.trim()),
       conversationMode,
@@ -219,20 +205,6 @@ export function TaskForm({
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-      </Field>
-      <Field id="task-agent" label="에이전트">
-        <NativeSelect
-          id="task-agent"
-          required
-          value={agentCode}
-          onChange={(event) => setAgentCode(event.target.value)}
-        >
-          {options.map((agent) => (
-            <option key={agent.code} value={agent.code}>
-              {agent.name}
-            </option>
-          ))}
-        </NativeSelect>
       </Field>
       <Field id="task-instruction" label="지시">
         <Textarea

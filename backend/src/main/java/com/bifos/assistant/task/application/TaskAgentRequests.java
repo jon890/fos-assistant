@@ -1,7 +1,5 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.action.domain.ControlPlaneActions;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.application.ControlPlaneApprovals;
@@ -54,7 +52,6 @@ public class TaskAgentRequests implements TaskRequests {
     private static final Duration DAILY_LIMIT_HORIZON = Duration.ofDays(8);
     private final TaskService tasks;
     private final TaskAgentLookup lookup;
-    private final AgentService agents;
     private final AgentExecutionRepository executions;
     private final ControlPlaneApprovals approvals;
     private final TaskProperties properties;
@@ -68,18 +65,15 @@ public class TaskAgentRequests implements TaskRequests {
 
 
     /**
-     * 만든다. 에이전트는 그 실행의 에이전트이고, 맡긴 실행이 아니고 대화가 있으면 결과를 그 대화에 쌓는다(스펙 DECISION27,
-     * DECISION29). 모델 단계는 비우고 시간대와 놓친 실행 처리는 화면 기본값이다(스펙 DECISION12).
+     * 만든다. 에이전트는 요청자의 기본 비서다(비서 중심 대화 스펙 REQ7). 맡긴 실행이 아니고 대화가 있으면 결과를 그 대화에
+     * 쌓는다(스펙 DECISION27, DECISION29). 그 대화의 에이전트가 기본 비서가 아니면 발화 때 새 대화가 열린다. 모델 단계는 비우고
+     * 시간대와 놓친 실행 처리는 화면 기본값이다(스펙 DECISION12).
      */
     @Override
     public TaskToolResult create(CurrentUser user, Long originExecutionId, TaskToolInput input) {
         Optional<AgentExecution> origin = executions.findById(originExecutionId);
-        if (origin.isEmpty() || origin.get().agentId() == null) {
-            return TaskToolResult.failed("agent_unavailable", "이 실행의 에이전트를 찾지 못해 만들지 않았다. /tasks/new 화면에서 만들라고 안내한다.");
-        }
-        Optional<Agent> agent = agents.findById(origin.get().agentId());
-        if (agent.isEmpty()) {
-            return TaskToolResult.failed("agent_unavailable", "이 실행의 에이전트를 찾지 못해 만들지 않았다. /tasks/new 화면에서 만들라고 안내한다.");
+        if (origin.isEmpty()) {
+            return TaskToolResult.failed("agent_unavailable", "이 실행을 찾지 못해 만들지 않았다. /tasks/new 화면에서 만들라고 안내한다.");
         }
         Long conversationId = origin.get().parentExecutionId() == null ? origin.get().conversationId() : null;
         Optional<UUID> same = lookup.sameTask(user, input.title(), input.cron(), input.fireAt());
@@ -93,7 +87,7 @@ public class TaskAgentRequests implements TaskRequests {
             if (tooMany.isPresent()) {
                 return tooMany.get();
             }
-            TaskInput created = new TaskInput(input.title(), agent.get().code(), input.instruction(), schedule,
+            TaskInput created = new TaskInput(input.title(), input.instruction(), schedule,
                 conversationId == null ? ConversationMode.NEW_PER_RUN : ConversationMode.SINGLE, null, notifyOf(input.notifyPolicy()), null);
             TaskDetail detail = tasks.create(user, created, conversationId);
             return done("created", user, detail.task().publicId());
@@ -103,16 +97,15 @@ public class TaskAgentRequests implements TaskRequests {
     }
 
 
-    /** 받은 칸만 바꾼다. 에이전트, 모델 단계, 시간대, 대화 방식, 놓친 실행 처리는 저장된 값 그대로다(스펙 DECISION23). */
+    /**
+     * 받은 칸만 바꾼다. 모델 단계, 시간대, 대화 방식, 놓친 실행 처리는 저장된 값 그대로다(스펙 DECISION23). 에이전트는 화면에서
+     * 고칠 때와 같게 기본 비서로 바뀐다(비서 중심 대화 스펙 DECISION23).
+     */
     @Override
     public TaskToolResult update(CurrentUser user, String ref, TaskToolInput changes) {
         return withTarget(user, ref, taskId -> {
             TaskDetail current = tasks.get(user, taskId);
             Task task = current.task();
-            if (current.agent() == null) {
-                return TaskToolResult.failed("agent_unavailable", "작업의 에이전트를 찾지 못해 고치지 않았다. " + TaskAgentLookup.link(taskId)
-                    + " 화면에서 고치라고 안내한다.");
-            }
             ScheduleInput schedule = changes.cron() == null && changes.fireAt() == null
                 ? stored(task)
                 : schedule(changes.cron(), changes.fireAt(), task.zone());
@@ -124,7 +117,6 @@ public class TaskAgentRequests implements TaskRequests {
             }
             TaskInput edited = new TaskInput(
                 changes.title() == null ? task.title() : changes.title(),
-                current.agent().code(),
                 changes.instruction() == null ? task.instruction() : changes.instruction(),
                 schedule,
                 task.conversationMode(),
@@ -271,8 +263,10 @@ public class TaskAgentRequests implements TaskRequests {
             case TASK_SCHEDULE_INVALID -> TaskToolResult.failed("invalid_schedule",
                 "시각이 올바르지 않거나 반복 간격이 15분보다 짧거나 이미 지난 시각이라 하지 않았다. 시각을 다시 확인한다.");
             case VALIDATION_FAILED -> TaskToolResult.failed("invalid", "이름은 1자부터 100자까지, 지시는 8000자까지다.");
+            case SKILL_COMMAND_UNKNOWN -> TaskToolResult.failed("unknown_skill",
+                "지시 맨 앞의 /스킬을 기본 비서가 쓸 수 없어 하지 않았다. 지시를 그 스킬 없이 고쳐 다시 부른다.");
             case AGENT_NOT_FOUND, AGENT_DISABLED -> TaskToolResult.failed("agent_unavailable",
-                "이 에이전트로는 예약 작업을 돌릴 수 없어 하지 않았다. /tasks 화면에서 다른 에이전트로 하라고 안내한다.");
+                "기본 비서를 쓸 수 없어 하지 않았다. 관리자에게 알리라고 안내한다.");
             default -> throw ex;
         };
     }

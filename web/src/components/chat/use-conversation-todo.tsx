@@ -37,6 +37,7 @@ export function useConversationTodo({
   selectedVersions,
   sending,
   activity,
+  readOnly = false,
 }: {
   conversationId: string | null;
   refreshKey: number;
@@ -47,6 +48,8 @@ export function useConversationTodo({
   selectedVersions: Record<number, number>;
   sending: boolean;
   activity: ActivityState | null;
+  /** 이어 쓸 수 없는 대화다. 고른 답이 메시지로 나가지 못하므로 질문 카드를 그리지 않는다(스펙 assistant-hub REQ5) */
+  readOnly?: boolean;
 }) {
   const searchParams = useSearchParams();
   const entry = searchParams.get(TODO_ENTRY_PARAM) === HANDOFF_ENTRY_OPEN;
@@ -91,7 +94,7 @@ export function useConversationTodo({
     executing: approvals.executing,
     setPanelTarget,
   });
-  const ask = activeAsk(turns, selectedVersions, sending);
+  const ask = readOnly ? null : activeAsk(turns, selectedVersions, sending);
   const count = approvals.count + handoffs.count + (ask ? 1 : 0);
   const hasContent =
     approvals.view !== null || handoffs.count > 0 || ask !== null;

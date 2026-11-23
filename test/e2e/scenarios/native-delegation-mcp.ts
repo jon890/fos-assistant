@@ -4,8 +4,12 @@
  * <p>가짜 Hermes 가 플러그인처럼 부모 run 안에서 자식 session 을 등록한다. 자식의 호출은 `/chat/messages` 가 응답한 뒤
  * 시나리오가 부른다. 자식 session 은 Control Plane 이 정한 값이 아니므로 등록이 없으면 요청자를 찾지 못한다(ADR-037).
  * 사용자가 turn 을 중지해 origin 실행이 `CANCELLED` 로 끝나면 그 자식의 호출도 거절된다.
+ *
+ * <p>에이전트가 기본 비서가 아닌 대화는 읽기 전용이고(스펙 assistant-hub REQ5) 한 profile 은 한 사람의 기본 비서만 될 수 있다.
+ * test-support 가 이 에이전트를 보내는 사람의 기본 비서로 잠시 두므로 두 사람의 부모 turn 은 차례로 보내고 사이에 되돌린다.
+ * 자식의 호출은 두 부모가 모두 끝난 뒤에 하므로 검사하려는 것은 그대로다.
  */
-import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, restorePrimaries, seedConversation, step, usePrimaryTemporarily, type Context, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { SUBAGENT_MEMORY_PROBE } from "../fake-hermes.ts";
 
@@ -151,10 +155,10 @@ export const nativeDelegationScenario: Scenario = {
       memoryIds.push({ token: context.tokens.kid, id: kidMemory.id });
 
       step("두 사용자의 부모 turn 이 끝나면 자식 session 이 각자의 루트 아래 등록돼 있다");
-      const [dadTurn, kidTurn] = await Promise.all([
-        send(context, context.tokens.dad, { text: SUBAGENT_MEMORY_PROBE }, "아빠 하위 에이전트 검사 대화"),
-        send(context, context.tokens.kid, { text: SUBAGENT_MEMORY_PROBE }, "아이 하위 에이전트 검사 대화"),
-      ]);
+      const dadTurn = await send(context, context.tokens.dad, { text: SUBAGENT_MEMORY_PROBE }, "아빠 하위 에이전트 검사 대화");
+      await restorePrimaries(context);
+      const kidTurn = await send(context, context.tokens.kid, { text: SUBAGENT_MEMORY_PROBE }, "아이 하위 에이전트 검사 대화");
+      await restorePrimaries(context);
       const dadChild = childOf(dadTurn, "아빠");
       const kidChild = childOf(kidTurn, "아이");
       const registrations = context.hermes.subagentRegistrations();
@@ -189,6 +193,7 @@ export const nativeDelegationScenario: Scenario = {
       expect(kidCross === NOT_READABLE, `아이 자식이 아빠의 Memory 를 읽었다: ${kidCross}`);
 
       step("같은 대화의 다음 turn 뒤에도 아빠 자식은 아빠 Memory 를 읽는다");
+      await usePrimaryTemporarily(context, context.tokens.dad, AGENT_CODE);
       await send(
         context,
         context.tokens.dad,

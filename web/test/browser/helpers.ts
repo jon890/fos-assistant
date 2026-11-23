@@ -198,6 +198,19 @@ export async function clearPrimary(email: string) {
 }
 
 /**
+ * test-support 의 대화 만들기가 잠시 바꾼 기본 비서와 에이전트 주인을 되돌린다. 공통 fixture 가 검사마다 부른다.
+ * 바꾼 것이 없으면 그대로다.
+ */
+export async function restorePrimaries() {
+  const response = await testSupport(
+    TEST_EMAIL,
+    "POST",
+    "primary-agent/restore",
+  );
+  expect(response.status, "잠시 바꾼 기본 비서를 되돌리지 못했다").toBe(200);
+}
+
+/**
  * 그 사용자의 실행 하나를 그 에이전트가 돈 것으로 바꾼다. `@` 맡기기를 없애기 전에 남은 맡김과 같은 꼴을 만든다
  * (docs/features/assistant-hub/spec.md 의 REQ6).
  */
@@ -215,10 +228,10 @@ export async function relabelExecution(
 }
 
 /**
- * 기본 비서가 아닌 에이전트와의 빈 대화를 만들고 그 대화를 연다. 그 전에 열어 둔 대화와 같다.
+ * 그 에이전트와의 빈 대화를 만들고 그 대화를 연다. test-support 경로가 그 에이전트를 그 사용자의 기본 비서로 잠시 둔다.
  *
- * <p>새 대화는 기본 비서로만 열리므로(docs/features/assistant-hub/spec.md 의 REQ4) 다른 에이전트의 입력창을 보는 검사가 쓴다.
- * 대화는 test-support 경로로 만든다.
+ * <p>새 대화는 기본 비서로만 열리고 비서가 아닌 대화는 읽기 전용이라(docs/features/assistant-hub/spec.md 의 REQ4, REQ5) 다른
+ * 에이전트의 입력창을 보는 검사가 쓴다. 공통 fixture 가 검사가 끝나면 {@link restorePrimaries} 로 되돌린다.
  */
 export async function openConversationWith(
   page: Page,
