@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageContents;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -65,6 +66,7 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
         context.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
         context.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
+        context.getBeanFactory().registerSingleton("primaries", new TestPrimaryAgents(mock(AllowedPersonRepository.class)));
         context.refresh();
         stub.willReportSessionRuntime(new SessionRuntime("model", "provider"));
         clock.set(FIXED);
@@ -163,6 +165,7 @@ class IntegrationTestIsolationTest {
             broken.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
             broken.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
             broken.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
+            broken.getBeanFactory().registerSingleton("primaries", new TestPrimaryAgents(mock(AllowedPersonRepository.class)));
             broken.refresh();
 
             assertThatThrownBy(() -> IntegrationTestIsolation.afterTest(broken, Duration.ofSeconds(5)))
