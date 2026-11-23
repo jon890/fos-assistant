@@ -245,7 +245,7 @@ public class McpMemoryRemember {
                 "고칠 기억을 찾지 못했다.", "memory_id 없이 새로 남기고, 고치지 못해 새로 남겼다고 답에 한 줄 알린다"));
             case UPDATE_PROPOSED -> success(
                 "지금은 기존 기억을 바로 고칠 수 없어 고치기 제안으로 남겼다. 사용자가 받아들이면 새 기억이 옛 기억을 대신한다. "
-                    + "같은 고치기를 다시 부르지 않고, 답에서 기억 화면이나 제안 카드에서 받아들여야 바뀐다고 알린다."
+                    + "받아들인 새 기억에는 한 줄 요약이 없다. 같은 고치기를 다시 부르지 않고, 답에서 기억 화면이나 제안 카드에서 받아들여야 바뀐다고 알린다."
                     + replacedText(remembered, "받아들이면 대신한다"));
             case ENCRYPTION_UNAVAILABLE -> failure(ToolFailureText.askUser("민감한 내용을 저장할 수 없다."));
         };

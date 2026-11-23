@@ -80,7 +80,7 @@ public class MemoryCaptureService {
         if (!access.collections().contains(collection)) {
             return MemoryRememberResult.of(MemoryRememberOutcome.COLLECTION_NOT_ALLOWED);
         }
-        return create(user, access, request, new MemoryPlacement(collection, MemoryRetrieval.SEARCH), request.archivable());
+        return create(user, access, request, new MemoryPlacement(collection, MemoryRetrieval.SEARCH), request.archivable(), null);
     }
 
 
@@ -88,15 +88,18 @@ public class MemoryCaptureService {
      * 새 항목을 바로 저장하거나 제안으로 남긴다. 값 검사와 collection 판정은 부르는 쪽이 마쳤다.
      *
      * @param archivable 새 항목에 적을 자동 보관 허락 표시
+     * @param target 고치기 제안이면 고칠 항목, 아니면 null. 중복 키에 그 번호와 판을 넣고 제안 기록에 그 판을 남긴다
      */
-    private MemoryRememberResult create(
-        CurrentUser user, MemoryAccess access, MemoryRememberRequest request, MemoryPlacement placement, boolean archivable) {
+    private MemoryRememberResult create(CurrentUser user, MemoryAccess access, MemoryRememberRequest request,
+        MemoryPlacement placement, boolean archivable, Memory target) {
         boolean direct = request.direct()
             && !request.sensitive()
             && !MemorySensitiveHints.suspected(request.title(), request.content(), request.summary());
         String dedupKey;
         try {
-            dedupKey = texts.proposalDedupKey(user.id(), request.title(), request.content());
+            // 고치기 제안은 고칠 번호와 판을 키에 넣는다. 같은 글의 일반 제안이나 기억과 섞이면 고칠 대상이 빠진 채 받아들여진다
+            String keyed = target == null ? request.content() : request.content() + "\u0000update:" + target.id() + ":" + target.revision();
+            dedupKey = texts.proposalDedupKey(user.id(), request.title(), keyed);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
                 return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
@@ -133,7 +136,9 @@ public class MemoryCaptureService {
         List<Long> replaced = direct
             ? replacements.supersede(user, access, saved.id(), request.replaces())
             : replacements.replaceable(user, access, request.replaces(), saved.id());
-        record(saved.id(), user, request, kind, direct ? saved.revision() : null, null, replaced);
+        // 고치기 제안은 고칠 항목의 판을 남긴다. 받아들일 때 그 사이 바뀌었으면 막는다(MemoryReplacements.requireUnchangedTarget)
+        Integer base = direct ? Integer.valueOf(saved.revision()) : target == null ? null : Integer.valueOf(target.revision());
+        record(saved.id(), user, request, kind, base, null, replaced);
         if (!direct) {
             // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
             feedback.record(MemoryProposalFeedback.of(
@@ -326,6 +331,10 @@ public class MemoryCaptureService {
         if (!request.direct()
             || request.sensitive()
             || MemorySensitiveHints.suspected(request.title(), request.content(), request.summary())) {
+            // 본문이 같으면 대신할 것이 없다. 제안은 요약을 두지 않으므로 요약만 고치는 제안도 만들지 않는다
+            if (request.content().equals(memory.content())) {
+                return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
+            }
             return proposeUpdate(user, access, request, memory);
         }
         // 요약을 주지 않았으면 지금 요약을 둔다. 빈 글이면 지운다
@@ -359,27 +368,26 @@ public class MemoryCaptureService {
      */
     private MemoryRememberResult proposeUpdate(
         CurrentUser user, MemoryAccess access, MemoryRememberRequest request, Memory target) {
-        MemoryRememberRequest proposal = new MemoryRememberRequest(
-            request.title(),
-            request.content(),
-            request.summary(),
-            target.collection(),
-            request.sensitive(),
-            null,
-            request.executionId(),
-            request.conversationId(),
-            false,
-            request.externalRead(),
-            target.archivable(),
-            List.of(target.id()));
+        MemoryRememberRequest proposal = new MemoryRememberRequest(request.title(), request.content(), request.summary(),
+            target.collection(), request.sensitive(), null, request.executionId(), request.conversationId(), false,
+            request.externalRead(), target.archivable(), List.of(target.id()));
         // 보관한 항목을 고치자고 했으면 다시 쓰일 사실이므로 색인으로 둔다
         MemoryRetrieval retrieval = target.retrieval() == MemoryRetrieval.ALWAYS ? MemoryRetrieval.ALWAYS : MemoryRetrieval.SEARCH;
-        MemoryRememberResult result = create(user, access, proposal, new MemoryPlacement(target.collection(), retrieval), target.archivable());
-        if (result.outcome() != MemoryRememberOutcome.PROPOSED) {
-            return result;
-        }
-        return new MemoryRememberResult(
-            MemoryRememberOutcome.UPDATE_PROPOSED, result.memoryId(), result.replaced(), result.notReplaced());
+        MemoryRememberResult result = create(user, access, proposal, new MemoryPlacement(target.collection(), retrieval), target.archivable(), target);
+        return switch (result.outcome()) {
+            case PROPOSED -> new MemoryRememberResult(
+                MemoryRememberOutcome.UPDATE_PROPOSED, result.memoryId(), result.replaced(), result.notReplaced());
+            // 같은 고치기를 다시 부른 것이다. 그 제안이 받아들이면 대신할 번호를 알린다. 모델이 실패로 읽지 않게 한다
+            case ALREADY_PROPOSED -> {
+                List<Long> replaced = captures
+                    .findFirstByMemoryIdAndKindOrderByIdDesc(result.memoryId(), MemoryCaptureKind.PROPOSED)
+                    .map(MemoryCapture::replacedMemoryIds)
+                    .orElse(List.of());
+                yield new MemoryRememberResult(
+                    MemoryRememberOutcome.ALREADY_PROPOSED, result.memoryId(), replaced, notReplaced(proposal.replaces(), replaced));
+            }
+            default -> result;
+        };
     }
 
 
