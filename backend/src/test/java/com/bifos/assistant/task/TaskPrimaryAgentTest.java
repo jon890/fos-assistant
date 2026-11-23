@@ -22,6 +22,8 @@ import com.bifos.assistant.task.application.dto.ScheduleInput;
 import com.bifos.assistant.task.application.dto.TaskInput;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.type.ConversationMode;
+import com.bifos.assistant.task.domain.type.MissedPolicy;
+import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
@@ -33,7 +35,9 @@ import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,6 +149,35 @@ class TaskPrimaryAgentTest {
         assertThat(edited.error()).isFalse();
         assertThat(agentOf(screen)).isEqualTo(primary.id());
         assertThat(agentOf(tool)).isEqualTo(primary.id());
+    }
+
+
+    @Test
+    @DisplayName("전문 에이전트에만 있는 스킬을 부르는 작업은 시각만 고쳐도 저장하지 않고 SKILL_COMMAND_UNKNOWN 으로 알린다")
+    void rejectsEditWhenPrimaryLacksInstructionSkill() {
+        Task specialist = Task.create(owner.id(), shopper.id(), "특가 확인", "/shop-deals 오늘 특가를 알려 줘",
+            ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        specialist.reschedule(TriggerType.CRON, "0 9 * * *", null, ZoneId.of("Asia/Seoul"), NOW.plus(Duration.ofDays(1)));
+        specialist.changeMissedPolicy(MissedPolicy.RUN_ONCE);
+        UUID taskId = tasks.save(specialist).publicId();
+        TaskInput timeOnly = new TaskInput(
+            "특가 확인",
+            "/shop-deals 오늘 특가를 알려 줘",
+            new ScheduleInput(TriggerType.CRON, "0 8 * * *", null, "Asia/Seoul"),
+            ConversationMode.NEW_PER_RUN,
+            null,
+            null,
+            null);
+
+        assertThatThrownBy(() -> taskService.update(owner, taskId, timeOnly))
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.SKILL_COMMAND_UNKNOWN);
+        TaskToolResult edited = requests.update(owner, taskId.toString(), new TaskToolInput(null, null, "0 8 * * *", null, null));
+
+        assertThat(edited.error()).isTrue();
+        assertThat(edited.body()).containsEntry("status", "unknown_skill");
+        assertThat(agentOf(taskId)).as("고치지 않은 작업의 에이전트").isEqualTo(shopper.id());
     }
 
 

@@ -5,9 +5,11 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import com.bifos.assistant.task.application.dto.ScheduleInput;
 import com.bifos.assistant.task.application.dto.TaskDetail;
 import com.bifos.assistant.task.application.dto.TaskInput;
@@ -58,6 +60,7 @@ public class TaskService {
     private final AppUserRepository users;
     private final AgentService agents;
     private final PrimaryAgents primaryAgents;
+    private final SkillCommandCatalog skillCommands;
     private final ConversationPublicIdLookup conversations;
     private final TaskProperties properties;
     private final TaskContents contents;
@@ -90,6 +93,7 @@ public class TaskService {
                 ErrorCode.TASK_LIMIT_REACHED, "a task limit of " + properties.maxPerUser() + " was reached");
         }
         Agent agent = requirePrimary(user);
+        requireRunnableCommand(agent, input.instruction());
         Schedule schedule = validated(input.schedule(), now);
         Task task = Task.create(
             user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
@@ -115,6 +119,7 @@ public class TaskService {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
         Agent agent = requirePrimary(user);
+        requireRunnableCommand(agent, input.instruction());
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
         // 고친 글이 평문으로 flush 되기 전에 바로 암호화한다. 같은 트랜잭션이다.
         contents.seal(task);
@@ -234,6 +239,24 @@ public class TaskService {
      *
      * @throws ApiException {@code AGENT_NOT_FOUND}(기본 비서가 없다), {@code AGENT_DISABLED}(기본 비서가 꺼졌다)
      */
+    /**
+     * 지시가 {@code /이름} 스킬 커맨드면 그 이름이 작업을 돌릴 에이전트(기본 비서)의 켜진 스킬인지 저장 전에 본다.
+     *
+     * <p>전문 에이전트로 만든 작업은 고치면 기본 비서로 바뀐다(비서 중심 대화 스펙 DECISION23). 그 에이전트에만 있던 스킬을 부르는
+     * 지시를 그대로 저장하면 다음 발화가 {@code SKILL_COMMAND_UNKNOWN} 으로 실패한다. 시각만 고쳐도 그렇게 되므로, 저장하지 않고
+     * 같은 코드로 알려 지시를 고치게 한다. 스킬 목록을 읽지 못하면 그 예외가 그대로 올라간다. 이름을 확인하지 못한 지시를 저장하지
+     * 않는다.
+     */
+    private void requireRunnableCommand(Agent agent, String instruction) {
+        SkillCommand.parse(instruction).ifPresent(command -> {
+            if (!skillCommands.enabledNames(agent).contains(command.name())) {
+                throw new ApiException(
+                    ErrorCode.SKILL_COMMAND_UNKNOWN, "the primary assistant has no enabled skill named " + command.name());
+            }
+        });
+    }
+
+
     private Agent requirePrimary(CurrentUser user) {
         Agent primary = primaryAgents.of(user)
             .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no primary assistant"));

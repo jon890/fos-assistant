@@ -263,6 +263,8 @@ public class TaskAgentRequests implements TaskRequests {
             case TASK_SCHEDULE_INVALID -> TaskToolResult.failed("invalid_schedule",
                 "시각이 올바르지 않거나 반복 간격이 15분보다 짧거나 이미 지난 시각이라 하지 않았다. 시각을 다시 확인한다.");
             case VALIDATION_FAILED -> TaskToolResult.failed("invalid", "이름은 1자부터 100자까지, 지시는 8000자까지다.");
+            case SKILL_COMMAND_UNKNOWN -> TaskToolResult.failed("unknown_skill",
+                "지시 맨 앞의 /스킬을 기본 비서가 쓸 수 없어 하지 않았다. 지시를 그 스킬 없이 고쳐 다시 부른다.");
             case AGENT_NOT_FOUND, AGENT_DISABLED -> TaskToolResult.failed("agent_unavailable",
                 "기본 비서를 쓸 수 없어 하지 않았다. 관리자에게 알리라고 안내한다.");
             default -> throw ex;
