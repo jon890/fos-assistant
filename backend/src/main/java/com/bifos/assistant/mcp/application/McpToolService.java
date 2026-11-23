@@ -20,6 +20,8 @@ import com.bifos.assistant.memory.application.dto.MemorySearchPage;
 import com.bifos.assistant.memory.application.QueryEmbedder;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.orchestration.application.DelegationWaiter;
+import com.bifos.assistant.orchestration.application.dto.DelegationWait;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -74,6 +76,10 @@ public class McpToolService {
         "artifact source host is not allowed");
     private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
     private static final ToolFailureText NOT_ALLOWED_IN_CHECK = ToolFailureText.askUser("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
+    /** 기다려도 끝나지 않은 맡김에 붙이는 지시다. 결과를 짐작한 글과 결과 답이 겹치지 않게 한다. */
+    static final String DELEGATE_RUNNING_NOTE = "아직 끝나지 않았다. 결과는 끝나면 이 대화의 다음 차례에 자동으로 전달된다. "
+        + "이번 답은 누구에게 무엇을 맡겼는지 한 줄로 끝내고 결과를 짐작해 쓰지 않는다.";
+
     /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
     public static final int TASK_MAX_CHARS = 8000;
 
@@ -85,6 +91,7 @@ public class McpToolService {
     private final QueryEmbedder queryEmbedder;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
+    private final DelegationWaiter waiter;
     private final AgentCapabilitiesReader capabilitiesReader;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ExecutionOutputs executionOutputs;
@@ -261,7 +268,8 @@ public class McpToolService {
 
 
     /**
-     * 다른 에이전트의 실행을 시작하고 번호를 JSON 글로 돌려준다. 제출까지만 기다린다.
+     * 다른 에이전트의 실행을 시작하고 번호를 JSON 글로 돌려준다. 대화 turn 의 루트가 맡기면 {@link DelegationWaiter} 가 상한까지 결과를
+     * 기다려 끝난 결과를 함께 돌려준다(ADR-20261121 / delegate-wait).
      * <p>부모는 요청자를 정한 origin 실행이다. 같은 호출을 알아보는 키는 그 실행의 profile 과 서명한 {@code _fos_ctx} 의 세
      * 값으로 만든다(ADR-032 「{@code delegation_key}」). 거절하면 정해 둔 코드와 한국어 한 줄만 싣는다.
      */
@@ -275,9 +283,19 @@ public class McpToolService {
             Failure failure = delegated.failure();
             return jsonFailure(failureBody(failure.name(), delegationFailureMessage(failure)), delegationFailure(failure));
         }
+        // 대화 turn 의 맡김은 정한 시간까지 기다려 결과를 함께 돌려준다(ADR-20261121 / delegate-wait)
+        DelegationWait waited = waiter.await(origin, delegated.executionId());
+        if (waited.deliverable()) {
+            markDeliveredIfFinished(waited.execution());
+            return success(JSON.writeValueAsString(statusOf(waited.execution())));
+        }
         Map<String, Object> started = new LinkedHashMap<>();
         started.put("execution_id", delegated.executionId());
-        started.put("status", delegated.status().name());
+        ExecutionStatus status = waited.waited() && waited.execution() != null ? waited.execution().status() : delegated.status();
+        started.put("status", status.name());
+        if (waited.waited() && status == ExecutionStatus.RUNNING) {
+            started.put("note", DELEGATE_RUNNING_NOTE);
+        }
         return success(JSON.writeValueAsString(started));
     }
 

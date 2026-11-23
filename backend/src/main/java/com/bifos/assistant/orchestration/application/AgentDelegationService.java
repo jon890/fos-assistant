@@ -156,6 +156,12 @@ public class AgentDelegationService {
     }
 
 
+    /** 이 서버가 돌리는 위임 실행이다. 없으면 null 이다. {@link DelegationWaiter} 가 끝나기를 기다릴 때 쓴다. */
+    RunningDelegation running(Long executionId) {
+        return runs.find(executionId);
+    }
+
+
     /**
      * 요청자가 물을 수 있는 위임 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. 그 실행이 다시 맡긴 실행은 멈추지 않는다.
      *

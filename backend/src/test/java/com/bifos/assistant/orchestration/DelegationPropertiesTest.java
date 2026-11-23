@@ -29,7 +29,7 @@ class DelegationPropertiesTest {
     @Test
     @DisplayName("모든 값이 1 이상이면 그대로 쓴다")
     void usesValuesAsIsWhenAllAreAtLeastOne() {
-        DelegationProperties properties = new DelegationProperties(1, 1, 1, Duration.ofMillis(1), 1, Duration.ofMillis(1));
+        DelegationProperties properties = new DelegationProperties(1, 1, 1, Duration.ofMillis(1), 1, Duration.ofMillis(1), Duration.ZERO);
 
         assertThat(properties.maxDepth()).isEqualTo(1);
         assertThat(properties.submitTimeout()).isEqualTo(Duration.ofMillis(1));
@@ -40,19 +40,19 @@ class DelegationPropertiesTest {
     @Test
     @DisplayName("정수 한도가 0 이면 어느 값인지 알리며 멈춘다")
     void stopsNamingWhichValueWhenIntegerLimitIsZero() {
-        assertThatThrownBy(() -> new DelegationProperties(0, 4, 16, TIMEOUT, 100, WAIT))
+        assertThatThrownBy(() -> new DelegationProperties(0, 4, 16, TIMEOUT, 100, WAIT, Duration.ZERO))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("max-depth");
-        assertThatThrownBy(() -> new DelegationProperties(2, 0, 16, TIMEOUT, 100, WAIT))
+        assertThatThrownBy(() -> new DelegationProperties(2, 0, 16, TIMEOUT, 100, WAIT, Duration.ZERO))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("max-concurrent-children");
-        assertThatThrownBy(() -> new DelegationProperties(2, 4, 0, TIMEOUT, 100, WAIT))
+        assertThatThrownBy(() -> new DelegationProperties(2, 4, 0, TIMEOUT, 100, WAIT, Duration.ZERO))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("max-active");
-        assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 0, WAIT))
+        assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 0, WAIT, Duration.ZERO))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("output-max-chars");
-        assertThatThrownBy(() -> new DelegationProperties(2, 4, -1, TIMEOUT, 100, WAIT))
+        assertThatThrownBy(() -> new DelegationProperties(2, 4, -1, TIMEOUT, 100, WAIT, Duration.ZERO))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("max-active");
     }
@@ -62,7 +62,7 @@ class DelegationPropertiesTest {
     @DisplayName("제출 대기 시간이 없거나 0 이하이면 멈춘다")
     void stopsWhenSubmitWaitTimeIsMissingOrNotPositive() {
         for (Duration invalid : new Duration[] {null, Duration.ZERO, Duration.ofMillis(-1)}) {
-            assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, invalid, 100, WAIT))
+            assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, invalid, 100, WAIT, Duration.ZERO))
                 .as("submit-timeout=%s", invalid)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("submit-timeout");
@@ -74,7 +74,7 @@ class DelegationPropertiesTest {
     @DisplayName("상태 대기 상한이 없거나 0 이하이면 멈춘다")
     void stopsWhenStatusWaitMaxIsMissingOrNotPositive() {
         for (Duration invalid : new Duration[] {null, Duration.ZERO, Duration.ofMillis(-1)}) {
-            assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 100, invalid))
+            assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 100, invalid, Duration.ZERO))
                 .as("status-wait-max=%s", invalid)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("status-wait-max");
@@ -102,6 +102,28 @@ class DelegationPropertiesTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("status-wait-max"));
+    }
+
+
+    @Test
+    @DisplayName("맡김 대기 상한을 적지 않으면 2분으로 뜨고 0 은 받는다")
+    void startsWithTwoMinuteDelegateWaitAndAcceptsZero() {
+        runner.run(context -> assertThat(context.getBean(DelegationProperties.class).delegateWaitMax())
+            .isEqualTo(Duration.ofMinutes(2)));
+        runner.withPropertyValues("assistant.delegation.delegate-wait-max=0s")
+            .run(context -> assertThat(context.getBean(DelegationProperties.class).delegateWaitMax()).isZero());
+    }
+
+
+    @Test
+    @DisplayName("맡김 대기 상한이 없거나 음수이면 멈춘다")
+    void stopsWhenDelegateWaitMaxIsMissingOrNegative() {
+        for (Duration invalid : new Duration[] {null, Duration.ofMillis(-1)}) {
+            assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 100, WAIT, invalid))
+                .as("delegate-wait-max=%s", invalid)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("delegate-wait-max");
+        }
     }
 
 

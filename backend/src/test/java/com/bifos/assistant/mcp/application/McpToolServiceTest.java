@@ -30,6 +30,7 @@ import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.application.QueryEmbedder;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.orchestration.application.DelegationWaiter;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -62,6 +63,7 @@ class McpToolServiceTest {
         QueryEmbedder.disabled(),
         artifacts,
         mock(AgentDelegationService.class),
+        mock(DelegationWaiter.class),
         mock(AgentCapabilitiesReader.class),
         mock(ExecutionDeliveryWriter.class),
         mock(ExecutionOutputs.class),
@@ -147,7 +149,7 @@ class McpToolServiceTest {
         McpCaller caller = mock(McpCaller.class);
         when(caller.user()).thenReturn(user);
         McpToolService service = new McpToolService(
-            memories, QueryEmbedder.disabled(), artifacts, delegations, capabilities,
+            memories, QueryEmbedder.disabled(), artifacts, delegations, mock(DelegationWaiter.class), capabilities,
             mock(ExecutionDeliveryWriter.class), mock(ExecutionOutputs.class), mock(ExecutionContextSourceWriter.class),
             mock(AgentRepository.class), mock(AgentConnectorBindings.class), mock(McpFollowUpTools.class),
             mock(McpMemoryRemember.class), mock(McpToolCatalog.class), Clock.systemUTC());
@@ -184,6 +186,7 @@ class McpToolServiceTest {
             embedder,
             artifacts,
             mock(AgentDelegationService.class),
+            mock(DelegationWaiter.class),
             mock(AgentCapabilitiesReader.class),
             mock(ExecutionDeliveryWriter.class),
             mock(ExecutionOutputs.class),

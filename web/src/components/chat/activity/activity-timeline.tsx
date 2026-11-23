@@ -1,7 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CircleAlert, CircleHelp, LoaderCircle, Square } from "lucide-react";
+import {
+  CircleAlert,
+  CircleHelp,
+  Hourglass,
+  LoaderCircle,
+  Square,
+} from "lucide-react";
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
@@ -31,6 +37,7 @@ const MARKS: Record<Exclude<ActivityItemState, "done">, ReactNode> = {
     <Square aria-hidden="true" className={`${ICON_CLASS} fill-current`} />
   ),
   "result-missing": <CircleHelp aria-hidden="true" className={ICON_CLASS} />,
+  "handed-off": <Hourglass aria-hidden="true" className={ICON_CLASS} />,
 };
 /** 화면 낭독기에만 읽히는 상태다. 실패와 결과 누락은 글자로 보이므로 여기 없다. */
 const SPOKEN: Partial<Record<ActivityItemState, string>> = {
@@ -60,7 +67,10 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
             data-kind={item.kind}
             data-state={item.state}
             data-tool={item.kind === "tool" ? item.name : undefined}
-            className="flex min-w-0 gap-2 text-sm text-foreground-soft"
+            className={cn(
+              "flex min-w-0 gap-2 text-sm text-foreground-soft",
+              item.parent ? "pl-5" : undefined,
+            )}
           >
             <span
               aria-hidden="true"
@@ -113,6 +123,11 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
               </div>
               {item.state === "result-missing" ? (
                 <p className="text-muted-foreground">결과를 받지 못함</p>
+              ) : null}
+              {item.state === "handed-off" && item.kind === "subagent" ? (
+                <p className="text-muted-foreground">
+                  끝나면 이어서 알려 드려요
+                </p>
               ) : null}
               {/* 명령과 도구 결과의 원본은 JSON 이나 내부 경로라 대화 화면에서는 그리지 않는다. */}
               {item.kind === "tool" &&

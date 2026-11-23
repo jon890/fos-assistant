@@ -48,7 +48,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | --- | --- | --- | --- |
 | [ADR-001](ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) | Hermes 를 런타임으로 두고 core 를 고치지 않는다 | 공통 | Accepted |
 | [ADR-005](ADR-005-기존-개인-저장소의-스택을-그대로-쓴다.md) | 기존 개인 저장소의 스택을 그대로 쓴다 | 공통 | Accepted. Checkstyle 을 뺀 부분은 ADR-042 가 대체한다 |
-| [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | 공통 | Accepted. 결과를 모델이 다시 묻는다는 부분은 ADR-040 이, 요청자를 MCP 토큰이 정한다는 부분은 ADR-032 가 대체한다. 사용자가 `@` 로 고른 맡김은 [ADR-20261112 / mention-delegation](ADR-20261112-mention-delegation.md) 이 예외로 둔다 |
+| [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | 공통 | Accepted. 결과를 모델이 다시 묻는다는 부분은 ADR-040 이, 요청자를 MCP 토큰이 정한다는 부분은 ADR-032 가 대체한다. 사용자가 `@` 로 고른 맡김은 [ADR-20261112 / mention-delegation](ADR-20261112-mention-delegation.md) 이 예외로 둔다. 대화 turn 의 맡김을 기다리지 않는다는 부분은 [ADR-20261121 / delegate-wait](../../backend/docs/adr/ADR-20261121-delegate-wait.md) 가 대체한다 |
 | [ADR-022](ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) | 다시 생성과 수정은 같은 session 에 판으로 쌓는다 | backend, frontend | Accepted. 수정은 ADR-024 가 대체 |
 | [ADR-024](ADR-024-메시지-수정을-없애고-중지한-뒤-다시-보낸다.md) | 메시지 수정을 없애고 중지한 뒤 다시 보낸다 | backend, frontend | Accepted. ADR-022 의 수정을 대체 |
 | [ADR-025](ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md) | 대화는 주소에 공개 식별자를 쓰고 번호는 안에만 둔다 | backend, frontend | Accepted |

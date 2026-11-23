@@ -164,6 +164,33 @@ class ExecutionTreeServiceTest {
 
 
     @Test
+    @DisplayName("다른 에이전트에게 맡긴 자식만 delegated 가 참이다")
+    void onlyDelegatedChildIsMarkedDelegated() {
+        AgentExecution root = execution(OWNER_ID, null, null);
+        AgentExecution plain = execution(OWNER_ID, root.id(), root.id());
+        AgentExecution delegated = executions.save(AgentExecution.builder()
+            .userId(OWNER_ID)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .delegationKey("tree-delegated-" + root.id())
+            .startedAt(Instant.now())
+            .build());
+
+        ExecutionTree tree = trees.of(owner(), root.id());
+
+        assertThat(tree.root().delegated()).isFalse();
+        assertThat(tree.root().children())
+            .extracting(ExecutionNode::executionId, ExecutionNode::delegated)
+            .containsExactlyInAnyOrder(tuple(plain.id(), false), tuple(delegated.id(), true));
+    }
+
+
+    @Test
     @DisplayName("자식 실행의 에이전트 행이 없어도 트리가 나오고 그 노드의 에이전트 칸이 비어 있다")
     void treeComesOutWithEmptyAgentColumnWhenChildAgentRowIsMissing() {
         AgentExecution root = execution(OWNER_ID, null, null);

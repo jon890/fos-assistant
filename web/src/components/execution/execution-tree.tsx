@@ -73,6 +73,8 @@ export type ExecutionTreeNode = {
   contextSources?: ExecutionContextSource[] | null;
   events: ExecutionEventView[];
   children: ExecutionTreeNode[];
+  /** 다른 에이전트에게 맡긴 실행이다. 답이 끝난 뒤에도 돌면 작업 과정이 「맡겨 둠」 으로 그린다 */
+  delegated?: boolean;
 };
 
 /**

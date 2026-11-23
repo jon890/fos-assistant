@@ -18,6 +18,9 @@ export type TreeNode = {
   inputTokens: number | null;
   outputTokens: number | null;
   children: TreeNode[];
+  /** 다른 에이전트에게 맡긴 실행이다 */
+  delegated?: boolean;
+  events?: { sequence: number; eventType: string; toolName: string | null }[];
 };
 export type Tree = { root: TreeNode; truncated: boolean };
 

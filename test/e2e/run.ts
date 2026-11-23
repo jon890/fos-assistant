@@ -302,6 +302,8 @@ function startControlPlane(
       ASSISTANT_CHAT_STREAM_HEARTBEAT: E2E_STREAM_HEARTBEAT,
       // 운영은 기본 꺼짐이다. 대역은 steer 검사 입력으로 연 실행만 받으므로 다른 시나리오의 대기열은 그대로다.
       ASSISTANT_CHAT_STEER_ENABLED: "true",
+      // 시나리오가 결과 자동 답을 기대한다. 맡긴 일 기다리기는 backend 통합 테스트가 본다
+      ASSISTANT_DELEGATION_DELEGATE_WAIT_MAX: "0s",
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",

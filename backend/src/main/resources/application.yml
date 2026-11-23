@@ -151,6 +151,9 @@ assistant:
     # agent_status 의 wait_seconds 로 맡긴 실행이 끝나기를 기다리는 시간의 상한. 더 긴 값은 이 값으로 줄인다.
     # 기다리는 동안 그 도구 호출이 Hermes turn 을 붙잡으므로 hermes.run-timeout 보다 훨씬 짧게 둔다
     status-wait-max: 20s
+    # 대화 turn 의 agent_delegate 가 결과를 기다리는 한 답 안의 상한. 0 이면 기다리지 않는다(ADR-20261121 / delegate-wait).
+    # Hermes 의 MCP 도구 호출 제한(기본 300초)보다 짧게 둔다
+    delegate-wait-max: ${ASSISTANT_DELEGATION_DELEGATE_WAIT_MAX:2m}
   user-execution:
     # 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행 수. turn 자리와 RUNNING 실행 줄의 합이다(ADR-069)
     max-running: 4

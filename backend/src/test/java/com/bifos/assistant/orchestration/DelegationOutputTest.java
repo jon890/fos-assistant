@@ -16,7 +16,7 @@ class DelegationOutputTest {
 
     private final DelegationOutputClip clip = new DelegationOutput(LiveProperties.fixed(
         DelegationProperties.class,
-        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 5, Duration.ofSeconds(20))));
+        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 5, Duration.ofSeconds(20), Duration.ZERO)));
 
 
     @Test

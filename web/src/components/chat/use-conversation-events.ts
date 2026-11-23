@@ -23,12 +23,17 @@ import {
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationHistory } from "./use-conversation-history";
 import { applyStreamText } from "./turn-stream-text";
+import {
+  applyDelegationActivity,
+  takeHeldDelegationActivity,
+} from "./activity/activity-delegation";
 import { createPendingAnswer } from "./pending-answer";
 
 type Context = Pick<
   ConversationSessionState,
   | "selectionVersion"
   | "currentExecutionId"
+  | "heldDelegationActivity"
   | "setExecutionId"
   | "setActivity"
   | "setLiveExpanded"
@@ -58,6 +63,7 @@ type Context = Pick<
 export function useConversationEvents({
   selectionVersion,
   currentExecutionId,
+  heldDelegationActivity,
   setExecutionId,
   setActivity,
   setLiveExpanded,
@@ -110,6 +116,20 @@ export function useConversationEvents({
       currentExecutionId.current = event.executionId ?? null;
       setExecutionId(event.executionId ?? null);
       await callbacks.onStarted?.(event);
+      // 실행 번호가 정해지기 전에 온 맡긴 실행의 도구 사건 가운데 이 답의 것만 넣는다. 작업 과정을 만든 `onStarted` 뒤에 넣는다
+      const held = takeHeldDelegationActivity(
+        heldDelegationActivity.current,
+        currentExecutionId.current,
+      );
+      if (held.length > 0)
+        setActivity(
+          (previous) =>
+            previous &&
+            held.reduce(
+              (activity, item) => applyDelegationActivity(activity, item),
+              previous,
+            ),
+        );
     } else if (event.type === "delta" && event.text) {
       callbacks.onDelta?.(event.text);
     } else if (event.type === "reset") {

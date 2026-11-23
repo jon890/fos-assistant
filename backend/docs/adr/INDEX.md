@@ -33,7 +33,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) | 추천 질문은 사용자의 대화 이력으로 모델이 만들고 메모리에만 둔다 | Accepted. 에이전트의 한 줄 소개를 없앤 부분은 [ADR-20261110 / agent-introduction](../../../docs/adr/ADR-20261110-agent-introduction.md) 이 대체한다 |
 | [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) | Hermes 하위 에이전트 session 의 주인은 만들 때 등록한 줄로 정한다 | Accepted. ADR-031, ADR-032 의 하위 에이전트 session 판정을 대체한다 |
 | [ADR-039](ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md) | 외부 서비스 연결은 사용자별 전용 에이전트로 실행한다 | Accepted. ADR-033의 일반 편집 권한에 연결용 에이전트 예외를 둔다. 전용 profile 과 에이전트, 도구 차단, 토큰 저장 부분은 새 연결에 대해 ADR-083 이 대체한다 |
-| [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) | 위임 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다 | Accepted. ADR-017 의 「결과는 모델이 다시 묻는다」 를 대체한다 |
+| [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) | 위임 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다 | Accepted. ADR-017 의 「결과는 모델이 다시 묻는다」 를 대체한다. 「부모는 맡긴 뒤 기다리지 않는다」 는 대화 turn 의 맡김에서 [ADR-20261121 / delegate-wait](ADR-20261121-delegate-wait.md) 가 대체한다 |
 | [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) | 커넥터는 plugin 의 connector.json 으로 선언하고 Control Plane 은 범용 흐름만 갖는다 | Accepted. ADR-039 위에 얹는다. 서비스 오류 코드를 공통 어휘 옆에 커넥터 코드로 전하는 부분은 ADR-092 가 더한다 |
 | [ADR-044](ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md) | 커넥터 manifest 는 읽기 전용 이미지 도구만 열 수 있다 | Accepted. ADR-039 의 도구 차단에 예외 하나를 둔다. `toolsets` 와 `attachments` 부분은 새 연결에 대해 ADR-083 이 대체한다 |
 | [ADR-045](ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md) | 커넥터 에이전트는 자기 MCP 서버만 받고 Memory 와 Control Plane 도구를 받지 않는다 | Accepted. ADR-039 의 전용 에이전트에 경계를 더한다. 남은 옛 커넥터 에이전트에만 걸린다. worker 경계 부분은 새 연결에 대해 ADR-083 이 대체한다 |
@@ -78,6 +78,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
 | [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) 에 그룹 데이터 key 를 더한다. 남긴 평문 해시는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 HMAC 으로 바꾼다 |
 | [ADR-20261120 / agent-service-writes](ADR-20261120-agent-service-writes.md) | 에이전트는 되돌릴 수 있는 서비스 쓰기를 바로 하고 지우기는 승인 카드로 미루며, 사람이 없는 실행에도 같게 연다 | Accepted. ADR-082 의 살펴보기 쓰기 스위치를 서비스 쓰기 도구에도 쓴다 |
+| [ADR-20261121 / delegate-wait](ADR-20261121-delegate-wait.md) | 대화 turn 이 맡긴 일은 Control Plane 이 정한 시간까지 기다려 같은 답에 돌려준다 | Accepted. ADR-017 의 「`agent_delegate` 는 기다리지 않는다」 와 ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 를 대화 turn 의 루트가 바로 맡긴 위임에서 대체한다 |
 
 ## 보관
 

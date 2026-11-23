@@ -218,7 +218,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 
 인자와 결과 모양은 `McpToolService` 가, 거절 코드는 `DelegationResult.Failure` 가 갖는다. 코드만으로는 알 수 없는 것은 아래다.
 
-- `agent_delegate` 는 제출까지만 기다린 뒤 실행 번호와 `RUNNING` 을 준다. 끝난 결과는 아래 「위임 결과가 도착했을 때」 로 다음 turn 에 전한다
+- `agent_delegate` 는 대화 turn 의 루트가 맡기면 그 답 안에서 상한(`assistant.delegation.delegate-wait-max`, 0 이면 기다리지 않음)까지 결과를 기다린다. 끝나면 `agent_status` 와 같은 모양으로 결과를 주고 전했다고 적는다. 끝나지 않았거나 손자 위임, 먼저 살펴보기면 실행 번호와 `RUNNING`(끝나지 않았으면 짧게 답을 끝내라는 `note`)을 주고, 끝난 결과는 아래 「위임 결과가 도착했을 때」 로 다음 turn 에 전한다. 한 답 안의 상한은 처음 기다리기 시작한 때부터 세고 같은 답의 맡김은 차례로 기다린다. 사용자가 그 답을 중지하면 곧 풀리고 전했다고 적지 않는다([ADR-20261121 / delegate-wait](../../backend/docs/adr/ADR-20261121-delegate-wait.md), `DelegationWaiter`)
 - `agent_status` 의 `wait_seconds` 는 먼저 살펴보기 트리에서만 기다린다. 상한은 `assistant.delegation.status-wait-max` 다. 살펴보기가 끝난 뒤에는 자동 turn 을 열지 않기 때문이다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md))
 - 물을 수 없는 실행은 까닭을 나누지 않고 모두 `NOT_FOUND` 하나다
 - `agent_status` 와 `agent_stop` 은 run 번호, profile, 토큰 수, 금액을 싣지 않는다. 끝난 상태를 돌려주면 그 실행의 `result_delivered_at` 을 적어 부모를 다시 깨우지 않는다
@@ -278,7 +278,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 
 ### 위임 결과가 도착했을 때
 
-맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 부모는 맡긴 뒤 기다리지 않는다. 먼저 살펴보기 트리만 예외다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md)).
+맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 대화 turn 이 상한 안에 받아 간 결과는 전한 것으로 적혀 깨우지 않는다(위 「다른 에이전트에게 맡기기」). 부모는 상한을 넘으면 더 기다리지 않는다. 먼저 살펴보기 트리만 예외다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md)).
 승인해 실행한 플러그인 호출의 결과도 같은 자동 turn 에 실린다. 위임 결과가 없어도 승인 결과만으로 turn 이 열린다. 흐름은 [`docs/features/connector-policy.md`](connector-policy.md) 의 「승인이 필요한 호출」 에 있다.
 
 #### 결과 도착이 갈리는 지점

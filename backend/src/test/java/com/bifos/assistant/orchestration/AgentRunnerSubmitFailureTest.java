@@ -40,6 +40,12 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
+import com.bifos.assistant.orchestration.application.ChildRunEvents;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import org.springframework.context.ApplicationEventPublisher;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -103,11 +109,18 @@ class AgentRunnerSubmitFailureTest {
             TestAgentRuntimes.hermes(hermes),
             lostRunRelease,
             executions,
-            mock(ExecutionEventRecorder.class),
-            mock(ExecutionEventRepository.class),
+            new ChildRunEvents(
+                mock(AgentConnectorBindings.class),
+                mock(ExecutionConnectorCalls.class),
+                mock(AgentRuntimes.class),
+                executions,
+                mock(ExecutionEventRecorder.class),
+                mock(ExecutionEventRepository.class),
+                mock(BackgroundTasks.class),
+                mock(ApplicationEventPublisher.class)),
             new DelegationOutput(LiveProperties.fixed(
                 DelegationProperties.class,
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20), Duration.ZERO))),
             modelTiers,
             Clock.systemUTC(),
             limiter,
