@@ -16,7 +16,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,18 +25,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code @} 맡김이 Hermes 입력에 싣는 단락을 만든다(ADR-20261112 / mention-delegation).
+ * 지난 {@code @} 맡김을 Hermes 입력에 넣는 단락을 만든다(ADR-20261112 / mention-delegation).
  *
- * <p>맡김 turn 은 맡은 에이전트에게 대화의 최근 줄을, 대화 에이전트의 turn 은 지난 자기 turn 뒤에 오간 맡김을 입력 앞에 싣는다.
- * 대화 에이전트의 Hermes session 에는 맡김이 없기 때문이다. 둘 다 이번 turn 의 질문을 저장하기 전에 부른다.
+ * <p>{@code @} 맡기기는 없앴지만(비서 중심 대화 스펙 REQ6) 그 전에 오간 맡김이 대화에 남아 있다. 대화 에이전트의 turn 은 지난 자기
+ * turn 뒤에 오간 맡김을 입력 앞에 넣는다. 대화 에이전트의 Hermes session 에는 맡김이 없기 때문이다. 이번 turn 의 질문을 저장하기
+ * 전에 부른다.
  */
 @Component
 @RequiredArgsConstructor
 class MentionInputs {
-    /** 맡은 에이전트에게 싣는 최근 줄의 수다. */
-    static final int RECENT_LINES = 6;
-
-    /** 최근 줄 하나를 자르는 글자 수다. */
+    /** 맡김 질문 하나를 자르는 글자 수다. */
     static final int LINE_CHARS = 1_000;
 
     /** 대화 에이전트에게 싣는 맡김의 수다. 더 오래된 것은 뺀다. */
@@ -45,8 +42,6 @@ class MentionInputs {
 
     /** 대화 에이전트에게 싣는 맡김 답 하나를 자르는 글자 수다. */
     static final int ANSWER_CHARS = 2_000;
-
-    static final String TASK_LABEL = "[맡긴 일]\n";
 
     static final String CARRY_TITLE = "[사용자가 @ 로 다른 에이전트에게 바로 맡긴 일]\n"
         + "너를 거치지 않고 오갔다. 사용자가 이어서 물으면 참고하고, 같은 일을 다시 하지 않는다.";
@@ -65,13 +60,10 @@ class MentionInputs {
     /**
      * 이번 turn 의 입력 앞에 붙일 단락이다. 붙일 것이 없으면 빈 글이다.
      *
-     * <p>맡김 turn 이면 최근 줄과 「[맡긴 일]」 머리, 사용자가 보낸 turn·자동 결과 전달 turn·예약 turn 이면 지난 자기 turn 뒤의
-     * 맡김이다. 다시 만들기와 먼저 살펴보기는 싣지 않는다.
+     * <p>사용자가 보낸 turn·자동 결과 전달 turn·예약 turn 이면 지난 자기 turn 뒤에 {@code @} 로 오간 맡김이다. {@code @} 맡기기는
+     * 없앴지만 그 전에 남은 대화가 있어 읽는다. 다시 만들기와 먼저 살펴보기는 싣지 않는다.
      */
     String lead(Conversation conversation, TurnIntent intent) {
-        if (intent instanceof TurnIntent.Mention) {
-            return recentLines(conversation) + TASK_LABEL;
-        }
         if (!(intent instanceof TurnIntent.Fresh
             || intent instanceof TurnIntent.DelegationResults
             || intent instanceof TurnIntent.Scheduled)) {
@@ -82,27 +74,6 @@ class MentionInputs {
             return "";
         }
         return intent instanceof TurnIntent.Fresh ? carried + USER_MESSAGE_LABEL : carried;
-    }
-
-
-    /** 맡은 에이전트가 받는 대화의 최근 줄이다. 줄이 없으면 빈 글이다. */
-    String recentLines(Conversation conversation) {
-        List<ChatMessage> lines = routing.activeMessages(conversation.id()).stream()
-            .filter(message -> message.role() == MessageRole.USER || message.role() == MessageRole.ASSISTANT)
-            .toList();
-        if (lines.isEmpty()) {
-            return "";
-        }
-        List<ChatMessage> recent = lines.subList(Math.max(0, lines.size() - RECENT_LINES), lines.size());
-        Map<Long, AgentLabel> answerAgents = mentionLines.marks(conversation).answers();
-        String conversationAgent = nameOf(AgentLabel.of(
-            agents.byIds(Collections.singletonList(conversation.agentId())).get(conversation.agentId())));
-        String body = recent.stream()
-            .map(message -> speaker(message, answerAgents, conversationAgent) + ": " + cut(message.content(), LINE_CHARS))
-            .collect(Collectors.joining("\n"));
-        return "[출처: 대화의 앞 줄, 대화 에이전트: " + conversationAgent + ", 줄 수: " + recent.size() + "]\n"
-            + ExternalData.wrap(body)
-            + "\n\n";
     }
 
 
@@ -180,15 +151,6 @@ class MentionInputs {
             }
         }
         return text.append("\n\n").toString();
-    }
-
-
-    private static String speaker(ChatMessage message, Map<Long, AgentLabel> answerAgents, String conversationAgent) {
-        if (message.role() == MessageRole.USER) {
-            return "사용자";
-        }
-        AgentLabel label = message.executionId() == null ? null : answerAgents.get(message.executionId());
-        return label == null ? conversationAgent : nameOf(label);
     }
 
 

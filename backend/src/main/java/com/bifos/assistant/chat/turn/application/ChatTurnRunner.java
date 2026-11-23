@@ -194,9 +194,7 @@ class ChatTurnRunner {
             String runId = null;
             RunResult result;
             try {
-                // 맡김은 사진을 싣지 않는다. 맡은 에이전트에 사진 도구를 붙이지 않는다.
-                if (!(intent instanceof TurnIntent.Mention)
-                    && attachments.allOf(conversation.id()).stream().anyMatch(photo -> photo.messageId() != null)) {
+                if (attachments.allOf(conversation.id()).stream().anyMatch(photo -> photo.messageId() != null)) {
                     try {
                         agentTools.ensureAttachmentInspection(routed.agent());
                     } catch (RuntimeException ex) {
@@ -307,11 +305,9 @@ class ChatTurnRunner {
     }
 
 
-    /** 질문과 관련된 기억을 고를 글이다. 사용자가 보낸 turn, 그 다시 생성, {@code @} 맡김만 글을 넘긴다. */
+    /** 질문과 관련된 기억을 고를 글이다. 사용자가 보낸 turn 과 그 다시 생성만 글을 넘긴다. */
     static String questionOf(TurnIntent intent, String text) {
-        return intent instanceof TurnIntent.Fresh
-            || intent instanceof TurnIntent.Regenerate
-            || intent instanceof TurnIntent.Mention ? text : null;
+        return intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Regenerate ? text : null;
     }
 
 

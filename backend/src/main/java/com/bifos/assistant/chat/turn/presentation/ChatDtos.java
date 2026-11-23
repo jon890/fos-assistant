@@ -42,8 +42,8 @@ public final class ChatDtos {
      * null 을 빈 목록으로 바꾼다
      */
     /**
-     * @param delegateTo 대화 중 {@code @} 로 고른 에이전트의 코드. 있으면 대화의 에이전트 대신 그 에이전트에게 바로 맡긴다
-     * (ADR-20261112 / mention-delegation). 비었으면 보통 보내기다
+     * @param delegateTo 옛 화면이 {@code @} 로 고른 에이전트의 코드. {@code @} 맡기기는 없앴으므로(비서 중심 대화 스펙 REQ6) 있으면
+     * {@code VALIDATION_FAILED} 로 거절한다
      * @param reply 답장으로 집은 것(스펙 chat-reference). 흐르는 보내기만 받는다. 답장이 아니면 null
      */
     public record SendMessageRequest(

@@ -185,6 +185,8 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
         attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
         attempt(failures, () -> context.getBean(FakeLinkImageWeb.class).reset());
+        // 기본 비서를 정하려고 만든 허용 목록 줄은 검사마다 지운다. 남으면 다음 검사의 같은 메일 사용자에게 기본 비서가 생긴다.
+        attempt(failures, () -> context.getBean(TestPrimaryAgents.class).reset());
         attempt(failures, () -> context.getBean(EchoCdpRelayConnector.class).reset());
         attempt(
             failures,
