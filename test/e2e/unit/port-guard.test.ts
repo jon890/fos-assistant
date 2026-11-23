@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
 import { once } from "node:events";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { pickAppPort } from "../port-guard.ts";
 
 for (const host of ["127.0.0.1", "::"]) {
@@ -37,3 +39,26 @@ for (const host of ["127.0.0.1", "::"]) {
     assert.equal(await pickAppPort(port), port);
   });
 }
+
+test("lsof가 없어도 러너는 명시한 포트를 열 수 없으면 서버 기동 전에 멈춘다", async () => {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+
+  try {
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("../run.ts", import.meta.url))], {
+      env: { ...process.env, PATH: "", E2E_APP_PORT: String(port) },
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    assert.ifError(run.error);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, new RegExp(`TCP 포트 ${port} 사용 중`));
+    assert.match(run.stderr, /PID와 명령 줄을 확인하지 못했습니다/);
+    assert.doesNotMatch(run.stdout, /Hermes 기동|Control Plane 기동/);
+    assert.ok(server.listening);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
