@@ -80,6 +80,7 @@ public class McpMemoryRemember {
         + "summary 에는 매 대화에 늘 보일 한 줄 요약을 200자까지 쓴다(예: 「아들 홍길동, 초등학생」). "
         + "금방 바뀌는 진행 중인 일(지원 현황, 예약)은 summary 를 주지 않는다. "
         + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고치고 summary 도 새 사실에 맞게 준다. "
+        + "바로 고칠 수 없으면 고치기 제안으로 남고 사용자가 받아들이면 바뀐다. "
         + "summary 를 빈 글로 주면 요약을 지운다. "
         + "사용자가 기억 정리를 부탁하면 같은 주제의 기억을 하나로 합쳐 새로 남기고 replaces 에 대신할 옛 번호를 준다. replaces 는 memory_id 와 함께 주지 않는다. "
         + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. "
@@ -240,7 +241,10 @@ public class McpMemoryRemember {
             case COLLECTION_NOT_ALLOWED -> failure(ToolFailureText.alternative("이 에이전트가 쓸 수 없는 collection 이다.", "collection 없이 다시 부른다"));
             case UPDATE_TARGET_NOT_FOUND -> failure(ToolFailureText.alternative(
                 "고칠 기억을 찾지 못했다.", "memory_id 없이 새로 남기고, 고치지 못해 새로 남겼다고 답에 한 줄 알린다"));
-            case UPDATE_NEEDS_CONFIRMATION -> failure(ToolFailureText.askUser("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다."));
+            case UPDATE_PROPOSED -> success(
+                "지금은 기존 기억을 바로 고칠 수 없어 고치기 제안으로 남겼다. 사용자가 받아들이면 새 기억이 옛 기억을 대신한다. "
+                    + "같은 고치기를 다시 부르지 않고, 답에서 기억 화면이나 제안 카드에서 받아들여야 바뀐다고 알린다."
+                    + replacedText(remembered, "받아들이면 대신한다"));
             case ENCRYPTION_UNAVAILABLE -> failure(ToolFailureText.askUser("민감한 내용을 저장할 수 없다."));
         };
     }

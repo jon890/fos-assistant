@@ -78,6 +78,8 @@ class McpMemoryRememberToolTest {
     private static final String QUESTION = "우리 집   다른 사람은 홍길동이야. 기억해 줘";
     private static final String REMEMBERED = "기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다.";
     private static final String PROPOSED = "제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.";
+    private static final String UPDATE_PROPOSED = "지금은 기존 기억을 바로 고칠 수 없어 고치기 제안으로 남겼다. 사용자가 받아들이면 새 기억이 옛 기억을 대신한다. "
+        + "같은 고치기를 다시 부르지 않고, 답에서 기억 화면이나 제안 카드에서 받아들여야 바뀐다고 알린다.";
 
     @LocalServerPort
     int port;
@@ -303,8 +305,8 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 확인하라고 답한다")
-    void refusesUpdateToSensitiveLookingContent() throws Exception {
+    @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 고치기 제안으로 남긴다")
+    void proposesUpdateToSensitiveLookingContent() throws Exception {
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", null));
         Long memoryId = onlyMemory().id();
@@ -313,9 +315,13 @@ class McpMemoryRememberToolTest {
 
         JsonNode result = call(arguments);
 
-        assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).startsWith("지금은 기존 기억을 고칠 수 없다");
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(text(result)).startsWith(UPDATE_PROPOSED);
         assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
+        assertThat(memoriesOfDad())
+            .filteredOn(memory -> !memory.id().equals(memoryId))
+            .extracting(Memory::status)
+            .containsExactly(MemoryStatus.PROPOSED);
     }
 
 
@@ -769,20 +775,41 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("바로 저장 조건이 아니면 기존 항목을 고치지 않고 사용자에게 확인하라고 답한다")
-    void refusesUpdateWithoutDirectConditions() throws Exception {
+    @DisplayName("바깥 글을 읽은 대화의 고치기는 고치기 제안으로 남고 사용자가 받아들이면 새 기억이 옛 기억을 대신한다")
+    void proposesUpdateWithoutDirectConditionsAndReplacesOnAccept() throws Exception {
+        // 운영에서 웹 검색을 한 대화의 「기억 #54 를 바꿔 줘」 가 「사용자에게 바꿀지 묻는다」 로 실패하고, 사용자가 바꿔 달라고 해도 같은 실패가 되풀이됐다
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 김철수다", "다른 사람은 홍길동이야"));
-        Long memoryId = onlyMemory().id();
+        Memory old = onlyMemory();
+        memoryService.update(currentDad(), old.id(), old.content(), true, null);
         ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", null);
-        arguments.put("memory_id", memoryId);
+        arguments.put("memory_id", old.id());
         toolStarted("web_search");
 
-        JsonNode result = call(arguments);
+        JsonNode result = call(arguments.deepCopy());
+        JsonNode again = call(arguments);
 
-        assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(text(result)).isEqualTo("지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.\n사용자에게 바로 알린다.");
-        assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(text(result)).isEqualTo(UPDATE_PROPOSED + " 옛 기억(번호 " + old.id() + ")을 받아들이면 대신한다.");
+        assertThat(text(again)).as("같은 고치기를 다시 불러도 제안을 하나만 둔다").startsWith("같은 제안이 이미 있다.");
+        assertThat(memories.findById(old.id()).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
+        List<Memory> proposals = memoriesOfDad().stream()
+            .filter(memory -> !memory.id().equals(old.id()))
+            .toList();
+        assertThat(proposals).hasSize(1);
+        Memory proposal = proposals.getFirst();
+        assertThat(proposal.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(proposal.retrieval()).as("사람이 켠 항상 싣기를 그대로 둔다").isEqualTo(MemoryRetrieval.ALWAYS);
+        assertThat(proposal.collection()).isEqualTo(old.collection());
+        assertThat(capturesOfDad())
+            .filteredOn(capture -> capture.memoryId().equals(proposal.id()))
+            .extracting(MemoryCapture::kind, MemoryCapture::externalRead, MemoryCapture::replacedMemoryIds)
+            .containsExactly(tuple(MemoryCaptureKind.PROPOSED, true, List.of(old.id())));
+
+        memoryService.accept(currentDad(), proposal.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isEqualTo(proposal.id());
+        assertThat(memories.findById(proposal.id()).orElseThrow().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
 
 

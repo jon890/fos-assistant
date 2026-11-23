@@ -80,6 +80,17 @@ public class MemoryCaptureService {
         if (!access.collections().contains(collection)) {
             return MemoryRememberResult.of(MemoryRememberOutcome.COLLECTION_NOT_ALLOWED);
         }
+        return create(user, access, request, new MemoryPlacement(collection, MemoryRetrieval.SEARCH), request.archivable());
+    }
+
+
+    /**
+     * 새 항목을 바로 저장하거나 제안으로 남긴다. 값 검사와 collection 판정은 부르는 쪽이 마쳤다.
+     *
+     * @param archivable 새 항목에 적을 자동 보관 허락 표시
+     */
+    private MemoryRememberResult create(
+        CurrentUser user, MemoryAccess access, MemoryRememberRequest request, MemoryPlacement placement, boolean archivable) {
         boolean direct = request.direct()
             && !request.sensitive()
             && !MemorySensitiveHints.suspected(request.title(), request.content(), request.summary());
@@ -98,7 +109,6 @@ public class MemoryCaptureService {
         if (existing.isPresent()) {
             return existingOutcome(user, existing.get(), direct, request);
         }
-        MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
         String body = request.content();
         // 제안에는 요약을 두지 않는다. 제안 카드가 요약을 보이기 전(PR2)에는 사용자가 보지 못한 요약이 받아들이는 순간 매 실행에 들어가기 때문이다
         String summary = !direct || request.summary() == null ? "" : request.summary();
@@ -107,7 +117,7 @@ public class MemoryCaptureService {
             : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant()))
                 .fillSummary(summary, null);
         // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
-        created.allowArchive(request.archivable());
+        created.allowArchive(archivable);
         Memory saved;
         try {
             // key 를 풀지 못하면 줄을 넣기 전에 거절된다
@@ -303,18 +313,21 @@ public class MemoryCaptureService {
     }
 
 
-    /** 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 풀리며 이 에이전트가 받는 collection 에 있다. */
+    /**
+     * 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 풀리며 이 에이전트가 받는 collection 에 있다. 바로 저장 조건이 아니면 고치지 않고 그 항목을
+     * 대신할 제안으로 남긴다({@link #proposeUpdate}).
+     */
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
-        if (!request.direct()
-            || request.sensitive()
-            || MemorySensitiveHints.suspected(request.title(), request.content(), request.summary())) {
-            return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
-        }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
         if (found.isEmpty() || !updatable(user, access, found.get()) || superseded(found.get())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_TARGET_NOT_FOUND);
         }
         Memory memory = found.get();
+        if (!request.direct()
+            || request.sensitive()
+            || MemorySensitiveHints.suspected(request.title(), request.content(), request.summary())) {
+            return proposeUpdate(user, access, request, memory);
+        }
         // 요약을 주지 않았으면 지금 요약을 둔다. 빈 글이면 지운다
         String current = memory.storedSummary() == null
             ? MemorySummaryBackfill.ruleSummary(memory, request.content(), memory.retrieval())
@@ -335,6 +348,38 @@ public class MemoryCaptureService {
         }
         record(memory.id(), user, request, MemoryCaptureKind.UPDATED, base);
         return new MemoryRememberResult(MemoryRememberOutcome.UPDATED, memory.id());
+    }
+
+
+    /**
+     * 바로 고칠 수 없는 고치기를 고치기 제안으로 남긴다. 합치기 제안과 같은 모양이다. 새 제안의 {@code replaces} 가 고칠 항목 하나이고, 사용자가
+     * 받아들이면 새 항목이 그 항목을 대신한다(「합치기」). 실패로 돌려주면 바깥 글을 읽은 대화에서는 사용자가 「바꿔 줘」 를 골라도 영영 고치지 못한다.
+     *
+     * <p>collection 과 자동 보관 허락, {@code ALWAYS} 꺼내기는 고칠 항목의 것을 그대로 둔다. 사람이 정한 값을 받아들이는 순간 바꾸지 않게 한다.
+     */
+    private MemoryRememberResult proposeUpdate(
+        CurrentUser user, MemoryAccess access, MemoryRememberRequest request, Memory target) {
+        MemoryRememberRequest proposal = new MemoryRememberRequest(
+            request.title(),
+            request.content(),
+            request.summary(),
+            target.collection(),
+            request.sensitive(),
+            null,
+            request.executionId(),
+            request.conversationId(),
+            false,
+            request.externalRead(),
+            target.archivable(),
+            List.of(target.id()));
+        // 보관한 항목을 고치자고 했으면 다시 쓰일 사실이므로 색인으로 둔다
+        MemoryRetrieval retrieval = target.retrieval() == MemoryRetrieval.ALWAYS ? MemoryRetrieval.ALWAYS : MemoryRetrieval.SEARCH;
+        MemoryRememberResult result = create(user, access, proposal, new MemoryPlacement(target.collection(), retrieval), target.archivable());
+        if (result.outcome() != MemoryRememberOutcome.PROPOSED) {
+            return result;
+        }
+        return new MemoryRememberResult(
+            MemoryRememberOutcome.UPDATE_PROPOSED, result.memoryId(), result.replaced(), result.notReplaced());
     }
 
 
