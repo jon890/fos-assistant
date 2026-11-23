@@ -22,6 +22,13 @@ public record DelegatedSkillCommand(String agentName, SkillCommand command) {
     private static final Pattern FORM = Pattern.compile("^/([^\\n·]+?) · ([a-z0-9][a-z0-9-]{0,63})(\\s|$)");
 
 
+    /** 그 에이전트 이름을 이 꼴로 적으면 그대로 다시 읽히는지 본다. 가운뎃점이나 줄바꿈이 있거나 앞뒤에 공백이 있으면 읽히지 않는다. */
+    public static boolean readsBack(String agentName) {
+        return agentName != null && !agentName.isBlank() && agentName.strip().equals(agentName) && agentName.indexOf('·') < 0
+            && agentName.indexOf('\n') < 0;
+    }
+
+
     /** 글이 이 꼴이면 에이전트 이름과 스킬, 나머지 글을 낸다. 아니면 빈 값이다. */
     public static Optional<DelegatedSkillCommand> parse(String text) {
         if (text == null) {

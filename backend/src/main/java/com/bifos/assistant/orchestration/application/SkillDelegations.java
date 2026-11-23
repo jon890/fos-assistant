@@ -31,9 +31,11 @@ import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -70,10 +72,18 @@ public class SkillDelegations {
      * 맡길 수 있는 전문 에이전트와 그 켜진 스킬이다. 비서의 {@code /} 목록과 같게 화면 스킬 목록에 보이는 스킬(Hermes 기본 스킬은 뺀다) 가운데
      * 켜졌고 커맨드로 부를 수 있는 이름만 둔다. 스킬이 없는 에이전트는 뺀다. 스킬 목록을 읽지 못한 에이전트도 빼고 경고 로그만 남긴다. 한
      * 에이전트가 실패해도 목록 전체를 막지 않기 위해서다.
+     *
+     * <p>이름이 「에이전트 · 스킬」 글로 다시 읽히지 않거나 같은 이름의 에이전트가 둘 이상이면 뺀다. 화면의 항목이 같은 글이라 어느 쪽인지
+     * 고를 수 없고, 예약 작업 지시도 그 이름으로 정하지 못한다(설계 DECISION8).
      */
     public List<SkillDelegationTarget> targets(CurrentUser user) {
+        List<Agent> candidates = delegable(user);
+        Map<String, Long> sameName = candidates.stream().collect(Collectors.groupingBy(Agent::name, Collectors.counting()));
         List<SkillDelegationTarget> found = new ArrayList<>();
-        for (Agent agent : delegable(user)) {
+        for (Agent agent : candidates) {
+            if (!DelegatedSkillCommand.readsBack(agent.name()) || sameName.get(agent.name()) > 1) {
+                continue;
+            }
             List<String> names;
             try {
                 names = listedNames(skillService.commandList(agent));

@@ -166,8 +166,15 @@ class SkillDelegationTest {
 
 
     @Test
-    @DisplayName("목록은 쓸 수 있고 켜진 전문 에이전트의 켜진 스킬만 주고 기본 비서, 꺼진 에이전트, 스킬 없는 에이전트, Hermes 기본 스킬과 커맨드로 못 부르는 이름은 뺀다")
+    @DisplayName("목록은 쓸 수 있고 켜진 전문 에이전트의 켜진 스킬만 주고 기본 비서, 꺼진 에이전트, 스킬 없는 에이전트, Hermes 기본 스킬과 커맨드로 못 부르는 이름, 글로 다시 읽히지 않거나 겹치는 에이전트 이름은 뺀다")
     void targetsAreEnabledSpecialistSkills() {
+        agents.save(agent("sales", "영업 · 국내", dad.id()));
+        agents.save(agent("memo-a", "메모", dad.id()));
+        agents.save(agent("memo-b", "메모", dad.id()));
+        skillsOf("sales", "position-recommender");
+        skillsOf("memo-a", "position-recommender");
+        skillsOf("memo-b", "weekly-plan");
+
         assertThat(delegations.targets(dad))
             .extracting(SkillDelegationTarget::agentCode, SkillDelegationTarget::agentName, SkillDelegationTarget::skills)
             .containsExactly(tuple("career", "커리어", List.of("position-recommender")));

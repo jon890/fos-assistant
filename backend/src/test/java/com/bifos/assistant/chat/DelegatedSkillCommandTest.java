@@ -39,4 +39,15 @@ class DelegatedSkillCommandTest {
     void winsOverPrimaryCommand() {
         assertThat(DelegatedSkillCommand.parse("/abc · weekly-plan").orElseThrow().agentName()).isEqualTo("abc");
     }
+
+
+    @Test
+    @DisplayName("가운뎃점이나 줄바꿈이 든 이름, 앞뒤 공백이 있는 이름은 이 꼴로 적어도 다시 읽히지 않는다")
+    void readsBackOnlyPlainNames() {
+        assertThat(DelegatedSkillCommand.readsBack("커리어")).isTrue();
+        assertThat(DelegatedSkillCommand.readsBack("영업 · 국내")).isFalse();
+        assertThat(DelegatedSkillCommand.readsBack("커리어\n담당")).isFalse();
+        assertThat(DelegatedSkillCommand.readsBack(" 커리어")).isFalse();
+        assertThat(DelegatedSkillCommand.readsBack(" ")).isFalse();
+    }
 }

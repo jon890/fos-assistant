@@ -99,7 +99,7 @@ const DELEGATED_PATTERN =
 /**
  * 글이 목록에 있는 「에이전트 · 스킬」 로 시작하면 맡을 에이전트를 돌려준다. 아니면 null 이고 보통 보내기로 간다.
  *
- * <p>같은 이름의 에이전트가 둘이면 그 스킬을 가진 첫 에이전트다.
+ * <p>Control Plane 이 이름이 겹치거나 이 꼴로 다시 읽히지 않는 에이전트를 목록에서 빼므로, 글 하나는 에이전트 하나로 정해진다.
  */
 export function delegatedTargetOf(
   text: string,
