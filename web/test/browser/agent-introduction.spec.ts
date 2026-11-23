@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import { agentSwitcher } from "./helpers.ts";
+import { openConversationWith } from "./helpers.ts";
 import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
@@ -48,7 +48,7 @@ test.afterEach(async ({ context, page }, testInfo) => {
   }
 });
 
-test("주인이 소개, 아이콘, 색을 저장하면 목록과 대화의 이름표에 보인다", async ({ page }) => {
+test("주인이 소개, 아이콘, 색을 저장하면 목록과 대화의 이름표에 보인다", async ({ page }, testInfo) => {
   const code = await createAgent(page);
   await page.goto(`/agents/${code}`);
   const section = introductionSection(page);
@@ -70,8 +70,9 @@ test("주인이 소개, 아이콘, 색을 저장하면 목록과 대화의 이�
   await expect(card).toContainText("쇼핑 검색과 장바구니를 맡아요");
   await expect(card.getByTestId("agent-badge")).toHaveText("🛍️");
 
-  // 그 에이전트와 대화하면 답 줄에 그 이름표가 보인다. 좁은 화면에서도 보인다.
-  await page.goto(`/new?agent=${code}`);
+  // 그 에이전트와의 대화에서 답 줄에 그 이름표가 보인다. 좁은 화면에서도 보인다. 새 대화는 기본 비서로만 열리므로 지난 대화로
+  // 연다(스펙 assistant-hub REQ4).
+  await openConversationWith(page, code, ownerOf(testInfo.project.name).email);
   await page.getByRole("textbox", { name: "메시지" }).fill("운동화 찾아줘");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);
@@ -114,19 +115,4 @@ test("주인이 아닌 사용자는 그룹 공개 에이전트의 소개를 읽�
     data: { name: "바꾼 이름", description: null, icon: null, color: null },
   });
   expect(denied.status()).toBe(403);
-});
-
-test("준비된 플러그인과 스킬이 없는 에이전트는 비서 고르기 목록에서 한 줄 소개를 보인다", async ({ page }) => {
-  const code = await createAgent(page);
-  await page.goto(`/agents/${code}`);
-  const section = introductionSection(page);
-  await section.getByLabel("한 줄 소개").fill("기차표 조회를 맡아요");
-  await section.getByRole("button", { name: "소개 저장" }).click();
-  await expect(section.getByText("저장했어요.")).toBeVisible();
-
-  await page.goto("/new");
-  await agentSwitcher(page).click();
-  await expect(
-    page.getByTestId("agent-switcher-list").getByRole("menuitemradio", { name: NAME, exact: true }),
-  ).toHaveAccessibleDescription("기차표 조회를 맡아요");
 });

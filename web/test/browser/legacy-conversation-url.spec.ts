@@ -10,6 +10,7 @@ import {
   test,
   HOME_URL,
 } from "./fixtures.ts";
+import { seedConversation } from "./helpers.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(): Promise<string> {
@@ -64,12 +65,9 @@ test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", asy
   await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "GROUP", null);
   try {
     await setSession(context, { email: "member@example.com", name: "가족 사용자" });
-    // 빈 대화라 Hermes 실행이 돌지 않는다.
-    const created = await page.request.post("/api/chat/conversations", {
-      data: { agentCode: PERSONA_GROUP_AGENT_CODE },
-    });
-    expect(created.ok(), `남의 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
-    const { conversationId } = (await created.json()) as { conversationId: string };
+    // 빈 대화라 Hermes 실행이 돌지 않는다. 새 대화는 기본 비서로만 열리므로 그룹 에이전트와의 지난 대화를 만든다(스펙
+    // assistant-hub REQ4).
+    const conversationId = await seedConversation(PERSONA_GROUP_AGENT_CODE, "member@example.com");
     const number = await conversationNumber(conversationId);
 
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });

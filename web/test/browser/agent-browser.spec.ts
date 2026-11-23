@@ -1,5 +1,5 @@
 import { expect, hermesBaseUrl, test } from "./fixtures.ts";
-import { pickAgent } from "./helpers.ts";
+import { expectStartAgent } from "./helpers.ts";
 import { FRAME, fakeScreen, type Input } from "./fake-screen.ts";
 
 const AGENT_TAB = "ABCDEF0123456789";
@@ -72,7 +72,7 @@ test("브라우저 도구가 도는 동안 「에이전트 화면 보기」 가 
   let released = false;
   try {
     await page.goto("/new");
-    await pickAgent(page, "브라우저 비서");
+    await expectStartAgent(page, "브라우저 비서");
     // 도구가 돌기 전에는 단추가 없다.
     await expect(page.getByTestId("agent-browser-open")).toHaveCount(0);
     await page.getByRole("textbox", { name: "메시지" }).fill(input);

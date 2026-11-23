@@ -1,5 +1,6 @@
 import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
+import { clearPrimary, usePrimary } from "./helpers.ts";
 import { NO_TOOL_CALL_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
@@ -547,7 +548,11 @@ test.describe("MEMBER 역할 사용자의 실행 상세", () => {
   async function createAgent(page: import("../../node_modules/@playwright/test/index.js").Page): Promise<string> {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
-    return ((await created.json()) as { code: string }).code;
+    const code = ((await created.json()) as { code: string }).code;
+    // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+    const me = (await (await page.request.get("/api/me")).json()) as { email: string };
+    await usePrimary(me.email, code);
+    return code;
   }
 
   test.beforeEach(async ({ context, page }, testInfo) => {
@@ -557,6 +562,8 @@ test.describe("MEMBER 역할 사용자의 실행 상세", () => {
 
   test.afterEach(async ({ context, page }, testInfo) => {
     await setSession(context, memberOf(testInfo.project.name));
+    // 기본 비서는 지울 수 없어 먼저 없앤다.
+    await clearPrimary(memberOf(testInfo.project.name).email);
     const response = await page.request.get("/api/agents");
     const mine = ((await response.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
     for (const agent of mine) {

@@ -99,7 +99,7 @@ test("켜져 있는 사용자는 /signout/revoked 를 열어도 로그아웃되�
 }) => {
   await page.goto("/signout/revoked");
 
-  // `/` 는 대화방을 열고, 기본 비서가 없는 검사 관리자는 새 대화 화면으로 간다.
+  // `/` 는 대화방을 연다. 기본 비서가 없는 사용자는 새 대화 화면으로 간다.
   await expect(page).toHaveURL(/\/(new|chat\/[0-9a-f-]+)$/);
   await expect(page).not.toHaveURL(/\/signin$/);
   expect(await sessionCookieNames(context)).not.toEqual([]);

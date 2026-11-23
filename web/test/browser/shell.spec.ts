@@ -54,7 +54,7 @@ test("새 대화에서 보내면 주소와 목록이 바뀌고 다시 열 수 �
   await expect(page.getByTestId("user-message").last()).toContainText(title);
 });
 
-test("모바일 머리줄 제목을 누르면 홈으로 가고 새 대화 상태로 돌아간다", async ({ page }, testInfo) => {
+test("모바일 머리줄 제목을 누르면 홈인 대화방으로 가고 입력이 빈다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
   const title = `모바일 홈 제목 ${Date.now()}`;
   const id = await createConversation(page, title);
@@ -66,15 +66,16 @@ test("모바일 머리줄 제목을 누르면 홈으로 가고 새 대화 상태
   expect(bounds?.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByTestId("user-message")).toHaveCount(1);
   await page.getByRole("textbox", { name: "메시지" }).fill("홈으로 가기 전 입력");
-  // 홈은 대화방을 연다. 검사 관리자는 기본 비서가 없어 새 대화 화면으로 간다.
+  // 홈은 대화방을 연다. 검사 관리자의 기본 비서는 「브라우저 비서」 다(스펙 assistant-hub REQ4).
   await home.click();
-  await expect(page).toHaveURL(/\/new$/);
-  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  await expect(page).not.toHaveURL(new RegExp(`/chat/${id}$`));
   await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
+  const room = page.url();
   await page.goto("/tasks");
   await expect(home).toHaveText("검사용 비서");
   await home.click();
-  await expect(page).toHaveURL(/\/new$/);
+  await expect(page).toHaveURL(room);
 });
 
 test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 비고 다음 대화가 생긴다", async ({ page }, testInfo) => {

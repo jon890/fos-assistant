@@ -6,7 +6,7 @@ import {
   test,
 } from "./fixtures.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
-import { waitForViewTransition, pickAgent } from "./helpers.ts";
+import { waitForViewTransition, expectStartAgent } from "./helpers.ts";
 
 const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -165,7 +165,7 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
     await route.fallback();
   });
   await page.goto("/new");
-  await pickAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("중지 패널 Esc 검사");

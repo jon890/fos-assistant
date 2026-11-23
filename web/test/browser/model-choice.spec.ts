@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import { agentSwitcher, expectPickedAgent } from "./helpers.ts";
+import { clearPrimary, expectStartAgent, usePrimary } from "./helpers.ts";
 import type {
   Locator,
   Page,
@@ -371,9 +371,12 @@ test("목록으로 고른 칸이 대화에 남고 다음 새 대화가 그 칸�
   });
   expect(agent.status()).toBe(201);
   const { code: agentCode } = (await agent.json()) as { code: string };
+  // 새 대화는 기본 비서로만 열린다(스펙 assistant-hub REQ4). 이 사용자는 허용 목록 없이 들어와 만든 에이전트를 기본 비서로 둔다.
+  await usePrimary(isolatedMember.email, agentCode);
   try {
     await expectChosenTierCarriesOver(page);
   } finally {
+    await clearPrimary(isolatedMember.email);
     const removed = await page.request.delete(`/api/agents/${agentCode}`);
     expect(removed.status()).toBe(204);
   }
@@ -528,7 +531,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
     await route.fulfill({ response });
   });
   await page.goto("/new");
-  await expectPickedAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
 
   await openList(page);
   await chooseAndWait(page, "Instant");
@@ -537,11 +540,9 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
   // 빈 대화가 생겨 에이전트가 정해졌다. 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(trigger(page)).toHaveText("Instant");
-  // 대화가 만들어져 이름표가 잠긴다. 눌러도 목록 대신 바꿀 수 없는 까닭이 보인다(app-shell 스펙의 REQ9).
-  await agentSwitcher(page).click();
-  await expect(page.getByTestId("agent-switcher-locked")).toBeVisible();
+  // 새 대화는 늘 기본 비서라 고르는 목록이 없다(스펙 assistant-hub REQ4).
+  await expectStartAgent(page, "브라우저 비서");
   await expect(page.getByRole("menuitemradio")).toHaveCount(0);
-  await page.keyboard.press("Escape");
 
   const uploaded = page.waitForResponse(
     (response) =>

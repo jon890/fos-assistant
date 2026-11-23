@@ -5,7 +5,13 @@ import type {
   TestInfo,
 } from "../../node_modules/@playwright/test/index.js";
 import playwright from "../../node_modules/@playwright/test/index.js";
-import { RUN_ID } from "./settings.ts";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
+import {
+  CONTROL_PLANE_BASE_URL,
+  JWT_SECRET,
+  RUN_ID,
+  TEST_EMAIL,
+} from "./settings.ts";
 
 const { expect } = playwright;
 
@@ -140,26 +146,106 @@ export async function openAccountMenu(page: Page, testInfo: TestInfo) {
 }
 
 /**
- * 새 대화 화면의 이름표 단추다. 넓은 화면은 대화 영역 머리 줄, 좁은 폭은 위 막대 가운데에 있어 보이는 쪽을 쓴다
- * (docs/features/app-shell/spec.md 의 REQ9).
+ * 새 대화 화면의 에이전트 이름표다. 넓은 화면은 대화 영역 머리 줄, 좁은 폭은 위 막대 가운데에 있어 보이는 쪽을 쓴다.
  */
-export function agentSwitcher(page: Page): Locator {
-  return page.locator('[data-testid="agent-switcher"]:visible');
+export function startAgentTag(page: Page): Locator {
+  return page.locator('[data-testid="start-agent-tag"]:visible');
 }
 
-/** 이름표를 눌러 목록을 열고 그 이름의 에이전트를 고른다. 고르면 목록이 닫힌다 */
-export async function pickAgent(page: Page, name: string) {
-  await agentSwitcher(page).click();
-  await page.getByRole("menuitemradio", { name, exact: true }).click();
-  await expect(page.getByTestId("agent-switcher-list")).toHaveCount(0);
-  await expectPickedAgent(page, name);
-}
-
-/** 이름표가 그 에이전트를 고른 채 보이는지 본다 */
-export async function expectPickedAgent(page: Page, name: string) {
-  await expect(agentSwitcher(page)).toHaveAccessibleName(
-    `에이전트 고르기, 지금 ${name}`,
+/** 새 대화 화면이 그 에이전트로 열렸는지 본다. 새 대화는 늘 기본 비서다(docs/features/assistant-hub/spec.md 의 REQ4) */
+export async function expectStartAgent(page: Page, name: string) {
+  await expect(startAgentTag(page).getByTestId("start-agent-name")).toHaveText(
+    name,
   );
+}
+
+/** 그 사용자의 메일로 서명한 Control Plane 토큰으로 test-support 경로를 부른다. */
+async function testSupport(
+  email: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  const token = await new SignJWT({})
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(email)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  return fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/test-support/${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/**
+ * 그 사용자의 기본 비서를 그 에이전트로 둔다. 검사 사용자는 허용 목록 없이 들어와 기본 비서가 없고, 새 대화는 기본 비서로만
+ * 열린다(docs/features/assistant-hub/spec.md 의 REQ4).
+ */
+export async function usePrimary(email: string, agentCode: string) {
+  const response = await testSupport(email, "PUT", `primary-agent/${agentCode}`);
+  expect(response.status, `${agentCode} 를 기본 비서로 두지 못했다`).toBe(200);
+}
+
+/** 그 사용자의 기본 비서를 없앤다. 기본 비서는 지울 수 없으므로 검사가 만든 에이전트를 지우기 전에 부른다. */
+export async function clearPrimary(email: string) {
+  const response = await testSupport(email, "DELETE", "primary-agent");
+  expect(response.status, "기본 비서를 없애지 못했다").toBe(200);
+}
+
+/**
+ * 그 사용자의 실행 하나를 그 에이전트가 돈 것으로 바꾼다. `@` 맡기기를 없애기 전에 남은 맡김과 같은 꼴을 만든다
+ * (docs/features/assistant-hub/spec.md 의 REQ6).
+ */
+export async function relabelExecution(
+  email: string,
+  executionId: number,
+  agentCode: string,
+) {
+  const response = await testSupport(
+    email,
+    "PUT",
+    `chat/executions/${executionId}/agent/${agentCode}`,
+  );
+  expect(response.status, `실행 ${executionId} 을 바꾸지 못했다`).toBe(200);
+}
+
+/**
+ * 기본 비서가 아닌 에이전트와의 빈 대화를 만들고 그 대화를 연다. 그 전에 열어 둔 대화와 같다.
+ *
+ * <p>새 대화는 기본 비서로만 열리므로(docs/features/assistant-hub/spec.md 의 REQ4) 다른 에이전트의 입력창을 보는 검사가 쓴다.
+ * 대화는 test-support 경로로 만든다.
+ */
+export async function openConversationWith(
+  page: Page,
+  agentCode: string,
+  email = TEST_EMAIL,
+): Promise<string> {
+  const conversationId = await seedConversation(agentCode, email);
+  await page.goto(`/chat/${conversationId}`);
+  return conversationId;
+}
+
+/** {@link openConversationWith} 의 대화를 만들기만 하고 공개 식별자를 돌려준다. 화면을 열기 전에 route 를 거는 검사가 쓴다. */
+export async function seedConversation(
+  agentCode: string,
+  email = TEST_EMAIL,
+): Promise<string> {
+  const response = await testSupport(email, "POST", "chat/conversations", {
+    agentCode,
+  });
+  expect(
+    response.status,
+    `${agentCode} 와의 대화를 만들지 못했다: ${await response.clone().text()}`,
+  ).toBe(200);
+  const { conversationId } = (await response.json()) as {
+    conversationId: string;
+  };
+  return conversationId;
 }
 
 /**

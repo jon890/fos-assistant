@@ -3,11 +3,10 @@ import {
   bindDemoConnector, connectDemoConnector, disconnectDemoConnector,
   expect, PERSONA_AGENT_CODE, setSession, test,
 } from "./fixtures.ts";
-import { pickAgent } from "./helpers.ts";
+import { openConversationWith } from "./helpers.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
-const SKILL_AGENT_NAME = "성격 비서";
 const NAME = "weekly-plan";
 const OTHER_NAME = "shopping-plan";
 const DISABLED_NAME = "weekly-plan-off";
@@ -36,10 +35,9 @@ async function putSkill(page: Page, code: string, name: string) {
     );
 }
 
-/** 새 대화 화면을 열고 이름표로 에이전트를 고른다. */
-async function startWith(page: Page, agentName: string) {
-  await page.goto("/new");
-  await pickAgent(page, agentName);
+/** 그 에이전트와의 대화를 연다. 새 대화는 기본 비서로만 열려 다른 에이전트는 지난 대화로 연다(스펙 assistant-hub REQ4). */
+async function startWith(page: Page, agentCode: string, email?: string) {
+  await openConversationWith(page, agentCode, email);
 }
 
 /** 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. */
@@ -85,7 +83,7 @@ test("붙인 플러그인의 스킬이 슬래시 목록과 읽기 전용 설정�
     expect((await page.request.delete(`/api/agents/${code}/skills/${NAME}`)).ok()).toBeTruthy();
     await bindDemoConnector(isolatedMember.email, code);
 
-    await startWith(page, name);
+    await startWith(page, code, isolatedMember.email);
     await composer(page).fill("/");
     await expect(skillList(page).getByRole("option")).toHaveText(["/demo-note-review"]);
 
@@ -133,7 +131,7 @@ test.describe("스킬을 올린 에이전트", () => {
       },
     );
     expect(disabled.ok()).toBeTruthy();
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
 
     await input.fill("/");
@@ -178,7 +176,7 @@ test.describe("스킬을 올린 에이전트", () => {
   test("커맨드로 보낸 말풍선에 스킬 칩이 붙고 답이 끝난다", async ({
     page,
   }) => {
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
 
     await input.fill(`/${NAME} 이번 주 계획`);
@@ -210,7 +208,7 @@ test.describe("스킬을 올린 에이전트", () => {
         ),
       });
     });
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
     await input.fill("/");
     await expect(
@@ -229,7 +227,7 @@ test.describe("스킬을 올린 에이전트", () => {
   test("목록에서 숨긴 기본 스킬도 이름을 직접 입력하면 커맨드로 실행한다", async ({
     page,
   }) => {
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
     await input.fill("/hermes-help 사용법");
     await input.press("Enter");
@@ -249,7 +247,7 @@ test.describe("스킬을 올린 에이전트", () => {
   test("커맨드로 보낸 질문을 다시 생성할 때 스킬이 없으면 영어 원문 대신 해요체 문구를 보인다", async ({
     page,
   }) => {
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
     await input.fill(`/${NAME} 이번 주 계획`);
     await input.press("Enter");
@@ -280,7 +278,7 @@ test.describe("스킬을 올린 에이전트", () => {
   test("없는 이름은 입력창 아래에 알리고 글을 남기며, 다음 보내기에서 지운다. /usr/bin 은 칩 없이 보낸다", async ({
     page,
   }) => {
-    await startWith(page, SKILL_AGENT_NAME);
+    await startWith(page, SKILL_AGENT_CODE);
     const input = composer(page);
 
     await input.fill("/nope 해 줘");

@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import { agentSwitcher, expectPickedAgent, pickAgent } from "./helpers.ts";
+import { expectStartAgent, startAgentTag } from "./helpers.ts";
 import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 /**
@@ -21,7 +21,7 @@ async function box(locator: Locator) {
 test("입력창 아래 줄에 사진 단추와 모델 단계와 보내기가 테두리 안 한 줄에 겹치지 않게 있다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectPickedAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
 
   const shell = page.getByTestId("composer-shell");
   const attach = shell.getByRole("button", { name: "사진 첨부" });
@@ -53,52 +53,40 @@ test("입력창 아래 줄에 사진 단추와 모델 단계와 보내기가 테
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("이름표 목록에는 이름과 할 수 있는 일과 체크와 에이전트 관리가 있다", async ({ page }, testInfo) => {
+test("새 대화 화면의 이름표는 기본 비서의 이름만 보이고 고르는 목록이 없다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectPickedAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
   if (testInfo.project.name === "mobile") {
     // 휴대폰은 위 막대 가운데 자리다. 그 자리의 홈 링크는 이름표로 바뀐다.
-    await expect(page.getByTestId("shell-title-slot").getByTestId("agent-switcher")).toBeVisible();
+    await expect(page.getByTestId("shell-title-slot").getByTestId("start-agent-tag")).toBeVisible();
   } else {
-    await expect(page.getByTestId("start-agent-header").getByTestId("agent-switcher")).toBeVisible();
+    await expect(page.getByTestId("start-agent-header").getByTestId("start-agent-tag")).toBeVisible();
   }
-
-  await agentSwitcher(page).click();
-  const list = page.getByTestId("agent-switcher-list");
-  await expect(list).toBeVisible();
-  await expect(list.getByRole("menuitemradio", { name: "브라우저 비서", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(list.getByRole("menuitemradio", { name: "성격 비서", exact: true })).toHaveAttribute("aria-checked", "false");
-  const box = await list.boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-
-  await list.getByRole("menuitem", { name: "에이전트 관리" }).click();
-  await expect(page).toHaveURL(/\/agents$/);
+  // 새 대화는 늘 기본 비서다(스펙 assistant-hub REQ4). 이름표는 단추가 아니라 눌러도 목록이 열리지 않는다.
+  await expect(startAgentTag(page).getByRole("button")).toHaveCount(0);
+  await startAgentTag(page).click();
+  await expect(page.getByRole("menuitemradio")).toHaveCount(0);
 });
 
-test("이름표로 다른 에이전트를 고르고 보내면 그 에이전트의 대화가 시작되고 이름표는 더 열리지 않는다", async ({ page }, testInfo) => {
+test("새 대화에서 보내면 기본 비서의 대화가 시작되고 이름표는 머리 줄의 이름으로 바뀐다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await pickAgent(page, "성격 비서");
+  await expectStartAgent(page, "브라우저 비서");
 
-  await page.getByRole("textbox", { name: "메시지" }).fill(`이름표 고르기 ${testInfo.project.name}`);
+  await page.getByRole("textbox", { name: "메시지" }).fill(`기본 비서 대화 ${testInfo.project.name}`);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 
-  // 메시지가 있는 대화는 머리 줄에 그 대화의 이름표만 있고 목록을 여는 단추가 없다(REQ10).
-  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
+  // 메시지가 있는 대화는 머리 줄에 그 대화의 이름표만 있고 목록을 여는 단추가 없다(app-shell 스펙의 REQ10).
+  await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
   if (testInfo.project.name === "mobile") {
     const home = page.getByRole("banner").getByRole("link", { name: /홈$/ });
-    await expect(home).toHaveText("성격 비서");
+    await expect(home).toHaveText("브라우저 비서");
     await expect(home).toHaveAttribute("href", "/");
-    // `/` 는 대화방이 없는 사용자에게 새 대화 화면을 연다. 어느 쪽이든 지금 대화를 떠난다.
-    const here = page.url();
-    await home.click();
-    await expect(page).not.toHaveURL(here);
   } else {
-    await expect(page.getByRole("main").getByTitle("성격 비서")).toBeVisible();
+    await expect(page.getByRole("main").getByTitle("브라우저 비서")).toBeVisible();
     await page.getByRole("main").getByTestId("agent-badge").first().click();
     await expect(page.getByRole("menuitemradio")).toHaveCount(0);
   }
@@ -107,7 +95,7 @@ test("이름표로 다른 에이전트를 고르고 보내면 그 에이전트�
 test("「＋」 를 누르면 메뉴 없이 사진을 고르는 창이 바로 열리고 고른 사진이 붙는다", async ({ page }, testInfo) => {
   await narrowOnMobile(page, testInfo);
   await page.goto("/new");
-  await expectPickedAgent(page, "브라우저 비서");
+  await expectStartAgent(page, "브라우저 비서");
 
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
@@ -139,5 +127,5 @@ test("에이전트 목록을 읽지 못하면 휴대폰 위 막대 가운데에 
 
   await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
   await expect(page.getByRole("banner").getByRole("link", { name: /홈$/ })).toBeVisible();
-  await expect(page.getByTestId("agent-switcher")).toHaveCount(0);
+  await expect(page.getByTestId("start-agent-tag")).toHaveCount(0);
 });

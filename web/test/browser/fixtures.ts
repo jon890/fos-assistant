@@ -504,6 +504,17 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       );
     }
   }
+  // 새 대화는 기본 비서로만 열린다(docs/features/assistant-hub/spec.md 의 REQ4). 테스트 사용자는 허용 목록 없이 들어와
+  // 기본 비서가 없으므로 「브라우저 비서」 를 기본 비서로 둔다.
+  const primary = await fetch(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/test-support/primary-agent/browser`,
+    { method: "PUT", headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!primary.ok) {
+    throw new Error(
+      `브라우저 비서를 기본 비서로 두지 못했다: ${primary.status} ${await primary.text()}`,
+    );
+  }
   await seedModelTiers(token);
 }
 
