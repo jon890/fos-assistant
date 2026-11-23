@@ -1,6 +1,6 @@
 # 비서 중심 대화 기술 설계
 
-스펙은 [`spec.md`](spec.md)(확인 2026-11-21)다. PR1 은 이 문서대로 구현한다. PR2, PR3 은 모듈과 경계만 정하고, 그 PR 을 시작할 때 코드 경로를 다시 읽어 이 문서의 해당 절을 고친다.
+스펙은 [`spec.md`](spec.md)(확인 2026-11-21)다. PR1 은 이 문서대로 구현했다. PR2, PR3 은 그 PR 을 시작할 때 코드 경로를 다시 읽어 이 문서의 해당 절을 고쳤다.
 
 ## 요구사항 연결
 
@@ -14,20 +14,20 @@
 | REQ6 | (PR2) `TurnIntent.Mention` 경로와 `delegateTo` 를 지우고 거절한다. 지난 맡김을 그리는 읽기 경로(`MentionLines`)는 남긴다. 지시문 구역 「맡길 수 있는 에이전트」 에 이름을 말하면 맡긴다는 줄을 더한다 |
 | REQ7 | (PR2) 작업 만들기와 고치기(화면, `task_` 도구)가 에이전트를 기본 비서로 정한다. 멈추기·다시 켜기는 에이전트를 건드리지 않는다 |
 | REQ8 | (PR2) `ServiceConceptsInstructions` 의 에이전트 바꾸기 안내를 맡기기로 바꾸고 평가 세트 문항을 고친다 |
-| REQ9 | (PR3) 붙이기 경로(`AgentConnectionController`, 연결 뒤 고르기, `connector_attach` 승인 카드)가 기본 비서를 대상에서 뺀다. 카드는 `SpecialistAgentCreator` 로 새 전문 에이전트를 만들어 붙인다 |
-| REQ10 | (PR3) `/` 목록 API 가 맡길 수 있는 전문 에이전트의 켜진 스킬을 함께 준다. 보내기에 「에이전트 · 스킬」 을 받으면 Control Plane 이 `ChildExecutionRunner` 로 그 에이전트에 스킬 커맨드를 맡기는 자식 실행을 만들고, 대화 turn 은 열지 않는다. 결과는 지금 깨우기로 전한다. 예약 작업 발화도 같은 판정을 쓴다 |
+| REQ9 | (PR3) 화면의 붙이기(`AgentConnectionController`)가 기본 비서를 거절하고, 연결 뒤 고르기와 에이전트 상세가 기본 비서에 붙이기를 보이지 않는다. `connector_attach` 승인 카드는 늘 새 전문 에이전트(`SpecialistAgentCreator`)를 만들어 붙이고, 그 연결이 붙은 전문 에이전트가 있으면 카드 없이 그 에이전트를 알려 맡기게 한다. 아래 「PR3」 |
+| REQ10 | (PR3) 새 목록 API 가 맡길 수 있는 전문 에이전트의 켜진 스킬을 주고, 웹이 `/` 목록에 비서 스킬과 함께 「에이전트 · 스킬」 로 보인다. 고르고 보내면 새 보내기 API 가 질문을 저장하고 그 에이전트의 실행을 대화 turn 없이 띄운다(`SkillDelegations`). 결과는 지금 깨우기(ADR-040)가 결과 도착 줄과 비서 답으로 전한다. 예약 작업 지시가 `/에이전트 이름 · 스킬` 로 시작하면 같은 경로로 맡긴다. 아래 「PR3」 |
 
 ## 책임과 경계
 
 | 모듈 | 이번에 갖는 것 |
 | --- | --- |
-| `orchestration` | 맡긴 실행의 기다리기와 그 예산(REQ1, REQ2), 맡긴 실행의 사건 스트림(REQ3), 스킬 맡기기 실행(REQ10) |
+| `orchestration` | 맡긴 실행의 기다리기와 그 예산(REQ1, REQ2), 맡긴 실행의 사건 스트림(REQ3), 스킬 맡기기의 목록, 보내기 API, 실행(REQ10) |
 | `mcp` | `agent_delegate` 결과의 모양과 지시 한 줄, 도구 설명(REQ1, REQ2) |
-| `chat` | 맡긴 실행 사건을 대화 SSE 로 보내기(REQ3), 새 대화의 에이전트와 읽기 전용 판정(REQ4, REQ5), `@` 지우기(REQ6) |
+| `chat` | 맡긴 실행 사건을 대화 SSE 로 보내기(REQ3), 새 대화의 에이전트와 읽기 전용 판정(REQ4, REQ5), `@` 지우기(REQ6), 스킬 맡기기의 질문 저장과 결과 전달 조회(REQ10) |
 | `task`, `connector` | 예약 작업의 에이전트(REQ7), 붙이기 대상(REQ9) |
 | `web` | 도는 답의 작업 과정에 자식 도구 줄 넣기(REQ3), 입구 화면(REQ4-REQ6), `/` 목록(REQ10) |
 
-의존 방향은 지금 그대로다. `orchestration` 은 `chat` 의 서비스를 부르지 않고 Spring 사건만 낸다(`ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE`). 자식 사건의 중계도 `DelegationStarted` 와 같은 꼴의 사건으로 한다.
+의존 방향은 지금 그대로다. `orchestration` 은 `ChatService` 를 부르지 않고 Spring 사건만 낸다(`ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE`). 자식 사건의 중계도 `DelegationStarted` 와 같은 꼴의 사건으로 한다. 스킬 맡기기의 질문 저장만 `chat.nextturn` 의 좁은 서비스(`SkillDelegationQuestions`)를 부른다. `chat` 은 `orchestration` 보다 아래 층이라 보내기 API 를 `chat` 에 둘 수 없다.
 
 ## 인터페이스와 데이터
 
@@ -66,13 +66,20 @@
 - **`@` 맡기기**: 보내기 요청의 `delegateTo` 가 있으면 `VALIDATION_FAILED` 다. `TurnIntent.Mention` 과 `ChatTurnRouting.routeMention` 을 지운다. 지난 맡김을 그리는 `MentionLines` 와 다음 turn 입력에 넣는 `MentionInputs` 는 남긴다. [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md) 은 새로 맡기는 부분만 대체되어 파일은 옮기지 않고 그 머리와 목록에 적는다(일부만 대체된 ADR 은 옮기지 않는다는 `docs/adr/INDEX.md` 규칙).
 - **예약 작업**(뒤 PR): `TaskService` 의 만들기와 고치기가 에이전트를 요청자의 기본 비서(`PrimaryAgents`)로 정한다. 기본 비서가 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED` 다. 작업 입력(`TaskInput`, 화면 요청 `TaskRequest`)의 `agentCode` 칸을 지운다. 옛 화면이 보내도 JSON 의 모르는 칸이라 버린다. 화면 API 와 `task_` 도구(`TaskAgentRequests`)와 배포 뒤 확인이 모두 이 길을 쓴다. 멈추기·다시 켜기는 에이전트를 바꾸지 않는다(DECISION23). 고쳐 비서로 바뀐 `SINGLE` 작업은 발화 때 대화의 에이전트가 작업의 에이전트와 다르면 새 대화를 여는 지금 규칙(`TaskRunStarter`)으로 새 비서 대화에 쌓인다. 지시 맨 앞의 `/이름` 은 지금처럼 그 작업의 에이전트(비서)의 스킬로 읽는다. 만들거나 고칠 때 그 이름이 기본 비서의 켜진 스킬이 아니면 저장하지 않고 `SKILL_COMMAND_UNKNOWN` 이다(`SkillCommandCatalog`). 전문 에이전트에만 있던 스킬을 부르는 작업은 시각만 고쳐도 비서로 바뀌어 다음 발화가 실패하기 때문이다. 「에이전트 · 스킬」 꼴은 PR3(REQ10, DECISION27)이다.
 - **지시문**: `ServiceConceptsInstructions` 의 에이전트 고르기 줄을 「대화의 에이전트는 바뀌지 않고 그 에이전트의 일은 내가 맡겨 처리한다, 링크를 붙이지 않는다」 로 바꾼다. `DelegationTargetsInstructions` 머리에 「사용자가 아래 에이전트의 이름을 말하며 맡기라고 하면 그 에이전트에게 맡긴다」 를 더한다. 평가 세트(`test/model-eval/concepts/questions.json`)의 바꾸기 문항은 링크가 없는 답을 기대하고, 이름으로 맡기는 문항은 `agent_delegate` 를 기대한다.
-- **테스트 준비**: 기본 비서는 허용 목록 줄로만 찾는데 테스트 사용자는 그 줄 없이 만든다. backend 통합 테스트는 `testsupport.TestPrimaryAgents` 로 대화할 에이전트를 그 사용자의 기본 비서로 두고 검사마다 지운다. e2e 와 브라우저 테스트는 test-support API(`/api/v1/test-support/primary-agent`, `/api/v1/test-support/chat/conversations`)로 기본 비서를 정하거나 다른 에이전트와의 지난 대화를 만든다. 다른 에이전트의 실행 자체를 보는 시나리오는 test-support 로 그 에이전트와 대화를 만든다. 지난 대화가 읽기 전용이 된 뒤로는 대화를 만들 때 그 에이전트를 잠시 기본 비서로 두고(`PrimaryAgentTestSupportController.useTemporarily`), e2e 는 시나리오마다, 브라우저 테스트는 검사마다 `/api/v1/test-support/primary-agent/restore` 로 되돌린다. 기본 비서는 지울 수 없으므로(409) 검사가 만든 에이전트를 지우기 전에도 되돌린다. 바꾸기 전의 값은 test-support 가 메모리에만 들고 있어, e2e 가 Control Plane 을 다시 띄울 때는 그 값을 읽어 두었다가 다시 넣는다(`/api/v1/test-support/primary-agent/originals`). 한 profile 은 한 사람의 기본 비서만 될 수 있어(`allowed_person` 의 profile 유일 제약) 같은 GROUP 에이전트로 두 사람이 보내는 시나리오는 차례로 보낸다.
+- **테스트 준비**: 기본 비서는 허용 목록 줄로만 찾는데 테스트 사용자는 그 줄 없이 만든다. backend 통합 테스트는 `testsupport.TestPrimaryAgents` 로 대화할 에이전트를 그 사용자의 기본 비서로 두고 검사마다 지운다. e2e 와 브라우저 테스트는 test-support API(`/api/v1/test-support/primary-agent`, `/api/v1/test-support/chat/conversations`)로 기본 비서를 정하거나 다른 에이전트와의 지난 대화를 만든다. 다른 에이전트의 실행 자체를 보는 시나리오는 test-support 로 그 에이전트와 대화를 만든다. 지난 대화가 읽기 전용이 된 뒤로는 대화를 만들 때 그 에이전트를 잠시 기본 비서로 두고(`PrimaryAgentTestSupportController.useTemporarily`), e2e 는 시나리오마다, 브라우저 테스트는 검사마다 `/api/v1/test-support/primary-agent/restore` 로 되돌린다. 기본 비서는 지울 수 없으므로(409) 검사가 만든 에이전트를 지우기 전에도 되돌린다. 바꾸기 전의 값은 test-support 가 메모리에만 들고 있어, e2e 가 Control Plane 을 다시 띄울 때는 그 값을 읽어 두었다가 다시 넣는다(`/api/v1/test-support/primary-agent/originals`). 한 profile 은 한 사람의 기본 비서만 될 수 있어(`allowed_person` 의 profile 유일 제약) 같은 GROUP 에이전트로 두 사람이 보내는 시나리오는 차례로 보낸다. 기본 비서에는 화면에서 연결을 붙이지 않으므로(PR3), e2e 의 붙이기 도우미는 붙이기 전에 기본 비서를 되돌리고, 비서에 붙은 연결이 필요한 시나리오는 배포 전부터 붙은 연결을 흉내 내는 `/api/v1/test-support/primary-agent/legacy-connections` 로 붙인다.
 - **웹**: 새 대화 화면은 목록의 `primary` 에이전트로 고정하고 이름표 목록과 `@` 고르기를 그리지 않는다. `?agent=` 는 읽지 않는다. 에이전트 상세, 전문 에이전트 만들기 제안, 연결 뒤 고르기의 「대화하기」 를 지운다. 대화 응답의 `writable` 이 거짓이면 입력창 대신 안내 줄과 대화방 링크를 보이고 다시 생성과 다시 전달 단추를 그리지 않는다. 이미 쌓인 대기 메시지는 보이고 취소할 수 있게 두고 「보내기」 만 그리지 않는다. 작업 화면의 에이전트 칸을 지운다.
 
 ### PR3
 
-- 스킬 맡기기: 보내기 요청에 `skillAgent`(에이전트 코드)와 스킬 커맨드를 받는다. 칸 이름과 예약 작업 지시의 글 꼴은 PR3 설계에서 정한다.
-
+- **화면의 붙이기**: `AgentConnectionController` 가 붙이기와 목록에서 대상이 기본 비서인지 본다(`ConnectorBindingService` 는 파일 길이 상한, `connector.connection.application` 은 클래스 수 상한에 닿아 있다). 대상이 요청자의 기본 비서(`PrimaryAgents`)면 `PRIMARY_AGENT_NO_CONNECTIONS`(409)로 거절하고 아무것도 바꾸지 않는다. 떼기는 그대로다. `bind` 자체는 막지 않는다. 전문 에이전트 만들기가 실패해 비서에서 뗀 연결을 되돌려 붙이는 길(`SpecialistAgentCreator.withdraw`)이 쓰기 때문이다.
+- **에이전트 상세와 연결 뒤 고르기**: 에이전트의 연결 목록 응답(`AgentConnectionsView.blockedReason`)에 기본 비서면 `PRIMARY_AGENT` 를 낸다. 웹은 그 까닭이면 붙이기 단추와 「외부 서비스 연결하기」 를 숨기고 이미 붙은 연결의 떼기만 둔다. 연결 화면의 에이전트 고르기(`agentChoices`)는 목록의 `primary` 에이전트를 후보에서 뺀다.
+- **붙이기 승인 카드**: `ConnectorAttachRequester` 는 대화의 에이전트를 보지 않는다. 연결이 준비됐고 그 연결이 붙은 전문 에이전트(기본 비서가 아니고 켜진 에이전트)가 있으면 카드 없이 `specialist_attached` 와 그 에이전트의 코드와 이름을 돌려주고, 모델에게 `agent_delegate` 로 맡기라고 한다. 기본 비서에만 붙어 있으면(배포 전부터 붙은 연결) 지금처럼 `already_attached` 다. 그 밖에는 카드를 띄운다. 카드 인자는 서비스, 만들 에이전트 이름(`<서비스 이름> 담당`, 마법사의 기본값과 같다), 도구 요약, 주의, `connector_id`, `agent_name` 이다. 새 에이전트는 셸과 파일 도구가 없어 셸 경고를 붙이지 않는다. 승인 줄의 키는 `<connector_id>:new` 다.
+- **카드 승인**: `ConnectorAttachRunner` 가 `SpecialistAgentCreator.create(user, connectorId, introduction, detach=false)` 로 만들고 붙인다. 소개는 이름, 「<서비스> 일을 맡아요」, 기본 아이콘이다(웹 `specialistDraft` 와 같다). 알림 줄은 「「Gmail 담당」 을 만들어 「Gmail」 을 붙였어요」 에 지금의 반영 안내를 잇는다. 배포 전에 뜬 옛 카드(인자에 `agent_code` 만 있음)는 승인해도 붙이지 않고 다시 부탁해 달라고 알린다. 카드 제목은 「새 전문 에이전트를 만들어 붙이기」 다.
+- **`/` 목록**: 새 `GET /api/v1/chat/skill-delegations/targets` 가 요청자가 쓸 수 있고 켜진 에이전트(`AgentService.readableBy`, `agent_list` 와 같은 기준) 가운데 기본 비서를 뺀 에이전트마다, 비서의 `/` 목록과 같은 기준의 스킬 이름(화면 스킬 목록에 보이는 켜진 스킬, Hermes 기본 스킬은 빼고 커맨드로 부를 수 있는 이름만)을 준다. 보낼 때 확인은 지금 커맨드처럼 `SkillCommandCatalog.enabledNames` 가 한다. 스킬이 없는 에이전트는 빼고, 목록을 읽지 못한 에이전트도 빼고 경고 로그만 남긴다. 웹은 대화의 에이전트가 기본 비서일 때만 읽어 비서 스킬 뒤에 「에이전트 이름 · 스킬」 로 붙인다. 고르면 입력창에 `/<에이전트 이름> · <스킬> ` 을 넣는다. 보낼 때 글이 목록에 있는 「에이전트 · 스킬」 로 시작하면 그 에이전트 코드로 아래 보내기 API 로 보내고, 아니면 보통 보내기다(같은 이름이 둘이면 그 스킬을 가진 첫 에이전트). 받아들여지면 입력창을 비우고 답이 돌고 있지 않으면 이력을 다시 읽는다.
+- **스킬 맡기기 보내기**: 새 `POST /api/v1/chat/skill-delegations` 의 본문은 `conversationId`(없으면 새 대화), `agentCode`, `text` 다. 글은 `/<에이전트 이름> · <스킬> [나머지]` 꼴이어야 하고(`DelegatedSkillCommand`), 에이전트는 `agentCode` 로 정한다(이름이 그사이 바뀌어도 된다). 판정 순서는 대화(주인, 읽기 전용, 없으면 기본 비서로 새 대화), 에이전트(쓸 수 있고 켜짐, 기본 비서 아님), 스킬(그 에이전트의 켜진 스킬), 사용자 자리와 서버 전체 위임 한도다. 다 지나면 질문을 저장하고(`chat.nextturn` 의 `SkillDelegationQuestions`) 그 에이전트의 실행을 가상 스레드로 띄운 뒤, 실행 줄이 생기면 `202` 와 대화 번호, 실행 번호를 돌려준다. 대화 turn 잠금은 잡지 않는다. 그래서 답이 도는 동안에도 보낼 수 있고 보낸 뒤 바로 다음 질문을 받는다(DECISION26). 실행 줄을 만들지 못하면 저장한 질문을 지우고 그 오류(`USER_BUSY` 등)를 돌려준다.
+- **맡긴 실행의 모양**: 부모가 없는 실행이고 에이전트가 대화의 에이전트와 다르다. 지난 `@` 맡김과 같은 모양이라 `MentionLines` 가 질문 아래 「나 → 커리어에게 맡김」 줄과 상태를 그대로 그리고, 다시 생성도 막는다. 실행 줄에 `delegation_key`(새 무작위 키)와 `question_message_id` 를 적는다. 지시는 `SkillCommand.hermesInput()`(지금 `/이름` 과 같은 문장)이다. 끝나면 `DelegationFinished` 를 내고, 아직 전하지 않은 결과 조회(`findUndeliveredResults`)가 부모 없는 위임 실행도 함께 읽어 지금 깨우기가 결과 도착 줄과 비서 답을 연다. `MentionInputs` 는 키가 있는 맡김을 다음 turn 입력에 다시 넣지 않는다. 결과가 깨우기로 이미 들어가기 때문이다.
+- **예약 작업**: `TaskRunStarter.runTurn` 이 지시가 `DelegatedSkillCommand` 꼴이면 `chat.runScheduledTurn` 대신 `SkillDelegations.runScheduled` 를 부른다. 이것은 시작 알림 줄과 지시를 질문으로 남기고 이름으로 에이전트를 찾아(같은 이름이 둘이면 찾지 못한 것으로 본다) 같은 실행을 그 스레드에서 끝까지 돌린다. 실행은 사람이 없는 실행으로 적는다. 에이전트가 없거나 꺼졌거나 스킬이 켜져 있지 않으면 `AGENT_NOT_FOUND`, `AGENT_DISABLED`, `SKILL_COMMAND_UNKNOWN` 으로 던져 그 발화가 `FAILED` 로 닫힌다. 성공이면 그 실행 번호와 답으로 발화를 닫고, 발화의 turn 잠금이 풀린 뒤 깨우기가 결과를 비서 답으로 전한다. 작업 화면에는 입력 안내 한 줄을 둔다. 작업을 저장할 때 기본 비서 스킬 확인(`TaskService.requireRunnableCommand`)은 이 꼴을 건너뛴다.
+- **글 꼴**: `/` 다음에 에이전트 이름, 공백과 가운뎃점(`·`)과 공백, 스킬 이름이 오고, 그 뒤는 공백이나 끝이다. 이름에는 줄바꿈과 가운뎃점이 없다. 기본 비서의 `/이름` 보다 먼저 본다. `/abc · x` 를 `abc` 스킬로 읽지 않게 하기 위해서다.
 ## 실패와 일관성
 
 - 기다리는 동안 사용자가 중지하면 지금 중지가 루트 turn 에 붙은 자식을 멈춘다(`docs/features/chat.md` 「중지」). `awaitEnded` 는 자식이 끝나면 풀리고, 결과는 `CANCELLED` 로 돌아간다. turn 은 중지로 끝난다.
@@ -97,7 +104,9 @@
 | REQ6, REQ8 | 평가 세트의 데이터와 채점 테스트, 배포 뒤 운영 모델로 서비스 개념 묶음 | `test/model-eval/`, 운영 평가 계정 |
 | REQ5 | 사람이 쓰는 길의 거절과 자동·예약 turn 이 막히지 않는 통합 테스트, 대화 응답의 `writable`, 읽기 전용 대화를 여는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
 | REQ7 | 화면 API 와 `task_` 도구로 만들고 고치면 기본 비서이고 멈추기·다시 켜기는 그대로인 통합 테스트, 작업 화면에 에이전트 칸이 없는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
-| REQ9, REQ10 | PR3 설계 때 정한다 | |
+| REQ9 | 기본 비서에 붙이기를 거절하고 떼기는 되는 통합 테스트, 승인 카드가 새 전문 에이전트를 만들어 붙이고 이미 붙은 전문 에이전트가 있으면 카드 없이 알리는 테스트(`ConnectorAttachRequesterTest`, `ConnectorAttachRunnerTest`), 연결 화면 고르기와 비서 상세에 붙이기가 없는 브라우저 테스트 | backend 테스트, `web/test/browser/` |
+| REQ10 | 목록 API 가 기본 비서, 꺼진 에이전트, Hermes 기본 스킬을 빼는 테스트, 보내기가 질문과 부모 없는 위임 실행을 만들고 turn 을 열지 않으며 결과가 깨우기로 전해지는 통합 테스트(`SkillDelegationTest`), 판정마다의 거절, 예약 작업의 `/이름 · 스킬` 발화와 실패(`TaskRunStarterTest`), `/` 목록에서 골라 보내면 맡긴 줄과 결과 답이 생기는 브라우저 테스트(실제 Control Plane 과 가짜 Hermes) | backend 테스트, `web/test/browser/` |
+| REQ10 | 배포 뒤 왕복(스펙 「배포 뒤 왕복 확인」 의 PR3) | 운영, 평가 계정 |
 
 ## 결정
 
@@ -108,6 +117,10 @@
 | DECISION3 | 자식 사건의 실시간 중계 | 새 SSE 사건 `delegation_activity` 를 대화 단위 SSE 로 보낸다. 웹이 트리를 주기적으로 읽지 않는다 | 작성자 | 도는 답은 흘러온 사건으로 그리는 지금 규칙(`docs/features/execution.md` 「작업 과정 패널」)과 맞다. 맡긴 줄도 같은 길(`DelegationLineNotifier`)로 간다 |
 | DECISION4 | 장기 결정 기록 | [ADR-20261121 / delegate-wait](../../../backend/docs/adr/ADR-20261121-delegate-wait.md) 를 남기고 ADR-017 「`agent_delegate` 는 기다리지 않는다」 와 ADR-040 「부모는 맡긴 뒤 기다리지 않는다」 를 대화 turn 에서 대체한다 | 작성자 | 되돌리면 도구 계약과 결과 전달 규칙을 함께 바꿔야 한다 |
 | DECISION5 | PR2 나눔 | 앞 PR 은 REQ4, REQ6, REQ8, 뒤 PR 은 REQ5, REQ7 | 작성자 | 계획의 운영 코드 추정이 상한을 넘었다. 새 대화와 `@` 는 서버와 화면이 함께 바뀌어야 끊기지 않고, 읽기 전용과 예약 작업은 앞 PR 없이도 서로 독립이다 |
+| DECISION6 | 스킬 맡기기 실행의 부모 | 부모 없는 실행(지난 `@` 맡김과 같은 모양)에 위임 키를 적는다. 대화 turn 을 열거나 가짜 루트 실행을 만들지 않는다 | 작성자 | 스펙의 「나 → 커리어에게 맡김」 줄을 `MentionLines` 가 이미 그린다. 결과 전달은 위임 키로 고르는 지금 조회에 부모 없는 실행만 더하면 된다. 가짜 루트는 실행 기록과 사용량에 빈 실행을 남긴다 |
+| DECISION7 | 스킬 맡기기를 보내는 API | 보내기(`/chat/messages`)에 칸을 더하지 않고 새 API 를 둔다 | 작성자 | 보내기는 turn 을 여는 길이고 응답이 답이다. 이 길은 turn 을 열지 않고 `orchestration` 이 갖는다. `chat` 은 `orchestration` 을 부를 수 없다(층 순서) |
+| DECISION8 | 예약 작업 지시의 꼴 | `/<에이전트 이름> · <스킬>`. 목록에 보이는 글 그대로이고 지금 `/이름` 을 넓힌 것이다. 같은 이름의 에이전트가 둘이면 발화가 실패한다 | 작성자 | 사용자는 에이전트 코드를 모른다. 스펙 DECISION27 이 화면에 고르기 없이 글자 그대로 읽게 했다 |
+| DECISION9 | 답이 도는 동안의 스킬 맡기기 | 대기 줄에 넣지 않고 바로 맡긴다 | 작성자 | 맡기기는 turn 잠금이 없어도 되고, 대기 줄은 비서 turn 의 글만 다룬다. 답 순서가 섞이는 것은 스펙 DECISION26 이 받아들였다 |
 
 ## 결정 기록 연결
 

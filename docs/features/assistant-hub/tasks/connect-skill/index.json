@@ -1,0 +1,25 @@
+{
+  "name": "connect-skill",
+  "description": "연결은 전문 에이전트에만 붙이고, 전문 에이전트의 스킬을 비서 대화의 / 목록과 예약 작업 지시로 맡긴다(스펙 PR3)",
+  "pr_scope": "화면의 붙이기가 기본 비서를 거절하고 연결 뒤 고르기와 비서 상세에서 붙이기를 뺀다. connector_attach 승인 카드는 새 전문 에이전트를 만들어 붙이고, 이미 붙은 전문 에이전트가 있으면 카드 없이 알린다. 새 목록 API 와 보내기 API 로 / 목록의 「에이전트 · 스킬」 을 대화 turn 없이 맡기고 결과는 깨우기로 전한다. 예약 작업 지시의 /에이전트 이름 · 스킬 도 같은 실행을 쓴다.",
+  "deferred": [
+    {
+      "what": "블로그 사진 평가(test/model-eval/blog)를 비서를 거치게 고치기",
+      "why": "PR2 앞 PR 이 남긴 제약. 이 PR 범위 밖",
+      "after": "코디네이터가 정할 때"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-23",
+  "spec": "docs/features/assistant-hub/spec.md",
+  "design": "docs/features/assistant-hub/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ9", "REQ10"],
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ9"]},
+    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ10"]},
+    {"number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ10"]}
+  ]
+}
