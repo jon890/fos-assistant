@@ -13,7 +13,7 @@ import { call, expect, expectStatus, fail, step, type Context, type Scenario } f
 import { DEMO_CONNECTOR, proactiveOutput } from "../fake-hermes.ts";
 import { DAD_BINDING } from "./binding.ts";
 import { callTool, contextFor, within, type ToolResult } from "../delegation-support.ts";
-import { attach, ConnectorSetup, connectionPath, useConnectorPolicy } from "../connector-support.ts";
+import { attachToPrimary, ConnectorSetup, connectionPath, useConnectorPolicy } from "../connector-support.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 
 type CheckBlocker = { code: string; toolsets: string[] };
@@ -224,7 +224,8 @@ export const proactiveCheckScenario: Scenario = {
       );
 
       step("준비: 살펴볼 에이전트에 그 연결을 붙이고 관리자가 반영 완료를 누른다. 붙은 플러그인 서버는 허용 목록과 상관없이 받는다");
-      await attach(context, context.tokens.dad, AGENT, DEMO_CONNECTOR.id);
+      // 기본 비서에는 화면에서 붙이지 않는다(스펙 assistant-hub REQ9). 배포 전부터 붙은 연결로 둔다.
+      await attachToPrimary(context, context.tokens.dad, AGENT, DEMO_CONNECTOR.id);
       const prepared = await statusOf(context);
       expect(
         prepared.available && prepared.blockers.length === 0,

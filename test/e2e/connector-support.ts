@@ -87,8 +87,14 @@ export async function createPrivateAgent(context: Context, token: string, name: 
   return { code: created.code, profile };
 }
 
-/** 내 연결을 내 에이전트에 붙인다. 붙인 바인딩은 반영이 확인될 때까지 `PENDING` 이다. */
+/**
+ * 내 연결을 내 에이전트에 붙인다. 붙인 바인딩은 반영이 확인될 때까지 `PENDING` 이다.
+ *
+ * <p>기본 비서에는 붙이지 않는다(스펙 assistant-hub REQ9). 앞서 test-support 대화가 이 에이전트를 잠시 기본 비서로 두었을 수 있어 먼저
+ * 되돌린다. 그 대화에 다시 보낼 때는 test-support 가 다시 둔다.
+ */
 export async function bind(context: Context, token: string, agentCode: string, connectorId: string): Promise<AgentConnectionView> {
+  await restorePrimaries(context);
   return expectStatus(
     await call(context, `/agents/${agentCode}/connections/${connectorId}`, { method: "PUT", token }),
     200,
@@ -124,6 +130,19 @@ export async function attach(context: Context, token: string, agentCode: string,
   expect(
     bound.bound && bound.status === "PENDING" && !bound.restartRequired,
     `붙인 바인딩이 재시작이 필요 없는 PENDING 이 아니다: ${JSON.stringify(bound)}`,
+  );
+  await awaitReady(context, token, agentCode, connectorId);
+}
+
+/**
+ * 기본 비서에 연결을 붙이고 `READY` 를 기다린다. 화면의 붙이기는 기본 비서를 거절하므로(스펙 assistant-hub REQ9) 배포 전부터 비서에 붙은
+ * 연결을 흉내 내려고 test-support 경로로 붙인다.
+ */
+export async function attachToPrimary(context: Context, token: string, agentCode: string, connectorId: string): Promise<void> {
+  expectStatus(
+    await call(context, `/test-support/primary-agent/legacy-connections/${agentCode}/${connectorId}`, { method: "PUT", token }),
+    200,
+    `기본 비서 ${agentCode} 에 ${connectorId} 붙이기`,
   );
   await awaitReady(context, token, agentCode, connectorId);
 }
