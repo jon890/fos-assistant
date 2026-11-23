@@ -26,7 +26,7 @@ import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
 import com.bifos.assistant.orchestration.domain.ChildResult;

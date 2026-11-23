@@ -1,5 +1,8 @@
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -97,7 +100,7 @@ class AgentRunnerSubmitFailureTest {
         when(executions.fail(any(), anyString())).thenReturn(failed);
         runner = new AgentRunner(
             contextAssembler,
-            hermes,
+            TestAgentRuntimes.hermes(hermes),
             lostRunRelease,
             executions,
             mock(ExecutionEventRecorder.class),
@@ -123,7 +126,7 @@ class AgentRunnerSubmitFailureTest {
         AgentRun run = run();
 
         verify(hermes).stop(API_BASE_URL, PROFILE, RUN_ID);
-        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), API_BASE_URL, PROFILE, RUN_ID, true);
+        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), new RuntimeTarget(RuntimeKind.HERMES, API_BASE_URL, PROFILE), RUN_ID, true);
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.execution()).isSameAs(failed);
         assertThat(run.result().succeeded()).isFalse();
@@ -168,7 +171,7 @@ class AgentRunnerSubmitFailureTest {
         AgentRun run = run();
 
         verify(hermes, never()).stop(any(), any(), any());
-        verify(limiter, never()).holdUntilRemoteEnds(any(), any(), any(), any(), any(), anyBoolean());
+        verify(limiter, never()).holdUntilRemoteEnds(any(), any(), any(), any(), anyBoolean());
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.result().succeeded()).isFalse();
     }
@@ -183,7 +186,7 @@ class AgentRunnerSubmitFailureTest {
 
         AgentRun run = run();
 
-        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), API_BASE_URL, PROFILE, RUN_ID, false);
+        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), new RuntimeTarget(RuntimeKind.HERMES, API_BASE_URL, PROFILE), RUN_ID, false);
         verify(executions).fail(started, ErrorCode.HERMES_RUN_TIMEOUT.name());
         assertThat(run.result().errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
     }

@@ -23,7 +23,7 @@ package com.bifos.assistant.hermes.application.dto;
  * @param streamedPrefixLength 안내로 확인한 직전 delta 구간의 UTF-16 길이. 원문이 아니라 제거할 길이만 전달한다
  * @param interimId 실행 안에서 같은 안내의 재수신을 가려낼 불투명한 번호. 원문과 timestamp를 노출하지 않는다
  */
-public record RunEvent(
+public record HermesRunEvent(
     String type,
     String text,
     String toolName,
@@ -43,7 +43,7 @@ public record RunEvent(
     String interimId) {
 
     /** 기존 소비자는 중간 안내의 재분류 정보를 모른다. */
-    public RunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed,
+    public HermesRunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed,
         String subagentId, String goal, String model, String childSessionId, Long inputTokens,
         Long outputTokens, String status, String skillName) {
         this(type, text, toolName, detail, durationMs, failed, subagentId, goal, model, childSessionId,
@@ -51,7 +51,7 @@ public record RunEvent(
     }
 
 
-    public RunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed) {
+    public HermesRunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed) {
         this(type, text, toolName, detail, durationMs, failed, null, null, null, null, null, null, null, null);
     }
 }

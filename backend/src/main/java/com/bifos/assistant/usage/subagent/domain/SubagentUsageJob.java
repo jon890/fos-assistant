@@ -3,7 +3,7 @@ package com.bifos.assistant.usage.subagent.domain;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

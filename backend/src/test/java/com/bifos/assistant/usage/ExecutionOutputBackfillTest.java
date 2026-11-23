@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -11,7 +12,7 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.crypto.application.dto.BackfillDirection;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -156,7 +157,7 @@ class ExecutionOutputBackfillTest {
     private AgentExecution plainExecution(String answer) {
         AgentExecution execution = recorder.start(
             user(owner), conversation.executionConversation(), agent(owner), null, null, 0L);
-        recorder.complete(execution, agent(owner), result(), new ModelChoice("anthropic", "example-model-large", null), answer);
+        recorder.complete(execution, agent(owner), TestAgentRuntimes.result(result()), new ModelChoice("anthropic", "example-model-large", null), answer);
         // 키를 넣기 전에 저장한 옛 줄처럼 평문과 빈 key 칸으로 돌린다
         jdbc.update("UPDATE agent_execution SET output_text = ?, output_key_id = NULL WHERE id = ?", answer, execution.id());
         return execution;

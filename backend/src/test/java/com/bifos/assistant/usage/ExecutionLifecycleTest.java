@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -11,8 +12,8 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -94,7 +95,7 @@ class ExecutionLifecycleTest {
         AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         Long id = execution.id();
 
-        AgentExecution completed = recorder.complete(execution, agent(), result(), requested());
+        AgentExecution completed = recorder.complete(execution, agent(), TestAgentRuntimes.result(result()), requested());
 
         assertThat(completed.id()).isEqualTo(id);
         assertThat(executions.count()).isOne();
@@ -145,7 +146,7 @@ class ExecutionLifecycleTest {
             "runtime-run", "runtime-session", "completed", "답", null, null, null,
             new TokenUsage(120L, 80L, 40L, 160L), new SessionRuntime(runModel, runProvider));
 
-        recorder.complete(execution, agent(), result, requested());
+        recorder.complete(execution, agent(), TestAgentRuntimes.result(result), requested());
 
         assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
             assertThat(saved.provider()).isEqualTo(expectedProvider);
@@ -163,9 +164,9 @@ class ExecutionLifecycleTest {
     void storesTerminalStatusAndOutputOnSameRow(ExecutionStatus status) {
         AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         if (status == ExecutionStatus.SUCCEEDED) {
-            recorder.complete(execution, agent(), result(), requested(), "저장할 답");
+            recorder.complete(execution, agent(), TestAgentRuntimes.result(result()), requested(), "저장할 답");
         } else {
-            recorder.cancel(execution, agent(), result(), requested(), "저장할 답");
+            recorder.cancel(execution, agent(), TestAgentRuntimes.result(result()), requested(), "저장할 답");
         }
 
         assertThat(executions.count()).isOne();
@@ -187,7 +188,7 @@ class ExecutionLifecycleTest {
         execution.markCancelled(cancelledAt);
         executions.save(execution);
 
-        recorder.cancel(execution, agent(), result(), requested(), "멈춘 답");
+        recorder.cancel(execution, agent(), TestAgentRuntimes.result(result()), requested(), "멈춘 답");
 
         assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
             assertThat(saved.finishedAt()).isEqualTo(cancelledAt);
@@ -203,11 +204,11 @@ class ExecutionLifecycleTest {
     @DisplayName("최종 결과가 없는 실패와 취소는 기존 사용량과 답을 보존한다")
     void preservesRecordedUsageWhenFinalResultIsMissing(ExecutionStatus status) {
         AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
-        recorder.complete(execution, agent(), result(), requested(), "기존 답");
+        recorder.complete(execution, agent(), TestAgentRuntimes.result(result()), requested(), "기존 답");
         if (status == ExecutionStatus.FAILED) {
-            recorder.fail(execution, agent(), null, requested(), "FAILED");
+            recorder.fail(execution, agent(), TestAgentRuntimes.result(null), requested(), "FAILED");
         } else {
-            recorder.cancel(execution, agent(), null, requested(), "새 답");
+            recorder.cancel(execution, agent(), TestAgentRuntimes.result(null), requested(), "새 답");
         }
 
         assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {

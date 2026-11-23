@@ -23,7 +23,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.port.HermesEventFeedClient;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.task.application.EventWatchPoller;

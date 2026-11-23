@@ -7,8 +7,8 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
+import com.bifos.assistant.runtime.application.dto.RunLookup;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -71,7 +71,7 @@ public class RestartReconciler implements SmartLifecycle {
 
     private final RestartReconcileProperties properties;
     private final LiveProperties<HermesProperties> hermesProperties;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final AgentExecutionRepository executions;
     private final AgentService agents;
     private final RecoveredRunRecorder recorder;
@@ -315,7 +315,7 @@ public class RestartReconciler implements SmartLifecycle {
             }
             agents.findById(row.agentId())
                 .ifPresent(agent -> turns.trackRun(
-                    markedExecutionId, agent.apiBaseUrl(), row.profileName(), row.hermesRunId()));
+                    markedExecutionId, agent.runtimeTargetOf(row.profileName()), row.hermesRunId()));
         } catch (RuntimeException ex) {
             if (opened) {
                 // 닫으면 닫기 리스너가 불려, 기동 때는 웹 서버가 열리기 전에 그 대화의 다음 turn 이 정해질 수 있다.
@@ -407,17 +407,18 @@ public class RestartReconciler implements SmartLifecycle {
                 return;
             }
             try {
-                HermesRunLookup lookup = hermes.lookupRun(agent.apiBaseUrl(), row.profileName(), runId);
+                var target = agent.runtimeTargetOf(row.profileName());
+                RunLookup lookup = runtimes.of(target).lookupRun(target, runId);
                 // 답을 받았으면 닿은 것이다. 그 뒤 적다가 실패해 상한을 넘겨도 닿지 못한 것으로 적지 않는다.
                 reached = true;
-                finished = lookup.state() == HermesRunLookup.State.FINISHED;
+                finished = lookup.state() == RunLookup.State.FINISHED;
                 if (finished) {
                     turns.untrackRun(markedExecutionId, runId);
                     // 거짓이면 다른 쪽이 이미 적었다. 어느 쪽이든 이 줄은 정해졌다.
                     recorder.settle(row.id(), lookup.result());
                     return;
                 }
-                if (lookup.state() == HermesRunLookup.State.NOT_FOUND) {
+                if (lookup.state() == RunLookup.State.NOT_FOUND) {
                     turns.untrackRun(markedExecutionId, runId);
                     recorder.failWithout(row.id(), REMOTE_RUN_LOST);
                     return;
@@ -463,7 +464,7 @@ public class RestartReconciler implements SmartLifecycle {
             sendStop(agent, row);
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
-                row.userId(), row.id(), agent.apiBaseUrl(), row.profileName(), row.hermesRunId(), true);
+                row.userId(), row.id(), agent.runtimeTargetOf(row.profileName()), row.hermesRunId(), true);
         }
         try {
             recorder.failWithout(row.id(), reached ? RECONCILE_TIMEOUT : RECONCILE_UNREACHABLE);
@@ -476,7 +477,8 @@ public class RestartReconciler implements SmartLifecycle {
     /** 보내지 못하면 경고 로그만 남기고 거짓을 돌려준다. */
     private boolean sendStop(Agent agent, AgentExecution row) {
         try {
-            hermes.stop(agent.apiBaseUrl(), row.profileName(), row.hermesRunId());
+            var target = agent.runtimeTargetOf(row.profileName());
+            runtimes.of(target).stop(target, row.hermesRunId());
             return true;
         } catch (RuntimeException ex) {
             log.warn("남은 실행에 중지를 보내지 못했다 executionId={} runId={}", row.id(), row.hermesRunId(), ex);

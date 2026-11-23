@@ -2,14 +2,14 @@ package com.bifos.assistant.hermes.infra;
 
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
-import com.bifos.assistant.hermes.application.dto.SteerOutcome;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Duration;
@@ -321,7 +321,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
         List<Map<String, Object>> content = new ArrayList<>();
         content.add(Map.of("type", "text", "text", command.input()));
-        for (HermesImage image : command.images()) {
+        for (RunImage image : command.images()) {
             content.add(Map.of("type", "text", "text", image.label()));
             content.add(Map.of("type", "image_url", "image_url", Map.of("url", image.dataUrl())));
         }

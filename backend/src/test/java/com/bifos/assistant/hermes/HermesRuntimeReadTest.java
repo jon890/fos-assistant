@@ -9,8 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;

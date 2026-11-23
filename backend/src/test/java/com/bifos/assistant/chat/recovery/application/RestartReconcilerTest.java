@@ -32,8 +32,8 @@ import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.application.dto.SessionRuntime;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -228,6 +228,24 @@ class RestartReconcilerTest {
 
 
     @Test
+    @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 실행이 돈 profile 로 묻는다")
+    void looksUpRunOnStoredProfileWhenAgentProfileDiffers() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
+
+        reconciler.claim();
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        assertThat(stub.lookupProfile(row.hermesRunId())).isEqualTo(storedProfile);
+    }
+
+
+    @Test
     @DisplayName("아직 도는 대화 turn 에는 다시 붙어 잠금을 쥐고, 끝나면 답을 적고 잠금을 푼다")
     void reattachesToRunningChatTurnHoldingLockUntilItFinishes() {
         AgentExecution row = chatTurn(conversation, chief);
@@ -343,6 +361,46 @@ class RestartReconcilerTest {
         assertThat(saved.errorCode()).isEqualTo("ORPHANED");
         awaitIdle(conversation.id());
         assertThat(stub.lookups()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("복구한 결과에 실제 모델이 없으면 실행이 돈 profile 의 세션에서 읽는다")
+    void readsActualModelOnStoredProfileWhenResultLacksRuntime() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        String sessionId = "sess-" + UUID.randomUUID();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.finished(new HermesRunResult(
+            row.hermesRunId(), sessionId, "completed", "끝난 답", null, null, null, USAGE, null)));
+
+        reconciler.claim();
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        assertThat(stub.sessionRuntimeProfile(sessionId)).isEqualTo(storedProfile);
+    }
+
+
+    @Test
+    @DisplayName("실행 기록의 profile 이 에이전트의 지금 profile 과 달라도 상한에서 실행이 돈 profile 로 중지를 보낸다")
+    void stopsRunOnStoredProfileWhenAgentProfileDiffers() {
+        String storedProfile = "moved-" + chief.hermesProfile();
+        AgentExecution row = executions.save(running(conversation, chief)
+            .profileName(storedProfile)
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
+
+        reconciler.claim();
+        reconciler.reconcile(SHORT_WAIT);
+
+        awaitStatus(row, ExecutionStatus.FAILED);
+        assertThat(stub.stoppedProfile(row.hermesRunId())).isEqualTo(storedProfile);
+        awaitIdle(conversation.id());
+        releaseRemoteEndHold(row);
     }
 
 

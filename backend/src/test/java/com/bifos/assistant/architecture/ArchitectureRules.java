@@ -402,8 +402,34 @@ public final class ArchitectureRules {
         .dependOnClassesThat(resideInAPackage("com.bifos.assistant.hermes..")
             .and(simpleNameEndingWith("Client")
                 .or(simpleName("HermesRunEventStream"))
-                .or(simpleName("HermesProfileKeyStore"))))
+                .or(simpleName("HermesProfileKeyStore")))
+            .or(resideInAPackage("com.bifos.assistant.runtime..")
+                .and(simpleName("AgentRuntime").or(simpleName("AgentRuntimes")))))
         .as("mcp 는 Hermes 를 부르는 타입에 의존하지 않는다");
+
+    /** rule-88: 까닭과 예외는 docs/code-rules/rule-88.md를 본다. */
+    public static final ArchRule RUNTIME_DOES_NOT_KNOW_HERMES = noClasses()
+        .that()
+        .resideInAPackage("com.bifos.assistant.runtime..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("com.bifos.assistant.hermes..")
+        .as("runtime 은 hermes 에 의존하지 않는다");
+
+    /** rule-89: 까닭과 예외는 docs/code-rules/rule-89.md를 본다. */
+    public static final ArchRule ONLY_HERMES_USES_HERMES_RUN_TYPES = noClasses()
+        .that()
+        .resideOutsideOfPackage("com.bifos.assistant.hermes..")
+        .should()
+        .dependOnClassesThat(resideInAPackage("com.bifos.assistant.hermes..")
+            .and(simpleName("HermesRunsClient")
+                .or(simpleName("HermesAgentRuntime"))
+                .or(simpleName("HermesRunEventStream"))
+                .or(simpleName("HermesRunCommand"))
+                .or(simpleName("HermesRunResult"))
+                .or(simpleName("HermesRunLookup"))
+                .or(simpleName("HermesRunEvent"))))
+        .as("hermes 밖은 Hermes 의 실행 port 와 실행 타입에 의존하지 않는다");
 
     /** rule-12: 까닭과 예외는 docs/code-rules/rule-12.md를 본다. */
     public static final ArchRule ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE = noClasses()

@@ -12,7 +12,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
-import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;

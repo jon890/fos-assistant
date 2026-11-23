@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult;
 import com.bifos.assistant.orchestration.application.dto.DelegationStop;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
@@ -8,7 +9,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult.Failure;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -61,7 +62,7 @@ public class AgentDelegationService {
     private final ChildExecutionRunner children;
     private final ConversationRepository conversations;
     private final LiveProperties<DelegationProperties> properties;
-    private final HermesRunsClient hermes;
+    private final AgentRuntimes runtimes;
     private final ProactiveCheckGuard checkGuard;
     private final Clock clock;
     private final BackgroundTasks backgroundTasks;
@@ -84,7 +85,7 @@ public class AgentDelegationService {
         ConversationRepository conversations,
         LiveProperties<DelegationProperties> properties,
         TurnCancellation turns,
-        HermesRunsClient hermes,
+        AgentRuntimes runtimes,
         ApplicationEventPublisher events,
         ProactiveCheckGuard checkGuard,
         Clock clock,
@@ -95,11 +96,11 @@ public class AgentDelegationService {
         this.children = children;
         this.conversations = conversations;
         this.properties = properties;
-        this.hermes = hermes;
+        this.runtimes = runtimes;
         this.checkGuard = checkGuard;
         this.clock = clock;
         this.backgroundTasks = backgroundTasks;
-        this.runs = new DelegationRuns(children, turns, hermes, events, checkGuard);
+        this.runs = new DelegationRuns(children, turns, runtimes, events, checkGuard);
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
         }
@@ -386,7 +387,8 @@ public class AgentDelegationService {
             return false;
         }
         try {
-            hermes.stop(found.get().apiBaseUrl(), execution.profileName(), execution.hermesRunId());
+            RuntimeTarget target = found.get().runtimeTargetOf(execution.profileName());
+            runtimes.of(target).stop(target, execution.hermesRunId());
             return true;
         } catch (RuntimeException ex) {
             log.warn("끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={}", execution.id(), ex);

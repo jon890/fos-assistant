@@ -1,9 +1,9 @@
 package com.bifos.assistant.hermes.infra;
 
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.testsupport.HermesInterimWire;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -18,7 +18,7 @@ class HermesInterimStreamTest {
     @DisplayName("64KiB보다 긴 안내도 확인된 delta 전체를 재분류한다")
     void classifiesLargeConfirmedInterim() throws IOException {
         String text = "긴 안내 ".repeat(15_000);
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"" + text + "\"}\n\n"
             + "data: {\"event\":\"message.interim\",\"text\":\"" + text + "\",\"already_streamed\":true}\n\n",
             ToolDetailScope.NONE, events::add);
@@ -30,10 +30,10 @@ class HermesInterimStreamTest {
     @Test
     @DisplayName("pinned SSE는 종료까지 읽고 완전 delta와 일부 접두사를 중간 안내로 확인한다")
     void readsWireAndClassifiesFullAndPartialPrefixes() throws IOException {
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read(HermesInterimWire.fixture(), ToolDetailScope.NONE, events::add);
         assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-            .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 0, "두 번째  안내".length(), "일부만 ".length());
+            .extracting(HermesRunEvent::streamedPrefixLength).containsExactly(0, 0, "두 번째  안내".length(), "일부만 ".length());
         assertThat(events.getLast().type()).isEqualTo("run.completed");
         assertThat(events).filteredOn(event -> "reasoning.available".equals(event.type()))
             .allSatisfy(event -> assertThat(event.text()).isNull());
@@ -46,7 +46,7 @@ class HermesInterimStreamTest {
     void preservesUnknownAndMismatchedPrefixes() throws IOException {
         for (String field : List.of("", ",\"already_streamed\":\"true\"", ",\"already_streamed\":1",
             ",\"already_streamed\":null", ",\"already_streamed\":false", ",\"already_streamed\":true")) {
-            List<RunEvent> events = new ArrayList<>();
+            List<HermesRunEvent> events = new ArrayList<>();
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"답 조각\"}\n\n"
                 + "data: {\"event\":\"message.interim\",\"text\":\"다른 안내\"" + field + "}\n\n",
                 ToolDetailScope.NONE, events::add);
@@ -61,7 +61,7 @@ class HermesInterimStreamTest {
     @Test
     @DisplayName("도구 경계를 넘어 앞의 답을 지우거나 같은 안내를 재수신해 두 번 빼지 않는다")
     void respectsToolBoundaryAndRepeatedInterim() throws IOException {
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read("""
                 data: {"event":"message.delta","delta":"앞의 답"}
 
@@ -77,7 +77,7 @@ class HermesInterimStreamTest {
 
                 """, ToolDetailScope.NONE, events::add);
         assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-            .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 4, 0);
+            .extracting(HermesRunEvent::streamedPrefixLength).containsExactly(0, 4, 0);
     }
 
 
@@ -85,13 +85,13 @@ class HermesInterimStreamTest {
     @DisplayName("안내 뒤 같은 접두사의 최종 delta가 와도 재수신한 안내는 그 delta를 지우지 않는다")
     void keepsFinalPrefixOnReplayedInterim() throws IOException {
         for (String identity : List.of("", ",\"timestamp\":1791630000.6")) {
-            List<RunEvent> events = new ArrayList<>();
+            List<HermesRunEvent> events = new ArrayList<>();
             String interim = "data: {\"event\":\"message.interim\",\"text\":\"새 안내\",\"already_streamed\":true" + identity + "}\n\n";
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"새 안내\"}\n\n"
                 + interim + "data: {\"event\":\"message.delta\",\"delta\":\"새 안내\"}\n\n" + interim,
                 ToolDetailScope.NONE, events::add);
             assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                .extracting(RunEvent::streamedPrefixLength).containsExactly(4, 0);
+                .extracting(HermesRunEvent::streamedPrefixLength).containsExactly(4, 0);
         }
     }
 
@@ -100,7 +100,7 @@ class HermesInterimStreamTest {
     @DisplayName("reset과 실행 시작은 앞 시도의 delta와 안내 중복 상태를 비운다")
     void resetsAttemptStateAtExplicitBoundaries() throws IOException {
         for (String boundary : List.of("reset", "run.started")) {
-            List<RunEvent> events = new ArrayList<>();
+            List<HermesRunEvent> events = new ArrayList<>();
             String interim = "data: {\"event\":\"message.interim\",\"text\":\"안내\",\"already_streamed\":true}\n\n";
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"안내\"}\n\n" + interim
                 + "data: {\"event\":\"message.delta\",\"delta\":\"앞 시도\"}\n\n"
@@ -108,7 +108,7 @@ class HermesInterimStreamTest {
                 + "data: {\"event\":\"message.delta\",\"delta\":\"안내\"}\n\n" + interim,
                 ToolDetailScope.NONE, events::add);
             assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                .extracting(RunEvent::streamedPrefixLength).containsExactly(2, 2);
+                .extracting(HermesRunEvent::streamedPrefixLength).containsExactly(2, 2);
         }
     }
 
@@ -121,7 +121,7 @@ class HermesInterimStreamTest {
         var delta = mapper.createObjectNode().put("event", "message.delta").put("delta", prefix);
         var interim = mapper.createObjectNode().put("event", "message.interim")
             .put("text", "확인😀 중이에요.").put("already_streamed", true);
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read("data: " + mapper.writeValueAsString(delta) + "\n\n"
             + "data: " + mapper.writeValueAsString(interim) + "\n\n", ToolDetailScope.NONE, events::add);
         assertThat(events.getLast().streamedPrefixLength()).isEqualTo(prefix.length());
@@ -131,7 +131,7 @@ class HermesInterimStreamTest {
     @Test
     @DisplayName("같은 timestamp의 다른 원문은 가린 글이 같아도 다른 안내이고 정확히 재수신한 사건만 같은 번호다")
     void distinguishesDifferentTextsAtSameTimestampBeforeRedaction() throws IOException {
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read("""
                 data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one"}
 
@@ -140,8 +140,8 @@ class HermesInterimStreamTest {
                 data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one"}
 
                 """, ToolDetailScope.NONE, events::add);
-        assertThat(events).extracting(RunEvent::text).containsExactly("token=[가림]", "token=[가림]", "token=[가림]");
-        assertThat(events).extracting(RunEvent::interimId).containsExactly("1", "2", "1");
+        assertThat(events).extracting(HermesRunEvent::text).containsExactly("token=[가림]", "token=[가림]", "token=[가림]");
+        assertThat(events).extracting(HermesRunEvent::interimId).containsExactly("1", "2", "1");
         assertThat(events.toString()).doesNotContain("secret-one", "secret-two", "1.1");
     }
 
@@ -161,7 +161,7 @@ class HermesInterimStreamTest {
                     """), scope);
             assertThat(hidden.text()).contains("가림").doesNotContain("민감한 결과");
         }
-        List<RunEvent> events = new ArrayList<>();
+        List<HermesRunEvent> events = new ArrayList<>();
         HermesInterimWire.read("""
                 data: {"event":"tool.started","tool":"mcp__external__read","preview":"민감한 인자"}
 

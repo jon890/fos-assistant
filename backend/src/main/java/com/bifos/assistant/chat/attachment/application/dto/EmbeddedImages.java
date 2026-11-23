@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.attachment.application.dto;
 
-import com.bifos.assistant.hermes.application.dto.HermesImage;
+import com.bifos.assistant.runtime.application.dto.RunImage;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -13,10 +13,10 @@ import java.util.stream.IntStream;
 public record EmbeddedImages(List<AgentPhoto> photos, List<String> extraDataUrls) {
 
     /** 넣은 함께 넣을 이미지만 이름표를 붙여 낸다. 이름표는 {@code labels} 의 같은 자리다. */
-    public List<HermesImage> extraImages(List<String> labels) {
+    public List<RunImage> extraImages(List<String> labels) {
         return IntStream.range(0, extraDataUrls.size())
             .filter(i -> extraDataUrls.get(i) != null)
-            .mapToObj(i -> new HermesImage(labels.get(i), extraDataUrls.get(i)))
+            .mapToObj(i -> new RunImage(labels.get(i), extraDataUrls.get(i)))
             .toList();
     }
 }

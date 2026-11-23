@@ -1,9 +1,9 @@
 package com.bifos.assistant.hermes;
 
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.testsupport.HermesInterimWire;
 import com.bifos.assistant.testsupport.HermesWire;
 import java.util.ArrayList;
@@ -14,18 +14,18 @@ class HermesWireCompatibilityTest {
     @Test
     @DisplayName("HTTP 파서는 미지 사건과 칸 및 SSE 메타데이터를 무시하고 뒤의 답을 읽는다")
     void ignoresUnknownEventsFieldsAndTransportMetadata() throws Exception {
-        var events = new ArrayList<RunEvent>();
+        var events = new ArrayList<HermesRunEvent>();
         HermesInterimWire.read(HermesWire.fixture("unknown"), ToolDetailScope.NONE, events::add);
 
-        assertThat(events).extracting(RunEvent::type).containsExactly("message.delta", "message.delta", "run.completed");
-        assertThat(events).extracting(RunEvent::text).containsExactly("앞", "뒤", "앞뒤");
+        assertThat(events).extracting(HermesRunEvent::type).containsExactly("message.delta", "message.delta", "run.completed");
+        assertThat(events).extracting(HermesRunEvent::text).containsExactly("앞", "뒤", "앞뒤");
     }
 
 
     @Test
     @DisplayName("현재 버전의 공유 사건 표본을 실제 HTTP 파서로 읽는다")
     void readsPinnedEventFixturesThroughHttpParser() throws Exception {
-        var events = new ArrayList<RunEvent>();
+        var events = new ArrayList<HermesRunEvent>();
         HermesInterimWire.read(HermesWire.fixture("events"), ToolDetailScope.NONE, events::add);
 
         // replay.truncated와 id/seq는 무시하고 지원하는 사건 14개를 읽는다.

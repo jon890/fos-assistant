@@ -6,8 +6,8 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,7 +27,7 @@ public final class HermesInterimWire {
     }
 
 
-    public static void read(String wire, ToolDetailScope scope, Consumer<RunEvent> consumer) throws IOException {
+    public static void read(String wire, ToolDetailScope scope, Consumer<HermesRunEvent> consumer) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/fixture-run/events", exchange -> {
             byte[] body = wire.getBytes(StandardCharsets.UTF_8);

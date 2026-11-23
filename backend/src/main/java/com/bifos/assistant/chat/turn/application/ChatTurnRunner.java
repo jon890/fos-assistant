@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.runtime.application.dto.RunOutcome;
 import com.bifos.assistant.chat.turn.application.dto.CarriedResults;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
@@ -23,7 +24,7 @@ import com.bifos.assistant.chat.room.application.RoomContext;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.ContextAssembler;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -191,7 +192,7 @@ class ChatTurnRunner {
                 return chatTurnStopper.stoppedTurn(handle, pending, null, choice, startedAt);
             }
             String runId = null;
-            HermesRunResult result;
+            RunResult result;
             try {
                 // 맡김은 사진을 싣지 않는다. 맡은 에이전트에 사진 도구를 붙이지 않는다.
                 if (!(intent instanceof TurnIntent.Mention)
@@ -219,7 +220,7 @@ class ChatTurnRunner {
                 turns.untrackRun(pending.execution().id(), runId);
             }
 
-            if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
+            if (turns.isStopConfirmed(handle) || result.outcome() == RunOutcome.CANCELLED) {
                 return chatTurnStopper.stoppedTurn(handle, pending, result, choice, startedAt);
             }
             if (result.succeeded()) {
@@ -253,12 +254,12 @@ class ChatTurnRunner {
         if (end.executionId == null) {
             return;
         }
-        HermesRunResult result = end.result;
+        RunResult result = end.result;
         SteerSettlement settlement;
         if (result != null && !result.pendingSteerKnown()) {
             // 넘어간 글이 있었는지 모르면 중지 여부와 관계없이 「전달됐는지 확인 못 함」 이다(docs/features/hermes-upgrade/spec.md DECISION16).
             settlement = SteerSettlement.unknown();
-        } else if (turns.isStopConfirmed(handle) || result != null && "cancelled".equalsIgnoreCase(result.status())) {
+        } else if (turns.isStopConfirmed(handle) || result != null && result.outcome() == RunOutcome.CANCELLED) {
             settlement = SteerSettlement.stopped(result == null ? null : result.pendingSteer());
         } else if (result != null) {
             settlement = SteerSettlement.completed(result.pendingSteer());
@@ -276,7 +277,7 @@ class ChatTurnRunner {
     /** turn 이 끝날 때까지 채우는 실행 번호와 결과다. */
     private static final class SteerEnd {
         Long executionId;
-        HermesRunResult result;
+        RunResult result;
     }
 
 
@@ -330,7 +331,7 @@ class ChatTurnRunner {
     }
 
 
-    static String hermesStatus(HermesRunResult result) {
-        return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    static String hermesStatus(RunResult result) {
+        return result.statusLabel() == null ? "UNKNOWN" : result.statusLabel().toUpperCase();
     }
 }

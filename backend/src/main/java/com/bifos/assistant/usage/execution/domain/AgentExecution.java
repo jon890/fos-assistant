@@ -2,7 +2,7 @@ package com.bifos.assistant.usage.execution.domain;
 
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.usage.execution.domain.type.EventObservation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;

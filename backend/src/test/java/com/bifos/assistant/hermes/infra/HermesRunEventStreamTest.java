@@ -1,9 +1,9 @@
 package com.bifos.assistant.hermes.infra;
 
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +21,7 @@ class HermesRunEventStreamTest {
     void hidesMemorySearchDetailInEveryEvent() {
         for (String tool : List.of("memory_search", "mcp__fos_assistant__memory_search")) {
             for (String type : List.of("tool.started", "tool.completed", "tool.failed")) {
-                RunEvent event = parse("{\"data\":{\"event\":\"" + type + "\",\"tool\":\"" + tool
+                HermesRunEvent event = parse("{\"data\":{\"event\":\"" + type + "\",\"tool\":\"" + tool
                     + "\",\"preview\":\"합성검색어\",\"detail\":\"합성민감제목\",\"result\":{\"items\":[\"합성본문\"]}}}");
                 assertThat(event.detail()).isNull();
                 assertThat(event.toolName()).isEqualTo(tool);
@@ -29,7 +29,7 @@ class HermesRunEventStreamTest {
             }
         }
         for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
-            RunEvent event = parse("{\"event\":\"tool.failed\",\"tool\":\"memory_search\",\"" + field + "\":\"합성민감표식\"}");
+            HermesRunEvent event = parse("{\"event\":\"tool.failed\",\"tool\":\"memory_search\",\"" + field + "\":\"합성민감표식\"}");
             assertThat(event.toString()).doesNotContain("합성민감표식");
         }
     }
@@ -51,7 +51,7 @@ class HermesRunEventStreamTest {
                         var root = mapper.createObjectNode();
                         var payload = nested ? root.putObject("data") : root;
                         payload.put("event", event).put("tool", tool).put(field, marker);
-                        RunEvent parsed = HermesRunEventStream.toRunEvent(root, ToolDetailScope.NONE);
+                        HermesRunEvent parsed = HermesRunEventStream.toRunEvent(root, ToolDetailScope.NONE);
                         assertThat(parsed.detail()).isNull();
                         assertThat(parsed.text()).isNull();
                         assertThat(parsed.toString()).doesNotContain(marker);
@@ -95,7 +95,7 @@ class HermesRunEventStreamTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
 
 
-    private RunEvent parse(String raw) {
+    private HermesRunEvent parse(String raw) {
         return HermesRunEventStream.toRunEvent(mapper.readTree(raw));
     }
 
@@ -103,11 +103,11 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("도구 결과 객체와 문자열을 중계 전에 같은 규칙으로 가린다")
     void redactsStructuredAndStringToolDetailsBeforeForwarding() {
-        RunEvent object = parse("""
+        HermesRunEvent object = parse("""
                 {"event":"tool.completed","tool":"web_search","result":
                   {"token":"small-secret","id":"12345678-1234-5678-9012-123456789abc","price":12000}}
                 """);
-        RunEvent text = parse("""
+        HermesRunEvent text = parse("""
                 {"data":{"event":"tool.started","tool":"terminal","preview":"Bearer small-secret"}}
                 """);
 
@@ -119,7 +119,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("연결용 도구의 결과는 가리되 이름과 성공 여부와 걸린 시간은 남긴다")
     void hidesConnectorDetailAndPreservesToolMetadata() {
-        RunEvent event = HermesRunEventStream.toRunEvent(mapper.readTree("""
+        HermesRunEvent event = HermesRunEventStream.toRunEvent(mapper.readTree("""
                 {"event":"tool.completed","tool":"lookup","detail":"tiny secret","duration":0.5,"error":false}
                 """), ToolDetailScope.ALL);
 
@@ -135,8 +135,8 @@ class HermesRunEventStreamTest {
     void hidesLongSkillNameInDetailAndCarriesNameTakenBeforeRedaction() {
         String name = "weekly-grocery-shopping-list-builder-2026-v2";
 
-        RunEvent nameOnly = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name + "\"}");
-        RunEvent withPath = parse("{\"data\":{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name
+        HermesRunEvent nameOnly = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name + "\"}");
+        HermesRunEvent withPath = parse("{\"data\":{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name
             + " → references/list.md\"}}");
 
         assertThat(nameOnly.detail()).isEqualTo("[가림]");
@@ -150,7 +150,7 @@ class HermesRunEventStreamTest {
     @DisplayName("이름 규칙에 맞지 않는 skill view 미리보기에서는 이름을 싣지 않는다")
     void carriesNoSkillNameWhenSkillViewPreviewBreaksNameRule() {
         for (String preview : new String[] {"Shopping", "weekly shopping", "a".repeat(65), "", "../shopping"}) {
-            RunEvent event = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + preview + "\"}");
+            HermesRunEvent event = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + preview + "\"}");
 
             assertThat(event.skillName()).as("미리보기 「%s」", preview).isNull();
         }
@@ -162,10 +162,10 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("skill view 가 아닌 도구와 도구 완료 사건과 연결용 실행에서는 스킬 이름을 싣지 않는다")
     void carriesNoSkillNameForOtherToolCompletedEventAndConnectorRun() {
-        RunEvent otherTool = parse("{\"event\":\"tool.started\",\"tool\":\"web_search\",\"preview\":\"shopping\"}");
-        RunEvent completed = parse("{\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}");
-        RunEvent subagent = parse("{\"event\":\"subagent.start\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}");
-        RunEvent connector = HermesRunEventStream.toRunEvent(
+        HermesRunEvent otherTool = parse("{\"event\":\"tool.started\",\"tool\":\"web_search\",\"preview\":\"shopping\"}");
+        HermesRunEvent completed = parse("{\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}");
+        HermesRunEvent subagent = parse("{\"event\":\"subagent.start\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}");
+        HermesRunEvent connector = HermesRunEventStream.toRunEvent(
             mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"),
             ToolDetailScope.ALL);
 
@@ -180,7 +180,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
     void convertsFractionalSecondsElapsedToIntegerMillis() {
-        RunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
+        HermesRunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("web_search");
@@ -199,7 +199,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("걸린 시간을 보내지 않으면 비운다")
     void leavesElapsedEmptyWhenNotSent() {
-        RunEvent event = parse("{\"event\": \"tool.started\", \"tool\": \"web_search\"}");
+        HermesRunEvent event = parse("{\"event\": \"tool.started\", \"tool\": \"web_search\"}");
 
         assertThat(event.durationMs()).isNull();
         assertThat(event.failed()).isNull();
@@ -213,7 +213,7 @@ class HermesRunEventStreamTest {
             .isTrue();
         assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed())
             .isFalse();
-        RunEvent inspection = parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
+        HermesRunEvent inspection = parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
         assertThat(inspection.toolName()).isEqualTo("attachment_inspect");
         assertThat(inspection.failed()).isTrue();
     }
@@ -222,7 +222,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("글자 조각은 delta로 온다")
     void textChunksComeAsDelta() {
-        RunEvent event = parse("{\"event\": \"message.delta\", \"delta\": \"안녕하\"}");
+        HermesRunEvent event = parse("{\"event\": \"message.delta\", \"delta\": \"안녕하\"}");
 
         assertThat(event.type()).isEqualTo("message.delta");
         assertThat(event.text()).isEqualTo("안녕하");
@@ -232,7 +232,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("사건이 data 안에 실려 와도 같은 칸을 읽는다")
     void readsSameFieldWhenEventIsNestedInData() {
-        RunEvent event = parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
+        HermesRunEvent event = parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
             + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
@@ -246,7 +246,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("하위 에이전트의 목표와 모델과 토큰을 읽는다")
     void readsSubagentGoalModelAndTokens() {
-        RunEvent event = parse("{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-1\","
+        HermesRunEvent event = parse("{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-1\","
             + "\"goal\":\"숙소 조사\",\"model\":\"model-a\",\"child_session_id\":\"child-1\","
             + "\"input_tokens\":12300,\"output_tokens\":410,\"status\":\"completed\",\"duration_seconds\":1.5}");
 
@@ -265,7 +265,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("data 안의 상태가 실패면 error 없이도 실패로 읽는다")
     void readsFailureFromStatusInDataEvenWithoutError() {
-        RunEvent event = parse("{\"data\":{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-2\","
+        HermesRunEvent event = parse("{\"data\":{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-2\","
             + "\"goal\":\"조사\",\"model\":\"model-b\",\"child_session_id\":\"child-2\","
             + "\"input_tokens\":5,\"output_tokens\":2,\"status\":\"failed\",\"duration_seconds\":0.25}}");
 
@@ -285,9 +285,9 @@ class HermesRunEventStreamTest {
     @DisplayName("하위 에이전트의 목표와 preview 는 도구 내용과 같은 규칙으로 비밀값과 UUID 를 가린다")
     void redactsSubagentGoalAndPreviewLikeToolDetail() {
         String id = "12345678-1234-5678-9012-123456789abc";
-        RunEvent withGoal = parse("{\"event\":\"subagent.start\",\"subagent_id\":\"sa-1\","
+        HermesRunEvent withGoal = parse("{\"event\":\"subagent.start\",\"subagent_id\":\"sa-1\","
             + "\"goal\":\"메일 정리 token=short-secret 대상 " + id + "\"}");
-        RunEvent withPreview = parse(
+        HermesRunEvent withPreview = parse(
             "{\"event\":\"subagent.complete\",\"preview\":\"Bearer small-secret 로 조회\",\"status\":\"completed\"}");
 
         assertThat(withGoal.goal()).isEqualTo("메일 정리 token=[가림] 대상 [항목 1]");
@@ -314,7 +314,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("목표와 preview가 없으면 상태를 목표 대신 쓰지 않는다")
     void doesNotUseStatusInPlaceOfGoalWhenGoalAndPreviewAreMissing() {
-        RunEvent event = parse("{\"event\":\"subagent.complete\",\"status\":\"completed\"}");
+        HermesRunEvent event = parse("{\"event\":\"subagent.complete\",\"status\":\"completed\"}");
 
         assertThat(event.goal()).isNull();
         assertThat(event.detail()).isNull();

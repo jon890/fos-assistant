@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.pricing.application.CostEstimator;
 import com.bifos.assistant.usage.pricing.domain.CatalogPrice;

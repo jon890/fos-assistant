@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -13,8 +14,7 @@ import java.util.concurrent.TimeUnit;
  */
 final class RunningDelegation {
 
-    private final String apiBaseUrl;
-    private final String profileName;
+    private final RuntimeTarget target;
     /** 실행 줄이 생기면 적힌다. */
     private volatile Long executionId;
     private String runId;
@@ -23,19 +23,13 @@ final class RunningDelegation {
     private final CountDownLatch ended = new CountDownLatch(1);
 
 
-    RunningDelegation(String apiBaseUrl, String profileName) {
-        this.apiBaseUrl = apiBaseUrl;
-        this.profileName = profileName;
+    RunningDelegation(RuntimeTarget target) {
+        this.target = target;
     }
 
 
-    String apiBaseUrl() {
-        return apiBaseUrl;
-    }
-
-
-    String profileName() {
-        return profileName;
+    RuntimeTarget target() {
+        return target;
     }
 
 

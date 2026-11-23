@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.recovery.application;
 
+import com.bifos.assistant.runtime.application.dto.RunOutcome;
 import com.bifos.assistant.chat.nextturn.application.SteerLedger;
 import com.bifos.assistant.chat.turn.application.dto.SteerSettlement;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
@@ -19,7 +20,7 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
@@ -102,7 +103,7 @@ public class RecoveredRunRecorder {
      * <p>적다가 예외가 나면 그 트랜잭션에서 적은 것이 모두 되돌아가고 예외가 그대로 올라간다. 줄이
      * {@code RUNNING} 으로 남으므로 부르는 쪽이 다시 적을 수 있다.
      */
-    public boolean settle(Long executionId, HermesRunResult result) {
+    public boolean settle(Long executionId, RunResult result) {
         boolean finished = finishOnce(
             executionId,
             row -> agents.findById(row.agentId())
@@ -110,7 +111,7 @@ public class RecoveredRunRecorder {
                 .orElseGet(() -> failLocked(row, ORPHANED)));
         if (finished) {
             settleSteer(executionId, result == null || !result.pendingSteerKnown() ? SteerSettlement.unknown()
-                : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped(result.pendingSteer())
+                : result.outcome() == RunOutcome.CANCELLED ? SteerSettlement.stopped(result.pendingSteer())
                     : SteerSettlement.completed(result.pendingSteer()));
         }
         return finished;
@@ -198,7 +199,7 @@ public class RecoveredRunRecorder {
     }
 
 
-    private Written settleLocked(AgentExecution row, Agent agent, HermesRunResult result) {
+    private Written settleLocked(AgentExecution row, Agent agent, RunResult result) {
         RecoveredRunKind kind = kindOf(row);
         ModelChoice requested = ModelChoice.stored(row.provider(), row.model(), row.reasoningEffort());
         if (kind == RecoveredRunKind.CHAT_TURN) {
@@ -226,7 +227,7 @@ public class RecoveredRunRecorder {
      * 대화에 적을 session 이다. {@code @} 맡김 turn(에이전트가 대화의 에이전트와 다른 루트 실행)은 새 session 으로 돌았으므로
      * 대화의 session 을 바꾸지 않게 null 이다(ADR-20261112 / mention-delegation).
      */
-    private static String sessionOf(AgentExecution row, Conversation conversation, HermesRunResult result) {
+    private static String sessionOf(AgentExecution row, Conversation conversation, RunResult result) {
         if (row.agentId() != null && !row.agentId().equals(conversation.agentId())) {
             return null;
         }
@@ -234,7 +235,7 @@ public class RecoveredRunRecorder {
     }
 
 
-    private Written settleChatTurn(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
+    private Written settleChatTurn(AgentExecution row, Agent agent, RunResult result, ModelChoice requested) {
         Conversation conversation = liveConversation(row);
         if (result.succeeded()) {
             AgentExecution saved = executions.complete(row, agent, result, requested);
@@ -278,7 +279,7 @@ public class RecoveredRunRecorder {
     }
 
 
-    private Written settleDelegation(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
+    private Written settleDelegation(AgentExecution row, Agent agent, RunResult result, ModelChoice requested) {
         if (result.succeeded()) {
             AgentExecution saved = executions.complete(row, agent, result, requested, delegationOutput.clip(result.output()));
             return new Written(saved, RecoveredRunKind.DELEGATION, ExecutionEventType.RUN_COMPLETED, null, null, null);
@@ -417,17 +418,17 @@ public class RecoveredRunRecorder {
     }
 
 
-    private static boolean isCancelled(HermesRunResult result) {
-        return "cancelled".equalsIgnoreCase(result.status());
+    private static boolean isCancelled(RunResult result) {
+        return result.outcome() == RunOutcome.CANCELLED;
     }
 
 
     /** 보통 turn 이 실패한 실행 줄에 적는 것과 같은 오류 코드다. */
-    private static String errorCodeOf(HermesRunResult result) {
+    private static String errorCodeOf(RunResult result) {
         if (result.providerBlocked()) {
             return ErrorCode.PROVIDER_BLOCKED.name();
         }
-        return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+        return result.statusLabel() == null ? "UNKNOWN" : result.statusLabel().toUpperCase();
     }
 
 

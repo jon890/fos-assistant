@@ -213,7 +213,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 부모는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
 결정은 [ADR-017](../adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md), [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다. 조회와 중지의 권한 판정은 `AgentDelegationService` 한 곳이 갖는다.
 
-**MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.
+**MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 실행 port(`AgentRuntimes` 로 고른 `AgentRuntime`)로 한다.
 검사: `ArchitectureRules.MCP_DOES_NOT_CALL_HERMES`
 
 인자와 결과 모양은 `McpToolService` 가, 거절 코드는 `DelegationResult.Failure` 가 갖는다. 코드만으로는 알 수 없는 것은 아래다.

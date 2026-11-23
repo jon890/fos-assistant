@@ -1,5 +1,7 @@
 package com.bifos.assistant.hermes.application.dto;
 
+import com.bifos.assistant.runtime.application.dto.RunImage;
+
 import java.util.List;
 
 /**
@@ -32,7 +34,7 @@ public record HermesRunCommand(
     String provider,
     String model,
     String reasoningEffort,
-    List<HermesImage> images) {
+    List<RunImage> images) {
 
     public HermesRunCommand {
         images = images == null ? List.of() : List.copyOf(images);

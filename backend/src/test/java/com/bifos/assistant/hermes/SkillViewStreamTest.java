@@ -1,7 +1,8 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.testsupport.TestAgentRuntimes;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,7 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
@@ -145,7 +146,7 @@ class SkillViewStreamTest {
 
 
     /** 이 SSE 본문을 Hermes 가 보낸 것처럼 실제 스트림 읽기로 읽는다. */
-    private static List<RunEvent> streamed(String body, boolean hideAllTools) throws IOException {
+    private static List<HermesRunEvent> streamed(String body, boolean hideAllTools) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/run-one/events", exchange -> {
             byte[] data = body.getBytes(StandardCharsets.UTF_8);
@@ -163,7 +164,7 @@ class SkillViewStreamTest {
                 keys,
                 new HermesProperties(null, null, null, null, null, null, null, null),
                 JsonMapper.builder().build());
-            List<RunEvent> events = new ArrayList<>();
+            List<HermesRunEvent> events = new ArrayList<>();
             stream.open(
                 "http://127.0.0.1:" + server.getAddress().getPort(),
                 "test-profile",
@@ -180,7 +181,7 @@ class SkillViewStreamTest {
 
 
     /** 새 실행 하나를 만들고, 대화 경로가 하듯 사건을 옮겨 적어 저장한다. 그 실행의 번호를 낸다. */
-    private Long store(List<RunEvent> events) {
+    private Long store(List<HermesRunEvent> events) {
         AgentExecution execution = executions.save(AgentExecution.builder()
             .userId(1L)
             .profileName("dad")
@@ -189,8 +190,8 @@ class SkillViewStreamTest {
             .startedAt(Instant.parse("2026-09-18T00:00:00Z"))
             .build());
         int sequence = 1;
-        for (RunEvent event : events) {
-            ExecutionEvent stored = recorder.record(execution, event, sequence);
+        for (HermesRunEvent event : events) {
+            ExecutionEvent stored = recorder.record(execution, TestAgentRuntimes.event(event), sequence);
             if (stored != null) {
                 executionEvents.save(stored);
                 sequence++;

@@ -1,5 +1,7 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -21,7 +23,7 @@ class RunningDelegationTest {
     @Test
     @DisplayName("중지가 먼저 오면 run 번호를 붙이는 쪽이 보낸다")
     void sideAttachingRunIdSendsWhenStopComesFirst() {
-        RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
+        RunningDelegation delegation = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://agent-runtime.test", "worker"));
 
         assertThat(delegation.requestStop()).as("아직 붙은 run 번호가 없다").isNull();
         assertThat(delegation.attachRun(RUN_ID)).as("붙이는 쪽이 중지를 보낸다").isTrue();
@@ -33,7 +35,7 @@ class RunningDelegationTest {
     @Test
     @DisplayName("run 번호가 먼저 붙으면 멈추는 쪽이 그 번호로 보낸다")
     void sideStoppingSendsByRunIdWhenIdIsAttachedFirst() {
-        RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
+        RunningDelegation delegation = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://agent-runtime.test", "worker"));
 
         assertThat(delegation.attachRun(RUN_ID)).as("중지 표시가 없어 붙이는 쪽은 보내지 않는다").isFalse();
         assertThat(delegation.requestStop()).isEqualTo(RUN_ID);
@@ -43,7 +45,7 @@ class RunningDelegationTest {
     @Test
     @DisplayName("실행 번호는 줄이 생긴 뒤에 적히고 끝나면 기다리던 쪽이 깨어난다")
     void recordsRunIdAfterRowExistsAndWakesWaiterWhenDone() {
-        RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
+        RunningDelegation delegation = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://agent-runtime.test", "worker"));
         assertThat(delegation.executionId()).isNull();
 
         delegation.bindExecution(7L);
@@ -63,7 +65,7 @@ class RunningDelegationTest {
     void exactlyOneSenderWhenStopAndRunIdAttachOverlap() throws Exception {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             for (int i = 0; i < RACES; i++) {
-                RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
+                RunningDelegation delegation = new RunningDelegation(new RuntimeTarget(RuntimeKind.HERMES, "http://agent-runtime.test", "worker"));
                 CyclicBarrier start = new CyclicBarrier(2);
                 Future<String> stopped = pool.submit(() -> {
                     start.await(5, TimeUnit.SECONDS);
