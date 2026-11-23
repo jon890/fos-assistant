@@ -96,14 +96,15 @@ public class DelegationWaiter {
     /**
      * 그 루트가 한 답 안에서 더 기다릴 수 있는 시간이다. 처음 부르면 지금을 시작으로 적는다.
      *
-     * <p>마감에서 상한만큼 더 지난 항목은 이때 지운다. 그만큼 지났으면 그 답은 이미 끝났다.
+     * <p>그 루트의 첫 시각은 turn 이 도는 동안 지우지 않는다. 시간으로 지우면 첫 기다림 뒤 오래 돈 같은 답이 새 맡김에서 상한을 다시
+     * 받는다. 다른 루트의 항목은 그 turn 이 이 프로세스에서 닫혔으면({@link TurnCancellation#find} 가 비면) 이때 지운다.
      */
     Duration remaining(Long rootId, Duration max) {
         if (max == null || max.isZero() || max.isNegative()) {
             return Duration.ZERO;
         }
         Instant now = clock.instant();
-        startedAt.values().removeIf(started -> started.plus(max.multipliedBy(2)).isBefore(now));
+        startedAt.keySet().removeIf(id -> !id.equals(rootId) && turns.find(id).isEmpty());
         Instant started = startedAt.computeIfAbsent(rootId, ignored -> now);
         Duration left = Duration.between(now, started.plus(max));
         return left.isNegative() ? Duration.ZERO : left;

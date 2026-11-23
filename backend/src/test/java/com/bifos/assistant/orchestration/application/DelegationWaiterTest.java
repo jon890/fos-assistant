@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
+import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.orchestration.application.dto.DelegationWait;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
@@ -46,9 +47,10 @@ class DelegationWaiterTest {
 
 
     @Test
-    @DisplayName("한 루트의 예산은 처음 기다린 때부터 흐른 시간으로 줄고, 상한이 지나면 0 이며, 오래된 항목은 지워진다")
+    @DisplayName("도는 turn 의 예산은 처음 기다린 때부터 흐른 시간으로 줄고 상한이 지나면 0 이며 다른 루트는 따로 센다")
     void budgetShrinksFromFirstWaitAndExpires() {
         Duration max = Duration.ofMinutes(2);
+        when(turns.find(ROOT_ID)).thenReturn(Optional.of(mock(TurnHandle.class)));
 
         assertThat(waiter.remaining(ROOT_ID, max)).isEqualTo(max);
         clock.advance(Duration.ofSeconds(30));
@@ -56,9 +58,34 @@ class DelegationWaiterTest {
         assertThat(waiter.remaining(99L, max)).as("다른 루트는 따로 센다").isEqualTo(max);
         clock.advance(Duration.ofMinutes(2));
         assertThat(waiter.remaining(ROOT_ID, max)).isZero();
-        clock.advance(Duration.ofMinutes(3));
-        assertThat(waiter.remaining(ROOT_ID, max)).as("지운 뒤 새 답의 루트처럼 다시 센다").isEqualTo(max);
         assertThat(waiter.remaining(ROOT_ID, Duration.ZERO)).isZero();
+    }
+
+
+    @Test
+    @DisplayName("같은 turn 이 오래 돌아 상한의 두 배가 지나도 그 답의 남은 시간은 0 이다")
+    void sameTurnDoesNotGetBudgetAgainAfterLongTime() {
+        Duration max = Duration.ofMinutes(2);
+        when(turns.find(ROOT_ID)).thenReturn(Optional.of(mock(TurnHandle.class)));
+
+        waiter.remaining(ROOT_ID, max);
+        clock.advance(Duration.ofMinutes(5));
+        waiter.remaining(99L, max);
+
+        assertThat(waiter.remaining(ROOT_ID, max)).isZero();
+    }
+
+
+    @Test
+    @DisplayName("닫힌 turn 의 기록은 다른 루트가 부를 때 지워져 같은 번호가 다시 오면 새로 센다")
+    void closedTurnEntryIsRemoved() {
+        Duration max = Duration.ofMinutes(2);
+
+        waiter.remaining(ROOT_ID, max);
+        clock.advance(Duration.ofMinutes(5));
+        waiter.remaining(99L, max);
+
+        assertThat(waiter.remaining(ROOT_ID, max)).isEqualTo(max);
     }
 
 

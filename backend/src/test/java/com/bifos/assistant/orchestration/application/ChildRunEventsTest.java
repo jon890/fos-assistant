@@ -163,6 +163,21 @@ class ChildRunEventsTest {
     }
 
 
+    @Test
+    @DisplayName("가리기 범위 조회가 실패해도 예외를 던지지 않고 관측만 불완전으로 남긴 채 끝 사건을 적는다")
+    void scopeLookupFailureDoesNotFailRun() {
+        when(bindings.connectorToolPrefixes(5L)).thenThrow(new IllegalStateException("DB 실패"));
+        ChildRunRecording recording = events.start(execution);
+
+        events.relay(recording, agent, "run-1", conversation);
+        events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
+
+        verify(executions).finishEventObservation(execution, false);
+        verify(stream, never()).open(anyString(), anyString(), anyString(), any(), any(), any(ToolDetailScope.class));
+        assertThat(recorded).containsExactly("RUN_COMPLETED#1");
+    }
+
+
     private ExecutionEvent recorded(String name, int sequence) {
         recorded.add(name + "#" + sequence);
         return mock(ExecutionEvent.class);

@@ -114,8 +114,26 @@ public class ChildRunEvents {
      */
     void relay(ChildRunRecording recording, Agent agent, String runId, Conversation conversation) {
         AgentExecution execution = recording.execution;
-        ToolDetailScope scope = detailScope(agent, execution.treeRootId());
         Long conversationId = conversation == null ? null : conversation.id();
+        // 가리기 범위 조회나 스레드 시작이 실패해도 제출한 실행은 그대로 둔다. 도구 사건만 없고 관측은 불완전으로 남는다
+        try {
+            ToolDetailScope scope = detailScope(agent, execution.treeRootId());
+            startStream(recording, agent, runId, conversationId, scope);
+        } catch (RuntimeException ex) {
+            log.warn("맡긴 실행의 사건 스트림을 시작하지 못했다 executionId={} runId={}", execution.id(), runId, ex);
+            synchronized (recording) {
+                recording.streamEnded = true;
+                if (!recording.closed) {
+                    executions.finishEventObservation(execution, false);
+                }
+            }
+        }
+    }
+
+
+    private void startStream(
+        ChildRunRecording recording, Agent agent, String runId, Long conversationId, ToolDetailScope scope) {
+        AgentExecution execution = recording.execution;
         backgroundTasks.start("child-event-stream-" + runId, () -> {
             boolean[] terminalSeen = {false};
             boolean complete = false;
