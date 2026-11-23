@@ -130,7 +130,9 @@ sequenceDiagram
 **기능마다 10분 마감(스펙 DECISION19).** `ChatService.send` 는 끝날 때까지 막히고, 그 안의 `TurnCancellation.cancel` 은 표시만 바꿔 Hermes run 을 멈추지 않는다. 그래서 아래 순서로 한다.
 
 1. 문항은 별도 작업(`BackgroundTasks`)에서 `send` 로 보낸다. 실행기 스레드는 그 기능의 끝남 조건을 1초 남짓 간격으로 본다.
-2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, `ChatService.deliveryStates` 의 그 대화 전달이 `DELIVERED` 이고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다.
+2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, 대화에 전할 결과(루트가 바로 맡긴 자식의 `SUCCEEDED`·`FAILED`)에 모두 전했다는 표시가 있고, 도는 전달 묶음(`ChatService.deliveryStates` 의 `DELIVERING`)이 없고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다(`DeployCheckObserver.delegationSettled`).
+   결과는 두 길로 전해진다. 상한 안에 끝난 맡김은 `agent_delegate` 의 도구 응답이 전하고 전했다는 표시만 남긴다. 묶음도 자동 답도 없다([ADR-20261121 / delegate-wait](../../../backend/docs/adr/ADR-20261121-delegate-wait.md)). 상한을 넘긴 맡김은 자동 답의 묶음이 전한다. 묶음이 끝나기만 기다리면 앞의 길에서 마감까지 돈다.
+   판정의 「전해짐」 도 같다. 묶음이 `DELIVERED` 이거나, 성공한 자식에 전했다는 표시가 있고 그 자식이 어느 묶음에도 들지 않았으면(도구 응답으로 전함) 전해진 것이다.
 3. 10분이 지나면 도는 turn 의 실행 번호를 `TurnCancellation.markOf(conversationId)` 로 읽어 `ChatService.stop` 을 부르고, 도는 위임 자식은 `AgentDelegationService` 의 중지로 멈춘다. 그 기능을 `TIMED_OUT` 으로 적는다.
 4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 기능을 `TIMED_OUT`(까닭 `HERMES_TIMEOUT`)으로 적는다. turn 잠금은 이미 풀려 `ChatService.stop` 으로 멈출 수 없고, 남은 원격 run 은 기존 잃은 run 정리(`LostRunRelease`)가 다음 제출 때 푼다.
 5. 대화에 도는 turn 이 없어진 뒤에 다음 기능으로 간다. 사용자 실행 자리를 겹쳐 쓰지 않게 한다.
@@ -284,7 +286,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 
 차례마다 `send` 가 돌아온 뒤 그 대화의 `connector_action` 가운데 이번 차례가 만든 `PENDING` 줄을 찾는다(`DeployCheckObserver` 가 이미 읽는 조회). `card` 가 `approve` 면 `ConnectorActionService.approve(평가 사용자, actionId, null, false)`, `reject` 면 `reject` 를 부른다. 화면 단추와 같은 서비스다(`ConnectorActionController`). 원고 저장 승인처럼 다른 길로 가는 줄은 평가 문항에 쓰지 않는다.
 `card` 를 적지 않았는데 카드가 뜨면 `leave` 로 본다. 남긴 카드는 판정 직후, 대화를 지우기 전에 거절한다(스펙 REQ16).
-카드를 누르면 결과가 대화로 가고 에이전트가 한 번 더 돌 수 있다(`ConnectorActionListener`, `NextTurnDispatcher`). 그래서 다음 차례는 위임과 같은 끝남 조건(대화에 도는 turn 이 없고 `ChatService.deliveryStates` 의 전달이 끝남)을 기다린 뒤 보낸다. 이 기다림도 문항 상한 안이다. 판정은 문항의 모든 루트 실행 트리와 마지막 답을 본다. `expect.cardStatus` 는 마지막으로 누른 줄의 상태를 본다.
+카드를 누르면 결과가 대화로 가고 에이전트가 한 번 더 돌 수 있다(`ConnectorActionListener`, `NextTurnDispatcher`). 그래서 다음 차례는 위임과 같은 끝남 조건(대화에 도는 turn 이 없고, 전할 결과를 모두 전했고, 도는 전달 묶음이 없음)을 기다린 뒤 보낸다. 이 기다림도 문항 상한 안이다. 판정은 문항의 모든 루트 실행 트리와 마지막 답을 본다. `expect.cardStatus` 는 마지막으로 누른 줄의 상태를 본다.
 카드 줄이 원고 저장 승인(`ContentDraftSaveApproval.select` 가 고르는 줄)이면 누르지 않고 그 문항을 `FAILED`, 까닭 `CARD_FAILED` 로 적는다. 화면은 그 줄을 다른 길로 승인하기 때문이다.
 
 ### 판정
