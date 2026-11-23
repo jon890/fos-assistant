@@ -128,7 +128,8 @@ public final class TaskDtos {
     }
 
     /**
-     * 작업을 만들거나 고치는 요청이다. {@code conversationMode}, {@code missedPolicy}, {@code notify} 는 비우면 기본값이다.
+     * 작업을 만들거나 고치는 요청이다. {@code conversationMode}, {@code missedPolicy}, {@code notify} 는 비우면 기본값이다. 에이전트는
+     * 받지 않고 요청자의 기본 비서로 정한다(비서 중심 대화 스펙 REQ7). 옛 화면이 보내는 {@code agentCode} 는 모르는 칸이라 버린다.
      *
      * @param title 앞뒤 공백을 떼고 저장한다
      * @param notifyPolicy JSON 이름은 {@code notify} 다. {@code Object.notify()} 와 겹쳐 record 이름을 달리한다
@@ -136,7 +137,6 @@ public final class TaskDtos {
      */
     public record TaskRequest(
         @NotBlank @Size(max = Task.TITLE_MAX) String title,
-        @NotBlank String agentCode,
         @NotBlank @Size(max = Task.INSTRUCTION_MAX) String instruction,
         @NotNull @Valid ScheduleRequest schedule,
         ConversationMode conversationMode,
@@ -147,7 +147,6 @@ public final class TaskDtos {
         public TaskInput toInput() {
             return new TaskInput(
                 title,
-                agentCode,
                 instruction,
                 schedule.toInput(),
                 conversationMode,

@@ -2,6 +2,7 @@ package com.bifos.assistant.task.application;
 
 import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -56,6 +57,7 @@ public class TaskService {
     private final TaskRunRepository runs;
     private final AppUserRepository users;
     private final AgentService agents;
+    private final PrimaryAgents primaryAgents;
     private final ConversationPublicIdLookup conversations;
     private final TaskProperties properties;
     private final TaskContents contents;
@@ -87,7 +89,7 @@ public class TaskService {
             throw new ApiException(
                 ErrorCode.TASK_LIMIT_REACHED, "a task limit of " + properties.maxPerUser() + " was reached");
         }
-        Agent agent = requireAgent(user, input.agentCode());
+        Agent agent = requirePrimary(user);
         Schedule schedule = validated(input.schedule(), now);
         Task task = Task.create(
             user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
@@ -112,7 +114,7 @@ public class TaskService {
     public TaskDetail update(CurrentUser user, UUID taskId, TaskInput input) {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
-        Agent agent = requireAgent(user, input.agentCode());
+        Agent agent = requirePrimary(user);
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
         // 고친 글이 평문으로 flush 되기 전에 바로 암호화한다. 같은 트랜잭션이다.
         contents.seal(task);
@@ -227,10 +229,15 @@ public class TaskService {
     }
 
 
-    /** 주인이 대화를 시작할 수 있는 에이전트여야 한다. */
-    private Agent requireAgent(CurrentUser user, String agentCode) {
-        Agent agent = agents.requireStartable(user, agentCode);
-        return agent;
+    /**
+     * 작업의 에이전트다. 만들거나 내용을 고치면 늘 요청자의 기본 비서다(비서 중심 대화 스펙 REQ7, DECISION8, DECISION23).
+     *
+     * @throws ApiException {@code AGENT_NOT_FOUND}(기본 비서가 없다), {@code AGENT_DISABLED}(기본 비서가 꺼졌다)
+     */
+    private Agent requirePrimary(CurrentUser user) {
+        Agent primary = primaryAgents.of(user)
+            .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no primary assistant"));
+        return agents.requireStartable(user, primary.code());
     }
 
 

@@ -251,7 +251,6 @@ class DeployCheckRunner {
         LocalDateTime fireAt = LocalDateTime.now(clock.withZone(TASK_ZONE)).truncatedTo(ChronoUnit.MINUTES).plusMinutes(2);
         TaskDetail created = tasks.create(evaluation, new TaskInput(
             DeployCheckItems.TASK_TITLE,
-            primary.code(),
             DeployCheckItems.TASK_INSTRUCTION,
             new ScheduleInput(TriggerType.ONCE, null, fireAt, TASK_ZONE.getId()),
             ConversationMode.NEW_PER_RUN,
