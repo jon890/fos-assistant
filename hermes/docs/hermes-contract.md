@@ -148,7 +148,7 @@ hook 목록은 `hermes_cli/plugins.py`의 `VALID_HOOKS`가 갖고, 그중 아래
 | hook | 얻는 것 |
 | --- | --- |
 | `post_llm_call` | LLM 호출 하나 단위의 모델, provider, 토큰 |
-| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간 |
+| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간. `post_tool_call` 은 `tool_name`, `session_id`, `tool_call_id`, `duration_ms`, `status`(`ok`, `error`, `blocked` 등), `error_type`, `error_message` 를 넘긴다. 사건이 없는 코드 실행 안의 호출에도 불리고, 그때 `tool_call_id` 는 빈 글이다. fos-ctx 가 이 값으로 실행 기록을 보낸다([fos-ctx 「도구 기록을 보낸다」](../plugins/fos-ctx/README.md#도구-기록을-보낸다)) |
 | `subagent_start`, `subagent_stop` | subagent 실행 경계 |
 
 Runs API 의 `usage` 는 실행 하나의 합계만 준다.

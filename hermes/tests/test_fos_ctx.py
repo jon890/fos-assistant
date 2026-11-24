@@ -72,7 +72,8 @@ class ManifestTest(unittest.TestCase):
         """manifest 가 정해진 모양을 갖는다."""
         manifest = yaml.safe_load((PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8"))
         self.assertEqual(manifest["name"], PLUGIN_DIR.name)
-        self.assertEqual(manifest["hooks"], ["pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result"])
+        self.assertEqual(manifest["hooks"], ["pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result",
+                                             "post_tool_call"])
         for key in ("version", "description", "author"):
             self.assertIsInstance(manifest.get(key), str)
             self.assertTrue(manifest[key].strip())
@@ -1456,7 +1457,9 @@ class TransformToolResultTest(PluginFixture):
                 registered[name] = callback
 
         self.plugin.register(Context())
-        self.assertEqual(set(registered), {"pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result"})
+        self.assertEqual(set(registered), {"pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result",
+                                           "post_tool_call"})
+        self.assertIs(registered["post_tool_call"], self.plugin.post_tool_call)
         self.assertIs(registered["subagent_stop"], self.plugin.subagent_stop)
         self.assertIs(registered["transform_tool_result"], self.plugin.transform_tool_result)
 
