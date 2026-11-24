@@ -49,7 +49,7 @@
 ## 검증
 
 ```bash
-cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*ToolTraceLedgerTest' --tests '*RunTraceEndpointTest' --tests '*ChatRunEventsTest' --tests '*ChildRunEventsTest' --tests '*AgentTokenFilterWiringTest'
+cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*ToolTraceLedgerTest' --tests '*RunTraceIntakeTest' --tests '*RunTraceEndpointTest' --tests '*ChatRunEventsTest' --tests '*ChildRunEventsTest' --tests '*AgentTokenFilterWiringTest'
 ```
 
 ## 변경 파일
@@ -68,3 +68,11 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*ToolTrac
 | `backend/src/main/java/com/bifos/assistant/mcp/presentation/AgentTokenAuthenticationFilter.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/execution/application/ToolTraceLedgerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/RunTraceEndpointTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/application/RunTraceIntakeTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/runtime/domain/WithheldToolContent.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/application/ToolTraceWriter.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 (그 시각에 돌던 실행) |
+| `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 (경로) |
+| `backend/docs/data-schema.md` | 수정 |
+| `docs/features/execution.md` | 수정 |
+| `docs/features/chat.md` | 수정 |
