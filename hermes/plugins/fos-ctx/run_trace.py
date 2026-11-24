@@ -53,6 +53,24 @@ _last_logged: dict[str, float] = {}
 _suppressed: dict[str, int] = {}
 
 
+def _reset_after_fork():
+    """갈라진(fork) 자식 프로세스에서 대기열과 잠금을 새로 만든다.
+
+    부모의 보내는 스레드가 대기열 잠금을 쥔 순간 갈라지면 자식의 `put_nowait` 가 도구 루프를 막을 수 있고,
+    부모에 쌓인 기록을 자식이 한 번 더 보낼 수 있다. 자식은 빈 대기열로 시작하고 첫 기록에서 스레드를 띄운다.
+    """
+    global _queue, _worker_lock, _worker, _worker_pid, _log_lock
+    _queue = queue.Queue(maxsize=QUEUE_LIMIT)
+    _worker_lock = threading.Lock()
+    _worker = None
+    _worker_pid = None
+    _log_lock = threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_after_fork)
+
+
 def trace_url() -> str:
     """기록을 보낼 주소다. 플러그인 정책 주소가 없거나 http(s) 가 아니면 빈 글이다."""
     policy = os.environ.get(POLICY_URL_ENV, "").strip().rstrip("/")
