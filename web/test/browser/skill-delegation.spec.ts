@@ -12,7 +12,7 @@ import { DEMO_CONNECTOR } from "../../../test/e2e/fake-hermes.ts";
 /**
  * 비서 대화의 `/` 목록에서 전문 에이전트의 스킬을 맡긴다(docs/features/assistant-hub/spec.md 의 REQ10, DECISION26).
  *
- * <p>검사마다 사용자를 나누고 비서와 전문 에이전트를 만들어 끝나면 지운다. 가짜 Hermes 는 맡긴 실행을 바로 끝내므로 결과 답까지 본다.
+ * <p>검사마다 사용자를 나누고 비서와 전문 에이전트를 만들어 끝나면 지운다.
  */
 const SKILL = "position-recommender";
 
@@ -36,6 +36,7 @@ test("/ 목록에 「에이전트 · 스킬」 이 보이고, 골라 보내면 �
   page,
   context,
   isolatedMember,
+  hermes,
 }) => {
   await setSession(context, isolatedMember);
   const chief = await createAgent(page, "맡기기 검사 비서");
@@ -56,6 +57,7 @@ test("/ 목록에 「에이전트 · 스킬」 이 보이고, 골라 보내면 �
     await input.press("Enter");
     await expect(input).toHaveValue(`/커리어 검사 · ${SKILL} `);
     await input.pressSequentially("이번 주 공고");
+    await hermes.holdNextRun();
     await input.press("Enter");
 
     await expect(input).toHaveValue("");
@@ -63,16 +65,24 @@ test("/ 목록에 「에이전트 · 스킬」 이 보이고, 골라 보내면 �
     const line = page.getByTestId("mention-line");
     await expect(line).toHaveCount(1);
     await expect(line).toContainText("나 → 커리어 검사에게 맡김");
+    await expect(line.getByTestId("mention-status")).toHaveText("진행 중");
+    const noAnswer = page.getByTestId("no-answer");
+    await expect(noAnswer).toHaveCount(0);
     await expect(page.getByTestId("user-message").last()).toContainText(
       `/커리어 검사 · ${SKILL} 이번 주 공고`,
     );
+    await hermes.waitForHeldRun();
+    await hermes.releaseHeldRun();
     await expect(page.getByTestId("assistant-message")).toHaveCount(1, {
       timeout: 15_000,
     });
     await expect(
       page.getByTestId("assistant-message").last().getByTestId("answer-agent-name"),
     ).toHaveText("맡기기 검사 비서");
+    await expect(line.getByTestId("mention-status")).toHaveText("끝남");
+    await expect(noAnswer).toHaveCount(0);
   } finally {
+    await hermes.releaseHeldRun();
     await clearPrimary(isolatedMember.email);
     for (const code of [career, chief]) {
       const removed = await page.request.delete(`/api/agents/${code}`);
