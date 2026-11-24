@@ -225,8 +225,12 @@ async function scoreEval(values: Record<string, unknown>): Promise<number> {
   const api = new ControlPlane(env.FOS_EVAL_BASE_URL, env.FOS_EVAL_TOKEN, turnTimeout());
   const run = await api.evalRun(values.eval as string);
   if (run.status === "RUNNING") throw new UsageError("평가가 아직 돈다. 끝난 뒤 다시 부른다");
-  const items = run.items.filter((item) => item.bundle === bundle);
-  if (items.length === 0) throw new UsageError(`그 평가에 ${bundle} 묶음 문항이 없다`);
+  const inBundle = run.items.filter((item) => item.bundle === bundle);
+  if (inBundle.length === 0) throw new UsageError(`그 평가에 ${bundle} 묶음 문항이 없다`);
+  // 평가 실행기가 자리(예: 위임 대상)를 채우지 못해 건너뛴 문항은 채점과 사람 비교, 세트 분모에서 뺀다(design.md 의 「묶음 파일」, 스펙 DECISION35)
+  const skipped = inBundle.filter((item) => item.status === "SKIPPED");
+  const items = inBundle.filter((item) => item.status !== "SKIPPED");
+  for (const item of skipped) console.log(`${item.question} 건너뜀(평가 실행기가 문항의 자리를 채우지 못했다)`);
   const links = new Map<string, LinkState>();
   const scores: QuestionScore[] = [];
   for (const item of items) {
@@ -253,7 +257,7 @@ async function scoreEval(values: Record<string, unknown>): Promise<number> {
   }
   const label = bundle === DEFAULT_BUNDLE ? `eval-${run.publicId}` : `eval-${run.publicId} ${bundle}`;
   const tier = run.tier ?? "";
-  const set = scoreSet(scores, comparisons, questions.size);
+  const set = scoreSet(scores, comparisons, questions.size - skipped.length);
   writeFileSync(join(out, "report.json"), `${JSON.stringify({ label, tier, set, scores, comparisons }, null, 2)}\n`);
   writeFileSync(join(out, "report.md"), markdown(label, tier, scores, set, comparisons));
   console.log(`세트 결과: ${set.outcome}${set.reasons.length > 0 ? ` (${set.reasons.join("; ")})` : ""}`);
