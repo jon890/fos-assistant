@@ -40,6 +40,9 @@ public class McpTaskTools {
     private static final String FAILURE_RULE = "isError 면 하지 못한 것이다. 했다고 말하지 않고 message 의 까닭을 알린다.";
     private static final String TASK_ARG = "task_list 의 id 나 작업 이름. 이름이 같은 작업이 여럿이면 status ambiguous 와 후보만 돌려주고 "
         + "바꾸지 않으므로 사용자에게 어느 것인지 되묻는다.";
+    private static final String TASK_INSTRUCTION = "instruction 에는 대화 맥락을 풀어 쓴다. 대상과 사용자가 정한 개수·한도·범위·제외 조건을 빠짐없이 옮긴다. "
+        + "스킬을 예약할 때는 /<스킬 이름> 또는 /<에이전트 이름> · <스킬> 명령을 실행할 때 글자 그대로 읽으므로, 그 표기를 맨 앞에 둔다. "
+        + "확인 방법(검증하지 못한 후보는 빼기), 판단 기준, 알릴 내용, 이미 알린 것은 되풀이하지 않기, 새것이 없으면 알리지 않기, 사용자 상황을 담는다. ";
     private final TaskRequests requests;
 
 
@@ -75,11 +78,10 @@ public class McpTaskTools {
                     + "에이전트의 매일 깨우기는 없다. 매일 깨우기를 바꿔 달라고 하면 그 에이전트 화면 /agents/<code> 링크로 안내한다. " + FAILURE_RULE,
                 Map.of(), List.of()),
             definition(CREATE,
-                "사용자가 정한 시각이나 주기마다 일을 해 달라고 하면(「매일 아침 7시에 날씨 알려 줘」, 「매시간 확인해서 알려 줘」) 예약 작업을 바로 만든다. "
+                "사용자가 정한 시각이나 주기에 일을 해 달라고 하면 예약 작업을 바로 만든다. "
                     + "시각이나 반복이 모호하면 만들지 않고 되묻는다. 시각은 Asia/Seoul 기준이고 cron(표준 5필드, 최소 15분 간격)이나 "
                     + "fire_at(한 번, 2026-11-21T07:00 꼴) 가운데 하나를 준다. 하루 발화가 너무 많은 주기는 거절된다. "
-                    + "instruction 은 사용자가 한 말을 그대로 넣지 말고 대화 맥락으로 구체적으로 쓴다. 대상의 정확한 조건과 제외할 것, 확인 방법"
-                    + "(검증하지 못한 후보는 빼기), 판단 기준, 알릴 때 담을 것, 이미 알린 것은 되풀이하지 않기, 새것이 없으면 알리지 않기, 사용자 상황을 담는다. "
+                    + TASK_INSTRUCTION
                     + "작업은 사용자의 기본 비서로 돌고, 비서와의 대화에서 만들면 결과가 이 대화에 이어 쌓인다. 모델 단계는 사용자가 작업 화면에서 고른다. "
                     + "만든 뒤 답에 작업 이름, next_run, 지시문 요약, link 를 마크다운 링크로 적는다. " + FAILURE_RULE,
                 Map.of(
@@ -92,7 +94,7 @@ public class McpTaskTools {
             definition(UPDATE,
                 "사용자가 예약 작업의 이름, 할 일, 시각과 반복, 알림을 바꿔 달라고 하면 바로 고친다. 준 칸만 바뀐다. "
                     + "고치면 작업은 사용자의 기본 비서로 돈다. 모델 단계, 시간대, 대화 방식은 고치지 못하므로 /tasks/<id> 화면에서 바꾸라고 안내한다. "
-                    + "instruction 을 고칠 때도 만들 때처럼 구체적으로 쓴다. " + FAILURE_RULE,
+                    + TASK_INSTRUCTION + FAILURE_RULE,
                 Map.of(
                     "task", Map.of("type", "string", "description", TASK_ARG),
                     "title", Map.of("type", "string", "minLength", 1, "maxLength", TITLE_MAX),
