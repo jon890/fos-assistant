@@ -94,7 +94,7 @@ public class LivePropertiesConfig {
     }
 
 
-    /** {@code runTimeout()} 과 {@code pollInterval()} 을 읽는 곳만 쓴다. 나머지 칸은 {@link HermesProperties} 를 그대로 주입받는다. */
+    /** {@code runTimeout()}, {@code backgroundRunTimeout()}, {@code pollInterval()} 을 읽는 곳만 쓴다. 나머지 칸은 {@link HermesProperties} 를 그대로 주입받는다. */
     @Bean
     public LiveProperties<HermesProperties> hermesPropertiesLive(HermesProperties value) {
         return LiveProperties.fixed(HermesProperties.class, value);

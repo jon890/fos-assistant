@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes.config;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -15,10 +16,13 @@ import org.springframework.validation.annotation.Validated;
  * 첫 로그인에 만드는 에이전트의 {@code apiBaseUrl} 이 이 값에 profile 접두를 붙인 것이다.
  * 우리 환경의 값이라 이 저장소가 정하지 않고 설정으로 받는다
  * @param pollInterval 실행 상태를 다시 묻기까지 기다리는 시간
- * @param runTimeout 실행 하나가 끝나기를 기다려 주는 한도
+ * @param runTimeout 사람이 답을 기다리는 실행 하나가 끝나기를 기다려 주는 한도
  * @param connectTimeout Hermes 호출 한 번의 TCP 연결 한도
  * @param readTimeout Hermes 호출 한 번의 응답 한도. 제출과 조회가 모두 곧바로 돌아오므로 {@code
  *     runTimeout} 보다 훨씬 짧다
+ * @param backgroundRunTimeout 맡긴 자식 실행과 예약 작업이 연 turn 처럼 사람이 그 자리에서 기다리지 않는 실행의 한도. 비우면 20분이다.
+ * {@code runTimeout} 보다 짧게 주면 {@code runTimeout} 으로 올린다. 어느 실행이 어느 한도를 쓰는지는
+ * {@code docs/features/execution.md} 의 「실행 한도」 가 갖는다
  */
 @Validated
 @ConfigurationProperties(prefix = "hermes")
@@ -30,13 +34,48 @@ public record HermesProperties(
     Duration pollInterval,
     Duration runTimeout,
     Duration connectTimeout,
-    Duration readTimeout) {
+    Duration readTimeout,
+    Duration backgroundRunTimeout) {
 
+
+    /**
+     * 사람이 기다리지 않는 실행의 기본 한도다. 2026-11-24 운영에서 커리어 담당의 공고 추천(공고 모으기 78초와 모델 왕복 약 21번)이 5분을
+     * 넘겨 끊겼다. 그 일이 두세 번 들어가는 여유를 두되, 끝나지 않는 실행이 사용자 자리를 오래 쥐지 않게 한다.
+     */
+    private static final Duration DEFAULT_BACKGROUND_RUN_TIMEOUT = Duration.ofMinutes(20);
+
+    @ConstructorBinding
     public HermesProperties {
         pollInterval = pollInterval == null ? Duration.ofMillis(700) : pollInterval;
         runTimeout = runTimeout == null ? Duration.ofMinutes(5) : runTimeout;
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(5) : connectTimeout;
         readTimeout = readTimeout == null ? Duration.ofSeconds(30) : readTimeout;
+        backgroundRunTimeout = backgroundRunTimeout == null ? DEFAULT_BACKGROUND_RUN_TIMEOUT : backgroundRunTimeout;
+        // 긴 한도가 사람이 기다리는 실행의 한도보다 짧으면 맡긴 일이 대화보다 먼저 끊긴다
+        backgroundRunTimeout = backgroundRunTimeout.compareTo(runTimeout) < 0 ? runTimeout : backgroundRunTimeout;
+    }
+
+
+    /** 긴 한도를 기본값으로 두는 생성자다. 테스트가 쓴다. */
+    public HermesProperties(
+        String profileKeyDir,
+        String dashboardBaseUrl,
+        String dashboardToken,
+        String sharedListenerBaseUrl,
+        Duration pollInterval,
+        Duration runTimeout,
+        Duration connectTimeout,
+        Duration readTimeout) {
+        this(
+            profileKeyDir,
+            dashboardBaseUrl,
+            dashboardToken,
+            sharedListenerBaseUrl,
+            pollInterval,
+            runTimeout,
+            connectTimeout,
+            readTimeout,
+            null);
     }
 
 

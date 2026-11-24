@@ -421,7 +421,11 @@ hermes:
   # 모든 profile 을 /p/<profile> 로 받는 listener 의 주소. 첫 로그인에 만드는 에이전트가 이 주소를 쓴다
   shared-listener-base-url: ${HERMES_SHARED_LISTENER_BASE_URL}
   poll-interval: 700ms
+  # 사람이 답을 기다리는 실행(대화 turn, 결과 전달, 살펴보기, 배포 뒤 확인)이 끝나기를 기다리는 한도
   run-timeout: 5m
+  # 맡긴 자식 실행과 예약 작업이 연 turn 의 한도. run-timeout 보다 짧으면 run-timeout 으로 올린다.
+  # 어느 실행이 어느 한도인지는 docs/features/execution.md 의 「실행 한도」 가 갖는다
+  background-run-timeout: ${HERMES_BACKGROUND_RUN_TIMEOUT:20m}
 
 logging:
   level:

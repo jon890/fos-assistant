@@ -7,6 +7,7 @@ import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
 import com.bifos.assistant.runtime.domain.RuntimeKind;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
@@ -29,8 +30,14 @@ public interface AgentRuntime {
     String submit(RunCommand command);
 
 
-    /** 보낸 실행이 끝날 때까지 기다려 결과를 받는다. */
-    RunResult awaitCompletion(RunCommand command, String runId);
+    /** 보낸 실행이 끝날 때까지 사람이 기다리는 실행의 한도로 기다려 결과를 받는다. */
+    default RunResult awaitCompletion(RunCommand command, String runId) {
+        return awaitCompletion(command, runId, RunWait.CONVERSATION);
+    }
+
+
+    /** 보낸 실행이 끝날 때까지 {@code wait} 쪽 한도로 기다려 결과를 받는다. 한도를 넘으면 {@code HERMES_RUN_TIMEOUT} 을 던진다. */
+    RunResult awaitCompletion(RunCommand command, String runId, RunWait wait);
 
 
     default RunResult runToCompletion(RunCommand command) {
