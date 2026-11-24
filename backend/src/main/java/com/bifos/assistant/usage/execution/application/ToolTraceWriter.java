@@ -27,7 +27,7 @@ public class ToolTraceWriter {
     static final String BRIDGE_TOOL = "tool_call";
 
     private final ToolTraceLedger ledger;
-    private final ExecutionEventRepository events;
+    private final ToolTraceRows rows;
 
 
     /** 완료 줄을 저장하기 전에 부른다. 먼저 와서 기다리던 기록을 줄에 옮긴다. */
@@ -69,7 +69,7 @@ public class ToolTraceWriter {
 
     /** 저장된 줄은 바꾸는 칸만 쓴다. 같은 규칙을 질의가 갖는다({@link ExecutionEventRepository#recordToolTrace}). */
     private void update(Long eventId, ToolTrace trace) {
-        events.recordToolTrace(eventId, trace.toolName(), trace.durationMs(), trace.errorType(), trace.errorSummary());
+        rows.record(eventId, trace);
     }
 
 

@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, Long> {
 
@@ -126,9 +125,10 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
      * 실패 표시가 참인 줄에만 쓴다. 도구 이름이 다르면 바꾸지 않는다. Tool Search 의 {@code tool_call} 은 사건이 다리 이름을 보내므로
      * 이름을 보지 않는다(docs/features/run-trace/design.md 「짝짓기 장부」).
      *
+     * <p>트랜잭션은 {@code ToolTraceRows} 가 연다.
+     *
      * @return 바꾼 줄 수
      */
-    @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update ExecutionEvent ev
