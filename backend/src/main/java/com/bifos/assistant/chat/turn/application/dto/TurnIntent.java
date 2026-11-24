@@ -39,7 +39,8 @@ public sealed interface TurnIntent {
         + "이 결과 때문에 일을 새로 맡기거나 같은 도구를 다시 부르지 않는다. "
         + RESULT_HANDLING_RULES;
 
-    String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
+    String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 이 작업의 시각과 주기는 이미 등록되어 있으니 같은 작업을 다시 만들지 않는다. "
+        + "사용자는 지금 화면에 없을 수 있다. 사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 
 
     /**
