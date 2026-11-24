@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.auth.AgentTokenFilter;
 import com.bifos.assistant.shared.error.ApiException;
@@ -45,9 +46,12 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
         "/internal/hermes/image-source",
         "/internal/hermes/found-links");
 
+    /** Hermes 의 MCP 클라이언트가 부르는 경로다. 나머지 경로는 profile plugin 의 hook 이 따로 부른다. */
+    private static final String MCP_PATH = "/mcp";
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";
     private final AgentTokenService tokens;
+    private final McpConnectionLiveness liveness;
 
 
     @Override
@@ -74,6 +78,10 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
             String raw = header.substring(BEARER.length()).trim();
             McpPrincipal principal = tokens.authenticate(raw);
             request.setAttribute(TOKEN_HASH_ATTRIBUTE, principal.tokenHash());
+            if (MCP_PATH.equals(request.getServletPath())) {
+                // keepalive 와 재연결도 이 길로 온다. 평가가 연결이 끊긴 채 돈 문항을 환경 오류로 구분하는 데 쓴다.
+                liveness.seen(principal.profileName());
+            }
             // 토큰은 사용자가 아니라 profile 을 증명한다(ADR-032). 사용자의 역할을 권한으로 싣지 않는다.
             SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(
