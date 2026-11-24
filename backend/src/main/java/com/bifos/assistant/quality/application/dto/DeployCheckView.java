@@ -2,6 +2,7 @@ package com.bifos.assistant.quality.application.dto;
 
 import com.bifos.assistant.quality.domain.FeatureResult;
 import com.bifos.assistant.quality.domain.type.CheckReason;
+import com.bifos.assistant.quality.domain.type.FeatureStatus;
 import com.bifos.assistant.quality.domain.QualityRun;
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +16,8 @@ import java.util.UUID;
  * @param finishedAt 도는 동안 null
  * @param elapsedMs 도는 동안 null
  * @param results 끝난 기능의 결과. 도는 동안에는 끝난 것만 있다
- * @param environmentError 평가 비서의 Control Plane 연결이 끊긴 채 돌아 실패한 기능이 있다. 그 실패는 품질이 아니라 평가 환경의 문제다
+ * @param environmentError 통과하지 못한 기능이 있고 모두 평가 비서의 Control Plane 연결이 없던 환경 오류(까닭 {@code ENVIRONMENT})다. 규칙 미달과 섞이면
+ * 거짓이고, 화면은 결과의 까닭으로 「일부 환경 오류」 를 따로 보인다
  */
 public record DeployCheckView(
     UUID publicId,
@@ -45,7 +47,13 @@ public record DeployCheckView(
             run.itemCount(),
             run.modelCallCount(),
             run.results().stream().map(FeatureResultView::of).toList(),
-            run.results().stream().anyMatch(result -> CheckReason.ENVIRONMENT.name().equals(result.reasonCode())));
+            onlyEnvironmentErrors(run.results()));
+    }
+
+
+    private static boolean onlyEnvironmentErrors(List<FeatureResult> results) {
+        List<FeatureResult> failed = results.stream().filter(result -> result.status() != FeatureStatus.PASSED).toList();
+        return !failed.isEmpty() && failed.stream().allMatch(result -> CheckReason.ENVIRONMENT.name().equals(result.reasonCode()));
     }
 
 

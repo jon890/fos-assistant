@@ -154,7 +154,7 @@ class DeployCheckApiTest {
 
 
     @Test
-    @DisplayName("환경 오류로 실패한 기능이 있으면 응답에 environmentError 가 참이고 알림 본문이 평가 환경의 문제라고 알린다")
+    @DisplayName("실패한 기능이 모두 환경 오류면 응답에 environmentError 가 참이고 알림 본문이 연결 문제부터 보라고 알린다")
     void environmentErrorIsShownSeparately() throws Exception {
         AppUser evaluation = evaluationUser();
         OpenedDeployCheck opened = runWrites.open(evaluation.id(), QualityRunTrigger.PIPELINE, admin.id());
@@ -168,7 +168,28 @@ class DeployCheckApiTest {
         assertThat(read.path("status").asString()).isEqualTo("FAILED");
         assertThat(read.path("environmentError").asBoolean()).isTrue();
         assertThat(notifications.findAll()).singleElement()
-            .satisfies(sent -> assertThat(sent.body()).contains("도구 찾기").contains("평가 환경의 문제"));
+            .satisfies(sent -> assertThat(sent.body()).contains("도구 찾기 확인은 평가 비서의 Control Plane 연결이 없었어요")
+                .doesNotContain("통과하지 못했어요"));
+    }
+
+
+    @Test
+    @DisplayName("규칙 미달과 환경 오류가 섞이면 environmentError 는 거짓이고 알림은 두 실패를 나눠 적는다")
+    void mixedFailuresKeepTheQualityFailureVisible() throws Exception {
+        AppUser evaluation = evaluationUser();
+        OpenedDeployCheck opened = runWrites.open(evaluation.id(), QualityRunTrigger.PIPELINE, admin.id());
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.MEMORY_READ, FeatureStatus.FAILED, "FACT_MISSING", 10, null, List.of()), 1);
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.TOOL_DISCOVERY, FeatureStatus.FAILED, "ENVIRONMENT", 10, null, List.of()), 1);
+
+        runWrites.finish(opened.runId());
+
+        JsonNode read = json.readTree(api("GET", CHECKS + "/" + opened.started().check().publicId(), admin).body());
+        assertThat(read.path("environmentError").asBoolean()).isFalse();
+        assertThat(notifications.findAll()).singleElement()
+            .satisfies(sent -> assertThat(sent.body()).contains("기억 읽기 확인이 통과하지 못했어요")
+                .contains("도구 찾기 확인은 평가 비서의 Control Plane 연결이 없었어요"));
     }
 
 
