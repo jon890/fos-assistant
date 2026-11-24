@@ -2,7 +2,7 @@
 // 기준은 docs/features/answer-quality/spec.md 의 DECISION10 이, 세는 규칙은 docs/features/answer-quality.md 의 「답변 품질 평가」 가 갖는다.
 import type { ExecutionNode, MessageView } from "../control-plane.ts";
 
-export type Check = "sources" | "date" | "none" | "photo-request";
+export type Check = "sources" | "date" | "none" | "photo-request" | "delegate";
 export type Question = { id: string; category: string; messages: string[]; check: Check; compare: boolean };
 /** 링크 하나를 열어 본 결과다. `unknown` 은 자동 요청을 막은 사이트라 열렸는지 모르는 것이다. */
 export type LinkState = "open" | "closed" | "unknown";
@@ -298,6 +298,16 @@ export function drewImage(root: ExecutionNode | null): boolean {
   return root.children.some(drewImage);
 }
 
+/** 위임 도구의 Hermes 쪽 이름이다. Control Plane MCP 도구는 이 접두어를 단다(concepts/score.ts 의 `TOOL_PREFIX`). */
+const DELEGATE_TOOL = "mcp__fos_assistant__agent_delegate";
+
+/** 실행 트리에서 위임 도구가 실패 없이 끝난 적이 있는가. 전문 에이전트에게 맡겨야 하는 문항(`delegate`)이 본다. */
+export function delegated(root: ExecutionNode | null): boolean {
+  if (!root) return false;
+  if (root.events.some((event) => event.eventType === "TOOL_COMPLETED" && event.toolName === DELEGATE_TOOL && !event.failed)) return true;
+  return root.children.some(delegated);
+}
+
 export function scoreQuestion(
   question: Question,
   answer: string | string[],
@@ -315,7 +325,9 @@ export function scoreQuestion(
         ? answers.some((text) => mentionsDate(text, startedAt))
         : question.check === "photo-request"
           ? drewImage(root) || answers.some(asksForPhoto)
-          : urls.length > 0;
+          : question.check === "delegate"
+            ? delegated(root)
+            : urls.length > 0;
   return {
     id: question.id,
     category: question.category,
@@ -378,6 +390,8 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], tot
   if (!datePassed) reasons.push("오늘 날짜 문항이 그날 날짜로 답하지 않았다");
   const photoMissed = scores.filter((score) => score.check === "photo-request" && !score.passed && !score.error).length;
   if (photoMissed > 0) reasons.push(`사진을 찾아 그려 달라는 문항 ${photoMissed}개가 그림을 만들지도, 사진이나 링크를 보내 달라고 하지도 않았다`);
+  const delegateMissed = scores.filter((score) => score.check === "delegate" && !score.passed && !score.error).length;
+  if (delegateMissed > 0) reasons.push(`전문 에이전트에게 맡겨야 하는 문항 ${delegateMissed}개가 위임하지 않았다`);
   const similarNeeded = Math.ceil(compareIds.size * SIMILAR_RATIO - 1e-9);
   const compareDone = given.length >= compareIds.size;
   if (compareDone && similar < similarNeeded) reasons.push(`「비슷하다」 ${similar}/${compareIds.size} (기준 ${similarNeeded} 이상)`);
