@@ -94,7 +94,8 @@ CI 와 배포에서는 돌지 않는다. 지침이나 검색 서비스를 바꾸
 | 파일 | 갖는 것 |
 | --- | --- |
 | `test/model-eval/answer/questions.json` | 문항마다 범주, 보낼 글의 차례, 통과를 보는 방식, 사람 비교 대상인지 |
-| `test/model-eval/answer/run.ts` | `send` 는 문항마다 새 대화를 만들어 보낸다. `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다 |
+| `test/model-eval/answer/hard-questions.json` | 「어려운 답변」 묶음(`answer-hard`)의 채점용 문항. 평가 실행기로 돌리고 `score-eval --bundle answer-hard` 로 채점한다([`agent-quality/design.md`](agent-quality/design.md) 의 「묶음 파일」) |
+| `test/model-eval/answer/run.ts` | `send` 는 문항마다 새 대화를 만들어 보낸다. `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다. `score-eval` 은 평가 실행기로 돈 묶음의 대화를 읽어 같은 기준으로 판정한다 |
 | `test/model-eval/answer/score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수이고 같은 폴더의 단위 테스트가 검사한다 |
 | `test/model-eval/control-plane.ts` | 블로그 사진 평가와 함께 쓰는 Control Plane 클라이언트 |
 
@@ -110,6 +111,7 @@ CI 와 배포에서는 돌지 않는다. 지침이나 검색 서비스를 바꾸
 | 날짜 문항 | 답에 그 문항을 보낸 날의 한국 날짜가 「11월 18일」 이나 연도가 붙은 숫자 꼴로 들었는가 |
 | 검색하지 않아도 되는 문항 | 늘 통과. 걸린 시간만 본다 |
 | 그림 참고 사진 문항(`photo-request`) | 비서가 사진을 찾아 그 사진을 참고로 그려 달라는 문항이다. 실행 트리에 실패 없이 끝난 `image_generate` 가 있으면(그림을 만들었으면) 통과다. 사진을 받지 못해 그리지 않고, 답이 사진이나 링크를 보내 달라고 부탁해도 통과다. 둘 다 아니면 세트가 미달이다. 그림이 찾은 사진을 실제로 참고했는지는 보지 않는다([비서가 찾은 사진 스펙](agent-found-image/spec.md) 의 REQ9, [도구 실패 뒤 다른 방법 스펙](tool-fallback/spec.md) 의 REQ7. 사용자 결정 2026-11-21) |
+| 맡기기 문항(`delegate`) | 전문 에이전트에게 맡겨야 하는 문항이다. 실행 트리에 실패 없이 끝난 위임 도구(`agent_delegate`)가 있으면 통과다. 아니면 세트가 미달이다. 맡긴 결과의 질은 사람 비교가 본다. 지금은 「어려운 답변」 묶음만 쓴다 |
 | 도구 수 | 실행 트리 전체의 끝 사건(`TOOL_COMPLETED`)만 센다. `web_search` 와 `web_extract` 의 수와 실패 수를 참고로 낸다 |
 | 걸린 시간 | 루트 실행의 `latencyMs` |
 | 도구 차례 | 참고 값이다. 실행마다 사건 순서대로 읽어 끝 사건 없이 이어진 `TOOL_STARTED` 를 한 차례로 센다. 한 응답이 함께 부른 도구가 한 차례다. 문항마다 차례 수와 호출 수를, 세트 요약에 평균 걸린 시간, 차례당 도구 수, 출처 링크 합을 낸다. 아주 빨리 끝난 도구가 묶음 중간에 끝 사건을 내면 한 차례가 둘로 세어질 수 있다 |
