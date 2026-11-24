@@ -18,6 +18,7 @@ import com.bifos.assistant.runtime.application.dto.RunOutcome;
 import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.RuntimeKind;
 import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.runtime.domain.TokenUsage;
@@ -45,7 +46,7 @@ class HermesAgentRuntimeTest {
         RunCommand command = new RunCommand(TARGET, "입력", "지침", "session-1", "openai-codex", "model-x", "high", images);
         ArgumentCaptor<HermesRunCommand> sent = ArgumentCaptor.forClass(HermesRunCommand.class);
         when(client.submit(sent.capture())).thenReturn("run-1");
-        when(client.awaitCompletion(any(), eq("run-1"))).thenReturn(
+        when(client.awaitCompletion(any(), eq("run-1"), eq(RunWait.CONVERSATION))).thenReturn(
             new HermesRunResult("run-1", "session-1", "completed", "답", "model-x", "openai-codex", null,
                 TokenUsage.empty()));
 
@@ -56,6 +57,19 @@ class HermesAgentRuntimeTest {
             UNIT, LOCATION, "입력", "지침", "session-1", "openai-codex", "model-x", "high", images));
         assertThat(result.outcome()).isEqualTo(RunOutcome.SUCCEEDED);
         assertThat(result.statusLabel()).isEqualTo("completed");
+        assertThat(result.output()).isEqualTo("답");
+    }
+
+
+    @Test
+    @DisplayName("사람이 기다리지 않는 실행의 기다림 종류를 Hermes 클라이언트에 그대로 넘긴다")
+    void passesBackgroundWait() {
+        RunCommand command = new RunCommand(TARGET, "입력", null, null, null, null, null);
+        when(client.awaitCompletion(any(), eq("run-1"), eq(RunWait.BACKGROUND))).thenReturn(
+            new HermesRunResult("run-1", "session-1", "completed", "답", null, null, null, TokenUsage.empty()));
+
+        RunResult result = runtime.awaitCompletion(command, "run-1", RunWait.BACKGROUND);
+
         assertThat(result.output()).isEqualTo("답");
     }
 

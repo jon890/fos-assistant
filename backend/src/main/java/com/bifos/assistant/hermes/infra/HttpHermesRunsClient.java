@@ -8,6 +8,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
@@ -93,8 +94,8 @@ public class HttpHermesRunsClient implements HermesRunsClient {
 
 
     @Override
-    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
-        return poll(command, runId, keyStore.resolve(command.profileName()));
+    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId, RunWait wait) {
+        return poll(command, runId, keyStore.resolve(command.profileName()), timeoutFor(wait));
     }
 
 
@@ -361,8 +362,14 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     }
 
 
-    private HermesRunResult poll(HermesRunCommand command, String runId, String apiKey) {
-        long deadline = System.nanoTime() + properties.runTimeout().toNanos();
+    /** 사람이 기다리지 않는 실행만 긴 한도를 쓴다. 어느 실행이 어느 쪽인지는 {@code docs/features/execution.md} 의 「실행 한도」 가 갖는다. */
+    private Duration timeoutFor(RunWait wait) {
+        return wait == RunWait.BACKGROUND ? properties.backgroundRunTimeout() : properties.runTimeout();
+    }
+
+
+    private HermesRunResult poll(HermesRunCommand command, String runId, String apiKey, Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
         while (true) {
             JsonNode run = fetch(command.apiBaseUrl(), runId, apiKey);
             if (HermesSessionRuns.lost(run)) {

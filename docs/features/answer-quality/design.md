@@ -202,3 +202,13 @@ Hermes 내장 위임(`delegate_task`)의 자식은 부모의 `instructions` 를 
 | REQ18, REQ19 | 브라우저 테스트(`chat.spec.ts`, 넓은 화면과 휴대폰): 제목 18px, 본문 15px, 출처 절 14px, 줄바꿈 `br`, mermaid 그림과 실패 문구, 그림이 화면 폭 안에 있다 |
 | REQ20 | `score.ts` 단위 테스트: 목록 꼴, 맨 주소, 반복, 긴 문단 판정과 보고서 칸 |
 | 모두 | 배포 뒤 확인 7: 출처 있는 답 하나를 넓은 화면과 휴대폰에서 보고 평가를 다시 돈다 |
+
+## ChatGPT 비교 뒤 답변 지침 보완
+
+| 스펙 결정 | 지침과 검증 |
+| --- | --- |
+| DECISION35 | `ContextAssembler.SEARCH_INSTRUCTIONS`에 국내 출처와 진료기관 안내를 더한다. `ContextAssemblerTest`에서 대화 실행에만 지침이 들어가는지 확인한다 |
+| DECISION36 | `AnswerFormatInstructions.RESPONSE_INSTRUCTIONS`에 본문을 끝맺는 행동을 더한다. 출처가 있으면 그 목록 앞에 행동을 적는다. `ContextAssemblerTest`에서 모든 실행 범위에 들어가는지 확인한다 |
+| DECISION37 | 같은 답변 형식 절에 전후 값과 변화량, 종가와 등락률의 우선순위를 더한다. `ContextAssemblerTest`에서 모든 실행 범위에 들어가는지 확인한다 |
+
+배포 뒤 답변 품질 평가 묶음을 돌리고 ChatGPT와 비교한 8문항을 다시 확인한다.

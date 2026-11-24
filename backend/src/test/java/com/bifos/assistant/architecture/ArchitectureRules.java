@@ -649,7 +649,7 @@ public final class ArchitectureRules {
         WorkspaceProperties.class);
 
     /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
-    private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");
+    private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "backgroundRunTimeout", "pollInterval");
 
     /** rule-28: 까닭과 예외는 docs/code-rules/rule-28.md를 본다. */
     public static final ArchRule LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES = classes()

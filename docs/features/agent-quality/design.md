@@ -297,10 +297,11 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | --- | --- |
 | `id` | 묶음 안에서 유일 |
 | `turns[]` | 차례. 각 차례는 `text`(보낼 글), 선택 `attachment`(리소스 사진 이름), 선택 `card`(`approve`, `reject`, `leave`) |
-| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
+| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`, `delegate`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
 | `keepConversation` | 통과해도 대화를 30일 남긴다. 답변 품질의 사람 비교 문항(스펙 DECISION38) |
 
 옛 `questions.json` 의 문항은 `messages` 를 `turns` 로 바꿔 그대로 옮긴다. 「답변 품질」 묶음은 `timeoutMinutes` 15, `pass` `answer-quality` 이고, 「서비스 개념」 묶음은 `ratio` 0.85 다.
+「어려운 답변」 묶음(`answer-hard`)은 여러 단계 조사, 조건이 많은 계획, 변화 추적, 모호한 질문, 맡기기, 긴 답 구조를 고루 묻는다(사용자 결정 2026-11-24). 답변 품질 묶음처럼 `external` 이고 모든 문항이 대화를 남긴다. 조사와 위임이 길어 `timeoutMinutes` 는 20 이다. 채점은 `answer/run.ts score-eval --bundle answer-hard` 가 같은 폴더의 `hard-questions.json` 으로 하고, 출처, 링크, 형식은 답변 품질과 같은 규칙으로, 맡기기 문항은 위임했는지(`delegate`)로 본다. 정답 글자를 심지 않고 모든 문항을 사람 비교로 ChatGPT 와 나란히 본다. 맡기기 문항은 `{otherAgentName}` 자리를 써서 `send` 로는 돌리지 않는다.
 문항의 자리(`{otherAgentCode}`, `{otherAgentName}`, `{connectorId}`, `{connectorTitle}`)는 실행기가 평가 사용자의 위임 대상 에이전트와, 그룹 카탈로그에서 평가 사용자가 연결하지 않은 첫 플러그인으로 채운다. 값이 없으면 그 문항은 「건너뜀」 이고 분모에서 빠진다(스펙 DECISION35).
 
 ### 평가 한 번의 흐름

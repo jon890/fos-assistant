@@ -45,3 +45,19 @@ test("답변 품질 묶음은 옛 질문 세트의 문항 id 와 글을 그대�
     assert.equal(question.keepConversation, true, question.id);
   }
 });
+
+test("어려운 답변 묶음은 채점용 문항 파일과 문항 id, 범주, 글이 같고 밖에서 채점하며 대화를 남긴다", () => {
+  const questions = readJson<{ questions: { id: string; category: string; messages: string[] }[] }>("test/model-eval/answer/hard-questions.json").questions;
+  const bundle = readJson<{ id: string; pass: { type: string }; questions: (NewQuestion & { keepConversation: boolean })[] }>(
+    "backend/src/main/resources/quality/bundles/answer-hard.json",
+  );
+
+  assert.equal(bundle.id, "answer-hard");
+  assert.equal(bundle.pass.type, "external", "판정은 answer/run.ts score-eval --bundle answer-hard 가 한다");
+  assert.deepEqual(bundle.questions.map((question) => question.id), questions.map((question) => question.id));
+  for (const [index, question] of bundle.questions.entries()) {
+    assert.equal(question.tag, questions[index].category, question.id);
+    assert.deepEqual(question.turns.map((turn) => turn.text), questions[index].messages, question.id);
+    assert.equal(question.keepConversation, true, question.id);
+  }
+});

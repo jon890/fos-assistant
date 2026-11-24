@@ -5,6 +5,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 
 /**
@@ -18,7 +19,17 @@ public interface HermesRunsClient {
     String submit(HermesRunCommand command);
 
 
-    HermesRunResult awaitCompletion(HermesRunCommand command, String runId);
+    /** 사람이 기다리는 실행의 한도({@code hermes.run-timeout})로 기다린다. */
+    default HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
+        return awaitCompletion(command, runId, RunWait.CONVERSATION);
+    }
+
+
+    /**
+     * 그 실행이 끝날 때까지 기다린다. 한도는 {@code CONVERSATION} 이면 {@code hermes.run-timeout}, {@code BACKGROUND} 면
+     * {@code hermes.background-run-timeout} 이다. 넘으면 {@code HERMES_RUN_TIMEOUT} 을 던진다.
+     */
+    HermesRunResult awaitCompletion(HermesRunCommand command, String runId, RunWait wait);
 
 
     /** 그 실행을 멈추라고 보낸다. */

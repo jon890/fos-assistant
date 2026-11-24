@@ -41,6 +41,7 @@ test("플러그인 README 는 존재 여부를 확인하는 hermes 검사만 돌
 test("모듈 코드는 그 모듈과 그것을 띄우는 job 을 돌린다", () => {
   assert.deepEqual(running(["backend/src/main/java/A.java"]), ["backend", "browser", "e2e", "quality"]);
   assert.deepEqual(running(["web/src/app/page.tsx"]), ["web", "browser", "e2e", "quality"]);
+  assert.deepEqual(running(["connectors/career/plugin/src/github.ts"]), ["hermes"]);
   assert.deepEqual(running(["hermes/connectors/gmail/server.py"]), ["backend", "e2e", "hermes", "quality"]);
   assert.deepEqual(running(["hermes/connectors/gmail/skills/gmail/SKILL.md"]), ["backend", "e2e", "hermes", "quality"]);
   assert.deepEqual(running(["hermes/docs/hermes-contract.md"]), ["hermes"]);

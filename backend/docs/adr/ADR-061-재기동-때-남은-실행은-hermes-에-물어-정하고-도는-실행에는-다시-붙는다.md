@@ -17,7 +17,7 @@
   흐름으로 도는 turn 과 그 자식에는 붙지 않는다. Hermes 에 중지를 보내고 끝난 상태와 사용량만 적는다.
   흐름의 단계 순서와 합치기는 프로세스 메모리에만 있어 이어 갈 수 없다.
 
-  **기다리는 시간에는 상한이 있다.** `assistant.restart-reconcile.max-wait` 이고 기본값은 `hermes.run-timeout` 과 같다.
+  **기다리는 시간에는 상한이 있다.** `assistant.restart-reconcile.max-wait` 이고, 비우면 줄마다 그 실행이 처음 쓴 한도와 같다(2026-11-24 부터. 맡긴 실행과 사람이 없는 루트는 `hermes.background-run-timeout`, 나머지는 `hermes.run-timeout`. [`docs/features/execution.md`](../../../docs/features/execution.md) 의 「실행 한도」).
   넘으면 Hermes 에 중지를 보내고 `FAILED` 로 적는다.
   그때까지 한 번이라도 Hermes 의 답을 받았으면 `RECONCILE_TIMEOUT`, 한 번도 받지 못했으면 `RECONCILE_UNREACHABLE` 이다.
 

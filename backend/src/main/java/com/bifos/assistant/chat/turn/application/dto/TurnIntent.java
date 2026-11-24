@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import com.bifos.assistant.context.application.dto.InstructionScope;
+import com.bifos.assistant.runtime.domain.RunWait;
 import java.util.List;
 
 /** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, {@code @} 로 맡긴 일인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
@@ -134,6 +135,15 @@ public sealed interface TurnIntent {
             return InstructionScope.PROACTIVE;
         }
         return unattended(intent) ? InstructionScope.SCHEDULED : InstructionScope.CONVERSATION;
+    }
+
+
+    /**
+     * 이 turn 의 실행이 끝나기를 어느 한도로 기다리는가. 예약 작업이 연 turn 만 긴 한도다(사용자 결정 2026-11-24). 결과를 전하는 turn 과
+     * 먼저 살펴보기는 사람이 보낸 turn 과 같은 한도다. 살펴보기는 그보다 짧은 {@code max-duration} 이 따로 끊는다.
+     */
+    static RunWait runWait(TurnIntent intent) {
+        return intent instanceof Scheduled ? RunWait.BACKGROUND : RunWait.CONVERSATION;
     }
 
 

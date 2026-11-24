@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration;
 
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.RuntimeKind;
 import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.testsupport.TestAgentRuntimes;
@@ -144,7 +145,7 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.execution()).isSameAs(failed);
         assertThat(run.result().succeeded()).isFalse();
         assertThat(run.result().errorCode()).isEqualTo("ORCHESTRATION_STEP_FAILED");
-        verify(hermes, never()).awaitCompletion(any(), any());
+        verify(hermes, never()).awaitCompletion(any(), any(), any());
     }
 
 
@@ -194,7 +195,7 @@ class AgentRunnerSubmitFailureTest {
     @DisplayName("기다리다 시간 초과로 끝나면 중지를 아직 보내지 않은 run 으로 사용자 자리를 쥐고 FAILED 로 끝낸다")
     void holdsUserSlotWithoutStopWhenAwaitTimesOut() {
         when(hermes.submit(any())).thenReturn(RUN_ID);
-        when(hermes.awaitCompletion(any(), eq(RUN_ID)))
+        when(hermes.awaitCompletion(any(), eq(RUN_ID), eq(RunWait.BACKGROUND)))
             .thenThrow(new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time"));
 
         AgentRun run = run();

@@ -36,3 +36,5 @@ worktrees/
 /hermes/connectors/naver-blog/dist/naver-blog-mcp.js
 /hermes/connectors/naver-shopping/dist/naver-shopping-mcp.js
 /hermes/connectors/tossinvest/dist/tossinvest-mcp.js
+
+/connectors/career/plugin/node_modules/
