@@ -21,6 +21,7 @@ const FAILED_CHECK = {
     { feature: "SEARCH", status: "FAILED", reasonCode: "NO_SOURCES", elapsedMs: 61_000, conversationPublicId: "0195f1aa-0000-7000-8000-0000000000c1", executionIds: [41] },
     { feature: "MEMORY_READ", status: "PASSED", reasonCode: null, elapsedMs: 12_000, conversationPublicId: null, executionIds: [] },
   ],
+  environmentError: false,
 };
 
 const OLD_CHECK = {
@@ -76,6 +77,25 @@ test("관리자 메뉴의 품질은 확인 기록을 최근 순으로 보이고 
   await expect(features.nth(1).getByRole("link")).toHaveCount(0);
   // 30일이 지나 링크를 비운 실패 줄은 실행 링크를 그리지 않는다.
   await expect(checks.nth(1).getByTestId("quality-feature").getByRole("link")).toHaveCount(0);
+});
+
+test("Control Plane 연결이 끊겨 실패한 확인은 「실패」 대신 「환경 오류」 로 보이고 기능에 그 까닭을 보인다", async ({ page }) => {
+  const environment = {
+    ...FAILED_CHECK,
+    results: [
+      { feature: "TOOL_DISCOVERY", status: "FAILED", reasonCode: "ENVIRONMENT", elapsedMs: 30_000, conversationPublicId: null, executionIds: [42] },
+    ],
+    environmentError: true,
+  };
+  await fakeQuality(page, () => READY, [environment]);
+  await page.goto("/admin/quality");
+
+  const row = page.getByTestId("quality-check");
+  await expect(row.getByText("환경 오류", { exact: true })).toBeVisible();
+  await expect(row.getByText("실패", { exact: true })).toHaveCount(0);
+  const feature = row.getByTestId("quality-feature");
+  await expect(feature).toContainText("도구 찾기");
+  await expect(feature).toContainText("평가 비서의 Control Plane 연결이 끊겨 있었어요");
 });
 
 test("도는 확인을 다시 읽다 한 번 실패해도 다음 차례에 다시 읽어 결과를 보인다", async ({ page }) => {

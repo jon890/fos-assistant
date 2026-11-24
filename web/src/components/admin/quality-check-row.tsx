@@ -14,12 +14,15 @@ import {
 
 const STATUS: Record<
   QualityCheck["status"],
-  { label: string; variant: "success" | "destructive" | "info" }
+  { label: string; variant: "success" | "destructive" | "info" | "warning" }
 > = {
   PASSED: { label: "통과", variant: "success" },
   FAILED: { label: "실패", variant: "destructive" },
   RUNNING: { label: "확인 중", variant: "info" },
 };
+
+/** 실패했지만 그 까닭이 평가 환경(Control Plane 연결 끊김)인 확인이다. 품질 실패와 다른 색으로 보인다. */
+const ENVIRONMENT_ERROR = { label: "환경 오류", variant: "warning" } as const;
 
 const FEATURE_STATUS: Record<QualityFeatureResult["status"], string> = {
   PASSED: "통과",
@@ -80,7 +83,10 @@ export function QualityCheckRow({
   busy: boolean;
   onRetry(publicId: string): void;
 }) {
-  const status = STATUS[check.status];
+  const status =
+    check.status === "FAILED" && check.environmentError
+      ? ENVIRONMENT_ERROR
+      : STATUS[check.status];
   return (
     <li data-testid="quality-check" className="rounded-md border border-border">
       <details
