@@ -1,0 +1,77 @@
+{
+  "name": "tool-trace",
+  "description": "도구의 걸린 시간과 실패한 도구의 오류 요약(실행 추적 PR1)",
+  "pr_scope": "실행 트리의 도구 줄에 실제 걸린 시간과 「모름」 을 보이고, plugin 의 post_tool_call 기록을 Control Plane 으로 보내 실패한 도구의 오류 종류와 가린 오류 요약을 관리자에게 보인다.",
+  "deferred": [
+    {
+      "what": "PR2 hook 에만 오는 도구 호출을 새 도구 줄로 적는다(REQ13)",
+      "why": "사건 번호를 한 곳에서 내는 구조가 먼저 필요해 PR 을 나눴다(설계 DECISION2)",
+      "after": "이 PR 머지"
+    },
+    {
+      "what": "PR3 모델 호출 기록의 수집과 저장(REQ4-REQ8, REQ10, REQ11)",
+      "why": "스펙 「범위」 의 PR 순서",
+      "after": "PR2 머지"
+    },
+    {
+      "what": "PR4 관리자 실행 상세의 모델 호출 표시(REQ9)",
+      "why": "스펙 「범위」 의 PR 순서",
+      "after": "PR3 머지"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-24",
+  "spec": "docs/features/run-trace/spec.md",
+  "design": "docs/features/run-trace/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3",
+    "REQ6",
+    "REQ7",
+    "REQ12"
+  ],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ3",
+        "REQ12"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ2",
+        "REQ6"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ6",
+        "REQ7"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ3",
+        "REQ12"
+      ]
+    }
+  ]
+}
