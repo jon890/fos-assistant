@@ -32,7 +32,7 @@ PR2 부터는 같은 경계를 쓰고, 그 PR 이 바꾸는 결정만 이 문서
 | `usage.execution.application.ToolTraceLedger` | 메모리의 짝짓기 장부. 같은 도구 호출의 사건 줄과 hook 기록이 어느 쪽이 먼저 와도 한 줄에 모이게 한다 |
 | `usage.execution.application.ToolTraceWriter` | 장부를 보고 hook 기록을 완료 줄에 옮긴다. 실패 규칙과 이름 확인을 갖는다 |
 | `usage.execution.application.ExecutionEventRecorder` | `TOOL_COMPLETED` 를 만들 때 기다리던 기록을 채운다. 사건을 저장하는 두 자리(`ChatRunEvents.store`, `ChildRunEvents.store`)가 저장 직후 `saved` 를 부른다 |
-| `hermes.infra.HermesRunEventStream` | `tool_call_id` 와 `timestamp` 를 읽고 걸린 시간을 계산한다. 끝나기 전에 같은 번호가 다시 시작되면 그 번호의 시간을 비운다 |
+| `hermes.infra.HermesRunEventStream`, `ToolElapsed` | `tool_call_id` 와 `timestamp` 를 읽고 걸린 시간을 계산한다. 끝나기 전에 같은 번호가 다시 시작되면 그 번호의 시간을 비운다 |
 | `hermes.application.dto.HermesRunEvent`, `runtime.application.dto.RunEvent` | `toolCallId` 칸을 더한다 |
 | `runtime.domain.WithheldToolContent` | 실행 기록에 내용을 남기지 않는 도구의 이름(사진·OCR, 원고, Memory, 할 일). 사건 스트림과 오류 요약이 같은 목록을 쓴다 |
 | `usage.tree` | 응답에 `errorType`, `errorSummary` 를 역할에 맞춰 넣고 짝짓기용 `toolCallId` 를 넣는다 |
@@ -43,7 +43,7 @@ PR2 부터는 같은 경계를 쓰고, 그 PR 이 바꾸는 결정만 이 문서
 
 ### session 을 실행으로 푼다
 
-`EventToolGuard` 와 같은 순서다. 등록된 하위 에이전트 session(`hermes_session_binding`)이면 그 origin 실행이고, 아니면 서명한 루트 session 과 그 profile 로 **도구가 시작한 시각에 돌던** 실행이 하나일 때 그 실행이다(`AgentExecutionRepository.findRunningAt`).
+`EventToolGuard` 와 같은 순서다. 등록된 하위 에이전트 session(`hermes_session_binding`)이면 그 origin 실행이고, 아니면 서명한 루트 session 과 그 profile 로 **도구가 시작한 시각에 돌던** 실행이 하나일 때 그 실행이다(`RunningExecutionRepository.findRunningAt`).
 도는 실행만 찾지 않는다. 대화의 turn 은 같은 루트 session 을 쓰므로, 실행이 끝난 직후 도착한 기록이 다음 turn 에 붙거나 사라진다. 시각은 1초의 시계 차이를 감안하고, turn 경계에 걸려 후보가 둘이면 버린다.
 둘 이상이거나 없으면 버린다. 남의 실행에 붙이지 않는 것이 버리는 것보다 중요하다(ADR-032 와 같은 까닭).
 PR1 은 등록된 하위 에이전트 session 의 기록과 `tool_call_id` 없는 기록(코드 실행 안의 호출)을 받기만 하고 버린다. 두 기록은 PR2 가 새 도구 줄로 쓴다.

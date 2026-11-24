@@ -59,6 +59,7 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*HermesRu
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunEventStream.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/infra/ToolElapsed.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/application/dto/HermesRunEvent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/infra/HermesRunEventKinds.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/runtime/application/dto/RunEvent.java` | 수정 |

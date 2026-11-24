@@ -20,7 +20,7 @@ import com.bifos.assistant.usage.execution.application.ToolTraceWriter;
 import com.bifos.assistant.usage.execution.application.dto.ToolTrace;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.RunningExecutionRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +35,7 @@ class RunTraceIntakeTest {
     private static final Instant STARTED = Instant.parse("2026-11-24T00:00:10Z");
 
     private final HermesSessionBindingRepository bindings = mock(HermesSessionBindingRepository.class);
-    private final AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
+    private final RunningExecutionRepository executions = mock(RunningExecutionRepository.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
     private final ExecutionConnectorCalls connectorCalls = mock(ExecutionConnectorCalls.class);
     private final ToolTraceWriter writer = mock(ToolTraceWriter.class);

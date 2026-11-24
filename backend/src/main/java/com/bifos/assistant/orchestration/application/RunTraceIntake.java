@@ -10,7 +10,7 @@ import com.bifos.assistant.usage.execution.application.dto.ToolTrace;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.RunningExecutionRepository;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +38,7 @@ import org.springframework.stereotype.Service;
 public class RunTraceIntake {
 
     private final HermesSessionBindingRepository bindings;
-    private final AgentExecutionRepository executions;
+    private final RunningExecutionRepository executions;
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
     private final ToolTraceWriter toolTraces;
