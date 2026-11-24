@@ -53,6 +53,7 @@ public final class HermesRunEventKinds {
             event.skillName(),
             event.alreadyStreamed(),
             event.streamedPrefixLength(),
-            event.interimId());
+            event.interimId(),
+            event.toolCallId());
     }
 }

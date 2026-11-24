@@ -114,6 +114,12 @@ profile 은 그 값이 `approve` 라 사람 없이 열린다. 판정은 Hermes �
 모델이 같은 이름의 로컬 스킬을 만들면 로컬이 먼저 선택되어 올린 스킬이 가려진다.
 읽기 전용 마운트로는 이것을 막지 못한다. 근거는 fos-assistant ADR-034 가 갖는다.
 
+## 실행 기록
+
+`post_tool_call` 은 도구마다 걸린 시간과 실패한 도구의 오류를 대기열에 넣고 바로 돌아간다. 데몬 스레드가 모아
+Control Plane 의 `/internal/hermes/run-trace` 로 보내고, 실패하면 버린다. 도구 인자와 결과는 보내지 않는다.
+계약은 README 의 「도구 기록을 보낸다」 가 갖고 구현은 `run_trace.py` 다.
+
 이 plugin 은 profile 마다 `profiles/<이름>/plugins/fos-ctx/` 에 두고 그 profile 에서 켠다.
 Hermes 는 plugin 을 HERMES_HOME 마다 따로 읽어, root 에 두면 기본 profile 에만 걸린다.
 """
@@ -226,6 +232,14 @@ from .subagent import (
 
 
 
+from .run_trace import (
+    TRACE_PATH,
+    build_tool_record,
+    post_tool_call,
+    sign_trace,
+    trace_url,
+)
+
 from .attachment_inspect import TOOL as INSPECT_TOOL, SCHEMA as INSPECT_SCHEMA, handle as inspect_attachment
 from .product_page import (TOOL as PRODUCT_PAGE_TOOL, TOOLSET as PRODUCT_PAGE_TOOLSET, SCHEMA as PRODUCT_PAGE_SCHEMA,
                            handle as read_product_page)
@@ -240,5 +254,7 @@ def register(ctx):
     ctx.register_hook("subagent_start", subagent_start)
     ctx.register_hook("subagent_stop", subagent_stop)
     ctx.register_hook("transform_tool_result", transform_tool_result)
+    ctx.register_hook("post_tool_call", post_tool_call)
     logger.info("fos-ctx: Control Plane MCP 호출에 _fos_ctx 를 서명해 붙이고 skill_manage 를 막고 자식 session 을 등록하고 끝 소식을 보내고 "
-                "플러그인 도구와 안전 목록 밖의 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싼다")
+                "플러그인 도구와 안전 목록 밖의 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싸고 "
+                "도구마다 걸린 시간과 실패한 도구의 오류를 실행 기록으로 보낸다")

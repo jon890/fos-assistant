@@ -113,6 +113,7 @@ class ChildRunEventsTest {
         releaseStream();
 
         assertThat(recorded).containsExactly("RUN_STARTED#1", "TOOL_STARTED#2", "TOOL_COMPLETED#3", "RUN_COMPLETED#4");
+        verify(recorder, times(4)).saved(any(ExecutionEvent.class));
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
         verify(publisher, times(2)).publishEvent(published.capture());
         assertThat(published.getAllValues())

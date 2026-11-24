@@ -148,7 +148,7 @@ hook 목록은 `hermes_cli/plugins.py`의 `VALID_HOOKS`가 갖고, 그중 아래
 | hook | 얻는 것 |
 | --- | --- |
 | `post_llm_call` | LLM 호출 하나 단위의 모델, provider, 토큰 |
-| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간 |
+| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간. `post_tool_call` 은 `tool_name`, `session_id`, `tool_call_id`, `duration_ms`, `status`(`ok`, `error`, `blocked` 등), `error_type`, `error_message` 를 넘긴다. 사건이 없는 코드 실행 안의 호출에도 불리고, 그때 `tool_call_id` 는 빈 글이다. fos-ctx 가 이 값으로 실행 기록을 보낸다([fos-ctx 「도구 기록을 보낸다」](../plugins/fos-ctx/README.md#도구-기록을-보낸다)) |
 | `subagent_start`, `subagent_stop` | subagent 실행 경계 |
 
 Runs API 의 `usage` 는 실행 하나의 합계만 준다.
@@ -791,7 +791,7 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 현재 v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 아래와 같다. 앞의 범용 callback 표에는 이 경로가 등록하지 않는 사건도 포함한다. 개별 사건의 미수신 여부까지 운영에서 확인한 결과는 아직 없다.
 
 - `message.interim`, `reasoning.available`, `subagent.start`, `subagent.complete` 가 오지 않는다. `_execute_run` 이 답 조각과 도구 시작·완료 sink 만 등록한다(`gateway/session_api_turn.py` 의 `wire_api_observers`). Control Plane 은 오는 사건만 그린다(스펙 DECISION2)
-- `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 을 걸린 시간 모름으로 읽는다
+- `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 이면 같은 `tool_call_id` 의 시작·완료 `timestamp` 차이로 걸린 시간을 채우고, 그래도 없으면 모름으로 둔다([실행 기록](../../docs/features/execution.md) 의 「도구의 걸린 시간과 실패 원인」)
 - 대기 중 gateway 가 물러나면 끝이 아닌 `run.queued` 가 온다. 아는 사건 목록 밖이라 건너뛴다
 - gateway 가 정상 종료로 내려가면 도는 실행에 `run.interrupted` 가 오고 `pending_steer` 와 `runtime` 은 빠진다
 

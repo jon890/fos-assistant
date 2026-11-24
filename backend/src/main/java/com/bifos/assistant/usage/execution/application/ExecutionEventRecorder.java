@@ -27,6 +27,9 @@ import org.springframework.stereotype.Service;
  * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 넘기는 것은 가린 {@code detail} 이 아니라 사건
  * 스트림이 가리기 전 미리보기에서 꺼내 검증한 {@code skillName} 이다. 근거는 ADR-047 에 있다. 그 저장은 스스로
  * 실패를 감싸므로 여기로 던지지 않는다.
+ *
+ * <p>도구 완료 사건은 plugin 의 도구 기록과 한 줄에 모은다. 만들 때 먼저 온 기록을 채우고, 저장한 쪽이 {@link #saved} 를 불러
+ * 그 사이에 온 기록을 옮기게 한다. 옮기는 일은 {@link ToolTraceWriter} 가 하고 실패를 스스로 감싼다(스펙 run-trace REQ2).
  */
 @Service
 @Slf4j
@@ -38,6 +41,8 @@ public class ExecutionEventRecorder {
 
     private final SkillUseRecorder skillUses;
     private final Clock clock;
+    /** 도구 기록을 옮기는 곳이다. 사건 모양만 보는 단위 테스트처럼 없으면 옮기지 않는다. */
+    private final ToolTraceWriter toolTraces;
 
     /**
      * Hermes 이름에서 우리 이름으로 가는 표다.
@@ -71,7 +76,7 @@ public class ExecutionEventRecorder {
         if (type == ExecutionEventType.TOOL_STARTED && SKILL_VIEW_TOOL.equals(event.toolName())) {
             skillUses.recordModel(execution.id(), event.skillName());
         }
-        return ExecutionEvent.builder()
+        ExecutionEvent built = ExecutionEvent.builder()
             .executionId(execution.id())
             .sequence(sequence)
             .eventType(type)
@@ -88,7 +93,20 @@ public class ExecutionEventRecorder {
             .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
             .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
             .occurredAt(clock.instant())
+            .toolCallId(type.isTool() ? event.toolCallId() : null)
             .build();
+        if (toolTraces != null) {
+            toolTraces.fill(built);
+        }
+        return built;
+    }
+
+
+    /** 사건을 저장한 직후 부른다. 저장 전에 와서 기다리던 도구 기록이 있으면 그 줄에 옮긴다. 실패해도 던지지 않는다. */
+    public void saved(ExecutionEvent event) {
+        if (toolTraces != null) {
+            toolTraces.afterSaved(event);
+        }
     }
 
 

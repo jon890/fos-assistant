@@ -44,7 +44,8 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
         "/internal/hermes/attachment-inspect/validate",
         "/internal/hermes/generated-image",
         "/internal/hermes/image-source",
-        "/internal/hermes/found-links");
+        "/internal/hermes/found-links",
+        "/internal/hermes/run-trace");
 
     /** Hermes 의 MCP 클라이언트가 부르는 경로다. 나머지 경로는 profile plugin 의 hook 이 따로 부른다. */
     private static final String MCP_PATH = "/mcp";

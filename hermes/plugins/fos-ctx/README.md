@@ -359,6 +359,29 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
+### 도구 기록을 보낸다
+
+도구 호출 하나마다 걸린 시간과 실패한 도구의 오류를 Control Plane 의 실행 기록으로 보낸다(fos-assistant [실행 추적 설계](../../../docs/features/run-trace/design.md)). 이 절이 기록 경로 계약의 정본이다. 1.19.0 부터다.
+
+**hook 은 기다리지 않는다.** `post_tool_call` 은 기록을 메모리 대기열(1,000개)에 넣고 바로 돌아간다. 데몬 스레드 하나가 0.5초 모아 보내고, 실패하면 다시 보내지 않고 버린다. Hermes 는 profile 여럿을 한 프로세스에서 돌리므로, hook 안에서 토큰과 `state.db` 경로를 기록에 담고 보내는 스레드가 토큰마다 묶는다.
+
+**도구 인자와 결과는 보내지 않는다.** 실패한 도구(`status` 가 `ok` 가 아닌 기록)의 오류 글만 보내고 Control Plane 이 가린다.
+
+| 칸 | 값 |
+| --- | --- |
+| 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `run-trace` 로 바꾼 것(`/internal/hermes/run-trace`). http(s) 가 아니거나 없으면 보내지 않는다 |
+| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>`. 토큰이 없으면 보내지 않는다 |
+| 본문 | `{"v": 1, "records": [...]}`. 한 요청에 기록 100개, 오류 글 합 UTF-8 256KB 까지 |
+| 기록 | `kind`(`"tool"`), `session_id`, `root_session_id`, `tool_call_id`(코드 실행 안의 호출처럼 없으면 빈 글), `tool_name`, `duration_ms`(0 이면 null), `status`, `error_type`, `error_message`(실패한 기록만, 65,537자까지), `ended_at`(초 단위 실수), `sig` |
+| 서명할 글 | `v1-run-trace`, `kind`, 루트 session, session, `tool_call_id` 를 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
+| 답 | 202 와 `{"accepted": n}`. 틀린 기록만 버린다. plugin 은 답을 읽지 않는다 |
+| 제한 시간 | `SEND_TIMEOUT`(3초). 한 번만 보낸다 |
+| 로그 | 실패 종류(`HTTP 404`, `URLError`)만 남기고 같은 실패는 60초에 한 번 남긴다. 토큰, 서명, 오류 글은 남기지 않는다 |
+
+확인 값: key `2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b`, 종류 `tool`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1` 의 서명은 `00838c8bbb3d1461b00deb843c093dc6ad9103c44211569433b6f9e74e283436` 다. backend 의 `RunTraceEndpointTest` 도 같은 값을 쓴다.
+
+운영은 plugin 을 먼저 올린다. 옛 Control Plane 은 이 경로가 없어 404 를 돌려주고 plugin 은 기록을 버린다. 실행에는 영향이 없다.
+
 ## _fos_ctx 와 session 등록
 
 Hermes 의 MCP 도구 호출에 실행을 가리키는 값을 싣는 방법과 그 근거가 된 Hermes 동작을 갖는다.

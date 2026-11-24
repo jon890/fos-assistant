@@ -21,6 +21,7 @@ package com.bifos.assistant.runtime.application.dto;
  * @param alreadyStreamed 중간 안내의 일부가 답 조각으로 전달됐는지. 모르면 null
  * @param streamedPrefixLength 안내로 확인한 직전 답 조각 구간의 UTF-16 길이
  * @param interimId 실행 안에서 같은 안내의 재수신을 구분할 불투명한 번호
+ * @param toolCallId 도구 사건의 호출 번호. 런타임이 보내지 않으면 null 이다
  */
 public record RunEvent(
     RunEventKind kind,
@@ -39,5 +40,14 @@ public record RunEvent(
     String skillName,
     Boolean alreadyStreamed,
     Integer streamedPrefixLength,
-    String interimId) {
+    String interimId,
+    String toolCallId) {
+
+    /** 도구 호출 번호를 모르는 런타임이다. */
+    public RunEvent(RunEventKind kind, String text, String toolName, String detail, Long durationMs, Boolean failed,
+        String subagentId, String goal, String model, String childSessionId, Long inputTokens, Long outputTokens,
+        String status, String skillName, Boolean alreadyStreamed, Integer streamedPrefixLength, String interimId) {
+        this(kind, text, toolName, detail, durationMs, failed, subagentId, goal, model, childSessionId, inputTokens,
+            outputTokens, status, skillName, alreadyStreamed, streamedPrefixLength, interimId, null);
+    }
 }

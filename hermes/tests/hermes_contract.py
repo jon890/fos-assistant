@@ -417,6 +417,11 @@ SUBAGENT_HOOKS = {
     "subagent_stop": ("tools/delegate_tool_results.py",
                       ("parent_session_id", "child_session_id", "child_status", "child_summary")),
 }
+# fos-ctx 가 실행 기록에 기대는 `post_tool_call` hook 이다(fos-assistant docs/features/run-trace/design.md).
+# 부르는 파일과 fos-ctx 가 읽는 키워드 인자, 식별 칸을 넘기는 `_CallIds` 의 칸이다. 이름이 바뀌면 기록이 조용히 빠진다.
+TOOL_TRACE_HOOK = ("post_tool_call", "model_tools.py",
+                   ("tool_name", "duration_ms", "status", "error_type", "error_message"),
+                   ("session_id", "tool_call_id"))
 # hook 이름 목록과, 제한 시간 worker 로 옮기지 않고 부르는 스레드에서 도는 hook 의 목록이다.
 # `subagent_stop` 이 worker 로 옮겨지면 끝 소식과 부모 session 의 결과 줄 순서가 바뀔 수 있다. 설계의 「깨우는 때」 를 다시 본다.
 HOOK_NAMES = ("hermes_cli/plugins.py", "VALID_HOOKS")

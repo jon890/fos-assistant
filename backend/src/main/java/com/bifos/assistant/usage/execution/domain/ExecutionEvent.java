@@ -41,6 +41,15 @@ public class ExecutionEvent {
     /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. 값은 {@code hermes} 의 {@code ToolDetailRedactor} 가 갖는다. */
     public static final int DETAIL_LIMIT = ToolDetailRedactor.DETAIL_LIMIT;
 
+    /** 도구 호출 번호 칸의 길이다. 넘는 번호는 적지 않는다. 잘라 적으면 다른 호출과 같아질 수 있다. */
+    public static final int TOOL_CALL_ID_LIMIT = 128;
+
+    /** 오류 종류 칸의 길이다. 받은 값을 이 길이로만 자른다(스펙 run-trace DECISION17). */
+    public static final int ERROR_TYPE_LIMIT = 64;
+
+    /** 오류 요약 칸의 길이다. 가린 요약은 {@link ToolDetailRedactor#ERROR_LIMIT} 를 넘지 않는다. */
+    public static final int ERROR_SUMMARY_LIMIT = 255;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter
@@ -105,6 +114,21 @@ public class ExecutionEvent {
     @Getter
     private Instant occurredAt;
 
+    /** 도구 사건의 Hermes {@code tool_call_id} 다. plugin 의 도구 기록과 맞춘다. */
+    @Column(name = "tool_call_id", length = TOOL_CALL_ID_LIMIT)
+    @Getter
+    private String toolCallId;
+
+    /** 실패한 도구의 오류 종류다. plugin 의 {@code post_tool_call} 이 준 값이다. */
+    @Column(name = "error_type", length = ERROR_TYPE_LIMIT)
+    @Getter
+    private String errorType;
+
+    /** 실패한 도구의 오류 글을 가린 요약이다. 대화를 지우면 비운다. */
+    @Column(name = "error_summary", length = ERROR_SUMMARY_LIMIT)
+    @Getter
+    private String errorSummary;
+
 
     private ExecutionEvent(Builder builder) {
         this.executionId = builder.executionId;
@@ -121,6 +145,27 @@ public class ExecutionEvent {
         this.inputTokens = builder.inputTokens;
         this.outputTokens = builder.outputTokens;
         this.occurredAt = builder.occurredAt;
+        this.toolCallId = builder.toolCallId;
+    }
+
+
+    /**
+     * plugin 의 도구 기록을 이 완료 줄에 옮긴다.
+     *
+     * <p>걸린 시간은 사건 시각으로 계산한 값이 없을 때만 채운다(스펙 run-trace DECISION5). 오류 칸은 값이 있을 때만 바꾼다.
+     */
+    public void recordToolTrace(Long traceDurationMs, String traceErrorType, String traceErrorSummary) {
+        if (durationMs == null && traceDurationMs != null && traceDurationMs >= 0) {
+            durationMs = traceDurationMs;
+        }
+        if (traceErrorType != null) {
+            errorType = traceErrorType.length() <= ERROR_TYPE_LIMIT ? traceErrorType : traceErrorType.substring(0, ERROR_TYPE_LIMIT);
+        }
+        if (traceErrorSummary != null) {
+            errorSummary = traceErrorSummary.length() <= ERROR_SUMMARY_LIMIT
+                ? traceErrorSummary
+                : traceErrorSummary.substring(0, ERROR_SUMMARY_LIMIT);
+        }
     }
 
 
@@ -143,6 +188,7 @@ public class ExecutionEvent {
         private Long inputTokens;
         private Long outputTokens;
         private Instant occurredAt;
+        private String toolCallId;
 
 
         public Builder executionId(Long executionId) {
@@ -220,6 +266,15 @@ public class ExecutionEvent {
 
         public Builder occurredAt(Instant occurredAt) {
             this.occurredAt = occurredAt;
+            return this;
+        }
+
+
+        /** 칸 길이를 넘는 번호는 적지 않는다. */
+        public Builder toolCallId(String toolCallId) {
+            this.toolCallId = toolCallId == null || toolCallId.isBlank() || toolCallId.length() > TOOL_CALL_ID_LIMIT
+                ? null
+                : toolCallId;
             return this;
         }
 
