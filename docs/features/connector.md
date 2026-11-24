@@ -2,7 +2,7 @@
 
 사용자가 플러그인에 계정을 연결하고 그 연결을 에이전트에 붙이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
+covers: `connectors/career/plugin/`, `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
 
 ## 도구 이름과 요약
 
@@ -606,3 +606,11 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 | `POST /api/v1/admin/secrets/connector-oauth/signing/regenerate` | 비밀을 새로 만들고 단추 연결마다 새 통로 주소를 다시 쓴다. 바뀐 상태(`signing`)와 다시 쓴 결과(`rewrite.total`, `rewrite.failed`)를 준다 |
 
 새로 만들면 옛 표식은 바로 401 이다. 바인딩을 다시 설치하지 않으며, 떠 있는 플러그인 프로세스는 다음 프로세스부터 새 주소를 받는다. 응답에 원문과 통로 주소는 없다.
+
+## 커리어 플러그인 이전 설계
+
+커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. Hermes 공용 플러그인은 기존 설치 계약으로 이 패키지를 읽는다.
+
+설치본에는 기존 ID `fos-career`, 버전 `0.14.1`, MCP 서버와 로컬 실행기, 에이전트 스킬이 함께 들어간다. 기존 `connector.json`은 같은 내용을 담은 `assistant.json`으로 옮긴다. Bun과 패키지 전용 잠금 파일로 두 실행 파일을 빌드한다. CI는 변경 경로에 맞춰 대역 테스트와 타입 검사를 실행하고, 설치본만으로 실행되는지 확인한다.
+
+GitHub 연동부터 테스트와 함께 옮긴다. 이어서 공고 조회와 MCP 서버, 로컬 실행기가 사용하는 명령 모듈을 각각 검증한 뒤 설치본을 조립한다. 운영 목록의 설치 경로는 두 실행 파일과 스킬 검증이 끝난 뒤 전환한다. 노트북 사용량 수집기와 월별 집계는 별도로 옮긴다. 서비스의 동작 계약과 유효한 설계 결정은 해당 코드와 함께 문서에 남긴다. 운영 주소와 계정은 운영 저장소에서 관리한다. 테스트에는 가상 지원 자료를 쓴다.
