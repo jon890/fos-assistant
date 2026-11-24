@@ -171,11 +171,13 @@ class RunTraceTest(base.PluginFixture):
         self.assertFalse(server.received.wait(1))
 
     def test_batches_split_by_count_and_error_size(self):
-        """한 요청은 기록 100개, 오류 글 합 256KB 를 넘지 않는다."""
-        records = [{"error_message": "가" * 100_000}] * 3 + [{"error_message": None}] * 150
+        """한 요청은 기록 100개, 오류 글의 UTF-8 합 256KB 를 넘지 않는다."""
+        records = [{"error_message": "가" * 40_000}] * 3 + [{"error_message": None}] * 150
         batches = list(sys.modules[self.plugin.__name__ + ".run_trace"]._batches(records))
         self.assertTrue(all(len(batch) <= 100 for batch in batches))
-        self.assertTrue(all(sum(len(r["error_message"] or "") for r in batch) <= 256 * 1024 for batch in batches))
+        self.assertTrue(all(sum(len((r["error_message"] or "").encode("utf-8")) for r in batch) <= 256 * 1024
+                            for batch in batches))
+        self.assertEqual(len(batches[0]), 2, "한글 4만 자는 12만 바이트라 셋째는 다음 요청으로 간다")
         self.assertEqual(sum(len(batch) for batch in batches), len(records))
 
 

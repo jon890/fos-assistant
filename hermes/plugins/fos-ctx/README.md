@@ -371,7 +371,7 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 
 | --- | --- |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `run-trace` 로 바꾼 것(`/internal/hermes/run-trace`). http(s) 가 아니거나 없으면 보내지 않는다 |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>`. 토큰이 없으면 보내지 않는다 |
-| 본문 | `{"v": 1, "records": [...]}`. 한 요청에 기록 100개, 오류 글 합 256KB 까지 |
+| 본문 | `{"v": 1, "records": [...]}`. 한 요청에 기록 100개, 오류 글 합 UTF-8 256KB 까지 |
 | 기록 | `kind`(`"tool"`), `session_id`, `root_session_id`, `tool_call_id`(코드 실행 안의 호출처럼 없으면 빈 글), `tool_name`, `duration_ms`(0 이면 null), `status`, `error_type`, `error_message`(실패한 기록만, 65,537자까지), `ended_at`(초 단위 실수), `sig` |
 | 서명할 글 | `v1-run-trace`, `kind`, 루트 session, session, `tool_call_id` 를 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
 | 답 | 202 와 `{"accepted": n}`. 틀린 기록만 버린다. plugin 은 답을 읽지 않는다 |

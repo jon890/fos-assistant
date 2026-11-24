@@ -33,8 +33,8 @@ TOOL_KIND = "tool"
 QUEUE_LIMIT = 1000
 # 한 요청에 넣는 기록의 수다. Control Plane 도 이만큼만 읽는다.
 BATCH_LIMIT = 100
-# 한 요청에 넣는 오류 글의 합이다. 프록시의 본문 상한에 걸려 묶음을 통째로 잃지 않게 한다.
-BATCH_ERROR_CHARS = 256 * 1024
+# 한 요청에 넣는 오류 글의 UTF-8 바이트 합이다. 프록시의 본문 상한에 걸려 묶음을 통째로 잃지 않게 한다.
+BATCH_ERROR_BYTES = 256 * 1024
 # 보내기 전에 기록을 모으는 시간(초)이다.
 FLUSH_DELAY = 0.5
 SEND_TIMEOUT = 3.0
@@ -174,8 +174,8 @@ def _signed(key: str, db_path: str, record: dict, roots: dict) -> dict:
 def _batches(records):
     batch, chars = [], 0
     for record in records:
-        size = len(record.get("error_message") or "")
-        if batch and (len(batch) >= BATCH_LIMIT or chars + size > BATCH_ERROR_CHARS):
+        size = len((record.get("error_message") or "").encode("utf-8"))
+        if batch and (len(batch) >= BATCH_LIMIT or chars + size > BATCH_ERROR_BYTES):
             yield batch
             batch, chars = [], 0
         batch.append(record)
