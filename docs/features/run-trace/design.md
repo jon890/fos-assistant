@@ -111,6 +111,8 @@ Hermes 는 profile 여럿을 한 프로세스에서 돌린다(multiplex). 보내
 - 운영은 plugin 을 먼저 올린다(`hermes/docs/code-architecture.md`). 그 사이 옛 Control Plane 은 404 를 돌려주고 plugin 은 기록을 버린다. 실행에는 영향이 없다.
 - Control Plane 은 기록 하나의 저장 실패를 그 기록에서 멈추고 실행 기록과 대화를 건드리지 않는다.
 - 걸린 시간은 사건 시각 차이를 먼저 쓴다. 줄을 고칠 때 `duration_ms` 는 비어 있을 때만 채운다. 사건 시각 차이에는 `pre_tool_call` 의 Control Plane 판정 왕복이 들어가고, hook 의 `duration_ms` 는 판정 뒤 도구 실행만 잰다. 화면의 시간은 사용자가 기다린 시간에 가까운 앞의 값이다.
+- 이미 저장된 줄은 바꾸는 칸만 쓰는 질의(`ExecutionEventRepository.recordToolTrace`)로 고친다. 엔티티를 통째로 저장하면 그 사이 대화 삭제가 비운 `detail` 을 다시 쓰기 때문이다.
+- 알려진 한계: 같은 루트 session 에 `finishedAt` 이 빈 채 끝난 실행 줄이 남으면 후보가 둘이 되어 그 session 의 기록을 버린다. 호출 번호를 다시 쓰는 모델에서 hook 이 순서를 바꿔 도착하면 첫 완료 줄에 다른 호출의 기록이 붙을 수 있다. 둘 다 버리거나 드물게 틀리는 쪽이고 남의 실행으로 새지는 않는다.
 - 대화를 지운 직후 늦게 온 기록이 오류 요약을 다시 쓸 수 있다. 장부의 10분 만료 안에서만 생기고, 요약은 이미 가린 값이다.
 - 오류 글의 UUID 번호표는 사건 스트림의 번호표와 따로 매긴다. 같은 UUID 가 도구 내용과 오류 요약에서 다른 번호로 보일 수 있지만, 원문은 어느 쪽에도 남지 않는다.
 - 플러그인 호출 여부는 도구가 시작한 시각(`ended_at - duration_ms`)으로 실행 트리 전체의 플러그인 정책 기록에서 확인한다. 사건 스트림이 쓰는 `ExecutionConnectorCalls.calledBefore` 와 같다. 조회가 실패하면 오류 글을 버린다.
