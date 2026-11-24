@@ -143,6 +143,9 @@ public class DeployCheckRuns {
         String body = failed.isEmpty()
             ? "확인한 기능이 없어요."
             : failed.stream().map(result -> featureLabel(result.feature())).collect(Collectors.joining(", ")) + " 확인이 통과하지 못했어요.";
+        if (failed.stream().anyMatch(result -> CheckReason.ENVIRONMENT.name().equals(result.reasonCode()))) {
+            body += " 평가 비서의 Control Plane 연결이 끊겨 있어 품질이 아니라 평가 환경의 문제예요.";
+        }
         NotificationTarget target = new NotificationTarget(NotificationTargetType.ADMIN_QUALITY, null);
         for (AppUser admin : users.findByGroupIdAndRole(run.groupId(), UserRole.ADMIN)) {
             if (signInPolicy.revoked(admin.email())) {
@@ -163,6 +166,7 @@ public class DeployCheckRuns {
             case MEMORY_READ -> "기억 읽기";
             case TASK_FIRE -> "예약 작업 발화";
             case PHOTO_INSPECT -> "원본 사진 조회";
+            case TOOL_DISCOVERY -> "도구 찾기";
         };
     }
 }

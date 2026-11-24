@@ -2,6 +2,7 @@ package com.bifos.assistant.quality.application;
 
 import com.bifos.assistant.quality.application.dto.TurnOutcome;
 import com.bifos.assistant.quality.application.dto.EvalVerdict;
+import com.bifos.assistant.quality.application.dto.EvalView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -14,6 +15,7 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.contentdraft.application.ContentDraftSaveApproval;
+import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.EvalObservation;
@@ -72,6 +74,11 @@ class EvalRunner {
     static final String RULES = "RULES";
     /** 평가가 도중에 멈춰 보내지 못한 문항이다. */
     static final String NOT_RUN = "NOT_RUN";
+    /**
+     * 평가 비서의 Control Plane MCP 연결이 끊긴 채 돌아 실패한 문항과, 그래서 보내지 않은 남은 문항이다. 품질 실패가 아니라 평가 환경의 문제다
+     * (docs/features/agent-quality/design.md 의 「평가 환경 오류」).
+     */
+    static final String ENVIRONMENT = EvalView.ENVIRONMENT;
 
     /** 카드를 누른 뒤 에이전트가 다시 도는 turn 이 시작되기를 기다리는 상한이다. 결과만 대화에 들어가고 turn 이 없을 수도 있다. */
     static final Duration CARD_FOLLOW_UP_GRACE = Duration.ofSeconds(10);
@@ -91,6 +98,7 @@ class EvalRunner {
     private final ConnectorActionService actionService;
     private final ContentDraftSaveApproval contentDrafts;
     private final ConnectorConnectionService connections;
+    private final McpConnectionLiveness liveness;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -102,10 +110,14 @@ class EvalRunner {
     }
 
 
-    /** 묶음을 차례로 돌리고 줄을 끝낸다. 도중의 예외는 남은 문항을 돌리지 않고 줄을 끝낸다. */
+    /**
+     * 묶음을 차례로 돌리고 줄을 끝낸다. 도중의 예외는 남은 문항을 돌리지 않고 줄을 끝낸다. 한 문항이 환경 오류로 끝나면 남은 문항도 보내지 않고 환경 오류로
+     * 적는다. 연결이 끊긴 채 보내면 모델 호출만 쓰고 같은 실패가 되풀이된다.
+     */
     void run(Long runId, Long evaluationUserId, List<EvalBundle> bundles, ModelTier tier) {
         boolean cleanedAll = true;
         boolean stopped = false;
+        String unrunReason = NOT_RUN;
         try {
             cleaner.recleanFinished();
             CurrentUser evaluation = EvaluationUserService.asCurrentUser(users.findById(evaluationUserId).orElseThrow());
@@ -116,7 +128,16 @@ class EvalRunner {
                 Duration timeout = Optional.ofNullable(properties.current().evalTimeoutOverride())
                     .orElse(Duration.ofMinutes(bundle.timeoutMinutes()));
                 for (EvalQuestion question : bundle.questions()) {
-                    cleanedAll &= runQuestion(runId, bundle, question, evaluation, primary, tier, slots, timeout);
+                    if (ENVIRONMENT.equals(unrunReason)) {
+                        break;
+                    }
+                    QuestionEnd end = runQuestion(runId, bundle, question, evaluation, primary, tier, slots, timeout);
+                    cleanedAll &= end.cleaned();
+                    if (end.environment()) {
+                        log.warn("평가 비서의 Control Plane MCP 연결이 끊겨 남은 문항을 보내지 않는다 runId={} profile={}", runId,
+                            primary.hermesProfile());
+                        unrunReason = ENVIRONMENT;
+                    }
                 }
             }
         } catch (RuntimeException ex) {
@@ -124,16 +145,18 @@ class EvalRunner {
             stopped = true;
             log.error("평가가 도중에 멈췄다 runId={}", runId, ex);
         } finally {
-            finish(runId, bundles, cleanedAll, stopped);
+            finish(runId, bundles, cleanedAll, stopped, unrunReason);
         }
     }
 
 
     /**
-     * 묶음 결과로 줄을 끝낸다. 돌지 못한 문항은 실패(까닭 {@code NOT_RUN})로 적어 묶음 결과의 분모와 오류에 넣는다. 적지 않으면 멈춘 평가가 앞 문항만으로
+     * 묶음 결과로 줄을 끝낸다. 돌지 못한 문항은 실패(까닭 {@code unrunReason})로 적어 묶음 결과의 분모와 오류에 넣는다. 적지 않으면 멈춘 평가가 앞 문항만으로
      * 통과로 끝난다. 도중에 멈췄으면 묶음 결과와 상관없이 줄을 실패로 끝낸다.
+     *
+     * @param unrunReason 돌지 못한 문항의 까닭. 보통 {@code NOT_RUN} 이고, 환경 오류로 멈췄으면 {@code ENVIRONMENT} 다
      */
-    private void finish(Long runId, List<EvalBundle> bundles, boolean cleanedAll, boolean stopped) {
+    private void finish(Long runId, List<EvalBundle> bundles, boolean cleanedAll, boolean stopped, String unrunReason) {
         try {
             QualityRun run = rows.findById(runId).orElseThrow();
             for (EvalBundle bundle : bundles) {
@@ -141,7 +164,7 @@ class EvalRunner {
                     boolean recorded = run.evalResult().items().stream()
                         .anyMatch(item -> item.bundle().equals(bundle.id()) && item.question().equals(question.id()));
                     if (!recorded) {
-                        runs.record(runId, new ItemResult(bundle.id(), question.id(), EvalItemStatus.FAILED, NOT_RUN, List.of(), 0, null, null, null,
+                        runs.record(runId, new ItemResult(bundle.id(), question.id(), EvalItemStatus.FAILED, unrunReason, List.of(), 0, null, null, null,
                             List.of(), question.keepConversation()), 0);
                     }
                 }
@@ -166,18 +189,18 @@ class EvalRunner {
 
 
     /**
-     * 문항 하나를 돌리고 판정하고 비운다.
+     * 문항 하나를 돌리고 판정하고 비운다. 통과하지 못했는데 평가 비서의 Control Plane MCP 연결이 끊겨 있으면 까닭을 환경 오류로 바꾼다.
      *
-     * @return 그 문항이 만든 것을 모두 지웠으면 참
+     * @return 만든 것을 모두 지웠는지와 환경 오류였는지
      */
-    private boolean runQuestion(Long runId, EvalBundle bundle, EvalQuestion original, CurrentUser evaluation, Agent primary, ModelTier tier,
+    private QuestionEnd runQuestion(Long runId, EvalBundle bundle, EvalQuestion original, CurrentUser evaluation, Agent primary, ModelTier tier,
         Map<String, String> slots, Duration timeout) {
         String bundleId = bundle.id();
         Optional<EvalQuestion> filled = EvalBundles.fill(original, slots);
         if (filled.isEmpty()) {
             runs.record(runId, new ItemResult(bundleId, original.id(), EvalItemStatus.SKIPPED, null, List.of(), 0, null, null, null, List.of(),
                 original.keepConversation()), 0);
-            return true;
+            return new QuestionEnd(true, false);
         }
         EvalQuestion question = filled.get();
         Instant startedAt = clock.instant();
@@ -229,6 +252,13 @@ class EvalRunner {
             status = EvalItemStatus.FAILED;
             reason = RUN_FAILED;
         }
+        boolean environment = status != EvalItemStatus.PASSED && !liveness.connected(primary.hermesProfile());
+        if (environment) {
+            // 도구를 받지 못한 채 돈 실패는 에이전트의 회귀가 아니다. 규칙 미달 목록을 비워 판정까지 가지 못한 문항(묶음의 오류)으로 센다.
+            status = EvalItemStatus.FAILED;
+            reason = ENVIRONMENT;
+            failures = List.of();
+        }
         long elapsedMs = Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
         boolean cleaned = false;
         boolean dropped = false;
@@ -247,7 +277,12 @@ class EvalRunner {
         }
         runs.record(runId, new ItemResult(bundleId, question.id(), status, reason, failures, elapsedMs, startedAt, conversationId,
             dropped ? null : conversation.publicId(), dropped ? List.of() : executionIds, question.keepConversation()), modelCalls);
-        return cleaned;
+        return new QuestionEnd(cleaned, environment);
+    }
+
+
+    /** 문항 하나가 끝난 모양이다. */
+    private record QuestionEnd(boolean cleaned, boolean environment) {
     }
 
 

@@ -170,6 +170,23 @@ class DeployCheckJudgeTest {
     }
 
 
+    @ParameterizedTest
+    @ValueSource(strings = {"task_list", "mcp__fos_assistant__task_list"})
+    @DisplayName("도구 찾기는 도구 이름을 적지 않은 문항에서 task_list 를 실패 없이 끝내야 통과다")
+    void toolDiscovery(String toolName) {
+        assertVerdict(judge.judge(QualityFeature.TOOL_DISCOVERY, of(turn("예약 작업은 0개예요", List.of(ok(toolName))))), FeatureStatus.PASSED,
+            null);
+        assertVerdict(
+            judge.judge(QualityFeature.TOOL_DISCOVERY, of(turn("찾지 못했어요", List.of(ok("tool_search"))))),
+            FeatureStatus.FAILED,
+            "NO_TOOL");
+        assertVerdict(
+            judge.judge(QualityFeature.TOOL_DISCOVERY, of(turn("목록을 읽지 못했어요", List.of(new ToolObservation(toolName, true))))),
+            FeatureStatus.FAILED,
+            "NO_TOOL");
+    }
+
+
     @Test
     @DisplayName("시간 초과, Hermes 기다림 초과, 바쁨, 실행 실패, 승인 카드는 기능 규칙보다 먼저 판정한다")
     void commonFailuresComeFirst() {

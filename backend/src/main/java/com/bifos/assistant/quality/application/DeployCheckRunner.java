@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
+import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.FeatureVerdict;
 import com.bifos.assistant.quality.config.QualityProperties;
@@ -78,6 +79,7 @@ class DeployCheckRunner {
     private final TaskService tasks;
     private final TurnCancellation turns;
     private final TurnDriver driver;
+    private final McpConnectionLiveness liveness;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -145,6 +147,11 @@ class DeployCheckRunner {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
         }
+        if (verdict.status() != FeatureStatus.PASSED && !controlPlaneConnected(evaluation)) {
+            // 도구를 받지 못한 채 돈 실패는 기능의 회귀가 아니다. 까닭을 환경 오류로 바꿔 품질 실패와 섞이지 않게 한다.
+            log.warn("평가 비서의 Control Plane MCP 연결이 끊긴 채 기능이 실패했다 feature={}", feature);
+            verdict = FeatureVerdict.failed(CheckReason.ENVIRONMENT);
+        }
         if (attempt.conversationId != null) {
             // 문항이 돌다 기억 도구로 남긴 것은 통과와 상관없이 되돌린다. 대화 번호로 찾아 함께 도는 평가의 기억은 건드리지 않는다.
             // 아래 조회가 실패해도 건너뛰지 않게 먼저 부른다.
@@ -163,6 +170,12 @@ class DeployCheckRunner {
             ? new FeatureResult(feature, verdict.status(), null, elapsedMs, null, List.of())
             : new FeatureResult(feature, verdict.status(), verdict.reasonCode(), elapsedMs, attempt.conversationPublicId, executionIds);
         return new Outcome(result, modelCalls);
+    }
+
+
+    /** 평가 비서 profile 의 Control Plane MCP 연결이 살아 있는가. 기본 비서가 없으면 연결도 없다고 본다. */
+    private boolean controlPlaneConnected(CurrentUser evaluation) {
+        return evaluationUsers.primaryAgent(evaluation).map(Agent::hermesProfile).filter(liveness::connected).isPresent();
     }
 
 
@@ -194,6 +207,7 @@ class DeployCheckRunner {
             case FILE_PUT -> send(evaluation, attempt, DeployCheckItems.FILE_PUT_PROMPT, List.of(), deadline);
             case IMAGE -> send(evaluation, attempt, DeployCheckItems.IMAGE_PROMPT, List.of(), deadline);
             case MEMORY_READ -> send(evaluation, attempt, DeployCheckItems.MEMORY_PROMPT, List.of(), deadline);
+            case TOOL_DISCOVERY -> send(evaluation, attempt, DeployCheckItems.TOOL_DISCOVERY_PROMPT, List.of(), deadline);
             case PHOTO_INSPECT -> {
                 ChatAttachment photo = uploadPhoto(evaluation, conversation.id());
                 send(evaluation, attempt, DeployCheckItems.PHOTO_UPLOAD_PROMPT, List.of(photo.id()), deadline);

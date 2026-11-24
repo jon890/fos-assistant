@@ -1,6 +1,7 @@
 package com.bifos.assistant.quality.application.dto;
 
 import com.bifos.assistant.quality.domain.FeatureResult;
+import com.bifos.assistant.quality.domain.type.CheckReason;
 import com.bifos.assistant.quality.domain.QualityRun;
 import java.time.Instant;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.UUID;
  * @param finishedAt 도는 동안 null
  * @param elapsedMs 도는 동안 null
  * @param results 끝난 기능의 결과. 도는 동안에는 끝난 것만 있다
+ * @param environmentError 평가 비서의 Control Plane 연결이 끊긴 채 돌아 실패한 기능이 있다. 그 실패는 품질이 아니라 평가 환경의 문제다
  */
 public record DeployCheckView(
     UUID publicId,
@@ -24,7 +26,8 @@ public record DeployCheckView(
     Long elapsedMs,
     int itemCount,
     int modelCallCount,
-    List<FeatureResultView> results) {
+    List<FeatureResultView> results,
+    boolean environmentError) {
 
     public DeployCheckView {
         results = List.copyOf(results);
@@ -41,7 +44,8 @@ public record DeployCheckView(
             run.elapsedMs(),
             run.itemCount(),
             run.modelCallCount(),
-            run.results().stream().map(FeatureResultView::of).toList());
+            run.results().stream().map(FeatureResultView::of).toList(),
+            run.results().stream().anyMatch(result -> CheckReason.ENVIRONMENT.name().equals(result.reasonCode())));
     }
 
 
