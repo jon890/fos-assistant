@@ -51,5 +51,11 @@ final class DeployCheckItems {
 
     static final String PHOTO_UPLOAD_PROMPT = "사진을 올려 둘게요. 다음 메시지에서 물어볼게요. 지금은 「받았어요」 라고만 답해 주세요.";
 
+    /**
+     * 도구 찾기 확인 문항이다. 도구 이름을 적지 않는다. 이름을 적은 문항은 지연 도구 이름 목록이 빠져도 모델이 그 이름으로 바로 부를 수 있어, 도구를 찾지 못하는
+     * 회귀를 놓친다.
+     */
+    static final String TOOL_DISCOVERY_PROMPT = "내 예약 작업 목록을 확인해서 몇 개인지만 알려 주세요.";
+
     static final String PHOTO_ASK_PROMPT = "앞 메시지에 올린 사진의 원본을 attachment_inspect 도구로 열어, 표지판에 적힌 글자를 그대로 알려 주세요.";
 }

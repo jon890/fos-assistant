@@ -1658,6 +1658,18 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 [plugin 의 직접 MCP 호출](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py#L509),
 [코드 실행 RPC](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_rpc.py#L28)
 
+### 원격 MCP 연결의 keepalive 와 쉬기
+
+Control Plane 의 평가 환경 오류 판정(`McpConnectionLiveness`, [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 「평가 환경 오류」)이 아래 동작에 기댄다. Hermes 를 올리면 다시 확인한다.
+
+| 동작 | 값 | 근거 |
+| --- | --- | --- |
+| `url` 로 붙은 원격 MCP 연결은 keepalive 가 기본으로 돈다 | 180초. 도구 호출이 도는 동안은 그 차례를 건너뛴다 | [`tools/mcp_tool_server_run.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool_server_run.py#L68-L73), [`tools/mcp_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool.py#L332) |
+| 서버가 `ping` 에 -32601 을 주고 `tools` capability 를 알리면 그 연결의 keepalive 를 `tools/list` 로 바꾼다 | Control Plane 은 `ping` 을 모르는 메서드로 답한다 | [`tools/mcp_tool_health.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool_health.py#L169-L199) |
+| keepalive 가 실패하면 다시 연결하고, 5번 실패하면 쉬게 두고(parked) 그 서버의 도구를 등록에서 뺀다 | 쉬는 동안 300초마다 다시 시도한다 | [`tools/mcp_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool.py#L317-L325) |
+
+Control Plane 은 MCP session(`Mcp-Session-Id`)을 두지 않는다. 그래서 Control Plane 이 다시 떠도 Hermes 는 다시 연결하지 않고, 그 사이 keepalive 가 실패한 경우에만 다시 연결한다.
+
 ### `tool_call` 의 단건 제한
 
 `v2026.9.24` 의 `tool_call` 은 `calls` 배열을 받고, 각 항목은 `name` 과 `arguments` 를 갖는다.

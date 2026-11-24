@@ -28,6 +28,8 @@ public class DeployCheckJudge {
 
     static final String ATTACHMENT_INSPECT = "attachment_inspect";
 
+    static final String TASK_LIST = "task_list";
+
     static final String IMAGE_KIND = "IMAGE";
 
     /** 실행 줄과 발화 줄이 성공으로 끝난 상태 이름이다. */
@@ -76,6 +78,9 @@ public class DeployCheckJudge {
             case MEMORY_READ -> containsOrFail(lastTurn(observation), DeployCheckItems.MEMORY_FACT, CheckReason.FACT_MISSING);
             case TASK_FIRE -> taskFire(observation);
             case PHOTO_INSPECT -> photoInspect(lastTurn(observation));
+            case TOOL_DISCOVERY -> observation.turns().stream().anyMatch(turn -> completed(turn, TASK_LIST))
+                ? FeatureVerdict.passed()
+                : FeatureVerdict.failed(CheckReason.NO_TOOL);
         };
     }
 

@@ -78,6 +78,7 @@ class DeployCheckRunner {
     private final TaskService tasks;
     private final TurnCancellation turns;
     private final TurnDriver driver;
+    private final ControlPlaneConnection connection;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -133,6 +134,9 @@ class DeployCheckRunner {
         long startedNanos = System.nanoTime();
         Instant deadline = clock.instant().plus(properties.current().featureTimeout());
         Attempt attempt = new Attempt();
+        // 평가 비서가 없으면 Hermes 를 부르지 않고 실패하므로 연결을 보지 않는다.
+        Optional<String> profile = evaluationUsers.primaryAgent(evaluation).map(Agent::hermesProfile);
+        boolean connectedAtStart = profile.map(connection::atStart).orElse(true);
         FeatureVerdict verdict;
         try {
             CheckObservation observation = feature == QualityFeature.TASK_FIRE
@@ -144,6 +148,11 @@ class DeployCheckRunner {
         } catch (RuntimeException ex) {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
+        }
+        if (verdict.status() != FeatureStatus.PASSED && profile.isPresent() && !(connectedAtStart && connection.atEnd(profile.get()))) {
+            // 도구를 받지 못한 채 돈 실패는 기능의 회귀가 아니다. 까닭을 환경 오류로 바꿔 품질 실패와 섞이지 않게 한다.
+            log.warn("평가 비서의 Control Plane MCP 연결이 끊긴 채 기능이 실패했다 feature={}", feature);
+            verdict = FeatureVerdict.failed(CheckReason.ENVIRONMENT);
         }
         if (attempt.conversationId != null) {
             // 문항이 돌다 기억 도구로 남긴 것은 통과와 상관없이 되돌린다. 대화 번호로 찾아 함께 도는 평가의 기억은 건드리지 않는다.
@@ -194,6 +203,7 @@ class DeployCheckRunner {
             case FILE_PUT -> send(evaluation, attempt, DeployCheckItems.FILE_PUT_PROMPT, List.of(), deadline);
             case IMAGE -> send(evaluation, attempt, DeployCheckItems.IMAGE_PROMPT, List.of(), deadline);
             case MEMORY_READ -> send(evaluation, attempt, DeployCheckItems.MEMORY_PROMPT, List.of(), deadline);
+            case TOOL_DISCOVERY -> send(evaluation, attempt, DeployCheckItems.TOOL_DISCOVERY_PROMPT, List.of(), deadline);
             case PHOTO_INSPECT -> {
                 ChatAttachment photo = uploadPhoto(evaluation, conversation.id());
                 send(evaluation, attempt, DeployCheckItems.PHOTO_UPLOAD_PROMPT, List.of(photo.id()), deadline);

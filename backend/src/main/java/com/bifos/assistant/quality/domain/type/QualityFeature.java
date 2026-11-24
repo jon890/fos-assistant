@@ -15,5 +15,7 @@ public enum QualityFeature {
     /** 예약 작업 발화. */
     TASK_FIRE,
     /** 원본 사진 조회({@code attachment_inspect}). */
-    PHOTO_INSPECT
+    PHOTO_INSPECT,
+    /** 도구 이름을 적지 않은 문항으로 Control Plane 도구({@code task_list})를 찾아 부르는가. */
+    TOOL_DISCOVERY
 }

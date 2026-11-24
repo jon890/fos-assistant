@@ -131,6 +131,8 @@ class DeployCheckApiTest {
         assertThat(read.path("status").asString()).isEqualTo("FAILED");
         assertThat(read.path("itemCount").asInt()).isEqualTo(QualityFeature.values().length);
         assertThat(read.path("results").get(0).path("reasonCode").asString()).isEqualTo("RUN_FAILED");
+        // 평가 비서가 없어 Hermes 를 부르지 않은 실패는 연결과 상관없어 환경 오류가 아니다.
+        assertThat(read.path("environmentError").asBoolean()).isFalse();
         assertThat(read.path("elapsedMs").isNumber()).isTrue();
         List<Notification> sent = notifications.findAll();
         assertThat(sent).hasSize(1);
@@ -148,6 +150,46 @@ class DeployCheckApiTest {
         assertThat(retried.statusCode()).isEqualTo(202);
         assertThat(json.readTree(retried.body()).path("trigger").asString()).isEqualTo("ADMIN");
         assertThat(runs.findAll()).hasSize(2);
+    }
+
+
+    @Test
+    @DisplayName("실패한 기능이 모두 환경 오류면 응답에 environmentError 가 참이고 알림 본문이 연결 문제부터 보라고 알린다")
+    void environmentErrorIsShownSeparately() throws Exception {
+        AppUser evaluation = evaluationUser();
+        OpenedDeployCheck opened = runWrites.open(evaluation.id(), QualityRunTrigger.PIPELINE, admin.id());
+        runWrites.record(opened.runId(), new FeatureResult(QualityFeature.SEARCH, FeatureStatus.PASSED, null, 10, null, List.of()), 1);
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.TOOL_DISCOVERY, FeatureStatus.FAILED, "ENVIRONMENT", 10, null, List.of()), 1);
+
+        runWrites.finish(opened.runId());
+
+        JsonNode read = json.readTree(api("GET", CHECKS + "/" + opened.started().check().publicId(), admin).body());
+        assertThat(read.path("status").asString()).isEqualTo("FAILED");
+        assertThat(read.path("environmentError").asBoolean()).isTrue();
+        assertThat(notifications.findAll()).singleElement()
+            .satisfies(sent -> assertThat(sent.body()).contains("도구 찾기 확인은 평가 비서의 Control Plane 연결이 없었어요")
+                .doesNotContain("통과하지 못했어요"));
+    }
+
+
+    @Test
+    @DisplayName("규칙 미달과 환경 오류가 섞이면 environmentError 는 거짓이고 알림은 두 실패를 나눠 적는다")
+    void mixedFailuresKeepTheQualityFailureVisible() throws Exception {
+        AppUser evaluation = evaluationUser();
+        OpenedDeployCheck opened = runWrites.open(evaluation.id(), QualityRunTrigger.PIPELINE, admin.id());
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.MEMORY_READ, FeatureStatus.FAILED, "FACT_MISSING", 10, null, List.of()), 1);
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.TOOL_DISCOVERY, FeatureStatus.FAILED, "ENVIRONMENT", 10, null, List.of()), 1);
+
+        runWrites.finish(opened.runId());
+
+        JsonNode read = json.readTree(api("GET", CHECKS + "/" + opened.started().check().publicId(), admin).body());
+        assertThat(read.path("environmentError").asBoolean()).isFalse();
+        assertThat(notifications.findAll()).singleElement()
+            .satisfies(sent -> assertThat(sent.body()).contains("기억 읽기 확인이 통과하지 못했어요")
+                .contains("도구 찾기 확인은 평가 비서의 Control Plane 연결이 없었어요"));
     }
 
 

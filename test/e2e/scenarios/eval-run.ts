@@ -10,6 +10,7 @@
  */
 import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
 import { TEST_SCRIPT_PATH } from "../fake-hermes/runtime-fixtures.ts";
+import { connectEvaluationMcp } from "../quality-support.ts";
 
 /** 러너가 Control Plane 에 주는 문항 상한이다. 답하지 않는 문항이 없어 넉넉하게 둔다. */
 export const E2E_QUALITY_EVAL_TIMEOUT = "30s";
@@ -19,7 +20,15 @@ const EVAL_WAIT_MS = 3 * 60_000;
 
 type ItemView = { bundle: string; question: string; status: string; reasonCode: string | null; failures: string[]; conversationPublicId: string | null };
 type BundleView = { id: string; status: string | null; passed: number; ran: number; skipped: number; errors: number };
-type EvalView = { publicId: string; status: string; tier: string | null; cleaned: boolean; bundles: BundleView[]; items: ItemView[] };
+type EvalView = {
+  publicId: string;
+  status: string;
+  tier: string | null;
+  cleaned: boolean;
+  bundles: BundleView[];
+  items: ItemView[];
+  environmentError: boolean;
+};
 
 async function count(context: Context, path: string): Promise<number> {
   return expectStatus(await call(context, path, { token: context.tokens.dad }), 200, path).json<unknown[]>().length;
@@ -52,6 +61,8 @@ export const evalRunScenario: Scenario = {
       body: JSON.stringify({ input: PASS_PROMPT, output: "내 파일은 [파일 공간](/files) 에서 봐요." }),
     });
     expect(response.ok, `가짜 Hermes 에 통과 문항의 답을 넣지 못했다: ${response.status}`);
+    // 실패 문항이 환경 오류가 아니라 규칙 미달로 적히게 평가 profile 의 MCP 연결을 살려 둔다.
+    await connectEvaluationMcp(context);
     const memoriesBefore = await count(context, "/memories");
     const tasksBefore = await count(context, "/tasks");
     const conversationsBefore = await count(context, "/chat/conversations");
@@ -82,6 +93,7 @@ export const evalRunScenario: Scenario = {
     expect(failed.status === "FAILED" && failed.failures.includes("MISSING_LINK:/memory"), `실패 문항의 까닭이 다르다: ${JSON.stringify(failed)}`);
     expect(finished.bundles[0]?.passed === 1 && finished.bundles[0]?.ran === 2, `묶음 결과가 다르다: ${JSON.stringify(finished.bundles)}`);
     expect(finished.cleaned, "평가가 만든 것을 다 비우지 못했다");
+    expect(!finished.environmentError, `MCP 연결이 살아 있는데 환경 오류로 적었다: ${JSON.stringify(finished)}`);
 
     step("관리자는 남겨 둔 실패 대화를 읽고, MEMBER 는 읽지 못한다");
     const messagesPath = `/admin/quality/conversations/${failed.conversationPublicId}/messages`;
