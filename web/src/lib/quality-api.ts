@@ -16,7 +16,7 @@ export type QualityFeatureResult = {
 
 /**
  * 배포 뒤 확인 한 번이다. 도는 동안 `finishedAt` 과 `elapsedMs` 는 null 이다.
- * `environmentError` 는 평가 비서의 Control Plane 연결이 끊긴 채 돌아 실패한 기능이 있다는 뜻이다. 그 실패는 품질이 아니라 평가 환경의 문제다.
+ * `environmentError` 는 통과하지 못한 기능이 모두 평가 비서의 Control Plane 연결이 없던 환경 오류라는 뜻이다. 규칙 미달과 섞이면 거짓이다.
  */
 export type QualityCheck = {
   publicId: string;
@@ -77,7 +77,7 @@ export const REASON_LABELS: Record<string, string> = {
   NO_TOOL:
     "도구 이름을 적지 않은 질문에서 Control Plane 도구를 찾아 부르지 않았어요",
   ENVIRONMENT:
-    "평가 비서의 Control Plane 연결이 끊겨 있었어요. 품질이 아니라 평가 환경의 문제예요",
+    "평가 비서의 Control Plane 연결이 없었어요. 연결 문제(배포 직후라면 Control Plane 회귀일 수 있음)부터 보세요",
 };
 
 /** 평가 사용자 준비에서 빠진 것이다. */

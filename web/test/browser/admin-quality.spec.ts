@@ -95,7 +95,25 @@ test("Control Plane 연결이 끊겨 실패한 확인은 「실패」 대신 「
   await expect(row.getByText("실패", { exact: true })).toHaveCount(0);
   const feature = row.getByTestId("quality-feature");
   await expect(feature).toContainText("도구 찾기");
-  await expect(feature).toContainText("평가 비서의 Control Plane 연결이 끊겨 있었어요");
+  await expect(feature).toContainText("평가 비서의 Control Plane 연결이 없었어요");
+});
+
+test("규칙 미달과 환경 오류가 섞인 확인은 「실패(일부 환경 오류)」 로 보여 진짜 실패를 가리지 않는다", async ({ page }) => {
+  const mixed = {
+    ...FAILED_CHECK,
+    results: [
+      { feature: "MEMORY_READ", status: "FAILED", reasonCode: "FACT_MISSING", elapsedMs: 12_000, conversationPublicId: null, executionIds: [43] },
+      { feature: "TOOL_DISCOVERY", status: "FAILED", reasonCode: "ENVIRONMENT", elapsedMs: 30_000, conversationPublicId: null, executionIds: [44] },
+    ],
+    environmentError: false,
+  };
+  await fakeQuality(page, () => READY, [mixed]);
+  await page.goto("/admin/quality");
+
+  const row = page.getByTestId("quality-check");
+  await expect(row.getByText("실패(일부 환경 오류)", { exact: true })).toBeVisible();
+  await expect(row.getByText("환경 오류", { exact: true })).toHaveCount(0);
+  await expect(row.getByTestId("quality-feature").nth(0)).toContainText("미리 넣은 기억이 답에 없어요");
 });
 
 test("도는 확인을 다시 읽다 한 번 실패해도 다음 차례에 다시 읽어 결과를 보인다", async ({ page }) => {
