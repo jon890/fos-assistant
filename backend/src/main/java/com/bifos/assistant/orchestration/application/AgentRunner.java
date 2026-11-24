@@ -15,6 +15,7 @@ import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.runtime.application.dto.RunCommand;
 import com.bifos.assistant.runtime.application.dto.RunResult;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
@@ -187,7 +188,8 @@ public class AgentRunner {
 
         RunResult result;
         try {
-            result = runtimes.of(command.target()).awaitCompletion(command, runId);
+            // 맡긴 실행은 사람이 그 자리에서 기다리지 않으므로 긴 한도로 기다린다. 대화 turn 의 기다림은 delegate-wait-max 가 따로 끊는다
+            result = runtimes.of(command.target()).awaitCompletion(command, runId, RunWait.BACKGROUND);
         } catch (RuntimeException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(

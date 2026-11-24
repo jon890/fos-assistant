@@ -27,6 +27,7 @@ import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -99,7 +100,7 @@ class AgentRunnerConnectorContextTest {
         when(executions.complete(any(), any(), any(), any())).thenReturn(completed);
         when(executions.complete(any(), any(), any(), any(), any())).thenReturn(completed);
         when(hermes.submit(any())).thenReturn(RUN_ID);
-        when(hermes.awaitCompletion(any(), eq(RUN_ID)))
+        when(hermes.awaitCompletion(any(), eq(RUN_ID), eq(RunWait.BACKGROUND)))
             .thenReturn(HermesRunResult.of(
                 RUN_ID, "sess-1", "completed", ANSWER, "example-model", null, TokenUsage.empty()));
         runner = new AgentRunner(

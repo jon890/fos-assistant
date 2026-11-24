@@ -188,7 +188,7 @@ public class RestartReconciler implements SmartLifecycle {
             log.error("기동할 때 남은 실행을 다시 잡지 못했다. 이미 잡은 줄만 정한다", ex);
         }
         try {
-            beginPending(maxWait());
+            beginPending(properties.maxWait());
         } catch (RuntimeException ex) {
             log.error("기동할 때 남은 실행을 정하기 시작하지 못했다", ex);
         }
@@ -232,14 +232,9 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
 
-    /** 기억한 줄을 설정한 상한으로 정한다. */
+    /** 기억한 줄을 설정한 상한으로 정한다. 비었으면 줄마다 {@link ReconcileWait} 다. */
     public void reconcile() {
-        reconcile(maxWait());
-    }
-
-
-    private Duration maxWait() {
-        return properties.maxWait() == null ? hermesProperties.current().runTimeout() : properties.maxWait();
+        reconcile(properties.maxWait());
     }
 
 
@@ -249,7 +244,7 @@ public class RestartReconciler implements SmartLifecycle {
      * <p>run 번호나 에이전트 행이 없는 줄은 묻지 않고 실패로 적는다. 나머지는 줄마다 가상 스레드 하나가 끝날 때까지
      * 묻는다. 이 메서드는 그 스레드를 기다리지 않는다.
      *
-     * @param maxWait 줄 하나에 다시 붙어 기다리는 상한
+     * @param maxWait 줄 하나에 다시 붙어 기다리는 상한. null 이면 줄마다 {@link ReconcileWait} 다
      */
     void reconcile(Duration maxWait) {
         synchronized (this) {
@@ -365,8 +360,9 @@ public class RestartReconciler implements SmartLifecycle {
             return;
         }
         Agent target = agent;
+        Duration wait = maxWait == null ? ReconcileWait.of(row, hermesProperties.current()) : maxWait;
         try {
-            backgroundTasks.start("restart-reconcile-" + row.id(), () -> follow(item, target, maxWait, epoch));
+            backgroundTasks.start("restart-reconcile-" + row.id(), () -> follow(item, target, wait, epoch));
         } catch (RuntimeException | Error ex) {
             log.warn("남은 실행을 정할 스레드를 띄우지 못했다 executionId={}", row.id(), ex);
             finish(item, epoch);

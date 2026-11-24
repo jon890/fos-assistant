@@ -48,6 +48,7 @@ import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
@@ -501,6 +502,21 @@ class ChatServiceTest {
         assertThat(stub().received().getLast().instructions())
             .contains("GFM", "memory_remember", TurnIntent.SCHEDULED_INSTRUCTION)
             .doesNotContain("# 최신 정보와 출처", "오늘은 ");
+    }
+
+
+    @Test
+    @DisplayName("사람이 보낸 turn 은 대화 한도로, 예약 작업 turn 은 긴 한도로 결과를 기다린다")
+    void scheduledTurnWaitsWithBackgroundLimit() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+        assertThat(stub().waitOf("run-1")).as("사람이 보낸 turn").isEqualTo(RunWait.CONVERSATION);
+
+        chat.runScheduledTurn(dad, turn.conversationId(), null, "예약 작업", "오늘 할 일을 정리해 줘", event -> {
+        });
+        assertThat(stub().waitOf("run-1")).as("예약 작업 turn").isEqualTo(RunWait.BACKGROUND);
     }
 
 

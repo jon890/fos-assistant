@@ -22,6 +22,7 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -239,6 +240,8 @@ class ChildExecutionRunnerTest {
         });
         String sentSession = stub().received().get(0).sessionId();
         assertThat(child.hermesSessionId()).as("자식 실행 줄의 session").isEqualTo(sentSession);
+        // 맡긴 실행은 사람이 그 자리에서 기다리지 않아 긴 한도로 기다린다(docs/features/execution.md 의 「실행 한도」)
+        assertThat(stub().waitOf("run-child")).isEqualTo(RunWait.BACKGROUND);
     }
 
 

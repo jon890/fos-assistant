@@ -63,6 +63,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         HermesProperties.class,
         Set.of(
             ConfigurationPropertyName.of("hermes.run-timeout"),
+            ConfigurationPropertyName.of("hermes.background-run-timeout"),
             ConfigurationPropertyName.of("hermes.poll-interval")),
         ConnectorPolicyProperties.class,
         Set.of(

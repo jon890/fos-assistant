@@ -10,6 +10,7 @@ import com.bifos.assistant.runtime.application.dto.RunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
 import com.bifos.assistant.runtime.application.port.AgentRuntime;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.RuntimeKind;
 import com.bifos.assistant.runtime.domain.RuntimeTarget;
 import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
@@ -46,8 +47,8 @@ public class HermesAgentRuntime implements AgentRuntime {
 
 
     @Override
-    public RunResult awaitCompletion(RunCommand command, String runId) {
-        return HermesRunOutcomes.toRunResult(client.awaitCompletion(toHermes(command), runId));
+    public RunResult awaitCompletion(RunCommand command, String runId, RunWait wait) {
+        return HermesRunOutcomes.toRunResult(client.awaitCompletion(toHermes(command), runId, wait));
     }
 
 
