@@ -7,7 +7,7 @@ PR2 부터는 같은 경계를 쓰고, 그 PR 이 바꾸는 결정만 이 문서
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `HermesRunEventStream` 이 `tool.started` 와 `tool.completed` 를 `tool_call_id` 로 짝짓고 두 사건 `timestamp` 의 차이를 걸린 시간으로 넣는다. 화면에 흘리는 사건과 저장하는 사건이 같은 값을 받는다. 짝이 없으면 hook 의 `duration_ms` 를 쓰고(DECISION3), 둘 다 없으면 비운다. 실행 트리는 빈 시간을 「모름」 으로 그리고, 시작 줄과 완료 줄을 `toolCallId` 로 짝짓는다 |
+| REQ1 | `HermesRunEventStream` 이 `tool.started` 와 `tool.completed` 를 `tool_call_id` 로 짝짓고 두 사건 `timestamp` 의 차이를 걸린 시간으로 넣는다. 화면에 흘리는 사건과 저장하는 사건이 같은 값을 받는다. 짝이 없으면 hook 의 `duration_ms` 를 쓰고(DECISION3), 둘 다 없으면 비운다. PR1 화면: 실행 트리는 빈 시간을 「모름」 으로 그리고, 시작 줄과 완료 줄을 `toolCallId` 로 짝짓는다 |
 | REQ2 | plugin 의 `post_tool_call` 이 실패한 도구의 오류 종류와 오류 글을 보낸다. Control Plane 이 `ToolDetailRedactor.redactError` 로 가린 뒤 200자로 자르고, 실패 표시가 참인 그 도구의 `TOOL_COMPLETED` 줄에 `error_type` 과 `error_summary` 로 적는다. 플러그인 도구, 플러그인 호출 뒤 도구, 실행 기록에 내용을 남기지 않는 도구(`WithheldToolContent`)는 오류 글을 버린다 |
 | REQ3 | `ExecutionEventView` 가 `errorType` 과 `errorSummary` 를 `InternalValuePolicy` 가 허락할 때만 넣는다. `durationMs` 와 `failed` 는 지금처럼 모두에게 넣는다 |
 | REQ4 | PR3. plugin 이 `post_api_request`, `api_request_error`, `post_auxiliary_call` 을 같은 길로 보내고 Control Plane 이 `MODEL_CALL` 사건 줄로 적는다 |
@@ -18,7 +18,7 @@ PR2 부터는 같은 경계를 쓰고, 그 PR 이 바꾸는 결정만 이 문서
 | REQ9 | PR4. 관리자 실행 트리가 `MODEL_CALL` 줄을 시각 순서로 끼우고 노드 요약을 화면에서 계산한다 |
 | REQ10 | PR3. `MODEL_CALL` 의 토큰은 실행 줄의 합계 칸과 사용량 집계 질의에 들어가지 않는다 |
 | REQ11 | PR3. 줄 수 상한은 받는 쪽이 센다. 대화 삭제의 `clearDetailsOf` 가 PR1 부터 `error_summary` 도 비운다 |
-| REQ12 | `ToolDetailRedactor` 가 플러그인 호출 뒤의 빈 내용에 길이 문구를 붙이지 않는다. 실행 트리의 도구 줄이 실패 표시와 관리자용 오류 종류를 보인다 |
+| REQ12 | `ToolDetailRedactor` 가 플러그인 호출 뒤의 빈 내용에 길이 문구를 붙이지 않는다. PR1 화면: 실행 트리의 도구 줄이 실패 표시와 관리자용 오류 종류를 보인다 |
 | REQ13 | PR2. 받는 쪽이 짝을 찾지 못한 도구 기록을 새 도구 줄로 적는다 |
 
 ## 책임과 경계
@@ -81,18 +81,11 @@ DB 의 `uk_execution_event_seq` 와 실행마다 메모리에 있는 사건 번�
 
 ### plugin 에서 Control Plane 으로
 
-| 칸 | 값 |
-| --- | --- |
-| 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `run-trace` 로 바꾼 것(`/internal/hermes/run-trace`). 운영 값을 새로 두지 않는다 |
-| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
-| 본문 | `{"v": 1, "records": [기록...]}`. 한 번에 100개까지 |
-| 기록 | `kind`(`"tool"`), `session_id`, `root_session_id`, `tool_call_id`(없으면 빈 글), `tool_name`, `duration_ms`, `status`, `error_type`, `error_message`, `ended_at`(초 단위 실수), `sig` |
-| 서명할 글 | `v1-run-trace`, `kind`, 루트 session, session, `tool_call_id` 를 `\n` 으로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
-| 답 | 202 와 `{"accepted": n}`. 기록 하나가 틀려도 나머지는 받는다 |
+주소, 인증, 본문의 칸, 서명할 글, 답의 계약은 [`hermes/plugins/fos-ctx/README.md`](../../../hermes/plugins/fos-ctx/README.md) 의 「도구 기록을 보낸다」 가 원본이다. 주소는 `FOS_CTX_POLICY_URL` 에서 만들어 운영 값을 새로 두지 않고, 인증과 서명은 다른 내부 경로와 같은 MCP 토큰과 HMAC 이다(DECISION1). 여기에는 설계 판단만 적는다.
 
 `error_message` 는 실패한 기록에만 넣고 plugin 이 가림 규칙의 입력 상한보다 한 글자 긴 65,537자까지 자른다(스펙 DECISION13). Control Plane 은 상한을 넘은 글을 `[긴 도구 내용 가림]` 으로 통째로 가린다. 앞부분만 잘라 가리면 잘린 끝의 비밀값 조각이 토큰 모양 검사를 피할 수 있어서다. 인자, 결과, 미들웨어 이력은 넣지 않는다.
 Hermes 는 profile 여럿을 한 프로세스에서 돌린다(multiplex). 보내는 데몬 스레드는 profile 맥락을 물려받지 못해 토큰과 `state.db` 를 바로 읽지 못한다. 그래서 hook 이 토큰과 `state.db` 경로를 기록에 담고, 보내는 스레드는 토큰마다 묶어 보낸다. 루트 session 은 보내는 스레드가 담긴 경로의 `state.db` 에서 찾는다. hook 스레드는 sqlite 를 열지 않는다. 프로세스 번호가 바뀌면(fork) 스레드를 다시 띄운다.
-한 요청의 오류 글 합은 256KB 를 넘지 않게 나눠 보낸다. 프록시의 본문 상한에 걸려 묶음을 통째로 잃지 않게 한다.
+한 요청의 오류 글 합은 UTF-8 로 256KB 를 넘지 않게 나눠 보낸다. 프록시의 본문 상한에 걸려 묶음을 통째로 잃지 않게 한다.
 
 ### 저장
 
@@ -101,7 +94,7 @@ Hermes 는 profile 여럿을 한 프로세스에서 돌린다(multiplex). 보내
 | 칸 | 값 |
 | --- | --- |
 | `tool_call_id VARCHAR(128) NULL` | 도구 사건의 `tool_call_id`. PR2 가 짝을 다시 찾을 때 쓴다 |
-| `error_type VARCHAR(64) NULL` | hook 이 준 오류 종류. 받은 값을 64자로만 자른다(스펙 DECISION17) |
+| `error_type VARCHAR(64) NULL` | hook 이 준 오류 종류. 스펙 DECISION17 대로 받은 값을 바꾸지 않고, 칸 길이인 64자로만 자른다 |
 | `error_summary VARCHAR(255) NULL` | 가린 뒤 200자로 자른 오류 글. 대화를 지우면 비운다 |
 
 색인은 더하지 않는다. PR1 은 장부의 사건 번호로 줄을 고치고 `tool_call_id` 로 찾지 않는다.
@@ -126,11 +119,11 @@ Hermes 는 profile 여럿을 한 프로세스에서 돌린다(multiplex). 보내
 
 | 대상 | 경계와 환경 |
 | --- | --- |
-| REQ1 | `HermesRunEventStreamTest` 에 v0.23.2 모양(`duration` 0, `tool_call_id`, `timestamp`)을 흘려 1.2초가 나오는지. 웹 단위 테스트로 빈 시간이 「모름」 인지 |
+| REQ1 | `HermesRunEventStreamTest` 에 v0.23.2 모양(`duration` 0, `tool_call_id`, `timestamp`)을 흘려 1.2초가 나오는지. PR1 화면: 웹 단위 테스트로 빈 시간이 「모름」 인지 |
 | REQ2, REQ6 | `ToolDetailRedactorTest` 의 오류 글 가림과 200자 경계. `RunTraceIntakeTest` 로 실행 풀기와 플러그인 범위. `RunTraceEndpointTest`(실제 HTTP, H2)로 비밀값과 UUID 가 든 오류 글이 가려져 저장되고, 표식 글이 저장값과 로그에 없는지, 끝난 직후 온 기록이 다음 turn 에 붙지 않는지 |
 | REQ3 | `ExecutionTreeServiceTest` 로 `MEMBER` 응답의 두 칸이 `null` 인지 |
 | REQ7 | plugin 단위 테스트로 hook 이 보내기를 기다리지 않는지, 5초 늦는 서버와 500 에서도 hook 이 바로 돌아오는지 |
-| REQ12 | `ToolDetailRedactorTest` 의 빈 내용. 웹 단위 테스트로 실패 줄에 오류 종류가 관리자에게만 보이는지 |
+| REQ12 | `ToolDetailRedactorTest` 의 빈 내용. PR1 화면: 웹 단위 테스트로 실패 줄에 오류 종류가 관리자에게만 보이는지 |
 | 장부 | `ToolTraceLedgerTest` 로 세 도착 순서와 만료 |
 | 배포 뒤 | 실제 실행 하나에서 도구 시간과 실패 도구의 오류 요약이 관리자 실행 상세에 보이는지(PR 본문의 후속 검증) |
 
