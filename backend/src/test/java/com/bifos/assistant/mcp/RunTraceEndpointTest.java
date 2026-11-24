@@ -133,8 +133,8 @@ class RunTraceEndpointTest {
         String root = "fos-" + UUID.randomUUID();
         AgentExecution run = running(root, now.minusSeconds(30));
         ExecutionEvent completed = completed(run, "call_1", "terminal", true);
-        String secret = "sk-" + "c".repeat(40);
-        String message = "합성원문표식 " + "가".repeat(180) + " " + secret + " " + UUID.randomUUID();
+        String secret = "fedcba9876543210fedcba9876543210fedcba98";
+        String message = "합성원문표식 " + "가".repeat(185) + " " + secret + " " + "나".repeat(100) + " " + UUID.randomUUID();
 
         HttpResponse<String> response = send(token, batch(record(token, root, root, "call_1", "terminal", "error", "PermissionError", message)));
 
@@ -142,7 +142,7 @@ class RunTraceEndpointTest {
         assertThat(json.readTree(response.body()).path("accepted").asInt()).isEqualTo(1);
         ExecutionEvent stored = events.findById(completed.id()).orElseThrow();
         assertThat(stored.errorType()).isEqualTo("PermissionError");
-        assertThat(stored.errorSummary()).hasSizeLessThanOrEqualTo(200).startsWith("합성원문표식").doesNotContain(secret, "cccc");
+        assertThat(stored.errorSummary()).hasSize(200).startsWith("합성원문표식").endsWith("…").doesNotContain("fedcba");
         assertThat(stored.durationMs()).isEqualTo(1_200L);
         assertThat(output.getAll()).doesNotContain("합성원문표식", secret);
     }

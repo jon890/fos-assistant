@@ -270,12 +270,16 @@ class ToolDetailRedactorTest {
     @Test
     @DisplayName("오류 글은 비밀값과 UUID 를 가린 뒤 200자로 자르고 경계에 걸친 토큰 조각을 남기지 않는다")
     void redactsErrorBeforeTruncating() {
-        String token = "sk-" + "a".repeat(40);
-        String message = "x".repeat(190) + " " + token + " 실패 " + FIRST_ID;
+        // 접두사 없는 40자 hex 는 32자 이상일 때만 토큰 모양에 걸린다. 먼저 자르면 경계에 남은 조각이 가림을 피한다.
+        String hex = "0123456789abcdef0123456789abcdef01234567";
+        String message = "가".repeat(190) + " " + hex + " " + "나".repeat(100) + " " + FIRST_ID;
 
         String summary = ToolDetailRedactor.redactError(message, "terminal", ToolDetailScope.NONE, false);
 
-        assertThat(summary).hasSizeLessThanOrEqualTo(ToolDetailRedactor.ERROR_LIMIT).doesNotContain("sk-", "aaaa", FIRST_ID);
+        assertThat(summary).hasSize(ToolDetailRedactor.ERROR_LIMIT).endsWith("…").doesNotContain("01234567", FIRST_ID);
+        assertThat(ToolDetailRedactor.redactError("가".repeat(300), "terminal", ToolDetailScope.NONE, false))
+            .hasSize(ToolDetailRedactor.ERROR_LIMIT)
+            .startsWith("가".repeat(199));
         assertThat(ToolDetailRedactor.redactError("Authorization: Bearer abc.def 연결 실패", "terminal", ToolDetailScope.NONE, false))
             .doesNotContain("abc.def");
         assertThat(ToolDetailRedactor.redactError("파일 " + FIRST_ID + " 없음", "read_file", ToolDetailScope.NONE, false))

@@ -67,12 +67,9 @@ public class ToolTraceWriter {
     }
 
 
+    /** 저장된 줄은 바꾸는 칸만 쓴다. 같은 규칙을 질의가 갖는다({@link ExecutionEventRepository#recordToolTrace}). */
     private void update(Long eventId, ToolTrace trace) {
-        events.findById(eventId).ifPresent(event -> {
-            if (apply(event, trace)) {
-                events.save(event);
-            }
-        });
+        events.recordToolTrace(eventId, trace.toolName(), trace.durationMs(), trace.errorType(), trace.errorSummary());
     }
 
 
