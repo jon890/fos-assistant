@@ -119,14 +119,14 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
 
 
     /**
-     * 그 대화 실행의 사건에서 {@code detail} 을 비운다. 사건 줄과 토큰은 남긴다.
+     * 그 대화 실행의 사건에서 {@code detail} 과 오류 요약을 비운다. 사건 줄, 토큰, 오류 종류는 남긴다.
      *
      * <p>트랜잭션은 {@code ConversationExecutionPurge} 가 연다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update ExecutionEvent ev set ev.detail = null
-             where ev.detail is not null
+            update ExecutionEvent ev set ev.detail = null, ev.errorSummary = null
+             where (ev.detail is not null or ev.errorSummary is not null)
                and ev.executionId in (select e.id from AgentExecution e where e.conversationId = :conversationId)
             """)
     int clearDetailsOf(@Param("conversationId") Long conversationId);

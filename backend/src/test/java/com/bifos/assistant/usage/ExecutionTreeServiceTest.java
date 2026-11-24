@@ -427,6 +427,34 @@ class ExecutionTreeServiceTest {
 
 
     @Test
+    @DisplayName("실패한 도구의 오류 종류와 요약은 ADMIN 에게만 실리고 걸린 시간과 실패 표시는 MEMBER 에게도 실린다")
+    void errorTraceOnlyForAdmin() {
+        AgentExecution execution = execution(OWNER_ID, null, null);
+        ExecutionEvent completed = ExecutionEvent.builder()
+            .executionId(execution.id())
+            .sequence(1)
+            .eventType(ExecutionEventType.TOOL_COMPLETED)
+            .toolName("terminal")
+            .toolCallId("call_1")
+            .failed(true)
+            .occurredAt(Instant.now())
+            .build();
+        completed.recordToolTrace(1_200L, "tool_error", "명령을 찾지 못했다");
+        events.save(completed);
+
+        ExecutionEventView member = trees.of(ownerAs(UserRole.MEMBER), execution.id()).root().events().getFirst();
+        ExecutionEventView admin = trees.of(ownerAs(UserRole.ADMIN), execution.id()).root().events().getFirst();
+
+        assertThat(member.errorType()).isNull();
+        assertThat(member.errorSummary()).isNull();
+        assertThat(member.failed()).isTrue();
+        assertThat(member.durationMs()).isEqualTo(1_200L);
+        assertThat(admin.errorType()).isEqualTo("tool_error");
+        assertThat(admin.errorSummary()).isEqualTo("명령을 찾지 못했다");
+    }
+
+
+    @Test
     @DisplayName("MEMBER 역할의 노드에는 모델과 토큰과 금액과 시각 구간이 비고 걸린 시간과 단계는 남는다")
     void memberNodeHasNoModelTokensCostOrTimestampsButKeepsLatencyAndTier() {
         AgentExecution execution = detailedExecution();

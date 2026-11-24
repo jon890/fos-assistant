@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -252,6 +253,51 @@ class ToolDetailRedactorTest {
             .doesNotContain(mail, token);
         assertThat(ToolDetailRedactor.redact(null, "web_extract", bound, new HashMap<>(), true))
             .isNull();
+    }
+
+
+    @Test
+    @DisplayName("플러그인 호출 뒤라도 빈 내용에는 길이 문구를 붙이지 않는다")
+    void leavesEmptyContentAfterConnectorEmpty() {
+        ToolDetailScope bound = ToolDetailScope.prefixes(Set.of("mcp__mail__"));
+
+        assertThat(ToolDetailRedactor.redact("", "terminal", bound, new HashMap<>(), true)).isNull();
+        assertThat(ToolDetailRedactor.redact("ls", "terminal", bound, new HashMap<>(), true))
+            .isEqualTo("[도구 내용 가림: 2자]");
+    }
+
+
+    @Test
+    @DisplayName("오류 글은 비밀값과 UUID 를 가린 뒤 200자로 자르고 경계에 걸친 토큰 조각을 남기지 않는다")
+    void redactsErrorBeforeTruncating() {
+        String token = "sk-" + "a".repeat(40);
+        String message = "x".repeat(190) + " " + token + " 실패 " + FIRST_ID;
+
+        String summary = ToolDetailRedactor.redactError(message, "terminal", ToolDetailScope.NONE, false);
+
+        assertThat(summary).hasSizeLessThanOrEqualTo(ToolDetailRedactor.ERROR_LIMIT).doesNotContain("sk-", "aaaa", FIRST_ID);
+        assertThat(ToolDetailRedactor.redactError("Authorization: Bearer abc.def 연결 실패", "terminal", ToolDetailScope.NONE, false))
+            .doesNotContain("abc.def");
+        assertThat(ToolDetailRedactor.redactError("파일 " + FIRST_ID + " 없음", "read_file", ToolDetailScope.NONE, false))
+            .isEqualTo("파일 [항목 1] 없음");
+    }
+
+
+    @Test
+    @DisplayName("플러그인 도구, 플러그인 호출 뒤 도구, 빈 오류 글은 오류 글을 남기지 않는다")
+    void dropsErrorTextOfConnectorScope() {
+        ToolDetailScope bound = ToolDetailScope.prefixes(Set.of("mcp__mail__"));
+
+        assertThat(ToolDetailRedactor.redactError("메일 본문 노출", "mcp__mail__read", bound, false)).isNull();
+        assertThat(ToolDetailRedactor.redactError("파일 없음", "read_file", bound, true)).isNull();
+        assertThat(ToolDetailRedactor.redactError("  ", "read_file", ToolDetailScope.NONE, false)).isNull();
+        assertThat(ToolDetailRedactor.redactError(null, "read_file", ToolDetailScope.NONE, false)).isNull();
+        assertThat(ToolDetailRedactor.redactError("가".repeat(65_537), "read_file", ToolDetailScope.NONE, false))
+            .isEqualTo("[긴 도구 내용 가림]");
+        for (String withheld : List.of("mcp__fos_assistant__memory_read", "mcp__fos_assistant__follow_up_list",
+            "content_draft_read", "mcp__x__list_media_observations", "mcp__fos_assistant__memory_remember")) {
+            assertThat(ToolDetailRedactor.redactError("본문 노출", withheld, ToolDetailScope.NONE, false)).isNull();
+        }
     }
 
 

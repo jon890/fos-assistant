@@ -368,4 +368,8 @@ public final class McpDtos {
     /** 하위 에이전트 끝 소식의 응답이다. {@code recorded} 나 {@code ignored} 다. */
     public record SubagentStopResponse(String result) {
     }
+
+    /** 실행 기록 묶음의 응답이다. 실행에 옮긴 기록의 수다. 버린 기록은 따로 알리지 않는다. */
+    public record RunTraceResponse(int accepted) {
+    }
 }

@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.application.dto.HermesSkillName;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.runtime.domain.ToolDetailRedactor;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.WithheldToolContent;
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -54,21 +55,20 @@ public class HermesRunEventStream {
      * Memory 본문을 읽는 Control Plane MCP 도구 이름의 끝이다. Hermes 는 {@code mcp__fos_assistant__memory_read} 처럼
      * 서버 이름을 앞에 붙여 보낸다.
      */
-    private static final String MEMORY_READ_TOOL_SUFFIX = "memory_read";
+    private static final String MEMORY_READ_TOOL_SUFFIX = WithheldToolContent.MEMORY_READ_TOOL_SUFFIX;
     /** 결과나 인자에 원고 본문이 실릴 수 있는 도구다. 정확한 이름과 {@code __} 뒤 이름만 가린다. */
-    private static final List<String> CONTENT_DRAFT_TOOLS = List.of(
-        "content_draft_write", "content_draft_read", "content_draft_preview", "content_draft_save");
+    private static final List<String> CONTENT_DRAFT_TOOLS = WithheldToolContent.CONTENT_DRAFT_TOOLS;
     /** 검색어와 제목도 시작과 끝의 실행 사건에서 가린다. */
-    private static final String MEMORY_SEARCH_TOOL_SUFFIX = "memory_search";
+    private static final String MEMORY_SEARCH_TOOL_SUFFIX = WithheldToolContent.MEMORY_SEARCH_TOOL_SUFFIX;
 
     /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
     private static final String MEMORY_READ_STARTED = "tool.started";
 
     /** 할 일을 다루는 Control Plane MCP 도구(제안, 목록, 끝내기) 이름에 든 글이다. 인자와 결과에 할 일 제목이 실린다. */
-    private static final String FOLLOW_UP_TOOL_MARK = "follow_up_";
+    private static final String FOLLOW_UP_TOOL_MARK = WithheldToolContent.FOLLOW_UP_TOOL_MARK;
 
     /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-20261007 / memory-remember). */
-    private static final String MEMORY_REMEMBER_TOOL_SUFFIX = "memory_remember";
+    private static final String MEMORY_REMEMBER_TOOL_SUFFIX = WithheldToolContent.MEMORY_REMEMBER_TOOL_SUFFIX;
 
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
@@ -236,10 +236,7 @@ public class HermesRunEventStream {
         }
         if (toolEvent
             && toolName != null
-            && (toolName.equals("list_media_observations")
-                || toolName.endsWith("__list_media_observations")
-                || toolName.equals("record_media_observation")
-                || toolName.endsWith("__record_media_observation"))) {
+            && WithheldToolContent.mediaObservation(toolName)) {
             // 사진·OCR 본문은 관리자와 커넥터 이력에 관계없이 사건을 만들기 전에 두 경로 모두 버린다.
             detail = null;
             text = null;
@@ -261,6 +258,11 @@ public class HermesRunEventStream {
             // 시작의 preview 에 할 일 제목이나 기억할 사실이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게
             // 시작과 끝 모두 남기지 않는다
             detail = null;
+        }
+        String toolCallId = toolEvent ? firstText(root, payload, "tool_call_id") : null;
+        Long durationMs = durationMs(root, payload);
+        if (toolEvent) {
+            durationMs = state.toolDuration(type, toolCallId, timestamp, durationMs);
         }
         String skillName = null;
         if (toolEvent) {
@@ -285,7 +287,7 @@ public class HermesRunEventStream {
             memorySearch ? null : text,
             toolName,
             detail,
-            durationMs(root, payload),
+            durationMs,
             failed(root, payload),
             firstText(root, payload, "subagent_id"),
             goal,
@@ -297,7 +299,8 @@ public class HermesRunEventStream {
             skillName,
             alreadyStreamed,
             streamedPrefixLength,
-            interimId);
+            interimId,
+            toolCallId);
     }
 
 
@@ -309,6 +312,42 @@ public class HermesRunEventStream {
         private final StringBuilder deltaSegment = new StringBuilder();
         private final Set<String> interimKeys = new HashSet<>();
         private final Map<InterimIdentity, String> interimIds = new LinkedHashMap<>();
+        /** 끝나지 않은 도구의 시작 시각(초)이다. 완료 사건이 오면 꺼낸다. */
+        private final Map<String, Double> toolStartedAt = new LinkedHashMap<>();
+        /** 끝나기 전에 다시 시작된 호출 번호다. 어느 시작과 짝인지 몰라 시간을 계산하지 않는다(llama.cpp 는 같은 번호를 다시 쓴다). */
+        private final Set<String> ambiguousToolCalls = new HashSet<>();
+
+
+        /**
+         * 도구의 걸린 시간이다. Hermes 가 준 값이 있으면 그대로 쓴다.
+         *
+         * <p>v0.23.2 의 실행 대기열 경로는 완료 사건의 {@code duration} 을 늘 0 으로 보낸다. 그때는 같은
+         * {@code tool_call_id} 의 시작과 완료 사건 {@code timestamp} 차이로 계산한다. 화면에 흘리는 사건과 저장하는 사건이 같은
+         * 값을 받는다. 짝이 없거나 시각이 거꾸로면 모름이다.
+         */
+        Long toolDuration(String type, String toolCallId, JsonNode timestamp, Long reported) {
+            if (toolCallId == null || toolCallId.isBlank()) {
+                return reported;
+            }
+            if ("tool.started".equalsIgnoreCase(type)) {
+                if (toolStartedAt.containsKey(toolCallId) || ambiguousToolCalls.contains(toolCallId)) {
+                    toolStartedAt.remove(toolCallId);
+                    ambiguousToolCalls.add(toolCallId);
+                } else if (timestamp != null) {
+                    toolStartedAt.put(toolCallId, timestamp.asDouble());
+                }
+                return reported;
+            }
+            if (!"tool.completed".equalsIgnoreCase(type) || ambiguousToolCalls.contains(toolCallId)) {
+                return reported;
+            }
+            Double startedAt = toolStartedAt.remove(toolCallId);
+            if (reported != null || startedAt == null || timestamp == null) {
+                return reported;
+            }
+            long elapsed = Math.round((timestamp.asDouble() - startedAt) * 1000);
+            return elapsed < 0 ? null : elapsed;
+        }
 
 
         /** timestamp는 고유 번호가 아니다. 원문도 대조하되, 바깥에는 실행 안에서 부여한 번호만 보낸다. */

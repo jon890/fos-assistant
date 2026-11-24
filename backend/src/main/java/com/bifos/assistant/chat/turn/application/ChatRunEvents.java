@@ -265,6 +265,7 @@ class ChatRunEvents {
             }
             executionEvents.save(event);
             pending.counter().advance();
+            eventRecorder.saved(event);
         } catch (RuntimeException ex) {
             log.warn(
                 "could not record an execution event executionId={}",

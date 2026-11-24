@@ -4,6 +4,9 @@ import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
+import com.bifos.assistant.testsupport.HermesInterimWire;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -93,6 +96,63 @@ class HermesRunEventStreamTest {
 
 
     private final JsonMapper mapper = JsonMapper.builder().build();
+
+
+    @Test
+    @DisplayName("v0.23.2 처럼 완료 사건의 걸린 시간이 0 이면 같은 호출 번호의 시작과 완료 시각 차이로 채운다")
+    void fillsToolElapsedFromTimestampsOfSameCall() throws IOException {
+        List<HermesRunEvent> events = new ArrayList<>();
+        HermesInterimWire.read("""
+                data: {"event":"tool.started","tool":"web_search","tool_call_id":"call_a","timestamp":100.000}
+
+                data: {"event":"tool.started","tool":"web_search","tool_call_id":"call_b","timestamp":100.100}
+
+                data: {"event":"tool.completed","tool":"web_search","tool_call_id":"call_b","duration":0,"timestamp":100.400}
+
+                data: {"event":"tool.completed","tool":"web_search","tool_call_id":"call_a","duration":0,"timestamp":101.200}
+
+                data: {"event":"tool.completed","tool":"terminal","tool_call_id":"call_c","duration":0,"timestamp":102.000}
+
+                """, ToolDetailScope.NONE, events::add);
+
+        assertThat(events).extracting(HermesRunEvent::toolCallId)
+            .containsExactly("call_a", "call_b", "call_b", "call_a", "call_c");
+        assertThat(events).extracting(HermesRunEvent::durationMs).containsExactly(null, null, 300L, 1200L, null);
+    }
+
+
+    @Test
+    @DisplayName("끝나기 전에 같은 호출 번호가 다시 시작되면 어느 짝인지 몰라 시간을 비운다")
+    void leavesElapsedEmptyWhenCallIdIsReusedWhileRunning() throws IOException {
+        List<HermesRunEvent> events = new ArrayList<>();
+        HermesInterimWire.read("""
+                data: {"event":"tool.started","tool":"web_search","tool_call_id":"call_0","timestamp":1.0}
+
+                data: {"event":"tool.started","tool":"web_search","tool_call_id":"call_0","timestamp":1.5}
+
+                data: {"event":"tool.completed","tool":"web_search","tool_call_id":"call_0","duration":0,"timestamp":2.0}
+
+                data: {"event":"tool.completed","tool":"web_search","tool_call_id":"call_0","duration":0,"timestamp":3.0}
+
+                """, ToolDetailScope.NONE, events::add);
+
+        assertThat(events).extracting(HermesRunEvent::durationMs).containsOnlyNulls();
+    }
+
+
+    @Test
+    @DisplayName("Hermes 가 걸린 시간을 보내면 시각 차이보다 그 값을 쓴다")
+    void keepsReportedElapsedOverTimestamps() throws IOException {
+        List<HermesRunEvent> events = new ArrayList<>();
+        HermesInterimWire.read("""
+                data: {"event":"tool.started","tool":"grep","tool_call_id":"call_a","timestamp":10.0}
+
+                data: {"event":"tool.completed","tool":"grep","tool_call_id":"call_a","duration":0.25,"timestamp":19.0}
+
+                """, ToolDetailScope.NONE, events::add);
+
+        assertThat(events.getLast().durationMs()).isEqualTo(250L);
+    }
 
 
     private HermesRunEvent parse(String raw) {

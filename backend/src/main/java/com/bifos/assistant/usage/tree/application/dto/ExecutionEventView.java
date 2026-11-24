@@ -34,7 +34,10 @@ public record ExecutionEventView(
     Instant occurredAt,
     String subagentUsageStatus,
     ConnectorToolName connector,
-    String delegatedAgentName) {
+    String delegatedAgentName,
+    String errorType,
+    String errorSummary,
+    String toolCallId) {
 
     /**
      * 사건 한 줄을 보는 사람에게 맞춰 옮긴다.
@@ -42,7 +45,9 @@ public record ExecutionEventView(
      * <p>도구 사건의 {@code detail} 은 {@link ToolDetailPolicy} 가 허락할 때만 싣는다. 도구 사건이 아닌
      * 사건의 {@code detail} 은 그대로 싣는다.
      *
-     * <p>{@code model} 과 토큰은 {@link InternalValuePolicy} 가 허락할 때만 싣는다.
+     * <p>{@code model} 과 토큰, 실패한 도구의 오류 종류와 요약은 {@link InternalValuePolicy} 가 허락할 때만 싣는다(스펙
+     * run-trace REQ3). {@code toolCallId} 는 Hermes 가 붙인 불투명한 번호라 누구에게나 싣는다. 화면이 같은 이름의 병렬 도구를 바른
+     * 짝으로 묶는 데만 쓴다(docs/features/run-trace/design.md DECISION8).
      */
     public static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer) {
         return from(event, viewer, null);
@@ -80,6 +85,9 @@ public record ExecutionEventView(
             event.occurredAt(),
             subagentUsageStatus,
             connector,
-            delegatedAgentName);
+            delegatedAgentName,
+            internal ? event.errorType() : null,
+            internal ? event.errorSummary() : null,
+            event.toolCallId());
     }
 }

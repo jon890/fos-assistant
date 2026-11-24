@@ -18,6 +18,9 @@ public final class ToolDetailRedactor {
     /** 가린 뒤 중계하고 저장하는 도구 내용의 글자 상한이다. 실행 사건의 {@code detail} 열 길이와 같다. */
     public static final int DETAIL_LIMIT = 500;
 
+    /** 실패한 도구의 오류 요약 글자 상한이다(스펙 run-trace REQ2). 가린 뒤에 자른다. */
+    public static final int ERROR_LIMIT = 200;
+
     private static final String HIDDEN = "[가림]";
 
     /** 커넥터 도구의 내용을 통째로 가린 자리에 남기는 글이다. */
@@ -105,16 +108,43 @@ public final class ToolDetailRedactor {
             return CONNECTOR_HIDDEN;
         }
         if (afterConnector) {
-            return "[도구 내용 가림: " + detail.length() + "자]";
+            // 빈 내용에 길이 문구를 붙이면 「0자」 만 보여 무엇을 가렸는지 헷갈린다(스펙 run-trace REQ12).
+            return detail.isEmpty() ? null : "[도구 내용 가림: " + detail.length() + "자]";
         }
         if (detail.length() > INPUT_LIMIT) {
             return "[긴 도구 내용 가림]";
         }
-        String redacted = redactContent(detail, identifiers);
-        if (redacted.length() <= DETAIL_LIMIT) {
+        return truncate(redactContent(detail, identifiers), DETAIL_LIMIT);
+    }
+
+
+    /**
+     * 실패한 도구의 오류 글을 가린 뒤 {@link #ERROR_LIMIT} 로 자른다.
+     *
+     * <p>플러그인 도구와 플러그인 호출 뒤의 도구는 외부 서비스의 글이 실릴 수 있어 오류 글을 남기지 않고 null 을 낸다. 오류 종류는
+     * 부르는 쪽이 따로 남긴다. 자르기 전에 가려야 경계에 걸친 비밀값 조각이 토큰 모양 검사를 피하지 못한다(스펙 run-trace
+     * DECISION13). 번호표는 이 글 하나 안에서만 매긴다. 실행 기록에 내용을 남기지 않는 도구({@link WithheldToolContent})도 오류
+     * 글을 남기지 않는다.
+     *
+     * @param toolName 그 도구의 등록 이름. 모르면 null
+     */
+    public static String redactError(String message, String toolName, ToolDetailScope scope, boolean afterConnector) {
+        if (message == null || message.isBlank() || scope.hides(toolName) || afterConnector
+            || WithheldToolContent.withholdsErrorText(toolName)) {
+            return null;
+        }
+        if (message.length() > INPUT_LIMIT) {
+            return "[긴 도구 내용 가림]";
+        }
+        return truncate(redactContent(message.strip(), new LinkedHashMap<>()), ERROR_LIMIT);
+    }
+
+
+    private static String truncate(String redacted, int limit) {
+        if (redacted.length() <= limit) {
             return redacted;
         }
-        int end = DETAIL_LIMIT - 1;
+        int end = limit - 1;
         if (Character.isHighSurrogate(redacted.charAt(end - 1))) {
             end--;
         }

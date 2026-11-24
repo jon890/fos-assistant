@@ -85,7 +85,7 @@ class SourceReadPreviewIntegrationTest {
 
 
     private static List<ExecutionEvent> records(HermesRunEvent... events) throws Exception {
-        ExecutionEventRecorder recorder = new ExecutionEventRecorder(mock(SkillUseRecorder.class), CLOCK);
+        ExecutionEventRecorder recorder = new ExecutionEventRecorder(mock(SkillUseRecorder.class), CLOCK, null);
         AgentExecution execution = execution();
         return IntStream.range(0, events.length)
             .mapToObj(index -> recorder.record(execution, TestAgentRuntimes.event(events[index]), index + 1))
