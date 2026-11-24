@@ -15,7 +15,6 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.contentdraft.application.ContentDraftSaveApproval;
-import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.EvalObservation;
@@ -98,7 +97,7 @@ class EvalRunner {
     private final ConnectorActionService actionService;
     private final ContentDraftSaveApproval contentDrafts;
     private final ConnectorConnectionService connections;
-    private final McpConnectionLiveness liveness;
+    private final ControlPlaneConnection connection;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -206,6 +205,7 @@ class EvalRunner {
         Instant startedAt = clock.instant();
         long startedNanos = System.nanoTime();
         Instant deadline = startedAt.plus(timeout);
+        boolean connectedAtStart = connection.atStart(primary.hermesProfile());
         Conversation conversation = chat.startEmpty(evaluation, primary.code());
         Long conversationId = conversation.id();
         runs.record(runId, new ItemResult(bundleId, question.id(), EvalItemStatus.RUNNING, null, List.of(), 0, startedAt, conversationId,
@@ -252,7 +252,7 @@ class EvalRunner {
             status = EvalItemStatus.FAILED;
             reason = RUN_FAILED;
         }
-        boolean environment = status != EvalItemStatus.PASSED && !liveness.connected(primary.hermesProfile());
+        boolean environment = status != EvalItemStatus.PASSED && !(connectedAtStart && connection.atEnd(primary.hermesProfile()));
         if (environment) {
             // 도구를 받지 못한 채 돈 실패는 에이전트의 회귀가 아니다. 규칙 미달 목록을 비워 판정까지 가지 못한 문항(묶음의 오류)으로 센다.
             status = EvalItemStatus.FAILED;

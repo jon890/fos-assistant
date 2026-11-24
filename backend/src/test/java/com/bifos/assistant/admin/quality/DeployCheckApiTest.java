@@ -131,6 +131,8 @@ class DeployCheckApiTest {
         assertThat(read.path("status").asString()).isEqualTo("FAILED");
         assertThat(read.path("itemCount").asInt()).isEqualTo(QualityFeature.values().length);
         assertThat(read.path("results").get(0).path("reasonCode").asString()).isEqualTo("RUN_FAILED");
+        // 평가 비서가 없어 Hermes 를 부르지 않은 실패는 연결과 상관없어 환경 오류가 아니다.
+        assertThat(read.path("environmentError").asBoolean()).isFalse();
         assertThat(read.path("elapsedMs").isNumber()).isTrue();
         List<Notification> sent = notifications.findAll();
         assertThat(sent).hasSize(1);
@@ -148,6 +150,25 @@ class DeployCheckApiTest {
         assertThat(retried.statusCode()).isEqualTo(202);
         assertThat(json.readTree(retried.body()).path("trigger").asString()).isEqualTo("ADMIN");
         assertThat(runs.findAll()).hasSize(2);
+    }
+
+
+    @Test
+    @DisplayName("환경 오류로 실패한 기능이 있으면 응답에 environmentError 가 참이고 알림 본문이 평가 환경의 문제라고 알린다")
+    void environmentErrorIsShownSeparately() throws Exception {
+        AppUser evaluation = evaluationUser();
+        OpenedDeployCheck opened = runWrites.open(evaluation.id(), QualityRunTrigger.PIPELINE, admin.id());
+        runWrites.record(opened.runId(), new FeatureResult(QualityFeature.SEARCH, FeatureStatus.PASSED, null, 10, null, List.of()), 1);
+        runWrites.record(opened.runId(),
+            new FeatureResult(QualityFeature.TOOL_DISCOVERY, FeatureStatus.FAILED, "ENVIRONMENT", 10, null, List.of()), 1);
+
+        runWrites.finish(opened.runId());
+
+        JsonNode read = json.readTree(api("GET", CHECKS + "/" + opened.started().check().publicId(), admin).body());
+        assertThat(read.path("status").asString()).isEqualTo("FAILED");
+        assertThat(read.path("environmentError").asBoolean()).isTrue();
+        assertThat(notifications.findAll()).singleElement()
+            .satisfies(sent -> assertThat(sent.body()).contains("도구 찾기").contains("평가 환경의 문제"));
     }
 
 

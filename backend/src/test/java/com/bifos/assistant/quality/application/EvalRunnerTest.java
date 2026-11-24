@@ -24,7 +24,6 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.contentdraft.application.ContentDraftSaveApproval;
-import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.ToolObservation;
@@ -83,7 +82,7 @@ class EvalRunnerTest {
     private final ConnectorActionService actionService = mock(ConnectorActionService.class);
     private final ContentDraftSaveApproval contentDrafts = mock(ContentDraftSaveApproval.class);
     private final ConnectorConnectionService connections = mock(ConnectorConnectionService.class);
-    private final McpConnectionLiveness liveness = mock(McpConnectionLiveness.class);
+    private final ControlPlaneConnection connection = mock(ControlPlaneConnection.class);
     private EvalRunner runner;
     private ConnectorAction card;
 
@@ -93,14 +92,15 @@ class EvalRunnerTest {
         QualityProperties properties = new QualityProperties(Duration.ofMinutes(10), Duration.ofMillis(10), Duration.ofDays(30), "0 15 5 * * *",
             "classpath:quality/bundles/", Duration.ofSeconds(5));
         runner = new EvalRunner(runs, rows, cleaner, conversations, observer, driver, evaluationUsers, users, chat, mock(AttachmentService.class),
-            mock(TaskService.class), connectorActions, actionService, contentDrafts, connections, liveness, mock(BackgroundTasks.class),
+            mock(TaskService.class), connectorActions, actionService, contentDrafts, connections, connection, mock(BackgroundTasks.class),
             LiveProperties.fixed(QualityProperties.class, properties), Clock.systemUTC());
         AppUser evaluation = AppUser.of("evaluation@quality.invalid", "평가 사용자", 1L, UserRole.MEMBER);
         when(users.findById(7L)).thenReturn(Optional.of(evaluation));
         Agent primary = mock(Agent.class);
         when(primary.code()).thenReturn("eval-primary");
         when(primary.hermesProfile()).thenReturn("eval-primary");
-        when(liveness.connected("eval-primary")).thenReturn(true);
+        when(connection.atStart("eval-primary")).thenReturn(true);
+        when(connection.atEnd("eval-primary")).thenReturn(true);
         when(evaluationUsers.primaryAgent(any())).thenReturn(Optional.of(primary));
         when(evaluationUsers.delegateAgent(any())).thenReturn(Optional.empty());
         Conversation conversation = mock(Conversation.class);
@@ -284,7 +284,7 @@ class EvalRunnerTest {
     @Test
     @DisplayName("Control Plane MCP 연결이 끊긴 채 통과하지 못한 문항은 환경 오류로 적고 남은 문항은 보내지 않는다")
     void disconnectedFailureIsEnvironmentErrorAndStopsTheRun() {
-        when(liveness.connected("eval-primary")).thenReturn(false);
+        when(connection.atEnd("eval-primary")).thenReturn(false);
         answer("도구를 찾지 못했어요", "tool_search");
         EvalQuestion first = question("task-create");
         EvalQuestion second = question("task-delete");
@@ -316,12 +316,37 @@ class EvalRunnerTest {
     @Test
     @DisplayName("연결이 끊겨 있어도 통과한 문항은 통과로 둔다")
     void disconnectedPassStaysPassed() {
-        when(liveness.connected("eval-primary")).thenReturn(false);
+        when(connection.atStart("eval-primary")).thenReturn(false);
+        when(connection.atEnd("eval-primary")).thenReturn(false);
 
         runner.run(RUN, 7L, List.of(bundle(null, null)), null);
 
         assertThat(lastItem().status()).isEqualTo(EvalItemStatus.PASSED);
         assertThat(lastItem().reasonCode()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("끊긴 채 시작해 도중에 다시 연결된 문항의 실패도 환경 오류다")
+    void failureStartedWhileDisconnectedIsEnvironmentError() {
+        when(connection.atStart("eval-primary")).thenReturn(false);
+        answer("도구를 찾지 못했어요", "tool_search");
+
+        runner.run(RUN, 7L, List.of(new EvalBundle("b", "묶음", 10, new PassRule(PassRule.RATIO, 0.85), List.of(question("task-create")))), null);
+
+        assertThat(lastItem().reasonCode()).isEqualTo("ENVIRONMENT");
+    }
+
+
+    @Test
+    @DisplayName("연결이 살아 있는데 도구를 부르지 않은 실패는 규칙 미달로 둔다")
+    void connectedFailureStaysRuleFailure() {
+        answer("도구를 찾지 못했어요", "tool_search");
+
+        runner.run(RUN, 7L, List.of(new EvalBundle("b", "묶음", 10, new PassRule(PassRule.RATIO, 0.85), List.of(question("task-create")))), null);
+
+        assertThat(lastItem().reasonCode()).isEqualTo("RULES");
+        assertThat(lastItem().failures()).isNotEmpty();
     }
 
 

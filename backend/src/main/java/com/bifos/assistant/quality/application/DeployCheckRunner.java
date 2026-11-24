@@ -6,7 +6,6 @@ import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
-import com.bifos.assistant.mcp.application.McpConnectionLiveness;
 import com.bifos.assistant.quality.application.dto.CheckObservation;
 import com.bifos.assistant.quality.application.dto.FeatureVerdict;
 import com.bifos.assistant.quality.config.QualityProperties;
@@ -79,7 +78,7 @@ class DeployCheckRunner {
     private final TaskService tasks;
     private final TurnCancellation turns;
     private final TurnDriver driver;
-    private final McpConnectionLiveness liveness;
+    private final ControlPlaneConnection connection;
     private final BackgroundTasks background;
     private final LiveProperties<QualityProperties> properties;
     private final Clock clock;
@@ -135,6 +134,9 @@ class DeployCheckRunner {
         long startedNanos = System.nanoTime();
         Instant deadline = clock.instant().plus(properties.current().featureTimeout());
         Attempt attempt = new Attempt();
+        // 평가 비서가 없으면 Hermes 를 부르지 않고 실패하므로 연결을 보지 않는다.
+        Optional<String> profile = evaluationUsers.primaryAgent(evaluation).map(Agent::hermesProfile);
+        boolean connectedAtStart = profile.map(connection::atStart).orElse(true);
         FeatureVerdict verdict;
         try {
             CheckObservation observation = feature == QualityFeature.TASK_FIRE
@@ -147,7 +149,7 @@ class DeployCheckRunner {
             log.warn("배포 뒤 확인의 기능이 예외로 끝났다 feature={}", feature, ex);
             verdict = FeatureVerdict.failed(CheckReason.RUN_FAILED);
         }
-        if (verdict.status() != FeatureStatus.PASSED && !controlPlaneConnected(evaluation)) {
+        if (verdict.status() != FeatureStatus.PASSED && profile.isPresent() && !(connectedAtStart && connection.atEnd(profile.get()))) {
             // 도구를 받지 못한 채 돈 실패는 기능의 회귀가 아니다. 까닭을 환경 오류로 바꿔 품질 실패와 섞이지 않게 한다.
             log.warn("평가 비서의 Control Plane MCP 연결이 끊긴 채 기능이 실패했다 feature={}", feature);
             verdict = FeatureVerdict.failed(CheckReason.ENVIRONMENT);
@@ -170,12 +172,6 @@ class DeployCheckRunner {
             ? new FeatureResult(feature, verdict.status(), null, elapsedMs, null, List.of())
             : new FeatureResult(feature, verdict.status(), verdict.reasonCode(), elapsedMs, attempt.conversationPublicId, executionIds);
         return new Outcome(result, modelCalls);
-    }
-
-
-    /** 평가 비서 profile 의 Control Plane MCP 연결이 살아 있는가. 기본 비서가 없으면 연결도 없다고 본다. */
-    private boolean controlPlaneConnected(CurrentUser evaluation) {
-        return evaluationUsers.primaryAgent(evaluation).map(Agent::hermesProfile).filter(liveness::connected).isPresent();
     }
 
 
