@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "id": "research-ai-jobs",
+      "category": "여러 단계 조사",
+      "messages": [
+        "구리시에서 대중교통으로 출퇴근 1시간 안인 판교나 강남의 AI 에이전트 개발자 채용 공고 세 개를 찾아서, 연봉 근거와 회사 리뷰를 표로 비교하고 하나를 추천해 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "research-ev-suv",
+      "category": "여러 단계 조사",
+      "messages": [
+        "올해 서울에서 보조금을 받으면 4천만원대에 살 수 있는 전기 SUV 세 대를 실구매가, 1회 충전 주행거리, 충전 속도, 트렁크 크기로 표로 비교하고 초등학생 둘 있는 4인 가족에게 하나 골라 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "plan-jeju-family",
+      "category": "조건이 많은 계획",
+      "messages": [
+        "다음 달 셋째 주 금요일 저녁에 김포에서 출발해 일요일 밤에 돌아오는 제주 2박 3일 여행을 짜 줘. 어른 둘, 초등학생 둘이고 항공권과 숙소를 합쳐 120만원 안, 렌터카 없이 대중교통과 택시로만 다니고 하루 이동은 합쳐서 2시간을 넘지 않아야 해. 날짜별 일정표와 항목별 예산 표도 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "plan-birthday-party",
+      "category": "조건이 많은 계획",
+      "messages": [
+        "다음 주 토요일 오후 2시부터 4시까지 집에서 초등학생 10명이 오는 생일 파티를 하려고 해. 예산 25만원 안에서 음식, 케이크, 놀이 준비물을 온라인으로 주문할 목록을 가격과 함께 짜고, 토요일 전에 받으려면 품목마다 언제까지 주문해야 하는지 알려 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "change-fx-week",
+      "category": "변화 추적",
+      "messages": [
+        "원달러, 원엔(100엔), 원유로 환율이 지난주 같은 요일과 비교해 얼마나 바뀌었는지 이전 값, 지금 값, 변화량을 표로 정리하고 왜 움직였는지 짧게 알려 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "change-mortgage-month",
+      "category": "변화 추적",
+      "messages": [
+        "최근 한 달 사이 주요 시중은행의 주택담보대출 금리와 정부의 가계대출 규제가 어떻게 바뀌었는지 이전, 지금, 변화량으로 정리하고 집을 사려는 사람에게 무엇이 달라졌는지 알려 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "vague-weekend-trip",
+      "category": "모호한 질문",
+      "messages": [
+        "이번 주말에 놀러 갈 데 정해 줘"
+      ],
+      "check": "none",
+      "compare": true
+    },
+    {
+      "id": "vague-laptop",
+      "category": "모호한 질문",
+      "messages": [
+        "노트북 하나 사려는데 괜찮은 걸로 골라서 바로 살 수 있게 해 줘"
+      ],
+      "check": "none",
+      "compare": true
+    },
+    {
+      "id": "delegate-parental-leave",
+      "category": "맡기기",
+      "messages": [
+        "{otherAgentName}한테 맡겨서 올해 육아휴직 급여 제도에서 바뀐 점을 조사하게 하고, 받은 결과를 바뀌기 전과 지금을 비교한 표와 출처로 정리해 줘"
+      ],
+      "check": "delegate",
+      "compare": true
+    },
+    {
+      "id": "delegate-compare-cards",
+      "category": "맡기기",
+      "messages": [
+        "{otherAgentName}한테 맡겨서 마트와 온라인 쇼핑 할인이 큰 신용카드 세 장을 찾게 하고, 받은 결과로 한 달 50만원 쓰는 집에 맞는 카드를 연회비와 실적 조건까지 따져 하나 골라 줘"
+      ],
+      "check": "delegate",
+      "compare": true
+    },
+    {
+      "id": "long-after-school",
+      "category": "긴 답 구조",
+      "messages": [
+        "초등학교 1학년 아이의 방과 후 돌봄 선택지(학교 돌봄교실, 다함께돌봄센터, 지역아동센터, 아이돌봄 서비스, 학원)를 비용, 신청 자격, 신청 방법, 운영 시간으로 비교해 줘. 결론을 먼저 쓰고, 표, 출처 목록, 마지막에 이번 주에 할 일을 순서대로 적어 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "long-year-end-couple",
+      "category": "긴 답 구조",
+      "messages": [
+        "맞벌이 부부가 올해 연말정산에서 의료비, 신용카드, 부양가족, 교육비 공제를 누구 쪽으로 몰아야 유리한지 항목별로 정리해 줘. 결론을 먼저 쓰고, 항목별 표, 주의할 점, 출처 목록, 마지막에 12월 안에 할 일을 순서대로 적어 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    }
+  ]
+}
