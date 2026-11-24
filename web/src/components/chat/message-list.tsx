@@ -116,10 +116,11 @@ export function MessageList({
   const { visible, latestView } = visibleTurns(turns, selectedVersions);
   const pendingLabel = pendingAnswerLabel(visible.map(({ turn }) => turn));
   const lastVisible = visible.at(-1)?.turn;
-  // 마지막 줄이 steer 말풍선이면 다시 시도할 질문이 아니다. 다시 보내면 같은 글이 질문으로 한 번 더 간다.
+  // 맡긴 질문은 맡긴 일 줄에서 상태를 보인다. steer 말풍선도 다시 시도할 질문에서 뺀다.
   const hasNoAnswer =
     lastVisible?.role === "USER" &&
     !isSteerTurn(lastVisible) &&
+    !lastVisible.delegatedTo &&
     latestView &&
     !sending &&
     !outgoing;
@@ -318,7 +319,7 @@ export function MessageList({
                           className="-mt-4 flex animate-fade-in items-center justify-end gap-2 text-xs text-muted-foreground"
                         >
                           <span>답을 받지 못했어요</span>
-                          {onRetry && !turn.delegatedTo ? (
+                          {onRetry ? (
                             <Button
                               type="button"
                               variant="link"
