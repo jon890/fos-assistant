@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
  * <p>「다 했어요」 는 닫기 전에 이어 갈 수 있는지 본다. 남긴 탭이 없어졌거나 연결이 끊겼으면 카드를 닫고 대화에 알림 줄을 남긴 뒤 이어 가지 않는다.
  * 탭 확인은 CDP 를 부르므로 트랜잭션 밖에서 한다. 표는 {@code docs/features/mobile-default-chat/design.md} 의 「단추 닫기 API」 가 갖는다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HandoffButtons {
@@ -57,10 +59,20 @@ public class HandoffButtons {
             return HandoffCloseResult.ALREADY_CLOSED;
         }
         if (blocked.isPresent()) {
-            conversations.post(conversationId, blocked.get());
+            notice(conversationId, blocked.get());
             return HandoffCloseResult.UNAVAILABLE;
         }
         return outcome == HandoffCloseOutcome.DONE ? HandoffCloseResult.CONTINUE : HandoffCloseResult.STOPPED;
+    }
+
+
+    /** 카드는 이미 닫혔으므로 알림 줄을 남기지 못해도 이어 갈 수 없다는 답은 그대로 준다. 실패하면 로그만 남긴다. */
+    private void notice(Long conversationId, String text) {
+        try {
+            conversations.post(conversationId, text);
+        } catch (RuntimeException ex) {
+            log.warn("이어 갈 수 없다는 알림 줄을 남기지 못했다 conversationId={} kind={}", conversationId, ex.getClass().getSimpleName());
+        }
     }
 
 
