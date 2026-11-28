@@ -2,6 +2,8 @@
 
 휴대폰에서 비서와의 대화방 하나로 일을 맡기고, 오래 걸리거나 확인이 필요한 일은 맡긴 일 카드로 다시 찾는 기능이다. 합의한 변경과 단계는 [스펙](mobile-default-chat/spec.md)이 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
+covers: `backend/src/main/java/com/bifos/assistant/connector/handoff/application/ConnectorHandoffs.java`, `web/src/components/chat/todo-panel.tsx`, `web/src/components/chat/use-conversation-todo.tsx`
+
 ## 요구
 
 아직 구현하지 않았다. 지금 동작은 [에이전트 팀](agent-team.md) 의 「대화방」, [사용자 브라우저](user-browser.md) 의 「대화 위 화면」, [지금 화면과 알림, 할 일](attention.md) 이 갖는다.
