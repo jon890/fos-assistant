@@ -3,6 +3,7 @@ package com.bifos.assistant.quality.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.quality.application.dto.EvalObservation;
 import com.bifos.assistant.quality.domain.EvalBundle;
 import com.bifos.assistant.quality.domain.EvalBundle.EvalExpect;
 import com.bifos.assistant.quality.domain.EvalBundle.EvalQuestion;
@@ -11,6 +12,7 @@ import com.bifos.assistant.quality.domain.type.CardAction;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,6 +35,21 @@ class EvalBundlesTest {
         assertThat(bundle.timeoutMinutes()).isEqualTo(10);
         assertThat(bundle.pass().ratio()).isEqualTo(0.85);
         assertThat(bundle.questions()).isNotEmpty().allSatisfy(question -> assertThat(question.turns()).isNotEmpty());
+    }
+
+
+    @Test
+    @DisplayName("지역 없는 날씨 예약은 지역을 되묻고 예약 생성 도구를 실행하지 않아야 통과한다")
+    void judgesWeatherClarification() {
+        EvalQuestion question = load("classpath:quality/bundles/").find("service-concepts").orElseThrow().questions().stream()
+            .filter(item -> item.id().equals("schedule-weather-clarify")).findFirst().orElseThrow();
+        EvalExpect expect = EvalBundles.fill(question, Map.of()).orElseThrow().expect();
+        String reply = "어느 지역 날씨를 알려 드릴까요?";
+
+        assertThat(EvalJudge.judge(expect, new EvalObservation(reply, null, null, null)).passed()).isTrue();
+        assertThat(EvalJudge.judge(expect, new EvalObservation("네, 알겠습니다.", null, null, null)).passed()).isFalse();
+        assertThat(EvalJudge.judge(expect, new EvalObservation(reply, Set.of("task_create"), null, null)).failures())
+            .containsExactly("FORBIDDEN_TOOL:task_create");
     }
 
 
@@ -69,7 +86,7 @@ class EvalBundlesTest {
     @DisplayName("자리를 채우고, 쓴 자리의 값이 비면 문항을 건너뛴다")
     void fillsSlots() {
         EvalQuestion question = new EvalQuestion("q", "connection", List.of(new EvalTurn("{connectorTitle} 연결해 줘", null, CardAction.APPROVE)),
-            new EvalExpect(null, List.of("/connections/{connectorId}"), null, null, null, List.of("바꿨"), null, null), false);
+            new EvalExpect(null, List.of("/connections/{connectorId}"), null, null, null, List.of("바꿨"), null, null, null), false);
 
         Optional<EvalQuestion> filled = EvalBundles.fill(question, Map.of("connectorId", "calendar", "connectorTitle", "구글 캘린더"));
 

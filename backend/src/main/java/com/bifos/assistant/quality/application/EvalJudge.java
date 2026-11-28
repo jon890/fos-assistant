@@ -29,6 +29,7 @@ final class EvalJudge {
     static final String MISSING_LINK = "MISSING_LINK";
     static final String FORBIDDEN_LINK = "FORBIDDEN_LINK";
     static final String MISSING_TOOL = "MISSING_TOOL";
+    static final String FORBIDDEN_TOOL = "FORBIDDEN_TOOL";
     static final String MISSING_WORD = "MISSING_WORD";
     static final String FORBIDDEN_WORD = "FORBIDDEN_WORD";
     static final String MISSING_INSTRUCTION = "MISSING_INSTRUCTION";
@@ -71,6 +72,11 @@ final class EvalJudge {
         for (String tool : expect.tools()) {
             if (!observation.completedTools().contains(tool)) {
                 failures.add(MISSING_TOOL + ":" + tool);
+            }
+        }
+        for (String tool : expect.noTools()) {
+            if (observation.completedTools().contains(tool)) {
+                failures.add(FORBIDDEN_TOOL + ":" + tool);
             }
         }
         if (!expect.includes().isEmpty() && expect.includes().stream().noneMatch(answer::contains)) {

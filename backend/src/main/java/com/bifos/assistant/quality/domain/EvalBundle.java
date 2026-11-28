@@ -84,16 +84,18 @@ public record EvalBundle(String id, String title, Integer timeoutMinutes, PassRu
         List<String> includes,
         List<String> absent,
         List<String> instructionIncludes,
-        String cardStatus) {
+        String cardStatus,
+        List<String> noTools) {
 
 
-        public static final EvalExpect NONE = new EvalExpect(null, null, null, null, null, null, null, null);
+        public static final EvalExpect NONE = new EvalExpect(null, null, null, null, null, null, null, null, null);
 
         public EvalExpect {
             links = copy(links);
             linkPrefixes = copy(linkPrefixes);
             noLinkPrefixes = copy(noLinkPrefixes);
             tools = copy(tools);
+            noTools = copy(noTools);
             includes = copy(includes);
             absent = copy(absent);
             instructionIncludes = copy(instructionIncludes);

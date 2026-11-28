@@ -34,7 +34,7 @@
       "id": "schedule-weather",
       "concept": "schedule",
       "messages": [
-        "매일 아침 7시에 날씨 알려 줘"
+        "매일 아침 7시에 서울 날씨 알려 줘"
       ],
       "expect": {
         "tools": [
@@ -42,6 +42,38 @@
         ],
         "linkPrefixes": [
           "/tasks/"
+        ]
+      }
+    },
+    {
+      "id": "schedule-weather-clarify",
+      "concept": "schedule",
+      "messages": [
+        "매일 아침 7시에 날씨 알려 줘"
+      ],
+      "expect": {
+        "includes": [
+          "어느 지역",
+          "어떤 지역",
+          "어디 날씨",
+          "어디의 날씨",
+          "어느 도시",
+          "어떤 도시",
+          "어느 동네",
+          "지역을 알려",
+          "지역명을 알려"
+        ],
+        "noTools": [
+          "task_create"
+        ],
+        "noLinkPrefixes": [
+          "/tasks/"
+        ],
+        "absent": [
+          "만들었어요",
+          "만들었습니다",
+          "등록했어요",
+          "등록했습니다"
         ]
       }
     },
