@@ -56,6 +56,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | 로컬 플러그인 MCP 프로세스 | 연결의 주인. 실행기가 그 연결의 보관 파일을 풀어 그 프로세스 env 에만 넣는다 | **Hermes 의 자식 프로세스. Hermes 와 모든 사용자의 플러그인이 같은 OS 계정이다.** 실행 공간 밖이다 | **Hermes 컨테이너의 파일 전체** | 연결 주인의 자격증명 | 호출마다 fos-ctx 가 Control Plane 에 묻고, 연결 주인과 실행의 사용자가 다르면 막는다. **OS 권한 경계는 없다**(아래 「경계 없음」 1) | 합성 검사: `ConnectorPolicyEndpointTest`, `ConnectorGuardSupportTest`, `ConnectorActionExecutionTest`, `test_connector_launcher.py`, `test_fos_ctx.py` |
 | 원격 플러그인 | 연결의 주인. 붙인 에이전트 profile 의 `.env` 에 값을 복사한다 | Hermes gateway 가 직접 연결한다 | 해당 없음 | 연결 주인의 자격증명 | 위와 같은 호출 판정. **사본이 profile `.env` 에 있어 같은 OS 계정의 프로세스가 읽는다**(아래 「경계 없음」 1) | 소스·구성 확인([「플러그인 비밀값을 두는 곳」](#플러그인-비밀값을-두는-곳)) |
 | 「내 브라우저」 중계 | 접근 표식. 바인딩 표식은 그 연결의 주인, 호출 표식은 그 사용자다. HMAC 서명이고 호출 표식은 5분 뒤 만료된다 | 사용자마다 브라우저 컨테이너 하나. 프로필 디렉터리도 사용자마다 따로다 | 그 사용자의 브라우저 프로필 | 표식의 주인 | Control Plane 중계가 서명, 바인딩, 만료, 허용 목록, 사람 잠금을 본 뒤 그 주인의 브라우저에만 넘긴다. 브라우저 망에서 브라우저에 닿는 것은 Control Plane 하나다 | 합성 검사: `BrowserGatewayTest`(합성 사용자 둘), `BrowserGatewayTokensTest`, `UserBrowserScreenControllerTest`. 운영 확인 필요: 브라우저 망에 Hermes 와 실행 공간이 닿지 않는 것 |
+| 에이전트의 「내 브라우저」 도구(`browser_tab*`) | Hermes → Control Plane MCP 구간이 정한 사용자. 사용자 스위치와 관리자 전체 스위치가 모두 켜져야 쓴다 | Control Plane 이 그 사용자 브라우저의 CDP 에 직접 닿는다. Hermes 쪽에는 브라우저 주소와 표식을 주지 않는다 | 그 사용자의 브라우저 탭 | 없음 | 도구는 요청자의 `user_browser` 줄만 고른다. 닫기와 열기는 승인 카드로만 하고, 승인한 사람의 브라우저에서 한 번 돈다. **강제 경계는 MCP 토큰과 서명이다**(아래 「경계 없음」 1) | 합성 검사: `BrowserTabControlTest`(합성 사용자 둘), `McpBrowserTabToolsTest`(남의 카드 승인 거절, 스위치) |
 | Hermes 내장 브라우저(`browser_*`) | 해당 없음 | Hermes 컨테이너 | Hermes 컨테이너 | 해당 없음 | **기능을 보류했다.** profile 틀이 toolset 을 끈다 | 소스·구성 확인([「같은 프로세스에 남는 구멍」](../hermes/docs/hermes-contract.md#같은-프로세스에-남는-구멍)) |
 
 ### 경계 없음
@@ -67,6 +68,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
    같은 계정이라 파일 권한이 막지 않는 것은 보관 key, 다른 사용자의 보관 파일과 OAuth 파일, 다른 profile 의 `.env`(원격 플러그인 사본 포함), 다른 바인딩의 서버 정의다. 서버 정의에는 만료 없는 바인딩 표식이 든 중계 주소가 있다.
    profile `.env` 에는 그 profile 의 `API_SERVER_KEY`, AI provider key, Control Plane MCP 토큰도 있다.
    영향은 플러그인 하나의 코드나 의존이 뚫리면 모든 사용자의 플러그인 자격증명과 「내 브라우저」 로그인에 닿고, 다른 profile 로 실행을 띄우거나 그 profile 의 이름으로 Control Plane MCP 를 부를 수 있다는 것이다.
+   그 이름으로 부르는 Control Plane MCP 에는 「내 브라우저」 탭 도구도 든다. 그 profile 에서 도는 실행이 있고 스위치를 켠 사용자의 탭 목록에 닿고, 닫기와 열기는 그 사용자의 승인을 거친다.
    지금 막는 것은 이 저장소가 검토한 플러그인 코드뿐이다([ADR-20261008 / browser-gateway-token](../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「맥락」). 보관 key 와 보관 파일을 같은 계정이 읽는다는 것은 [ADR-20261103 / connector-vault-key](../hermes/docs/adr/ADR-20261103-connector-vault-key.md) 의 「결과」 가 적는다.
    호출 판정(연결 주인과 실행 사용자 비교)은 모델이 부르는 도구만 막고 프로세스 자체를 막지 않는다.
 2. **Hermes gateway 의 profile 경계는 한 프로세스 안의 scope 다.**
