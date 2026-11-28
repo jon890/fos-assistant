@@ -4,7 +4,7 @@
 
 covers: `docs/features/agent-browser/spec.md`, `backend/src/main/java/com/bifos/assistant/mcp/application/McpBrowserTabTools.java`, `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpBrowserTabCalls.java`, `backend/src/main/java/com/bifos/assistant/mcp/application/port/BrowserTabRequests.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/BrowserTabRequester.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/BrowserTabRunners.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/BrowserTabCloseRunner.java`, `backend/src/main/java/com/bifos/assistant/connector/action/application/BrowserTabOpenRunner.java`
 
-스펙은 PR 셋으로 나뉜다. 이 파일은 지금 동작하는 것만 적는다. 화면 읽기, 막는 사이트, 누르기와 글자 넣기, 사람에게 넘기기는 아직 없다.
+구현 순서는 스펙의 DECISION12 가 정한다. 이 파일은 지금 동작하는 것만 적는다. 화면 읽기, 막는 사이트, 누르기와 글자 넣기, 사람에게 넘기기는 아직 없다.
 
 ## 켜기 스위치
 
@@ -18,7 +18,7 @@ covers: `docs/features/agent-browser/spec.md`, `backend/src/main/java/com/bifos/
 | --- | --- |
 | `browser_tabs` | 요청자 브라우저의 탭 목록(번호, 제목, 주소)이다. 에이전트가 쥔 탭과 넘기기 카드가 지키는 탭은 빠진다. 꺼진 브라우저는 켜지 않고 빈 목록이다 |
 | `browser_tab_close` | 탭을 닫는 「브라우저 탭 닫기」 승인 카드를 띄운다. 카드에는 탭마다 제목과 사이트가 보인다. 승인하면 그 사이 다른 페이지로 간 탭과 다른 작업이 쥔 탭은 두고 나머지를 닫는다 |
-| `browser_tab_open` | 새 탭을 여는 「브라우저 탭 열기」 승인 카드를 띄운다. `http`, `https` 의 공개 웹 주소만 받고 내부 주소는 거절한다. 카드에서 다 보이지 않는 주소는 카드를 띄우지 않는다 |
+| `browser_tab_open` | 새 탭을 여는 「브라우저 탭 열기」 승인 카드를 띄운다. `http`, `https` 의 공개 웹 주소만 받고 내부 주소(숫자 꼴은 네 마디 십진 표기만)는 거절한다. 카드에서 다 보이지 않는 주소는 카드를 띄우지 않는다 |
 
 - 브라우저는 늘 요청자의 것이다. 도구는 사용자나 브라우저를 인자로 받지 않는다.
 - 승인 결과는 대화의 알림 줄로 남고 에이전트를 다시 깨우지 않는다. 결과 글에는 닫은 수만 있고 탭 제목과 주소는 없다.
