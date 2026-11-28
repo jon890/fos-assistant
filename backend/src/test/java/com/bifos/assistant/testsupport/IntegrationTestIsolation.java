@@ -168,6 +168,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(RecordingContentDraftJobStarter.class).reset());
         attempt(failures, () -> context.getBean(RecordingWebPushClient.class).reset());
         attempt(failures, () -> context.getBean(TestClock.class).reset());
+        attempt(failures, () -> context.getBean(FakeCdpTargets.class).reset());
         // H2는 지운 사용자와 데이터 key의 번호를 다시 쓸 수 있다. 앞 검사의 key 캐시가 새 사용자에게 남지 않게 비운다.
         attempt(failures, () -> context.getBean(DataKeyService.class).forgetCachedKeys());
         // 서버 비밀값 줄과 그 캐시는 검사마다 비운다. 중계 서명 비밀은 검사 시작 때 설정에서 다시 넣는다.

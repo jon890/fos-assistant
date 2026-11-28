@@ -180,6 +180,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기와 지우기 청하기, 
 - 예약 작업 목록(`task_list`)과, 지우지 않고 승인 카드만 띄우는 `task_delete` 는 늘 받는다. 바로 바꾸는 `task_create`, `task_update`, `task_set_state` 는 쓰기 도구를 허용한 살펴보기만 받고 점검 대화로 묶지 않는다(서비스 개념 스펙 DECISION32)
 - `follow_up_propose` 와 챙기는 할 일을 읽는 `follow_up_list` 는 쓰기 도구 허용과 관계없이 받는다. 살펴보기의 할 일은 제안만 하고 사람이 받아들여야 챙긴다. 할 일을 끝내는 `follow_up_done` 은 쓰기 도구를 허용한 살펴보기만 받고, 받더라도 살펴보기 트리에서는 상태를 바꾸지 않는다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
 - 지우지 않고 승인 카드만 띄우는 `memory_forget` 과, 붙이지 않고 승인 카드만 띄우는 `connector_attach` 는 늘 받는다
+- 「내 브라우저」 의 `browser_tabs`, `browser_tab_close`, `browser_tab_open` 은 쓰기 도구 허용과 관계없이 받는다. 목록은 읽기이고 닫기와 열기는 승인 카드만 띄운다([ADR-20261128 / agent-browser](../adr/ADR-20261128-agent-browser.md)). 이름 목록은 `McpBrowserTabCalls.NAMES` 다
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`docs/features/proactive.md`](proactive.md) 의 「읽기 경계」).
@@ -201,6 +202,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기와 지우기 청하기, 
 | `connector_list` | [서비스 개념 설계](service-concepts/design.md) 의 「`connector_list`」. 요청자의 플러그인마다 연결 상태, 이 에이전트에 붙은 상태, 연결 화면 링크를 준다. 결과는 바깥 글이 아니라 기억 바로 저장 판정의 내부 도구다 |
 | `connector_attach` | [서비스 개념 설계](service-concepts/design.md) 의 「PR4 연결 붙이기 승인 카드」. 요청자의 연결을 이 실행의 에이전트에 붙이는 승인 카드만 띄운다. 결과에 플러그인의 이름이 없고 기억 바로 저장 판정의 내부 도구다 |
 | `task_list`, `task_create`, `task_update`, `task_set_state`, `task_delete` | [서비스 개념 설계](service-concepts/design.md) 의 「PR2 예약 작업 도구」. 요청자의 일반 예약 작업만 다룬다. 지우기는 승인 카드만 띄운다. 결과는 기억 바로 저장 판정의 내부 도구다 |
+| `browser_tabs`, `browser_tab_close`, `browser_tab_open` | [에이전트의 내 브라우저 조작](agent-browser.md) 의 「도구」. 요청자 브라우저만 쓰고 닫기와 열기는 승인 카드만 띄운다. 실행 기록에 인자와 결과를 남기지 않는다 |
 | `approval_resume` | [browser-cowork 설계](browser-cowork/design.md) 의 「PR4 이어 가기」. 호출한 대화의 사람 기다림 승인 하나를 같은 승인으로 한 번 더 실행한다 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않고, Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.

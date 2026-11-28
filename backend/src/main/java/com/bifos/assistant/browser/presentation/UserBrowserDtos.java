@@ -23,6 +23,7 @@ public final class UserBrowserDtos {
      * 내 브라우저다. 기능이 꺼져 있으면 {@code enabled} 만 싣고, 브라우저가 없으면 {@code exists} 가 거짓이다.
      *
      * @param idleTimeoutSeconds 자동 중지까지의 유휴 시간(초). 화면이 안내 문구에 쓴다
+     * @param agentControl 에이전트 조작 스위치. 브라우저가 있을 때만 싣는다
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record BrowserView(
@@ -32,19 +33,20 @@ public final class UserBrowserDtos {
         @JsonInclude(JsonInclude.Include.ALWAYS) String lastError,
         @JsonInclude(JsonInclude.Include.ALWAYS) Instant startedAt,
         @JsonInclude(JsonInclude.Include.ALWAYS) Instant lastActiveAt,
-        Long idleTimeoutSeconds) {
+        Long idleTimeoutSeconds,
+        AgentControlView agentControl) {
 
         static BrowserView disabled() {
-            return new BrowserView(false, null, null, null, null, null, null);
+            return new BrowserView(false, null, null, null, null, null, null, null);
         }
 
 
         static BrowserView missing(Duration idleTimeout) {
-            return new BrowserView(true, false, null, null, null, null, idleTimeout.toSeconds());
+            return new BrowserView(true, false, null, null, null, null, idleTimeout.toSeconds(), null);
         }
 
 
-        static BrowserView of(UserBrowserSnapshot browser, Duration idleTimeout) {
+        static BrowserView of(UserBrowserSnapshot browser, Duration idleTimeout, AgentControlView agentControl) {
             return new BrowserView(
                 true,
                 true,
@@ -52,7 +54,29 @@ public final class UserBrowserDtos {
                 browser.lastError(),
                 browser.startedAt(),
                 browser.lastActiveAt(),
-                idleTimeout.toSeconds());
+                idleTimeout.toSeconds(),
+                agentControl);
+        }
+    }
+
+    /**
+     * 에이전트가 이 브라우저를 쓰게 하는 스위치다(docs/features/agent-browser/design.md 의 「PR1 스위치」).
+     *
+     * @param enabled 사용자가 켰는가
+     * @param adminAllowed 관리자가 그룹 전체를 허용했는가. 거짓이면 사용자가 켜 두었어도 쓰지 않는다
+     */
+    public record AgentControlView(boolean enabled, boolean adminAllowed) {
+    }
+
+    /** 에이전트 조작 스위치를 바꾸는 본문이다. 사용자와 관리자 경로가 함께 쓴다. */
+    public record AgentControlRequest(Boolean enabled) {
+
+        /** 칸이 없으면 {@code VALIDATION_FAILED} 다. */
+        public boolean required() {
+            if (enabled == null) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "enabled is required");
+            }
+            return enabled;
         }
     }
 

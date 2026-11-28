@@ -34,6 +34,9 @@ public class GroupSetting {
     /** 그룹의 기억 요약 구역 예산과 기억 전체 상한을 담는 설정 종류다. 줄이 없으면 코드의 기본값을 쓴다. */
     public static final String MEMORY_CONTEXT = "MEMORY_CONTEXT";
 
+    /** 관리자가 그룹 전체의 「내 브라우저」 에이전트 조작을 껐는지 담는 설정 종류다. 줄이 없으면 허용이다. */
+    public static final String BROWSER_AGENT_CONTROL = "BROWSER_AGENT_CONTROL";
+
     @EmbeddedId
     private GroupSettingId id;
 

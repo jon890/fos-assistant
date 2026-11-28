@@ -88,6 +88,7 @@ const MESSAGES: Record<string, string> = {
   FOLLOW_UP_STATE_CONFLICT:
     "이미 처리했거나 같은 할 일이 있어요. 화면을 다시 열어 주세요.",
   BROWSER_NOT_FOUND: "브라우저가 없어요. 화면을 다시 열어 주세요.",
+  BROWSER_AGENT_CONTROL_OFF: "관리자가 에이전트의 브라우저 조작을 꺼 두었어요.",
   BROWSER_DISABLED: "아직 준비 중이에요.",
   BROWSER_CAPACITY:
     "지금은 켤 수 있는 브라우저가 다 찼어요. 잠시 뒤 다시 켜 주세요.",

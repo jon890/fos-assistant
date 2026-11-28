@@ -111,6 +111,7 @@ public class McpController {
     private final McpFollowUpTools followUpTools;
     private final McpMemoryForgetTool memoryForget;
     private final McpConnectorAttachTool connectorAttach;
+    private final McpBrowserTabCalls browserTabs;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -160,7 +161,9 @@ public class McpController {
             Map.entry(McpMemoryForgetTool.NAME, this::forgetMemory),
             Map.entry(McpConnectorAttachTool.NAME, (caller, id, args) -> McpConnectorAttachTool.connectorOf(args)
                 .map(connector -> response(id, connectorAttach.attach(caller, connector)))
-                .orElseGet(() -> invalidParams(id, INVALID_ARGUMENTS))));
+                .orElseGet(() -> invalidParams(id, INVALID_ARGUMENTS))),
+            Map.entry(McpBrowserTabCalls.TABS, (caller, id, args) -> browserTabs.tabs(caller, id, args)),
+            Map.entry(McpBrowserTabCalls.CLOSE, (caller, id, args) -> browserTabs.close(caller, id, args)), Map.entry(McpBrowserTabCalls.OPEN, (caller, id, args) -> browserTabs.open(caller, id, args)));
     }
 
 
@@ -233,7 +236,7 @@ public class McpController {
             }
             return response(id, tools.invalidContext());
         }
-        if (!CHECK_TREE_TOOLS.contains(toolName)) {
+        if (!CHECK_TREE_TOOLS.contains(toolName) && !McpBrowserTabCalls.NAMES.contains(toolName)) {
             // 살펴보기 줄을 한 번만 읽어 트리인지와 쓰기 허용을 함께 본다.
             Optional<ProactiveCheck> check = checkGuard.checkOf(caller.originExecution());
             if (check.isPresent() && !writeAllowedInCheck(toolName, check.get(), caller, arguments)) {

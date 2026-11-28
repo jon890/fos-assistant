@@ -282,9 +282,9 @@ public class ConnectorActionDetails {
         // 상한 변경 줄은 커넥터 도구가 아니라 선언이 없다. 제목과 식별자는 Control Plane 이 정한 정책에서 받는다.
         boolean limitChange = FinancialLimitChanges.owns(action);
         if (ControlPlaneActions.owns(action)) {
-            // Control Plane 동작의 줄도 선언이 없다. 허락은 주지 않고 인자 이름표는 그 동작의 것이다.
-            return ConnectorActionView.from(action, ControlPlaneActions.policy(action.toolName()), false, false,
-                ControlPlaneActions.labels(action.toolName()), false);
+            // Control Plane 동작의 줄도 선언이 없다. 허락은 주지 않고 인자 이름표는 그 동작의 것이다. 서버가 만든 실행 칸은 카드에서 뺀다.
+            return ConnectorActionView.from(action, ControlPlaneActions.cardArgs(action.toolName(), action.argsJson()),
+                ControlPlaneActions.policy(action.toolName()), false, false, ControlPlaneActions.labels(action.toolName()), false);
         }
         return ConnectorActionView.from(
             action,

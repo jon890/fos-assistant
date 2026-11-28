@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton, LoadFailure } from "@/components/ui/page-state";
 import { Notice } from "@/components/ui/notice";
 import { describeFailure } from "@/components/error-message";
+import { AgentControlSwitch } from "@/components/browser/agent-control-switch";
 import { BrowserScreen } from "@/components/browser/browser-screen";
 import { DeleteBrowserDialog } from "@/components/browser/delete-browser-dialog";
 import {
@@ -208,6 +209,9 @@ export function UserBrowserPanel({
               지우기
             </Button>
           </div>
+          {view.agentControl ? (
+            <AgentControlSwitch control={view.agentControl} onChange={apply} />
+          ) : null}
         </section>
       )}
       {screen && status !== undefined ? (

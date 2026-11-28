@@ -14,7 +14,27 @@ export type BrowserView = {
   startedAt?: string | null;
   lastActiveAt?: string | null;
   idleTimeoutSeconds?: number;
+  /** 에이전트가 이 브라우저를 쓰게 하는 스위치다. 브라우저가 있을 때만 온다. */
+  agentControl?: AgentControl;
 };
+
+/** 에이전트 조작 스위치다. `adminAllowed` 가 거짓이면 사용자가 켜 두었어도 쓰지 않는다. */
+export type AgentControl = { enabled: boolean; adminAllowed: boolean };
+
+/** 화면의 스위치 모양이다. 관리자가 꺼 두면 켜진 값과 상관없이 꺼진 모양으로 잠그고 안내를 보인다. 끄는 것은 늘 할 수 있다. */
+export function agentControlSwitch(control: AgentControl): {
+  checked: boolean;
+  locked: boolean;
+  note: string | null;
+} {
+  if (!control.adminAllowed)
+    return {
+      checked: false,
+      locked: !control.enabled,
+      note: "관리자가 에이전트의 브라우저 조작을 꺼 두었어요.",
+    };
+  return { checked: control.enabled, locked: false, note: null };
+}
 
 export type AdminBrowser = {
   id: number;
@@ -122,4 +142,27 @@ export function takeOverBrowser(
 /** 「돌려주기」 다. 잠금만 푼다. 글을 보낼지는 부르는 쪽이 정한다. */
 export function giveBackBrowser(): Promise<Response> {
   return fetch("/api/browser/give-back", { method: "POST" });
+}
+
+/** 에이전트가 내 브라우저를 쓰게 할지 바꾼다. 성공하면 바뀐 `BrowserView` 가 온다. */
+export function setAgentControl(enabled: boolean): Promise<Response> {
+  return fetch("/api/browser/agent-control", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+/** 관리자. 그룹 전체의 에이전트 브라우저 조작 스위치다. 응답은 `{ enabled }` 다. */
+export function fetchAdminAgentControl(): Promise<Response> {
+  return fetch("/api/admin/browsers/agent-control", { cache: "no-store" });
+}
+
+/** 관리자. 그룹 전체 스위치를 바꾼다. 끄면 켜 둔 사용자도 다음 호출부터 쓰지 못한다. */
+export function setAdminAgentControl(enabled: boolean): Promise<Response> {
+  return fetch("/api/admin/browsers/agent-control", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
 }

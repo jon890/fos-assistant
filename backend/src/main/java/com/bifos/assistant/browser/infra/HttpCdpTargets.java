@@ -18,7 +18,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * CDP 의 HTTP 창구({@code /json/list}, {@code /json/new}, {@code /json/activate})를 부른다.
+ * CDP 의 HTTP 창구({@code /json/list}, {@code /json/new}, {@code /json/activate}, {@code /json/close})를 부른다.
  *
  * <p>주소는 컨테이너 IP 라서 Chrome 의 {@code Host} 검사를 그대로 통과한다. {@code Origin} 은 보내지 않는다. 실패 메시지에 응답 본문과
  * 주소를 싣지 않는다.
@@ -70,6 +70,13 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
     public void activate(URI cdp, String id) {
         requireTargetId(id);
         send(HttpRequest.newBuilder(endpoint(cdp, "/json/activate/" + id)).GET(), "activate");
+    }
+
+
+    @Override
+    public void close(URI cdp, String id) {
+        requireTargetId(id);
+        send(HttpRequest.newBuilder(endpoint(cdp, "/json/close/" + id)).GET(), "close");
     }
 
 

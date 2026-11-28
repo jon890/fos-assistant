@@ -237,6 +237,19 @@ const LABELS: Record<string, Label> = {
     running: "붙이기 승인을 요청하고 있어요",
     done: "붙이기 승인을 요청했어요",
   },
+  browser_tabs: {
+    running: "내 브라우저의 탭을 보고 있어요",
+    done: "내 브라우저의 탭을 봤어요",
+  },
+  // 닫기와 열기는 승인 카드만 만든다. 한 것처럼 읽히지 않게 쓴다.
+  browser_tab_close: {
+    running: "탭 닫기 승인을 요청하고 있어요",
+    done: "탭 닫기 승인을 요청했어요",
+  },
+  browser_tab_open: {
+    running: "탭 열기 승인을 요청하고 있어요",
+    done: "탭 열기 승인을 요청했어요",
+  },
   tool_search: {
     running: "쓸 도구를 찾고 있어요",
     done: "쓸 도구를 찾았어요",

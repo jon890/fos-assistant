@@ -106,7 +106,15 @@ const KINDS: Record<
   },
   browser: {
     name: "브라우저",
-    tools: ["browser_exec", "browser_cdp", "browser_dialog", "browser_vault"],
+    tools: [
+      "browser_exec",
+      "browser_cdp",
+      "browser_dialog",
+      "browser_vault",
+      "browser_tabs",
+      "browser_tab_close",
+      "browser_tab_open",
+    ],
   },
   computer: { name: "화면 조작", tools: ["computer_use"] },
   schedule: {
