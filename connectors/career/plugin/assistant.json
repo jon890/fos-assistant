@@ -1,0 +1,102 @@
+{
+  "schema": 2,
+  "id": "fos-career",
+  "title": "커리어",
+  "icon": "icon.svg",
+  "link": "https://github.com/jon890/fos-agents/tree/main/career-os",
+  "link_kind": "project",
+  "readme_url": "https://github.com/jon890/fos-agents/blob/main/career-os/README.md",
+  "description": "GitHub 프로필 README 와 원티드 이력서를 읽고 승인받아 갱신합니다. 면접 연습, 공고 추천, 공부 추천, 지원 준비는 에이전트의 셸 실행 공간에서 작업 폴더에 쌓습니다.",
+  "fields": [
+    {
+      "key": "github_token",
+      "env": "CAREER_GITHUB_TOKEN",
+      "label": "GitHub token",
+      "description": "프로필 저장소 하나의 내용 읽기와 쓰기 권한만 가진 token 입니다. 비워 두면 GitHub 도구를 쓰지 않습니다.",
+      "secret": true,
+      "required": false
+    }
+  ],
+  "verify": {
+    "tool": "check_connection"
+  },
+  "oauth": {
+    "provider": "github",
+    "fields": ["github_token"],
+    "token_env": "CAREER_GITHUB_TOKEN_URL"
+  },
+  "agent_skills": {
+    "path": "./agent-skills",
+    "sandbox_env": {
+      "position-recommender": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT", "CAREER_EVIDENCE_DIR"],
+      "study-collection": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT"],
+      "interview-practice": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT"],
+      "career-connector": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT"],
+      "application-package-writer": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT", "CAREER_EVIDENCE_DIR"],
+      "resume-preparer": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT", "CAREER_EVIDENCE_DIR"],
+      "resume-review": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT"],
+      "interview-question-prep": ["CLAUDE_PLUGIN_ROOT", "CAREER_WORKSPACE_ROOT"]
+    }
+  },
+  "owner_browser_env": "CAREER_BROWSER_URL",
+  "owner_browser_login_url": "https://www.wanted.co.kr/cv/list",
+  "tools": {
+    "check_connection": {
+      "risk": "READ",
+      "approval": "none",
+      "title": "연결 확인",
+      "description": "GitHub token 이나 GitHub 단추 연결이 있으면 지정된 프로필 저장소에 접근할 수 있는지 확인합니다. 입력 인자는 없습니다. GitHub 저장소 정보만 읽으며 저장하거나 프로필을 갱신하지 않습니다. 성공하면 github: ok 또는 not_configured 를 텍스트 JSON 과 structuredContent 로 반환합니다. GitHub 연결이 없어도 not_configured 로 성공합니다. 인증 거절, 권한 부족, 통신 실패나 잘못된 응답은 해당 CAREER 오류로 반환합니다. token 과 개인 프로필 본문은 결과에 넣지 않으며 READ 도구로 승인 없이 호출합니다."
+    },
+    "get_github_profile": {
+      "risk": "READ",
+      "approval": "none",
+      "title": "GitHub 프로필 읽기",
+      "description": "설정된 GitHub 프로필 저장소 한 개의 현재 내용을 읽습니다. 입력 인자는 없고 GitHub 연결이 필요합니다. repo, 기본 branch, 그 branch 의 head, 같은 head 의 README.md 본문인 readme 를 반환합니다. README 가 없으면 readme 는 null 입니다. 연결이 없으면 CAREER_GITHUB_NOT_CONFIGURED, 인증이나 권한 부족, 통신과 응답 실패는 해당 CAREER 오류입니다. 개인 프로필 본문이 포함될 수 있으며 token 은 반환하지 않습니다. 파일이나 branch 를 변경하지 않는 READ 도구로 승인 없이 호출합니다. 갱신할 때는 이 결과의 branch 와 head 를 변경안에 함께 넣어 별도 승인받습니다."
+    },
+    "update_github_profile": {
+      "risk": "WRITE",
+      "approval": "required",
+      "outbound": true,
+      "grant": false,
+      "title": "GitHub 프로필 갱신",
+      "description": "설정된 GitHub 프로필 저장소의 README.md 한 파일을 한 커밋으로 갱신합니다. 필수 readme 는 공백뿐인 값을 제외한 UTF-8 65536바이트 이하의 전체 README, expectedBranch 와 expectedHead 는 get_github_profile 이 반환한 branch 와 40자리 소문자 16진수 head 입니다. 선택 인자와 기본값은 없으며 GitHub 연결이 필요합니다. 사용량 차트와 Tokens 배지는 다루지 않고 달 목록이나 SVG 를 받지 않습니다. 검토한 branch 나 head 가 바뀌면 CAREER_GITHUB_STALE_REVIEW 로 쓰기 전에 중단합니다. 실행 중 경합은 CAREER_GITHUB_CONFLICT 가 될 수 있습니다. 결과는 changed, commitSha, branch 이고 내용이 같으면 changed: false 입니다. 개인 경력이 외부 저장소에 게시되므로 전체 변경안을 보여 주고 승인받는 WRITE 도구입니다. 자동 재전송이나 강제 push 를 하지 않으며 실패 시 저장소를 다시 읽어 결과를 확인합니다. 지원서나 메일을 보내지는 않습니다. 변경안은 작업 폴더의 프로필 원고 파일에서 만들므로 셸 실행 공간이 없는 에이전트에서는 부르지 않습니다."
+    },
+    "get_wanted_resume": {
+      "risk": "READ",
+      "approval": "none",
+      "title": "원티드 이력서 읽기",
+      "description": "사용자의 「내 브라우저」 에서 원티드 이력서의 지금 값을 읽습니다. 선택 resumeKey 는 1자 이상 200자 이하이며 기본값은 없습니다. resumeKey 를 생략하면 이력서 목록을 읽어 하나면 그 이력서를 읽고, 여럿이면 status: choose 와 resumes(resumeKey, title, updatedAt)를 돌려주니 사용자에게 고르게 한 뒤 그 resumeKey 로 다시 부릅니다. 정상 결과는 status: ok, resumeKey, resumeTitle, fields, unreadable, outOfScope 입니다. fields 의 각 칸은 field, label, value, fingerprint 이고 field 는 about 이거나 project:<경력 순번>:<프로젝트 순번>:title|description|start|end 이며 기간 값은 YYYY-MM 입니다. label 의 회사와 프로젝트 제목으로 원고 항목과 짝짓고(짝이 없거나 제목 자체를 바꾸면 어느 항목에 넣을지 사용자에게 묻습니다), 원고와 다른 칸만 변경 전후 표로 보입니다. fingerprint 는 update_wanted_resume 의 before 에 그대로 넣습니다. unreadable 은 화면에서 기간을 읽지 못한 칸으로, 빈 값이 아니므로 바꾸자고 제안하지 않습니다. outOfScope 의 기술, 링크, AI 활용 경험은 읽기만 하며 이 플러그인으로 쓰지 않습니다. 원고와 다르면 원티드 화면에서 직접 고치라고 안내합니다. 원티드 로그인이 풀려 있으면 오류가 아닌 status: HUMAN_ACTION_REQUIRED 와 handoff(need: login)를 돌려주고 대화에 화면 넘기기 카드가 뜹니다. 사용자가 로그인하고 「다 했어요」 를 누를 때까지 다시 부르지 않습니다. 사용자가 「내 브라우저」 를 직접 쓰는 중이면 need: human_browser 입니다. 「내 브라우저」 에 닿지 못하면 CAREER_BROWSER_UNREACHABLE, 받은 resumeKey 의 이력서가 없으면 CAREER_WANTED_RESUME_NOT_FOUND, 목록이 비었거나 화면이 예상과 다르면 CAREER_WANTED_PAGE_CHANGED 이며 이때는 원티드 화면에서 직접 고치기를 안내합니다. 개인 경력이 담긴 이력서를 읽고 아무것도 쓰지 않는 READ 도구로 승인 없이 호출합니다."
+    },
+    "update_wanted_resume": {
+      "risk": "WRITE",
+      "approval": "required",
+      "outbound": true,
+      "grant": false,
+      "title": "원티드 이력서 반영",
+      "description": "승인한 변경을 사용자의 「내 브라우저」 에서 원티드 이력서의 칸에 하나씩 넣고, 넣을 때마다 원티드 서버에서 다시 읽어 글자 단위로 저장을 확인합니다. 필수 resumeKey(1자 이상 200자 이하), resumeTitle(1자 이상 100자 이하, get_wanted_resume 이 준 이력서 이름 그대로, 지금 이력서 이름과 다르면 아무것도 넣지 않습니다), changes(1개 이상 30개 이하)를 받고 선택 인자와 기본값은 없습니다. changes 의 각 항목은 field, label, before, value 입니다. field 는 get_wanted_resume 의 about 이나 project:<c>:<p>:title|description|start|end 만 받고 기술, 링크, AI 활용 경험은 받지 않습니다(outOfScope 는 읽기만 합니다). label 은 get_wanted_resume 이 준 그 칸의 label 을 그대로, before 는 get_wanted_resume 이 준 fingerprint, value 는 넣을 값이며 기간은 YYYY-MM 입니다. 같은 field 를 두 번 넣지 않습니다. 인자는 UTF-8 16KB 까지라, 16KB 를 넘을 변경은 칸을 나눠 여러 번 부르고 앞 호출의 칸이 모두 inserted 일 때만, get_wanted_resume 으로 다시 읽어 새 label 과 fingerprint 로 다음 호출을 합니다. 칸을 건드리기 전에 모든 label 이 지금 이력서의 같은 칸 이름과 같은지 보고, 읽은 뒤 항목이 늘어 다르면 아무것도 넣지 않고 page_changed 로 멈춥니다. 넣기 직전 서버에서 새로 받은 값(기간은 편집 화면을 새로 연 값)의 지문이 before 와 다르면 덮어쓰지 않고 멈춥니다. 결과는 오류가 아닌 status: done 또는 stopped 와 results 입니다. results 의 각 칸은 field, label, state, reason 이고 state 는 inserted, failed, not_inserted 입니다. reason 은 fingerprint_mismatch(다른 곳에서 바뀜), stopped_earlier(앞 칸에서 멈춤), time_limit(시간 제한, 남은 칸은 다시 읽어 새로 승인), page_changed(화면이 예상과 다름), not_saved(넣었지만 저장 확인 실패), login_required(로그인 풀림, get_wanted_resume 을 다시 불러 화면 넘기기 카드를 띄움), browser_in_use(사용자가 브라우저를 쓰는 중), browser_taken(넣는 중 사용자가 브라우저를 가져가 저장 여부 불명), browser_unreachable(브라우저 연결 끊김), too_long(원티드 칸 글자 수 초과, 넣지 않음) 입니다. 진행 중 프로젝트의 종료월처럼 폼 제약으로 원고와 다르게 넣은 값은 원고 저장 때 그 사실을 함께 적습니다. failed 칸은 저장됐을 수 있으니 get_wanted_resume 으로 다시 읽어 확인합니다. 같은 인자로 자동으로 다시 부르지 않습니다. 화면이 바뀌었으면 원티드 화면에서 직접 고치기를 안내합니다. 「내 브라우저」 에 닿지 못하면 CAREER_BROWSER_UNREACHABLE, 이력서가 없으면 CAREER_WANTED_RESUME_NOT_FOUND 오류이며 이때는 아무 칸도 바꾸지 않았습니다. 누구나 보는 개인 프로필이 바뀌므로 변경 전후 표를 대화에 보이고 호출마다 승인 카드에서 승인받는 WRITE 도구입니다. 상시 허락과 대화 허락을 받지 않습니다. 변경안은 작업 폴더의 프로필 원고 파일에서 만들므로 셸 실행 공간이 없는 에이전트에서는 부르지 않습니다."
+    }
+  },
+  "default_tool_policy": "deny",
+  "operator_env": ["CAREER_GITHUB_PROFILE_REPO"],
+  "errors": {
+    "CAREER_INVALID_RESPONSE": "unavailable",
+    "CAREER_INVALID_INPUT": "invalid_input",
+    "CAREER_GITHUB_NOT_CONFIGURED": "credential_rejected",
+    "CAREER_GITHUB_UNAUTHORIZED": {
+      "category": "credential_rejected",
+      "recovery": "reconnect"
+    },
+    "CAREER_GITHUB_FORBIDDEN": "forbidden",
+    "CAREER_GITHUB_CONFLICT": "unavailable",
+    "CAREER_GITHUB_STALE_REVIEW": "invalid_input",
+    "CAREER_GITHUB_UNAVAILABLE": "unavailable",
+    "CAREER_BROWSER_UNREACHABLE": "unavailable",
+    "CAREER_BROWSER_IN_USE": "unavailable",
+    "CAREER_WANTED_LOGIN_REQUIRED": {
+      "category": "credential_rejected",
+      "recovery": "reconnect"
+    },
+    "CAREER_WANTED_PAGE_CHANGED": "unavailable",
+    "CAREER_WANTED_RESUME_NOT_FOUND": "invalid_input"
+  }
+}

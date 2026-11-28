@@ -38,3 +38,4 @@ worktrees/
 /hermes/connectors/tossinvest/dist/tossinvest-mcp.js
 
 /connectors/career/plugin/node_modules/
+/connectors/career/plugin/dist/
