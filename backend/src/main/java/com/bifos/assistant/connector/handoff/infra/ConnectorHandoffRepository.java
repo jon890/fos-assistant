@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -40,12 +41,17 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
     List<ConnectorAction> findOpen(@Param("conversationId") Long conversationId, @Param("userId") Long userId);
 
 
-    /** 그 대화에서 닫히지 않은 넘기기다. 대화의 주인과 상관없이 고른다. */
+    Optional<ConnectorAction> findByPublicId(UUID publicId);
+
+
+    /** 그 사용자의 그 대화에서 그 플러그인의 닫히지 않은 넘기기다. 같은 플러그인의 다음 호출이 닫을 줄을 고른다. */
     @Query("""
             select a from ConnectorAction a
-            where a.conversationId = :conversationId and a.handoff.need is not null and a.handoff.closedAt is null
+            where a.userId = :userId and a.conversationId = :conversationId and a.connectorId = :connectorId
+              and a.handoff.need is not null and a.handoff.closedAt is null
             """)
-    List<ConnectorAction> findOpenInConversation(@Param("conversationId") Long conversationId);
+    List<ConnectorAction> findOpenOfConnector(
+        @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("connectorId") String connectorId);
 
 
     /** 열린 줄에만 닫은 시각을 적는다. */

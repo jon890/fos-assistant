@@ -1,6 +1,7 @@
 package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
+import com.bifos.assistant.orchestration.application.dto.PluginCallEnded;
 import com.bifos.assistant.orchestration.application.dto.ToolTraceRecord;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
 import com.bifos.assistant.runtime.domain.ToolDetailRedactor;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +33,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>오류 글은 받을 때 그 실행의 가림 범위로 가린다. 범위는 맡긴 실행의 사건 스트림({@code ChildRunEvents.detailScope})과 같다.
  * 원문은 로그에도 남기지 않는다(스펙 run-trace REQ6).
+ *
+ * <p>호출 번호가 있는 기록은 실행을 찾기 전에 {@link PluginCallEnded} 사건으로도 낸다. 하위 에이전트 session 의 기록도 낸다. 화면 넘기기가
+ * 그 플러그인의 다음 호출이 끝났는지 본다(docs/features/mobile-default-chat/design.md 「플러그인 성공으로 닫기」).
  */
 @Service
 @Slf4j
@@ -42,6 +47,7 @@ public class RunTraceIntake {
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
     private final ToolTraceWriter toolTraces;
+    private final ApplicationEventPublisher events;
 
     /**
      * Hermes 와 Control Plane 의 시계 차이를 감안하는 폭이다. turn 경계에 걸린 기록은 후보가 둘이 되어 버려진다.
@@ -79,6 +85,7 @@ public class RunTraceIntake {
         if (record.toolCallId() == null || record.toolCallId().isBlank()) {
             return false;
         }
+        announce(profileName, record);
         if (bindings.findByProfileNameAndSessionId(profileName, record.sessionId()).isPresent()) {
             return false;
         }
@@ -88,6 +95,17 @@ public class RunTraceIntake {
         }
         toolTraces.receive(execution.get().id(), record.toolCallId(), trace(execution.get(), record));
         return true;
+    }
+
+
+    /** 듣는 쪽의 실패는 기록 옮기기를 막지 않는다. 예외 본문에 원격 글이 섞일 수 있어 종류만 남긴다. */
+    private void announce(String profileName, ToolTraceRecord record) {
+        try {
+            events.publishEvent(new PluginCallEnded(
+                profileName, record.rootSessionId(), record.sessionId(), record.toolCallId(), record.failed()));
+        } catch (RuntimeException ex) {
+            log.warn("도구 호출의 끝을 알리지 못했다 profile={} reason={}", profileName, ex.getClass().getSimpleName());
+        }
     }
 
 

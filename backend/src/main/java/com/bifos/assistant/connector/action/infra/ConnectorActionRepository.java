@@ -50,7 +50,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     /**
      * 그 사용자의 열린 화면 넘기기가 {@code since} 뒤에 생긴 것이 있는가. 브라우저 자동 중지가 사람을 기다리는지 볼 때 쓴다.
      *
-     * <p>대화가 없는 넘기기는 닫을 사람 turn 이 없어 영영 열려 있으므로 세지 않는다. 조건은 {@code ConnectorHandoffRepository} 의
+     * <p>대화가 없는 넘기기는 닫을 카드가 없어 영영 열려 있으므로 세지 않는다. 조건은 {@code ConnectorHandoffRepository} 의
      * 열린 넘기기와 같다.
      */
     @Query("""

@@ -2,11 +2,16 @@ package com.bifos.assistant.connector.handoff.presentation;
 
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.connector.handoff.application.ConnectorHandoffs;
+import com.bifos.assistant.connector.handoff.application.HandoffButtons;
 import com.bifos.assistant.connector.handoff.application.dto.ConnectorHandoffRequest;
+import com.bifos.assistant.connector.handoff.application.dto.HandoffCloseRequest;
+import com.bifos.assistant.connector.handoff.application.dto.HandoffCloseView;
 import com.bifos.assistant.connector.handoff.application.dto.HandoffView;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,7 +27,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 화면 넘기기의 두 경로다. profile 의 hook 이 알리는 내부 경로와, 화면이 대화의 카드를 읽는 경로다.
+ * 화면 넘기기의 경로다. profile 의 hook 이 알리는 내부 경로와, 화면이 대화의 카드를 읽고 카드의 단추로 닫는 경로다.
+ *
+ * <p>닫기의 답은 {@code docs/features/mobile-default-chat/design.md} 의 「단추 닫기 API」 가 갖는다.
  *
  * <p>계약은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 내부 경로의 인증은
  * {@code /internal/hermes/connector-policy} 와 같은 profile 토큰이다.
@@ -33,6 +40,7 @@ public class ConnectorHandoffController {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final ConnectorHandoffs handoffs;
+    private final HandoffButtons buttons;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -53,6 +61,18 @@ public class ConnectorHandoffController {
     public List<HandoffView> open(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         return handoffs.open(user, conversations.requireOwnId(user, conversationId));
+    }
+
+
+    /** 카드 하나를 닫는다. 주소의 번호는 대화와 넘기기의 공개 식별자다. 주인의 대화가 아니거나 그 대화의 넘기기가 아니면 없는 대화와 같은 응답이다. */
+    @PostMapping("/api/v1/chat/conversations/{conversationId}/handoffs/{handoffId}/close")
+    public HandoffCloseView close(
+        @PathVariable UUID conversationId, @PathVariable UUID handoffId, @RequestBody(required = false) HandoffCloseRequest request) {
+        if (request == null || request.outcome() == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "outcome is required");
+        }
+        CurrentUser user = currentUser.require();
+        return new HandoffCloseView(buttons.close(user, conversations.requireOwnId(user, conversationId), handoffId, request.outcome()));
     }
 
 
