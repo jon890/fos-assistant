@@ -44,6 +44,8 @@ import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.orchestration.application.ChildRunEvents;
 import com.bifos.assistant.runtime.application.AgentRuntimes;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionTemplate;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
@@ -118,7 +120,9 @@ class AgentRunnerSubmitFailureTest {
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
                 mock(BackgroundTasks.class),
-                mock(ApplicationEventPublisher.class)),
+                mock(ApplicationEventPublisher.class),
+                mock(ConversationRepository.class),
+                mock(TransactionTemplate.class)),
             new DelegationOutput(LiveProperties.fixed(
                 DelegationProperties.class,
                 new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20), Duration.ZERO))),

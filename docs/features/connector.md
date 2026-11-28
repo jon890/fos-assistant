@@ -609,8 +609,32 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 ## 커리어 플러그인 이전 설계
 
-커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. 현재 이 모듈에는 GitHub 연동과 공통 오류 처리가 있다. 설치에는 기존 패키지를 쓴다.
+커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. 현재 이 모듈에는 MCP 서버와 도구(GitHub 프로필, 원티드 이력서, 「내 브라우저」 중계), 도구 선언 `assistant.json`, 공통 오류 처리, MCP 실행 파일 빌드, 에이전트 스킬 `agent-skills/` 와 그 검사(`connectors/career/plugin/scripts/agent-skills.ts`), 설치본 선언 `.mcp.json` 과 `.claude-plugin/plugin.json`, 아이콘이 있다. 빌드한 실행 파일과 설치본 선언은 옮기기 전 설치본과 바이트 단위로 같고, 스킬은 금지어에 걸린 한 낱말만 고쳤다. 설치에는 아직 기존 패키지를 쓴다.
 
-후속 단계에서 조립할 설치본에는 기존 ID `fos-career`, 버전 `0.14.1`, MCP 서버와 로컬 실행기, 에이전트 스킬이 함께 들어간다. 기존 `connector.json`은 같은 내용을 담은 `assistant.json`으로 옮긴다. Bun과 패키지 전용 잠금 파일로 두 실행 파일을 빌드한다. CI는 변경 경로에 맞춰 대역 테스트와 타입 검사를 실행한다. 설치본만으로 실행되는지는 두 실행 파일을 조립하는 단계에서 검증한다.
+설치본은 `plugin/` 의 추적 파일과 빌드한 `dist/` 다. 기존 ID `fos-career`, 버전 `0.14.1`, MCP 서버와 에이전트 스킬이 들어 있고, 로컬 실행기 번들 `dist/career-local.js` 는 다음 단계에서 더한다. 기존 `connector.json`은 같은 내용의 `assistant.json`으로 옮겼고, MCP 서버가 도구 설명을 이 파일에서 읽는다. Bun과 패키지 전용 잠금 파일로 실행 파일을 빌드한다. CI는 변경 경로에 맞춰 대역 테스트와 타입 검사를 실행한다. MCP 실행 파일만으로 서버가 뜨는지는 테스트가 확인한다. 스킬이 적은 실행기 명령이 번들 사용법에 있는지는 로컬 실행기 번들을 옮길 때 함께 검사한다.
 
 GitHub 연동부터 테스트와 함께 옮긴다. 이어서 공고 조회와 MCP 서버, 로컬 실행기가 사용하는 명령 모듈을 각각 검증한 뒤 설치본을 조립한다. 운영 목록의 설치 경로는 두 실행 파일과 스킬 검증이 끝난 뒤 전환한다. 노트북 사용량 수집기와 월별 집계는 별도로 옮긴다. 서비스의 동작 계약과 유효한 설계 결정은 해당 코드와 함께 문서에 남긴다. 운영 주소와 계정은 운영 저장소에서 관리한다. 테스트에는 가상 지원 자료를 쓴다.
+
+### 커리어 플러그인 오류 코드
+
+`assistant.json` 의 `errors` 가 오른쪽 칸의 공통 어휘로 잇는다. 비어 있는 코드는 `errors` 에 넣지 않으며 fos-assistant 가 `unavailable` 로 읽는다. `connectors/career/plugin/scripts/assistant-config.test.ts` 가 이 표와 `errors` 가 같은지 본다.
+
+| 오류 코드 | 조건 | 공통 어휘 |
+| --- | --- | --- |
+| `CAREER_CONFIG` | 프로필 저장소 이름(`CAREER_GITHUB_PROFILE_REPO`)이 없거나 모양이 틀림 | |
+| `CAREER_INVALID_RESPONSE` | GitHub 이나 토큰 통로의 응답에서 필요한 구조를 읽지 못함 | `unavailable` |
+| `CAREER_INVALID_INPUT` | 도구 입력 검증 실패 | `invalid_input` |
+| `CAREER_GITHUB_NOT_CONFIGURED` | GitHub token 도 토큰 통로 주소도 없음, 토큰 통로 주소가 HTTP 나 HTTPS 주소가 아님, 또는 토큰 통로가 404 로 답함(연결이 없거나 해제됨) | `credential_rejected` |
+| `CAREER_GITHUB_UNAUTHORIZED` | GitHub 가 401 로 답함, 또는 토큰 통로가 401(주소의 표식이 틀림)이나 409(다시 연결해야 함)로 답함. `assistant.json` 은 recovery `reconnect` 를 함께 선언한다 | `credential_rejected` |
+| `CAREER_GITHUB_FORBIDDEN` | GitHub 가 401, 409, 422, 429 를 뺀 4xx 로 답함. 주로 403 과 404 이며 token 에 그 저장소의 권한이 없거나 저장소 이름이 틀리다 | `forbidden` |
+| `CAREER_GITHUB_CONFLICT` | branch 를 옮기는 마지막 요청에서만 GitHub 가 409 나 422 로 답함. 그 사이 다른 커밋이 올라왔다 | `unavailable` |
+| `CAREER_GITHUB_STALE_REVIEW` | 실행할 때의 기본 branch 나 그 끝 커밋이 `expectedBranch`, `expectedHead` 와 다름. 검토한 뒤 저장소가 바뀌었고 GitHub 에 아무것도 쓰지 않았다 | `invalid_input` |
+| `CAREER_GITHUB_UNAVAILABLE` | GitHub 의 5xx 와 429, branch 를 옮기기 전 단계의 409 와 422, 연결과 시간 초과 실패. 토큰 통로의 503(갱신을 지금 못 함)과 그 밖의 실패 응답, 통로 연결과 시간 초과 실패도 든다 | `unavailable` |
+| `CAREER_BROWSER_UNREACHABLE` | 「내 브라우저」 중계 주소가 비었거나 브라우저에 닿지 못함. 원티드 도구는 아무 칸도 건드리지 않았다 | `unavailable` |
+| `CAREER_BROWSER_IN_USE` | 사람이 「직접 할게요」 로 「내 브라우저」 를 쥐고 있음. 읽기 도구는 오류 대신 이 코드를 `code` 로 한 화면 넘기기(`human_browser`)를 돌려준다 | `unavailable` |
+| `CAREER_WANTED_LOGIN_REQUIRED` | 원티드 로그인이나 보안 확인 화면. 읽기 도구는 이 코드를 `code` 로 한 화면 넘기기(`login`)를 돌려준다. `assistant.json` 은 recovery `reconnect` 를 함께 선언한다 | `credential_rejected` |
+| `CAREER_WANTED_PAGE_CHANGED` | 원티드 화면이나 칸 구조가 예상과 다름. 기다린 뒤에도 이력서 목록이 비어 있는 경우도 든다. 쓰기 도구는 오류 대신 칸의 `reason: page_changed` 로 멈춘다 | `unavailable` |
+| `CAREER_WANTED_RESUME_NOT_FOUND` | 받은 `resumeKey` 의 이력서가 없음. 쓰기 도구는 첫 칸을 건드리기 전에만 이 오류를 낸다 | `invalid_input` |
+| `CAREER_UNKNOWN_TOOL`, `CAREER_INTERNAL` | 지원하지 않는 도구 또는 내부 처리 실패 | |
+
+`message` 는 사람에게 보일 고정 문구다. GitHub 과 원티드의 응답 본문, token, 프로필 본문을 담지 않는다.

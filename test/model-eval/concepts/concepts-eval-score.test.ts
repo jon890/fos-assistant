@@ -164,3 +164,15 @@ test("브리핑 작업은 뉴스 개수를 건으로 적어도 통과하고 개�
   assert.equal(scoreQuestion(briefing, answer, tree, [`AI 뉴스를 요약한다. ${rest}`]).passed, false);
   assert.equal(scoreQuestion(briefing, answer, tree, [`AI 뉴스는 최대 5건 요약한다. ${rest}`]).passed, false);
 });
+
+test("지역을 되묻더라도 예약 생성 도구가 끝났으면 미달이다", () => {
+  const { questions } = JSON.parse(readFileSync(new URL("questions.json", import.meta.url), "utf8")) as { questions: Question[] };
+  const target = questions.find(({ id }) => id === "schedule-weather-clarify");
+  assert.ok(target);
+  const reply = "어느 지역 날씨를 알려 드릴까요?";
+
+  assert.equal(scoreQuestion(target, reply, node([])).passed, true);
+  assert.equal(scoreQuestion(target, "네, 알겠습니다.", node([])).passed, false);
+  const tree = node([], [node([completed("mcp__fos_assistant__task_create")])]);
+  assert.deepEqual(scoreQuestion(target, reply, tree).failures, ["없어야 할 도구 task_create 를 불렀다"]);
+});

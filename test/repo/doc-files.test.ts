@@ -40,6 +40,9 @@ const OUTSIDE_DOCS = [
   /\/skills\/(?:.+\/)?SKILL\.md$/,
   /^hermes\/skill-packages\/[a-z0-9-]+\/(?:SKILL\.md|(?:references|templates)\/[^/]+\.md)$/,
   /^hermes\/connectors\/[^/]+\/ICON-SOURCE\.md$/,
+  // 서비스 전용 플러그인의 에이전트 스킬은 대시보드 plugin 이 SKILL.md 와 references, templates 를 복사해 스킬이 읽는다.
+  /^connectors\/[^/]+\/plugin\/agent-skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:references|templates)\/[^/]+\.md)$/,
+  /^connectors\/[^/]+\/plugin\/ICON-SOURCE\.md$/,
   /^tasks\//,
   /^\.claude\/spec-overlay\.md$/,
   // verify 스킬은 저장소의 검증 환경과 실행 절차를 이 파일에서 읽는다.

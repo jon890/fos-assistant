@@ -28,6 +28,7 @@ import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionContextSourceRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionObservationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -167,7 +168,8 @@ class ExecutionContextSourceTest {
             executions,
             limiter,
             new ExecutionContextSourceWriter(failing, transactionManager),
-            completion);
+            completion,
+            mock(ExecutionObservationRepository.class));
 
         AgentExecution execution = start(swapped, adminUser());
 
