@@ -63,6 +63,7 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
         context.getBeanFactory().registerSingleton("browsers", browsers);
         context.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
+        context.getBeanFactory().registerSingleton("cdpTargets", new FakeCdpTargets());
         context.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
         context.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
         context.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
@@ -162,6 +163,7 @@ class IntegrationTestIsolationTest {
             broken.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
             broken.getBeanFactory().registerSingleton("browsers", browsers);
             broken.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
+            broken.getBeanFactory().registerSingleton("cdpTargets", new FakeCdpTargets());
             broken.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
             broken.getBeanFactory().registerSingleton("webPush", new RecordingWebPushClient());
             broken.getBeanFactory().registerSingleton("linkWeb", new FakeLinkImageWeb());
