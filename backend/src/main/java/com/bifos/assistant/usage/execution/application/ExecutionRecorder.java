@@ -21,7 +21,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
@@ -328,10 +327,9 @@ public class ExecutionRecorder {
     }
 
 
-    /** 결과를 먼저 저장한 자식이 사건을 마저 받았다. 다른 스레드가 쓴 결과 전달 표시를 보존한다. */
-    @Transactional
-    public void completeLateEventObservation(Long executionId) {
-        observations.completeLateEventObservation(executionId);
+    /** 결과를 먼저 저장한 자식의 관측 상태만 갱신한다. 후속 수집 쪽이 연 트랜잭션 안에서 부른다. */
+    public int completeLateEventObservation(Long executionId) {
+        return observations.completeLateEventObservation(executionId);
     }
 
 

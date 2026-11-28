@@ -226,7 +226,7 @@ public class ChildRunEvents {
         }
         if (completeLate) {
             try {
-                executions.completeLateEventObservation(recording.execution.id());
+                transactions.execute(status -> executions.completeLateEventObservation(recording.execution.id()));
             } catch (RuntimeException ex) {
                 log.warn("맡긴 실행의 후속 사건 관측 상태를 저장하지 못했다 executionId={}", recording.execution.id(), ex);
             }
