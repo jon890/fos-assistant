@@ -6,7 +6,7 @@
  * 재시작한 뒤 반영 완료를 눌러야 한다. 대역이 그 profile 의 hook 처럼 도구 호출마다 Control Plane 에 판정을 묻는다. 연결의 주인은
  * 관리자가 아닌 kid 다. 관리자인 dad 가 남의 에이전트에 붙이거나 떼지 못하는 것을 함께 보기 위해서다.
  */
-import { call, expect, expectStatus, fail, seedConversation, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, restorePrimaries, seedConversation, step, type Context, type Scenario } from "../harness.ts";
 import {
   CONNECTOR_ARGUMENT_SAMPLE,
   CONNECTOR_RESULT_SAMPLE,
@@ -238,6 +238,8 @@ export const connectorBindingScenario: Scenario = {
       await awaitDelivered(context, owner, asked.conversationId);
 
       step("연결이 붙은 에이전트를 그룹 공개로 바꾸려 하면 AGENT_CONNECTIONS_REQUIRE_PRIVATE 이고 비공개로 남는다");
+      // 앞 단계의 test-support 대화가 이 에이전트를 잠시 기본 비서로 두었다. 기본 비서면 붙이기 까닭이 PRIMARY_AGENT 라 되돌린다.
+      await restorePrimaries(context);
       const shared = expectStatus(
         await call(context, `/agents/${agent.code}/visibility`, { method: "PATCH", token: owner, body: { visibility: "GROUP" } }),
         409,

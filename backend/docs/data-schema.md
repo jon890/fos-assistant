@@ -687,6 +687,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓰고 사용량 합계에 더하지 않는다.
 부모가 끝난 뒤에도 완료 사건이 없으면 재조회로 보완한다. `(execution_id, completed_child_session_id)` 가 유일해 같은 자식 완료를 두 번 저장하지 않는다. 이 칸이 생기기 전의 중복 완료 사건은 최신 한 줄에만 키가 있다.
 `PROVIDER_SWITCHED` 는 옛 실행에만 남은 값이고, 지금은 이 값을 적는 경로가 없다.
+**`tool_call_id`, `error_type`, `error_summary` 는 도구 사건의 호출 번호와 실패한 도구의 오류다.** 호출 번호는 Hermes 사건의 `tool_call_id` 이고 128자를 넘으면 적지 않는다. 오류 두 칸은 fos-ctx plugin 이 `post_tool_call` 에서 보낸 기록을 사건의 실패 표시가 참인 `TOOL_COMPLETED` 줄에만 옮긴 값이다. 오류 종류는 받은 값을 64자로 자르고, 오류 요약은 `ToolDetailRedactor.redactError` 로 가린 뒤 200자로 자른다. 플러그인 도구, 플러그인 호출 뒤 도구, 내용을 남기지 않는 도구는 요약을 비운다. 오류 두 칸은 `ADMIN` 에게만 응답에 넣고, 대화를 지우면 요약을 `detail` 과 함께 비운다. 흐름은 [`docs/features/run-trace/design.md`](../../docs/features/run-trace/design.md) 가 갖는다.
 
 ### subagent_usage_job
 
@@ -820,7 +821,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 - `memory_id` 는 되돌리거나 사람이 지우면 `memory` 에 없는 번호가 되므로 외래 키를 걸지 않는다
 - `execution_id` 는 기록을 남긴 origin 실행이고, 한 실행의 상한을 이 칸으로 센다
-- `base_revision` 은 `CREATED` 면 저장한 때의 판 번호, `UPDATED` 면 고치기 전의 판 번호이고 `PROPOSED` 면 비어 있다
+- `base_revision` 은 `CREATED` 면 저장한 때의 버전, `UPDATED` 면 고치기 전의 버전이다. `PROPOSED` 면 비어 있고, 고치기 제안(`memory_id` 를 바로 고칠 수 없어 내린 제안)만 고칠 항목의 버전이다. 받아들일 때 고칠 항목의 버전이 이 값과 다르면 막는다
 - `previous_status` 는 기존 제안을 받아들인 `CREATED` 만 `PROPOSED` 이고 나머지는 비어 있다
 - `external_read` 는 기록을 남길 때 그 대화의 어느 실행이 바깥 글을 읽었는지다(「바로 저장 판정」 의 조건 4). 승인 카드가 이 값을 보인다. 이 컬럼이 생기기 전의 줄은 거짓이다
 - `replaced_memory_ids` 는 합치기에서 새 항목이 대신한 옛 항목 번호의 JSON 배열이다. 바로 저장은 실제로 대신한 번호, 제안은 받아들일 때 대신할 번호이고 받아들이면 실제로 대신한 번호로 고친다. 합치기가 아니면 `NULL` 이다. 옛 항목이 지워질 수 있어 외래 키를 걸지 않는다

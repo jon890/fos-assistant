@@ -22,6 +22,7 @@ package com.bifos.assistant.hermes.application.dto;
  * @param alreadyStreamed 중간 안내의 일부가 delta로 전달됐는지. 누락되거나 boolean이 아니면 null
  * @param streamedPrefixLength 안내로 확인한 직전 delta 구간의 UTF-16 길이. 원문이 아니라 제거할 길이만 전달한다
  * @param interimId 실행 안에서 같은 안내의 재수신을 가려낼 불투명한 번호. 원문과 timestamp를 노출하지 않는다
+ * @param toolCallId 도구 사건의 {@code tool_call_id}. 시작과 완료를 짝짓고 plugin 의 도구 기록과 맞춘다. 없으면 null
  */
 public record HermesRunEvent(
     String type,
@@ -40,7 +41,18 @@ public record HermesRunEvent(
     String skillName,
     Boolean alreadyStreamed,
     Integer streamedPrefixLength,
-    String interimId) {
+    String interimId,
+    String toolCallId) {
+
+    /** 도구 호출 번호를 모르는 소비자다. */
+    public HermesRunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed,
+        String subagentId, String goal, String model, String childSessionId, Long inputTokens,
+        Long outputTokens, String status, String skillName, Boolean alreadyStreamed, Integer streamedPrefixLength,
+        String interimId) {
+        this(type, text, toolName, detail, durationMs, failed, subagentId, goal, model, childSessionId,
+            inputTokens, outputTokens, status, skillName, alreadyStreamed, streamedPrefixLength, interimId, null);
+    }
+
 
     /** 기존 소비자는 중간 안내의 재분류 정보를 모른다. */
     public HermesRunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed,

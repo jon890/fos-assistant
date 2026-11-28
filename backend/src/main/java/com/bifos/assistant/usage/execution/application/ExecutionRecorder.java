@@ -199,13 +199,19 @@ public class ExecutionRecorder {
             modelTier,
             requestReceivedAt,
             effortSource(requested),
-            admissionOf(conversation, parentExecutionId, rootExecutionId));
+            admissionOf(conversation, parentExecutionId, rootExecutionId, delegationKey));
     }
 
 
-    /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
+    /**
+     * 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. 부모 없이 위임 키가 있는 실행(스킬 맡기기, 비서 중심
+     * 대화 스펙 REQ10)은 turn 자리를 쥐지 않으므로 자식처럼 사용자 한도로 센다(ADR-069).
+     */
     private ExecutionAdmission admissionOf(
-        ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
+        ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId, DelegationKey delegationKey) {
+        if (parentExecutionId == null && conversation != null && delegationKey != null) {
+            return ExecutionAdmission.CHILD;
+        }
         if (parentExecutionId != null) {
             Long rootId = rootExecutionId == null ? parentExecutionId : rootExecutionId;
             Long rootConversationId = executions

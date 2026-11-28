@@ -804,6 +804,21 @@ class HermesSourceTest(unittest.TestCase):
                 for call in calls:
                     self.assertEqual(set(), set(keywords) - {keyword.arg for keyword in call.keywords},
                                      "%s hook 이 fos-ctx 가 읽는 인자를 넘기지 않는다" % hook)
+        hook, relative, keywords, ids = contract.TOOL_TRACE_HOOK
+        self.assertIn(hook, names)
+        tree = self.tree(self.root / relative)
+        calls = [node for node in ast.walk(tree)
+                 if isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant)
+                 and node.args[0].value == hook
+                 and (getattr(node.func, "id", None) or getattr(node.func, "attr", "")).endswith("invoke_hook")]
+        self.assertTrue(calls, "%s 에서 %s hook 을 부르는 자리가 없다" % (relative, hook))
+        for call in calls:
+            self.assertEqual(set(), set(keywords) - {keyword.arg for keyword in call.keywords},
+                             "%s hook 이 fos-ctx 가 읽는 인자를 넘기지 않는다" % hook)
+        id_fields = {field.target.id for cls in ast.walk(tree)
+                     if isinstance(cls, ast.ClassDef) and cls.name == "_CallIds"
+                     for field in cls.body if isinstance(field, ast.AnnAssign) and isinstance(field.target, ast.Name)}
+        self.assertEqual(set(), set(ids) - id_fields, "post_tool_call 의 식별 칸이 _CallIds 에 없다")
         relative, name, expected = contract.CALLER_THREAD_HOOKS
         self.assertTrue(expected <= self._string_set(relative, name),
                         "subagent_stop 이 부르는 스레드에서 돌지 않는다. 설계의 「깨우는 때」 를 다시 본다")

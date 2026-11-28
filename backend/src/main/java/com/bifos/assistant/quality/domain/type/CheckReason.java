@@ -35,5 +35,12 @@ public enum CheckReason {
     /** 원본 사진 조회 도구가 끝나지 않았거나 실패했다. */
     NO_INSPECT,
     /** 사진에 심은 글자가 답에 없다. */
-    MARKER_MISSING
+    MARKER_MISSING,
+    /** 도구 이름을 적지 않은 문항에서 Control Plane 도구를 찾아 부르지 않았다. */
+    NO_TOOL,
+    /**
+     * 평가 비서의 Control Plane MCP 연결이 끊긴 채 돌았다. 에이전트 품질이 아니라 평가 환경의 문제다(docs/features/agent-quality/design.md 의 「평가 환경
+     * 오류」).
+     */
+    ENVIRONMENT
 }

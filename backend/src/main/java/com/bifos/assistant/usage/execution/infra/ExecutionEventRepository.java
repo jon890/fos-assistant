@@ -119,14 +119,43 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
 
 
     /**
-     * 그 대화 실행의 사건에서 {@code detail} 을 비운다. 사건 줄과 토큰은 남긴다.
+     * plugin 의 도구 기록을 이미 저장된 도구 완료 줄 하나에 옮긴다. 바꾸는 칸만 쓴다.
+     *
+     * <p>엔티티를 읽어 통째로 저장하면 그 사이 대화 삭제가 비운 {@code detail} 을 다시 쓴다. 걸린 시간은 비었을 때만 채우고, 오류 두 칸은
+     * 실패 표시가 참인 줄에만 쓴다. 도구 이름이 다르면 바꾸지 않는다. Tool Search 의 {@code tool_call} 은 사건이 다리 이름을 보내므로
+     * 이름을 보지 않는다(docs/features/run-trace/design.md 「짝짓기 장부」).
+     *
+     * <p>트랜잭션은 {@code ToolTraceRows} 가 연다.
+     *
+     * @return 바꾼 줄 수
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ExecutionEvent ev
+               set ev.durationMs = coalesce(ev.durationMs, :durationMs),
+                   ev.errorType = case when ev.failed = true then coalesce(:errorType, ev.errorType) else ev.errorType end,
+                   ev.errorSummary = case when ev.failed = true then coalesce(:errorSummary, ev.errorSummary)
+                                     else ev.errorSummary end
+             where ev.id = :id and ev.eventType = 'TOOL_COMPLETED'
+               and (:toolName is null or ev.toolName is null or ev.toolName = :toolName or ev.toolName = 'tool_call')
+            """)
+    int recordToolTrace(
+        @Param("id") Long id,
+        @Param("toolName") String toolName,
+        @Param("durationMs") Long durationMs,
+        @Param("errorType") String errorType,
+        @Param("errorSummary") String errorSummary);
+
+
+    /**
+     * 그 대화 실행의 사건에서 {@code detail} 과 오류 요약을 비운다. 사건 줄, 토큰, 오류 종류는 남긴다.
      *
      * <p>트랜잭션은 {@code ConversationExecutionPurge} 가 연다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update ExecutionEvent ev set ev.detail = null
-             where ev.detail is not null
+            update ExecutionEvent ev set ev.detail = null, ev.errorSummary = null
+             where (ev.detail is not null or ev.errorSummary is not null)
                and ev.executionId in (select e.id from AgentExecution e where e.conversationId = :conversationId)
             """)
     int clearDetailsOf(@Param("conversationId") Long conversationId);

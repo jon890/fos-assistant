@@ -14,6 +14,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -149,6 +150,67 @@ final class DelegationRuns {
             if (runId != null) {
                 // 끝난 run 을 turn 중지가 다시 멈추지 않게 뗀다.
                 turns.untrackRun(rootId, runId);
+            }
+            delegation.markEnded();
+            activeDelegations.release();
+            handoff.markEnded(failure);
+            if (executionId != null) {
+                publishFinished(conversation, executionId);
+            }
+        }
+    }
+
+
+    /**
+     * 부모 없는 위임 실행 하나를 끝까지 돌린다. 사람이 {@code /} 목록으로 스킬을 맡긴 길과 예약 작업의 같은 지시가 쓴다(비서 중심 대화 스펙 REQ10).
+     *
+     * <p>{@link #run} 과 같이 어떻게 끝나든 전체 한도 자리를 돌려주고 기다리는 쪽을 깨우며 시작과 끝 사건을 낸다. 루트 turn 이 없어 turn 중지에
+     * 붙이지 않는다. 부르는 쪽이 {@link #tryAcquire} 로 자리를 얻은 뒤 부른다.
+     *
+     * @param onRowCreated 실행 줄이 생긴 직후, 기다리는 쪽을 깨우기 전에 부른다. 질문을 잇는 일 같은 것을 한다
+     */
+    void runUnparented(
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String task,
+        DelegationKey delegationKey,
+        Consumer<AgentExecution> onRowCreated,
+        Handoff handoff) {
+        RunningDelegation delegation = new RunningDelegation(agent.runtimeTarget());
+        RuntimeException failure = null;
+        try {
+            children.runUnparented(
+                user,
+                conversation,
+                agent,
+                task,
+                delegationKey,
+                execution -> {
+                    delegation.bindExecution(execution.id());
+                    running.put(execution.id(), delegation);
+                    onRowCreated.accept(execution);
+                    handoff.onRowCreated(execution);
+                    publishStarted(conversation, execution.id());
+                },
+                (execution, runId) -> {
+                    handoff.markSubmitted();
+                    if (delegation.attachRun(runId)) {
+                        sendStop(delegation, runId);
+                    }
+                },
+                () -> handoff.abandoned() || delegation.stopRequested());
+        } catch (RuntimeException ex) {
+            failure = ex;
+            if (isUserBusy(ex)) {
+                log.info("사용자 실행 한도에 닿아 스킬 맡기기를 시작하지 않았다 conversationId={}", conversation.id());
+            } else {
+                log.warn("스킬 맡기기 실행이 예외로 끝났다 conversationId={}", conversation.id(), ex);
+            }
+        } finally {
+            Long executionId = delegation.executionId();
+            if (executionId != null) {
+                running.remove(executionId, delegation);
             }
             delegation.markEnded();
             activeDelegations.release();

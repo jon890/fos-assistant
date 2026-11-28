@@ -24,15 +24,16 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
-import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.dto.CallResult;
-import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
+import com.bifos.assistant.hermes.application.dto.SoulDocument;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ProbeResult;
@@ -45,6 +46,7 @@ import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -70,8 +72,8 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 「이 에이전트에 붙이기」 승인 카드의 계약을 확인한다(스펙 service-concepts REQ15, REQ16, REQ17, REQ18). 계약은
- * {@code docs/features/service-concepts/design.md} 의 「PR4 연결 붙이기 승인 카드」 가 갖는다.
+ * 실제 HTTP 경계에서 「새 전문 에이전트를 만들어 붙이기」 승인 카드의 계약을 확인한다(스펙 service-concepts REQ15-REQ18, 비서 중심 대화 스펙
+ * REQ9, DECISION25). 계약은 {@code docs/features/assistant-hub/design.md} 의 「PR3」 이 갖는다. 대화의 에이전트는 기본 비서다.
  *
  * <p>테스트 클래스에 트랜잭션을 두지 않는다. 승인한 붙이기는 승인 트랜잭션 밖에서 돌아야 한다. 대시보드의 커넥터, 스킬, 도구 목록
  * 경로만 대역이다.
@@ -151,6 +153,15 @@ class McpConnectorAttachToolTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    HermesDashboardClient dashboard;
+
+    @Autowired
+    HermesProfileKeyStore keyStore;
+
+    @Autowired
+    TestPrimaryAgents primaries;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -175,11 +186,13 @@ class McpConnectorAttachToolTest {
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of());
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web"));
+        when(dashboard.readSoul(anyString())).thenReturn(new SoulDocument("기본 성격", true));
         dad = users.save(AppUser.of("attach-dad-" + UUID.randomUUID() + "@example.com", "아빠", 4472L, UserRole.MEMBER));
         token = tokens.issue(PROFILE, "connector-attach").rawToken();
         agent = agents.save(Agent.of(
             "attach-agent", "메모 비서", PROFILE, "http://runtime.test/p/" + PROFILE, CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
+        primaries.make(dad, agent);
         conversation = conversations.save(Conversation.startedBy(dad.id(), TITLE_OF_CHAT, agent.id(), Instant.now()));
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
@@ -188,19 +201,23 @@ class McpConnectorAttachToolTest {
 
     @AfterEach
     void tearDown() {
+        agents.findAll().stream()
+            .filter(Agent::profileManaged)
+            .map(Agent::hermesProfile)
+            .forEach(keyStore::delete);
         clean();
     }
 
 
     @Test
-    @DisplayName("붙이기 도구는 붙이지 않고 서비스와 도구 수가 보이는 승인 카드를 띄우며, 승인하면 그 에이전트에 붙고 언제 쓸 수 있는지 알림 줄로 알린다")
-    void attachesAfterApproval() throws Exception {
+    @DisplayName("붙이기 도구는 만들지 않고 새 전문 에이전트 카드를 띄우며, 승인하면 「<서비스> 담당」 이 생겨 그 연결이 붙고 비서에는 붙지 않는다")
+    void createsSpecialistAfterApproval() throws Exception {
         connect();
 
         JsonNode result = call(DEMO);
 
         assertThat(isError(result)).as(text(result)).isFalse();
-        assertThat(text(result)).contains("approval_requested", "아직 붙이지 않았다").doesNotContain("검사용 메모");
+        assertThat(text(result)).contains("approval_requested", "아직 만들지 않았다").doesNotContain("검사용 메모");
         assertThat(bindings.findAll()).isEmpty();
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         ConnectorAction card = actions.findAll().getFirst();
@@ -208,55 +225,102 @@ class McpConnectorAttachToolTest {
         assertThat(card.status()).isEqualTo(ActionStatus.PENDING);
         assertThat(card.conversationId()).isEqualTo(conversation.id());
         var view = actionService.listForConversation(current(dad), conversation.id()).getFirst();
-        assertThat(view.title()).isEqualTo("이 에이전트에 붙이기");
-        assertThat(view.argsJson()).contains("검사용 메모", "메모 비서", "도구 3개 · 조회 1 · 쓰기 2", "이 서비스의 도구를 직접 써요")
-            .doesNotContain("켜져 있어요");
+        assertThat(view.title()).isEqualTo("새 전문 에이전트를 만들어 붙이기");
+        assertThat(view.argsJson()).contains("검사용 메모", "검사용 메모 담당", "도구 3개 · 조회 1 · 쓰기 2", "이 서비스의 도구를 직접 써요")
+            .doesNotContain("켜져 있어요", agent.code());
         assertThat(view.grantAllowed()).isFalse();
 
         var approved = actionService.approve(current(dad), card.publicId(), null, false);
 
         assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
-        assertThat(bindingService.listForAgent(current(dad), agent.code()).connections())
+        Agent specialist = agents.findAll().stream()
+            .filter(candidate -> "검사용 메모 담당".equals(candidate.name()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(specialist.ownerUserId()).isEqualTo(dad.id());
+        assertThat(specialist.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(bindingService.listForAgent(current(dad), specialist.code()).connections())
             .singleElement()
             .satisfies(bound -> {
                 assertThat(bound.connectorId()).isEqualTo(DEMO);
                 assertThat(bound.bound()).isTrue();
-                assertThat(bound.status()).isEqualTo(BindingStatus.PENDING);
             });
-        assertThat(actionService.undeliveredResults(conversation.id())).isEmpty();
-        assertThat(notices()).containsExactly("「검사용 메모」 를 「메모 비서」 에 붙였어요. 몇 분 안에 쓸 수 있어요");
+        assertThat(bindingService.listForAgent(current(dad), agent.code()).connections())
+            .allSatisfy(bound -> assertThat(bound.bound()).isFalse());
+        assertThat(notices()).singleElement().asString().startsWith("「검사용 메모 담당」 를 만들어 「검사용 메모」 를 붙였어요.");
 
         JsonNode again = call(DEMO);
         assertThat(isError(again)).as(text(again)).isFalse();
-        assertThat(text(again)).contains("already_attached", "pending");
+        // 준비에서 붙이기가 profile 다시 읽기를 기다리게 두어 아직 쓸 수 없다.
+        assertThat(text(again)).contains("specialist_attached", specialist.code(), "\"agent_status\":\"pending\"");
         assertThat(actions.findAll()).hasSize(1);
     }
 
 
     @Test
-    @DisplayName("재시작이 필요한 붙이기는 관리자 확인 뒤에 쓸 수 있다고 알리고, 셸 도구가 켜진 에이전트의 카드에는 경고가 더 보인다")
-    void tellsRestartAndWarnsShellTools() throws Exception {
+    @DisplayName("기본 비서에만 붙어 있으면 이미 붙은 것으로, 전문 에이전트가 있으면 카드 없이 그 에이전트를, 그 에이전트가 꺼졌으면 카드 없이 연결 화면을 알린다")
+    void pointsToAttachedSpecialistOrKeepsPrimary() throws Exception {
         connect();
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-            .thenReturn(new InstallResult(true, false));
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal"));
+        bindingService.bind(current(dad), agent.code(), DEMO);
 
-        call(DEMO);
+        JsonNode primaryOnly = call(DEMO);
 
-        var view = actionService.listForConversation(current(dad), conversation.id()).getFirst();
-        assertThat(view.argsJson()).contains("명령 실행이나 파일 도구가 켜져 있어요");
-        actionService.approve(current(dad), actions.findAll().getFirst().publicId(), null, false);
-        assertThat(notices()).containsExactly("「검사용 메모」 를 「메모 비서」 에 붙였어요. 관리자가 반영을 확인하면 쓸 수 있어요");
+        assertThat(isError(primaryOnly)).as(text(primaryOnly)).isFalse();
+        assertThat(text(primaryOnly)).contains("already_attached");
+        Agent shopper = agents.save(Agent.of(
+            "attach-other-agent", "메모 담당", PROFILE + "-2", "http://runtime.test/p/" + PROFILE + "-2", CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
+        bindingService.bind(current(dad), shopper.code(), DEMO);
+        // profile 다시 읽기가 끝나 지금 쓸 수 있는 붙임으로 둔다.
+        jdbc.update("UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE WHERE agent_id = ?", shopper.id());
+
+        JsonNode specialist = call(DEMO);
+
+        assertThat(isError(specialist)).as(text(specialist)).isFalse();
+        assertThat(text(specialist)).contains(
+            "specialist_attached", "\"agent_code\":\"" + shopper.code() + "\"", "메모 담당", "\"agent_status\":\"ready\"", "agent_delegate");
+        assertThat(actions.findAll()).isEmpty();
+
+        bindingService.unbind(current(dad), agent.code(), DEMO);
+        jdbc.update("UPDATE agent SET enabled = false WHERE id = ?", shopper.id());
+
+        JsonNode disabled = call(DEMO);
+
+        assertThat(isError(disabled)).isTrue();
+        assertThat(text(disabled)).contains("specialist_unavailable", "\"link\":\"/connections/" + DEMO + "\"");
+        assertThat(actions.findAll()).isEmpty();
     }
 
 
     @Test
-    @DisplayName("거절하면 붙지 않고, 설치 호출이 실패하면 실패로 끝나며 상태를 확인하라고 알린다")
-    void keepsUnboundWhenRejectedAndReportsInstallFailure() throws Exception {
+    @DisplayName("재시작이 필요한 붙이기는 관리자 확인 뒤에 쓸 수 있다고 알리고, 그동안 다시 부르면 카드 없이 반영 대기를 알린다")
+    void tellsRestart() throws Exception {
         connect();
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+            .thenReturn(new InstallResult(true, false));
+
+        call(DEMO);
+
+        actionService.approve(current(dad), actions.findAll().getFirst().publicId(), null, false);
+        assertThat(notices()).containsExactly("「검사용 메모 담당」 를 만들어 「검사용 메모」 를 붙였어요. 관리자가 반영을 확인하면 쓸 수 있어요");
+
+        JsonNode waiting = call(DEMO);
+
+        assertThat(isError(waiting)).as(text(waiting)).isFalse();
+        assertThat(text(waiting)).contains("specialist_attached", "검사용 메모 담당", "\"agent_status\":\"pending\"", "아직 맡기지 말고");
+        assertThat(actions.findAll()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("거절하면 만들지 않고, 설치 호출이 실패하면 만든 에이전트를 거두고 실패로 끝나며 상태를 확인하라고 알린다")
+    void keepsNothingWhenRejectedAndReportsInstallFailure() throws Exception {
+        connect();
+        long before = agents.count();
         call(DEMO);
         actionService.reject(current(dad), actions.findAll().getFirst().publicId());
         assertThat(bindings.findAll()).isEmpty();
+        assertThat(agents.count()).isEqualTo(before);
 
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
@@ -270,29 +334,7 @@ class McpConnectorAttachToolTest {
 
         assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
         assertThat(notices()).last().asString().contains("반영을 확인하지 못했어요", "외부 서비스 연결 화면");
-    }
-
-
-    @Test
-    @DisplayName("그룹에 공개한 에이전트와 남의 에이전트에서는 카드 없이 까닭과 연결 화면 링크를 돌려준다")
-    void refusesGroupAndOthersAgent() throws Exception {
-        connect();
-        jdbc.update("UPDATE agent SET visibility = 'GROUP' WHERE id = ?", agent.id());
-
-        JsonNode group = call(DEMO);
-
-        assertThat(isError(group)).isTrue();
-        assertThat(text(group)).contains("agent_not_private", "비공개 에이전트에만", "\"link\":\"/connections/" + DEMO + "\"");
-
-        AppUser other = users.save(AppUser.of("attach-other-" + UUID.randomUUID() + "@example.com", "엄마", 4472L, UserRole.MEMBER));
-        jdbc.update("UPDATE agent SET visibility = 'PRIVATE', owner_user_id = ? WHERE id = ?", other.id(), agent.id());
-
-        JsonNode others = call(DEMO);
-
-        assertThat(isError(others)).isTrue();
-        assertThat(text(others)).contains("not_owner", "\"link\":\"/connections/" + DEMO + "\"");
-        assertThat(actions.findAll()).isEmpty();
-        assertThat(bindings.findAll()).isEmpty();
+        assertThat(agents.findAll()).noneMatch(candidate -> "검사용 메모 담당".equals(candidate.name()) && !candidate.isDeleted());
     }
 
 
@@ -302,7 +344,7 @@ class McpConnectorAttachToolTest {
         JsonNode notConnected = call(DEMO);
 
         assertThat(isError(notConnected)).isTrue();
-        assertThat(text(notConnected)).contains("not_connected", "\"link\":\"/connections/" + DEMO + "?agent=" + agent.code() + "\"");
+        assertThat(text(notConnected)).contains("not_connected", "\"link\":\"/connections/" + DEMO + "\"");
 
         JsonNode missing = call("no-such-plugin");
 
@@ -312,26 +354,6 @@ class McpConnectorAttachToolTest {
         assertThat(send(json.createObjectNode()).has("error")).isTrue();
         assertThat(send(json.createObjectNode().put("connector", 7)).has("error")).isTrue();
         assertThat(send(json.createObjectNode().put("connector", DEMO).put("agent", "other")).has("error")).isTrue();
-    }
-
-
-    @Test
-    @DisplayName("에이전트 하나에만 붙는 연결이 이미 다른 에이전트에 붙어 있으면 카드 없이 까닭과 연결 화면 링크를 돌려준다")
-    void refusesSingleBindingAttachedElsewhere() throws Exception {
-        ConnectorManifest single = new ConnectorManifest(DEMO, "검사용 메모", "", MANIFEST.fields(), "list_scopes", "attachdemo", 2,
-            MANIFEST.tools(), List.of(), ConnectorAppearance.NONE, true, false, null);
-        when(connector.readCatalog()).thenReturn(List.of(single));
-        connect();
-        Agent elsewhere = agents.save(Agent.of(
-            "attach-other-agent", "다른 비서", PROFILE + "-2", "http://runtime.test/p/" + PROFILE + "-2", CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
-        bindingService.bind(current(dad), elsewhere.code(), DEMO);
-
-        JsonNode result = call(DEMO);
-
-        assertThat(isError(result)).isTrue();
-        assertThat(text(result)).contains("single_binding", "\"link\":\"/connections/" + DEMO + "\"");
-        assertThat(actions.findAll()).isEmpty();
     }
 
 
@@ -362,23 +384,7 @@ class McpConnectorAttachToolTest {
         assertThat(actions.findById(card.id()).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
         assertThat(bindings.findAll()).isEmpty();
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
-        assertThat(notices()).containsExactly("「이 에이전트에 붙이기」 요청의 결과를 확인하지 못했어요. 외부 서비스 연결 화면에서 상태를 확인해 주세요");
-    }
-
-
-    @Test
-    @DisplayName("카드를 띄운 뒤 에이전트를 그룹에 공개하면 승인해도 붙지 않고 실패로 끝난다")
-    void rechecksVisibilityAtApproval() throws Exception {
-        connect();
-        call(DEMO);
-        ConnectorAction card = actions.findAll().getFirst();
-        jdbc.update("UPDATE agent SET visibility = 'GROUP' WHERE id = ?", agent.id());
-
-        var approved = actionService.approve(current(dad), card.publicId(), null, false);
-
-        assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
-        assertThat(bindings.findAll()).isEmpty();
-        assertThat(notices()).containsExactly("「검사용 메모」 를 「메모 비서」 에 붙이지 못했어요. 비공개 에이전트에만 붙일 수 있어요");
+        assertThat(notices()).containsExactly("「새 전문 에이전트를 만들어 붙이기」 요청의 결과를 확인하지 못했어요. 외부 서비스 연결 화면에서 상태를 확인해 주세요");
     }
 
 
@@ -447,6 +453,9 @@ class McpConnectorAttachToolTest {
         jdbc.update("DELETE FROM conversation WHERE title = ?", TITLE_OF_CHAT);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update("DELETE FROM agent WHERE hermes_profile IN (?, ?)", PROFILE, PROFILE + "-2");
+        if (dad != null) {
+            jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", dad.id());
+        }
     }
 
 

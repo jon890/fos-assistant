@@ -57,6 +57,8 @@ const UNBOUND = {
 
 const BLOCKED_MESSAGES: Record<AgentConnectionBlock, string> = {
   AGENT_NOT_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
+  PRIMARY_AGENT:
+    "비서에는 연결을 붙이지 않아요. 연결은 전문 에이전트에 붙이고 비서가 맡겨요. 이미 붙은 연결은 뗄 수 있어요.",
 };
 
 const RISK_MESSAGE =
@@ -243,9 +245,9 @@ export function AgentConnectionsSection({
     null,
   );
   // 공개 범위는 이 화면에서 바뀔 수 있다. 그룹 공개를 비공개로 되돌리면 다시 붙일 수 있다.
-  // 공개 범위를 모르면 서버가 준 까닭을 그대로 쓴다.
+  // 공개 범위를 모르거나 기본 비서면 서버가 준 까닭을 그대로 쓴다.
   const blockedReason: AgentConnectionBlock | null =
-    visibility === undefined
+    initialBlockedReason === "PRIMARY_AGENT" || visibility === undefined
       ? initialBlockedReason
       : visibility === GROUP_VISIBILITY
         ? "AGENT_NOT_PRIVATE"

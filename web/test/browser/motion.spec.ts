@@ -1,5 +1,5 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
-import { expectStartAgent } from "./helpers.ts";
+import { waitForStartComposer } from "./helpers.ts";
 import { cleanupMemories, confirmDelete, createMemory, memoryRow, openRow, reloadMemoryListBySaving } from "./memory-page.ts";
 import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
@@ -20,7 +20,7 @@ function enterVariable(element: Locator, name: string) {
 }
 
 async function send(page: Page, text: string) {
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }

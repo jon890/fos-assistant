@@ -89,6 +89,9 @@ Hermes 는 profile 마다 아래를 따로 가진다.
 `config.yaml` 안의 `${VAR}` 는 그 profile 의 `.env` 에서만 값을 찾는다.
 셸 환경 변수도, 다른 profile 의 `.env` 도 보지 않는다.
 
+**이 격리는 Hermes 코드 안의 논리 경계다.** 공유 gateway 와 그 자식인 플러그인 MCP 프로세스는 모든 profile 과 같은 OS 계정으로 돌아, 파일 권한이 profile 사이를 막지 않는다.
+사용자 요청에서 실행 공간, 플러그인, 「내 브라우저」 까지 구간마다 인증 주체와 강제 경계, 경계가 없는 경로는 [`docs/code-architecture.md`](../../docs/code-architecture.md#사용자별-실행-경계) 의 「사용자별 실행 경계」 가 갖는다.
+
 #### OAuth credential 은 여기서 빠진다
 
 AI credential 이 어디 있고 profile 사이에 무엇을 함께 쓰는지는 이 절과 다음 절이 갖는다. 다른 문서는 요약만 두고 여기를 가리킨다.
@@ -148,7 +151,7 @@ hook 목록은 `hermes_cli/plugins.py`의 `VALID_HOOKS`가 갖고, 그중 아래
 | hook | 얻는 것 |
 | --- | --- |
 | `post_llm_call` | LLM 호출 하나 단위의 모델, provider, 토큰 |
-| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간 |
+| `pre_tool_call`, `post_tool_call` | 도구 호출과 소요 시간. `post_tool_call` 은 `tool_name`, `session_id`, `tool_call_id`, `duration_ms`, `status`(`ok`, `error`, `blocked` 등), `error_type`, `error_message` 를 넘긴다. 사건이 없는 코드 실행 안의 호출에도 불리고, 그때 `tool_call_id` 는 빈 글이다. fos-ctx 가 이 값으로 실행 기록을 보낸다([fos-ctx 「도구 기록을 보낸다」](../plugins/fos-ctx/README.md#도구-기록을-보낸다)) |
 | `subagent_start`, `subagent_stop` | subagent 실행 경계 |
 
 Runs API 의 `usage` 는 실행 하나의 합계만 준다.
@@ -791,7 +794,7 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 현재 v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 아래와 같다. 앞의 범용 callback 표에는 이 경로가 등록하지 않는 사건도 포함한다. 개별 사건의 미수신 여부까지 운영에서 확인한 결과는 아직 없다.
 
 - `message.interim`, `reasoning.available`, `subagent.start`, `subagent.complete` 가 오지 않는다. `_execute_run` 이 답 조각과 도구 시작·완료 sink 만 등록한다(`gateway/session_api_turn.py` 의 `wire_api_observers`). Control Plane 은 오는 사건만 그린다(스펙 DECISION2)
-- `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 을 걸린 시간 모름으로 읽는다
+- `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 이면 같은 `tool_call_id` 의 시작·완료 `timestamp` 차이로 걸린 시간을 채우고, 그래도 없으면 모름으로 둔다([실행 기록](../../docs/features/execution.md) 의 「도구의 걸린 시간과 실패 원인」)
 - 대기 중 gateway 가 물러나면 끝이 아닌 `run.queued` 가 온다. 아는 사건 목록 밖이라 건너뛴다
 - gateway 가 정상 종료로 내려가면 도는 실행에 `run.interrupted` 가 오고 `pending_steer` 와 `runtime` 은 빠진다
 
@@ -1657,6 +1660,18 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 [dispatcher 의 중계 처리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L707),
 [plugin 의 직접 MCP 호출](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py#L509),
 [코드 실행 RPC](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_rpc.py#L28)
+
+### 원격 MCP 연결의 keepalive 와 쉬기
+
+Control Plane 의 평가 환경 오류 판정(`McpConnectionLiveness`, [`docs/features/agent-quality/design.md`](../../docs/features/agent-quality/design.md) 「평가 환경 오류」)이 아래 동작에 기댄다. Hermes 를 올리면 다시 확인한다.
+
+| 동작 | 값 | 근거 |
+| --- | --- | --- |
+| `url` 로 붙은 원격 MCP 연결은 keepalive 가 기본으로 돈다 | 180초. 도구 호출이 도는 동안은 그 차례를 건너뛴다 | [`tools/mcp_tool_server_run.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool_server_run.py#L68-L73), [`tools/mcp_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool.py#L332) |
+| 서버가 `ping` 에 -32601 을 주고 `tools` capability 를 알리면 그 연결의 keepalive 를 `tools/list` 로 바꾼다 | Control Plane 은 `ping` 을 모르는 메서드로 답한다 | [`tools/mcp_tool_health.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool_health.py#L169-L199) |
+| keepalive 가 실패하면 다시 연결하고, 5번 실패하면 쉬게 두고(parked) 그 서버의 도구를 등록에서 뺀다 | 쉬는 동안 300초마다 다시 시도한다 | [`tools/mcp_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v0.23.2/tools/mcp_tool.py#L317-L325) |
+
+Control Plane 은 MCP session(`Mcp-Session-Id`)을 두지 않는다. 그래서 Control Plane 이 다시 떠도 Hermes 는 다시 연결하지 않고, 그 사이 keepalive 가 실패한 경우에만 다시 연결한다.
 
 ### `tool_call` 의 단건 제한
 

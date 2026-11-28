@@ -90,7 +90,7 @@
 | 요청 | 응답 |
 | --- | --- |
 | `POST /api/v1/admin/quality/checks` | 202 와 확인 한 줄(`trigger` `PIPELINE`). 도는 `DEPLOY_CHECK` 가 있으면 새로 만들지 않고 그 줄을 `200` 으로 돌려준다(같은 배포에서 두 번 불러도 하나). 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING` |
-| `GET /api/v1/admin/quality/checks/{publicId}` | 한 줄과 기능별 결과. 파이프라인이 이 `status` 를 읽는다 |
+| `GET /api/v1/admin/quality/checks/{publicId}` | 한 줄과 기능별 결과. 파이프라인이 이 `status` 를 읽는다. `environmentError` 가 참이면 까닭이 `ENVIRONMENT` 인 기능이 있다(아래 「평가 환경 오류」). `status` 는 그래도 `FAILED` 다 |
 | `GET /api/v1/admin/quality/checks?cursor=` | 최근 순 목록. 품질 화면 첫 칸 |
 | `POST /api/v1/admin/quality/checks/{publicId}/retry` | 같은 기능 묶음으로 새 확인을 시작한다(`trigger_type` `ADMIN`). 도는 확인이 있으면 첫 줄처럼 그 줄을 돌려주고, 화면은 「이미 확인이 돌고 있다」 를 보인다 |
 | `GET /api/v1/admin/quality/executions/{executionId}/tree` | 평가 사용자의 실행 트리만 연다. 응답은 `/api/v1/usage/executions/{id}/tree` 와 같은 모양이고, 내부 값은 보는 관리자 기준으로 싣는다(`ExecutionTreeService.ofOwner`). 다른 사용자의 실행은 404 다. 지금 실행 트리 조회(`ExecutionTreeService`)는 주인만 열어 관리자가 평가 사용자의 실패를 볼 길이 없다(ADR-063 의 관리자 영역 규칙대로 `admin.quality` 에 둔다) |
@@ -130,7 +130,9 @@ sequenceDiagram
 **기능마다 10분 마감(스펙 DECISION19).** `ChatService.send` 는 끝날 때까지 막히고, 그 안의 `TurnCancellation.cancel` 은 표시만 바꿔 Hermes run 을 멈추지 않는다. 그래서 아래 순서로 한다.
 
 1. 문항은 별도 작업(`BackgroundTasks`)에서 `send` 로 보낸다. 실행기 스레드는 그 기능의 끝남 조건을 1초 남짓 간격으로 본다.
-2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, `ChatService.deliveryStates` 의 그 대화 전달이 `DELIVERED` 이고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다.
+2. 끝남 조건은 기능마다 다르다. 보통은 `send` 가 돌아온 것이다. 위임은 `send` 가 돌아오고, 자식 실행이 끝났고, 대화에 전할 결과(루트가 바로 맡긴 자식의 `SUCCEEDED`·`FAILED`)에 모두 전했다는 표시가 있고, 도는 전달 묶음(`ChatService.deliveryStates` 의 `DELIVERING`)이 없고, 대화에 도는 turn(`TurnCancellation.markOf`)이 없을 때다(`DeployCheckObserver.delegationSettled`).
+   결과는 두 길로 전해진다. 상한 안에 끝난 맡김은 `agent_delegate` 의 도구 응답이 전하고 전했다는 표시만 남긴다. 묶음도 자동 답도 없다([ADR-20261121 / delegate-wait](../../../backend/docs/adr/ADR-20261121-delegate-wait.md)). 상한을 넘긴 맡김은 자동 답의 묶음이 전한다. 묶음이 끝나기만 기다리면 앞의 길에서 마감까지 돈다.
+   판정의 「전해짐」 도 같다. 묶음이 `DELIVERED` 이거나, 성공한 자식에 전했다는 표시가 있고 그 자식이 어느 묶음에도 들지 않았으면(도구 응답으로 전함) 전해진 것이다.
 3. 10분이 지나면 도는 turn 의 실행 번호를 `TurnCancellation.markOf(conversationId)` 로 읽어 `ChatService.stop` 을 부르고, 도는 위임 자식은 `AgentDelegationService` 의 중지로 멈춘다. 그 기능을 `TIMED_OUT` 으로 적는다.
 4. `send` 가 `HERMES_RUN_TIMEOUT` 으로 끝나면(Hermes 기다림 상한 `hermes.run-timeout`) 원격 run 이 남아 있을 수 있다. 그 기능을 `TIMED_OUT`(까닭 `HERMES_TIMEOUT`)으로 적는다. turn 잠금은 이미 풀려 `ChatService.stop` 으로 멈출 수 없고, 남은 원격 run 은 기존 잃은 run 정리(`LostRunRelease`)가 다음 제출 때 푼다.
 5. 대화에 도는 turn 이 없어진 뒤에 다음 기능으로 간다. 사용자 실행 자리를 겹쳐 쓰지 않게 한다.
@@ -150,6 +152,9 @@ sequenceDiagram
 | 기억 읽기 | 미리 넣은 기억을 물어본다 | 답에 미리 넣은 사실의 낱말이 든다 | 대화. 미리 넣은 한 줄은 남긴다 |
 | 예약 작업 발화 | 문항을 보내지 않는다. 실행기가 `TaskService` 로 평가 전용 사용자의 `TURN` 작업을 한 번(`ONCE`, 지금 뒤 1분. `ONCE` 는 지금보다 뒤여야 한다)으로 만들어 발화기에 맡긴다. 끝남 조건은 그 작업의 `task_run` 이 끝난 상태가 된 것이다. 지시는 짧은 고정 글이다 | 그 작업의 `task_run` 이 `SUCCEEDED` 로 끝나고 `execution_id` 가 찬다 | 예약 작업과 그 대화 |
 | 원본 사진 조회 | 앞 메시지에 합성 사진(심은 글자)을 올리고 다음 메시지에서 글자를 묻는다 | 답에 심은 글자가 들고, 둘째 turn 트리에 `attachment_inspect` 의 `TOOL_COMPLETED` 가 실패 없이 있다. `inspected` 단계 사건은 로그에만 남아 Control Plane 이 읽지 못한다(`MediaPipelineEvents`) | 첨부, 대화 |
+| 도구 찾기 | 도구 이름을 적지 않고 예약 작업 목록을 묻는다(스펙 DECISION43) | 트리에 `task_list` 의 `TOOL_COMPLETED` 가 실패 없이 있다. 아니면 까닭 `NO_TOOL` | 대화. 목록 읽기라 만드는 것이 없다 |
+
+다른 기능의 문항은 도구 이름을 글에 적는다. 모델은 Hermes 의 지연 도구 이름 목록을 받지 못해도 글에 적힌 이름으로 `tool_describe` 를 바로 불러 통과한다. 도구 찾기만 이름 없이 묻는다.
 
 합성 사진은 표지판에 심은 글자를 그린 단순한 그림 하나를 `backend/src/main/resources/quality/deploy-check-photo.png` 에 둔다.
 확인 시작 뒤 평가 사용자에게 생긴 기억 가운데 미리 넣은 한 줄이 아닌 것은 확인이 끝날 때 기능의 통과와 상관없이 지운다(문항이 돌다 `memory_remember` 로 생길 수 있다). 「정리」 는 통과한 기능에만 바로 한다. 실패한 기능의 대화와 만든 것은 30일 뒤 정리 작업이 지운다(스펙 DECISION16, DECISION19). 정리 작업은 하루 한 번 돌고, 대화를 지운 뒤 `quality_run.result_json` 의 `conversationPublicId` 와 `executionIds` 를 비운다. 그래서 30일 뒤에는 화면에 링크가 없다. 줄과 숫자는 남는다. 실행 기록 줄 자체는 기존 실행 기록 보존(rule-49)을 따른다.
@@ -182,15 +187,45 @@ sequenceDiagram
 - **통합 테스트가 실행기를 끝까지 돌리지 않게 `start` 를 「줄 만들기」 와 「띄우기」 로 나눈다.** 끝내기와 알림은 따로 부를 수 있는 메서드로 두고 직접 테스트한다. 마감 값은 `LiveProperties` 로 읽어 테스트에서 줄일 수 있게 한다.
 - **e2e 시나리오는 `test/e2e/run.ts` 의 맨 끝에 등록한다.** 사용자를 하나 더 만들어 앞 시나리오의 사람 수 세기를 깨지 않게 한다.
 - **화면 PR 전까지 알림의 이동 대상 `/admin/quality` 는 없는 화면이다.** 실행기 PR 과 화면 PR 을 같은 배포에 묶거나, 화면 PR 이 먼저 머지되게 한다.
-- 까닭 코드에는 기능 규칙의 코드와 함께 `BUSY`, `INTERRUPTED`, `RUN_FAILED`, `TIMED_OUT` 을 둔다.
+- 까닭 코드에는 기능 규칙의 코드와 함께 `BUSY`, `INTERRUPTED`, `RUN_FAILED`, `TIMED_OUT`, `ENVIRONMENT`(「평가 환경 오류」) 를 둔다.
 - **문항을 보내기 전에 빈 평가 대화를 먼저 만든다(`ChatService.startEmpty`).** 마감이 지났을 때 실행기 스레드가 그 대화의 도는 turn 을 찾아 멈추려면 `send` 가 돌아오기 전에 대화 번호를 알아야 한다. 사진 조회도 이 대화에 사진을 먼저 올린다.
 - **실행 줄이 생기기 전의 거절은 `USER_BUSY`, `CONVERSATION_BUSY` 만 `BUSY` 로 적는다.** 그 밖의 거절과 실행기 쪽 예외는 `RUN_FAILED` 다. 실행이 실패한 것은 실행 줄에 남아 판정이 읽는다.
 - **30일 정리는 `assistant.quality.cleanup-cron`(기본 매일 05:15) 에 돈다.** 보관 기간은 `assistant.quality.link-retention`(기본 30일)이다.
+
+### 평가 환경 오류
+
+평가 비서 profile 의 Control Plane MCP 연결이 끊긴 채 돈 실패는 에이전트 품질이 아니라 평가 환경의 문제다(스펙 DECISION44).
+Hermes 는 원격 MCP 서버의 연결을 재시도 5번 안에 되살리지 못하면 쉬게 두고(parked) 그 서버의 도구를 등록에서 뺀다. 5분마다 다시 시도한다. 그동안 모델은 `tool_search` 만 부르고 Control Plane 도구를 하나도 부르지 못한다. 2026-11-24 같은 커밋을 두 번 배포해 Control Plane 이 다시 뜬 뒤 평가 profile 의 연결이 8분 쉬었고, 그 사이 돈 묶음 평가가 이렇게 실패했다.
+
+**연결이 살아 있는지는 Control Plane 이 받은 `/mcp` 요청으로 판단한다(`mcp.application.McpConnectionLiveness`).** 토큰 인증 필터(`AgentTokenAuthenticationFilter`)가 인증한 `/mcp` 요청마다 토큰의 profile 과 시각을 메모리에 적는다. profile plugin 의 hook 이 부르는 다른 경로는 MCP 연결과 상관없어 적지 않는다.
+
+- Hermes 는 원격 MCP 연결에 기본 180초마다 keepalive 를 보낸다. 이 서버는 `ping` 을 모르는 메서드로 답하므로 Hermes 는 그 연결의 keepalive 를 `tools/list` 로 바꾼다. 다시 연결할 때도 `initialize` 와 `tools/list` 를 부른다.
+- 그래서 마지막 요청이 10분 안이면 살아 있다고 본다. 도구 호출이 도는 동안 keepalive 를 한 번 건너뛸 수 있어 간격이 360초까지 벌어지는 것을 받는다.
+- 기록은 프로세스 메모리에만 있다. 이 서버는 MCP session 을 두지 않아, Control Plane 이 다시 떠도 Hermes 는 그것을 모르고 다음 keepalive 를 보낼 뿐이다. 그래서 뜬 뒤 4분(keepalive 180초에 여유)은 기록이 없어도 끊겼는지 알 수 없다.
+
+**판정은 문항의 시작과 끝에서 연결을 보고(`ControlPlaneConnection`), 통과하지 못한 문항에만 적용한다.** 둘 중 하나라도 끊겼으면 까닭을 `ENVIRONMENT` 로 바꾼다.
+
+- 시작에서도 보는 까닭: 끊긴 채 시작해 문항 상한(10~15분) 안에 다시 연결된 문항을 놓치지 않으려는 것이다.
+- 서버가 뜬 지 4분이 안 돼 알 수 없으면 시작은 살아 있다고 보고, 끝에서는 4분이 될 때까지 그 profile 의 요청을 기다린 뒤 판정한다. 배포 뒤 확인은 이 구간에 돌므로, 기다리지 않으면 정상 연결의 실패까지 환경 오류가 된다.
+- 시작 확인이 안전한 까닭: 공유 gateway 는 profile 의 MCP 서버에 실행 전부터 연결해 keepalive 를 보낸다. 2026-11-24 운영에서 평가 profile 의 연결은 실행과 상관없이 끊기고(parked) 되살아났다. 서버가 막 뜬 동안은 시작을 판정하지 않는다.
+- 평가 비서가 없어 Hermes 를 부르지 않은 실패는 연결과 상관없어 판정하지 않는다.
+- 한계: Control Plane 재기동 없이 Hermes 쪽에서만 끊기면 마지막 요청 뒤 10분 동안은 살아 있다고 본다.
+- 한계: 배포가 `/mcp` 인증을 깨는 회귀(401, 403)도 요청 기록이 없어 같은 환경 오류가 된다. 그래서 알림과 화면은 「품질 문제가 아니다」 라고 단정하지 않고 「연결이 없었다. 연결 문제(배포 직후라면 Control Plane 회귀일 수 있음)부터 보라」 고 적는다.
+- 한계: 재기동 때 이미 쉬던 연결이 4분을 기다리는 사이 Hermes 의 5분 주기 재시도로 되살아나면, 도구 없이 돈 문항이 품질 실패로 남는다.
+
+| 대상 | 처리 |
+| --- | --- |
+| 배포 뒤 확인의 기능 | `FAILED`, 까닭 `ENVIRONMENT`. 다음 기능은 그대로 돈다. 실패 알림 본문은 규칙 미달 기능과 환경 오류 기능을 나눠 적는다 |
+| 평가 문항 | `FAILED`, 까닭 `ENVIRONMENT`, `failures` 는 비운다. 그래서 묶음 결과의 `errors` 로 센다. 남은 문항은 보내지 않고 같은 까닭으로 적는다. 연결이 끊긴 채 보내면 모델 호출만 쓰고 같은 실패가 되풀이된다 |
+| 통과한 기능과 문항 | 그대로 둔다 |
+| 관리자 API | 확인과 평가의 응답에 `environmentError`(통과하지 못한 결과가 있고 모두 까닭이 `ENVIRONMENT` 인가)를 더한다. 규칙 미달과 섞이면 거짓이다. `status` 는 바꾸지 않는다. 파이프라인과 스크립트가 `PASSED`, `FAILED` 만 기다리므로 새 상태를 만들면 그쪽이 끝을 알아채지 못한다 |
+| 품질 화면 | 실패가 모두 환경 오류면 확인 줄의 결과 표시를 「환경 오류」(경고 색)로, 규칙 미달과 섞이면 「실패(일부 환경 오류)」(실패 색)로 그린다. 기능 줄에 그 까닭을 보인다 |
 
 ## 실패와 일관성
 
 | 상황 | 처리 |
 | --- | --- |
+| 평가 비서의 Control Plane MCP 연결이 끊김 | 위 「평가 환경 오류」 |
 | 확인을 두 번 시작 | 도는 `DEPLOY_CHECK` 를 그대로 돌려준다. 시작은 평가 사용자 행 잠금(`AppUserRepository.findByIdForUpdate`) 안에서 `RUNNING` 인 `DEPLOY_CHECK` 를 찾아 하나만 만든다(「실행기 구현 메모」) |
 | `USER_BUSY`, `CONVERSATION_BUSY` | 평가 전용 사용자는 실행기만 쓰므로 정상이면 일어나지 않는다. 일어나면 그 기능을 `FAILED`, 까닭 `BUSY` 로 적는다 |
 | Hermes 연결 실패, 시간 초과, 실행 실패 | 그 기능 `FAILED`, 까닭은 실행 줄의 오류 종류를 고정 코드로 옮긴다 |
@@ -262,10 +297,11 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | --- | --- |
 | `id` | 묶음 안에서 유일 |
 | `turns[]` | 차례. 각 차례는 `text`(보낼 글), 선택 `attachment`(리소스 사진 이름), 선택 `card`(`approve`, `reject`, `leave`) |
-| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
+| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`, `delegate`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
 | `keepConversation` | 통과해도 대화를 30일 남긴다. 답변 품질의 사람 비교 문항(스펙 DECISION38) |
 
 옛 `questions.json` 의 문항은 `messages` 를 `turns` 로 바꿔 그대로 옮긴다. 「답변 품질」 묶음은 `timeoutMinutes` 15, `pass` `answer-quality` 이고, 「서비스 개념」 묶음은 `ratio` 0.85 다.
+「어려운 답변」 묶음(`answer-hard`)은 여러 단계 조사, 조건이 많은 계획, 변화 추적, 모호한 질문, 맡기기, 긴 답 구조를 고루 묻는다(사용자 결정 2026-11-24). 답변 품질 묶음처럼 `external` 이고 모든 문항이 대화를 남긴다. 조사와 위임이 길어 `timeoutMinutes` 는 20 이다. 채점은 `answer/run.ts score-eval --bundle answer-hard` 가 같은 폴더의 `hard-questions.json` 으로 하고, 출처, 링크, 형식은 답변 품질과 같은 규칙으로, 맡기기 문항은 위임했는지(`delegate`)로 본다. 정답 글자를 심지 않고 모든 문항을 사람 비교로 ChatGPT 와 나란히 본다. 맡기기 문항은 `{otherAgentName}` 자리를 써서 `send` 로는 돌리지 않는다.
 문항의 자리(`{otherAgentCode}`, `{otherAgentName}`, `{connectorId}`, `{connectorTitle}`)는 실행기가 평가 사용자의 위임 대상 에이전트와, 그룹 카탈로그에서 평가 사용자가 연결하지 않은 첫 플러그인으로 채운다. 값이 없으면 그 문항은 「건너뜀」 이고 분모에서 빠진다(스펙 DECISION35).
 
 ### 평가 한 번의 흐름
@@ -284,7 +320,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 
 차례마다 `send` 가 돌아온 뒤 그 대화의 `connector_action` 가운데 이번 차례가 만든 `PENDING` 줄을 찾는다(`DeployCheckObserver` 가 이미 읽는 조회). `card` 가 `approve` 면 `ConnectorActionService.approve(평가 사용자, actionId, null, false)`, `reject` 면 `reject` 를 부른다. 화면 단추와 같은 서비스다(`ConnectorActionController`). 원고 저장 승인처럼 다른 길로 가는 줄은 평가 문항에 쓰지 않는다.
 `card` 를 적지 않았는데 카드가 뜨면 `leave` 로 본다. 남긴 카드는 판정 직후, 대화를 지우기 전에 거절한다(스펙 REQ16).
-카드를 누르면 결과가 대화로 가고 에이전트가 한 번 더 돌 수 있다(`ConnectorActionListener`, `NextTurnDispatcher`). 그래서 다음 차례는 위임과 같은 끝남 조건(대화에 도는 turn 이 없고 `ChatService.deliveryStates` 의 전달이 끝남)을 기다린 뒤 보낸다. 이 기다림도 문항 상한 안이다. 판정은 문항의 모든 루트 실행 트리와 마지막 답을 본다. `expect.cardStatus` 는 마지막으로 누른 줄의 상태를 본다.
+카드를 누르면 결과가 대화로 가고 에이전트가 한 번 더 돌 수 있다(`ConnectorActionListener`, `NextTurnDispatcher`). 그래서 다음 차례는 위임과 같은 끝남 조건(대화에 도는 turn 이 없고, 전할 결과를 모두 전했고, 도는 전달 묶음이 없음)을 기다린 뒤 보낸다. 이 기다림도 문항 상한 안이다. 판정은 문항의 모든 루트 실행 트리와 마지막 답을 본다. `expect.cardStatus` 는 마지막으로 누른 줄의 상태를 본다.
 카드 줄이 원고 저장 승인(`ContentDraftSaveApproval.select` 가 고르는 줄)이면 누르지 않고 그 문항을 `FAILED`, 까닭 `CARD_FAILED` 로 적는다. 화면은 그 줄을 다른 길로 승인하기 때문이다.
 
 ### 판정
@@ -300,7 +336,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | 칸 | `EVAL` 에서 |
 | --- | --- |
 | `kind`, `trigger_type` | `EVAL`, `ADMIN`. PR2b 가 `SCHEDULED` 를 더한다 |
-| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(판정까지 가지 못한 문항 수: 시간 초과, 보내기 거절, 한도 거절, 카드 실패, 답 없음, 평가가 멈춰 돌지 못함(`NOT_RUN`). 이 수가 하나라도 있으면 묶음은 비율을 넘어도 통과가 아니다. 옛 평가가 보내기·읽기 오류를 「오류」 로 따로 둔 것과 같은 뜻이고, 카드 실패도 문항이 판정까지 가지 못한 것이라 같이 센다). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`, `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
+| `result_json` | `{tier, bundles[], items[], cleaned}`. `bundles` 는 묶음마다 `id`, `status`, `passed`, `ran`, `skipped`, `errors`(판정까지 가지 못한 문항 수: 시간 초과, 보내기 거절, 한도 거절, 카드 실패, 답 없음, 평가가 멈춰 돌지 못함(`NOT_RUN`). 이 수가 하나라도 있으면 묶음은 비율을 넘어도 통과가 아니다. 옛 평가가 보내기·읽기 오류를 「오류」 로 따로 둔 것과 같은 뜻이고, 카드 실패도 문항이 판정까지 가지 못한 것이라 같이 센다). `items` 는 문항마다 `bundle`, `question`, `status`(`RUNNING`, `PASSED`, `FAILED`, `TIMED_OUT`, `SKIPPED`), `reasonCode`(평가 환경 오류면 `ENVIRONMENT`), `failures`(규칙 미달의 고정 코드와 대상), `elapsedMs`, `startedAt`, `conversationId`(비우기용 내부 번호, 시작 때 적는다), `conversationPublicId` 와 `executionIds`(실패나 `keep` 만, 30일), `keep`. `cleaned` 는 모든 문항이 만든 것을 지웠는지다. 답변 품질의 규칙 숫자는 그 묶음 PR 이 더한다 |
 
 `result_json` 의 모양이 `kind` 마다 다르다. 지금 `QualityRun.results` 는 `FeatureResultsConverter` 로 `List<FeatureResult>` 에 묶여 있고 JPA 변환기는 `kind` 를 보지 못한다. 그래서 엔티티 칸을 JSON 문자열로 두고, `kind` 별 읽기·쓰기는 domain 의 codec 두 개(지금 `FeatureResultsConverter` 를 JPA 변환기에서 정적 codec 으로 바꾼 것과 새 `EvalResult` codec)가 한다. 지금 변환기처럼 codec 안의 정적 `JsonMapper` 를 쓴다. 엔티티는 `kind` 가 맞지 않는 읽기·쓰기를 거절한다. `item_count` 는 `EVAL` 에서 고른 문항 수이고 PR1 의 `record` 처럼 결과 수로 덮지 않는다. 답 본문과 질문 본문은 담지 않는다.
 
@@ -332,7 +368,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | `GET /api/v1/admin/quality/eval-bundles` | 묶음 목록(`id`, `title`, 문항 수, 상한) |
 | `POST /api/v1/admin/quality/evals` | 본문 `{bundles: [id...], tier}`. `bundles` 가 비면 전체, `tier` 가 없으면 평가 사용자에게 걸리는 기본 단계(스펙 DECISION41). 202 와 새 줄. 도는 평가가 있으면 새로 만들지 않고 200 과 그 줄(PR1 의 확인 시작과 같다). 화면과 스크립트는 200 이면 「평가가 돌고 있다」 를 보인다. 평가 전용 사용자가 없으면 409 `EVALUATION_USER_MISSING`, 기본 에이전트가 없어 준비가 덜 됐으면 409 `EVALUATION_USER_NOT_READY`. 없는 묶음 id 는 400 `QUALITY_EVAL_BUNDLE_UNKNOWN`, 모르는 단계는 400 |
 | `GET /api/v1/admin/quality/evals?cursor=` | 최근 순 목록. 품질 화면 둘째 칸 |
-| `GET /api/v1/admin/quality/evals/{publicId}` | 한 줄과 묶음 결과, 문항 결과 |
+| `GET /api/v1/admin/quality/evals/{publicId}` | 한 줄과 묶음 결과, 문항 결과. `environmentError` 는 PR1 의 확인과 같은 뜻이다(「평가 환경 오류」) |
 | `GET /api/v1/admin/quality/conversations/{publicId}/messages` | 평가 사용자의 대화만 연다. 남겨 둔 실패 대화와 사람 비교 문항의 답을 관리자가 읽는다. 다른 사용자의 대화는 404 다(PR1 의 트리 조회와 같은 이유, 이 문서 DECISION8) |
 
 ### 화면
@@ -400,6 +436,7 @@ PR1 의 표를 그대로 쓴다. 새 칸은 없다.
 | DECISION11 | 만든 것을 가리는 방법 | 문항의 대화 번호로 찾는다. 예약 작업은 `task.conversation_id`, 기억은 `memory_capture`, 할 일과 승인 줄은 `conversation_id` 다. 위임 자식이 만든 예약 작업만 대화 칸이 비어 문항 시간 범위와 배포 뒤 확인의 고정 지시문으로 가린다. PR1 의 기억 지우기도 대화 방식으로 바꾼다 | 작성자 | 문항마다 대화가 새로 생겨 대화 번호가 문항을 정확히 가린다. 시각 비교는 함께 도는 배포 뒤 확인의 것을 지우고 고친 기억을 놓친다 |
 | DECISION12 | 출처 링크를 여는 곳 | Control Plane 이 공개 IP 에 고정한 연결로만 연다. 그림 받기 두 곳의 공개 주소 읽기를 `shared` 로 꺼내 함께 쓴다 | 작성자 | 실행기가 Control Plane 안이라 서버가 열어야 한다. 모델이 쓴 주소를 서버가 열면 내부 주소로 갈 수 있어, 이미 검증한 판정과 IP 고정 연결을 다시 쓴다 |
 | DECISION13 | 코디네이터가 평가를 부르는 길 | 관리자 토큰으로 관리자 API 를 부르는 `scripts/dev/run-eval.ts`(`scripts/README.md` 의 폴더 규칙) | 작성자 | 기존 관리자 토큰 경계(DECISION4)를 그대로 쓰고, 기능 완료 증거에 붙일 결과를 한 명령으로 낸다 |
+| DECISION14 | 평가 환경 오류를 아는 방법 | Control Plane 이 profile 마다 받은 `/mcp` 요청 시각을 메모리에 두고, 통과하지 못한 기능과 문항의 시작이나 끝에서 10분 안의 요청이 없었으면 환경 오류로 본다. Control Plane 이 뜬 뒤 4분 안이면 끝의 판정은 4분까지 요청을 기다린다 | 작성자 | Hermes 의 MCP 연결 상태를 읽는 공개 API 가 없다. keepalive 와 재연결이 늘 `/mcp` 로 오므로 추가 호출 없이 판단한다. 실행 사건에 Control Plane 도구가 없는 것으로 보면 모델이 도구를 고르지 않은 품질 실패와 구분하지 못한다. 시작 전 점검 문항은 모델 호출을 더 쓴다. 공유 gateway 가 profile 의 MCP 서버에 실행 전부터 연결하므로 문항 시작의 확인도 쓸 수 있다 |
 
 ## 결정 기록 연결
 

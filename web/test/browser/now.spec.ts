@@ -4,7 +4,7 @@ import { isoToSeoulInput } from "../../src/lib/attention.ts";
 import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET } from "./settings.ts";
 
-import { clearPrimary, clickAndWaitForResponse, expectStartAgent, usePrimary } from "./helpers.ts";
+import { clearPrimary, clickAndWaitForResponse, waitForStartComposer, usePrimary } from "./helpers.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 // 할 일 동작 뒤에는 router.refresh() 가 서버 화면을 다시 받아야 바뀐다. CI 부하 아래에서는 기본 대기 5초를 넘은 적이 있다.
@@ -573,9 +573,7 @@ test.describe("지금 화면", () => {
       const composer = page.getByTestId("composer-shell");
       await expect(composer).toBeVisible();
       await expect(page.getByTestId("attention-line")).toHaveCount(0);
-      // 에이전트를 읽는 동안의 뼈대가 한 줄로 바뀌며 입력창이 움직인 값을 기준으로 삼지 않는다.
-      await expectStartAgent(page, "장보기 비서");
-      await expect(page.getByRole("status", { name: "에이전트를 읽는 중" })).toHaveCount(0);
+      await waitForStartComposer(page);
       const before = (await composer.boundingBox())?.y;
       expect(before, "입력창의 자리를 읽지 못했다").toBeDefined();
 

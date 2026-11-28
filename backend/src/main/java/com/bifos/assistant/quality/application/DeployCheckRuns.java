@@ -23,8 +23,10 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -140,9 +142,7 @@ public class DeployCheckRuns {
 
     /** 본문은 실패한 기능 이름만 담는다. 모델이 쓴 글과 대화 내용은 넣지 않는다. */
     private void notifyAdmins(QualityRun run, List<FeatureResult> failed) {
-        String body = failed.isEmpty()
-            ? "확인한 기능이 없어요."
-            : failed.stream().map(result -> featureLabel(result.feature())).collect(Collectors.joining(", ")) + " 확인이 통과하지 못했어요.";
+        String body = failed.isEmpty() ? "확인한 기능이 없어요." : failedBody(failed);
         NotificationTarget target = new NotificationTarget(NotificationTargetType.ADMIN_QUALITY, null);
         for (AppUser admin : users.findByGroupIdAndRole(run.groupId(), UserRole.ADMIN)) {
             if (signInPolicy.revoked(admin.email())) {
@@ -150,6 +150,29 @@ public class DeployCheckRuns {
             }
             notifications.notify(admin.id(), NotificationKind.QUALITY_CHECK_FAILED, FAILED_TITLE, body, target, run.publicId());
         }
+    }
+
+
+    /**
+     * 실패한 기능을 규칙 미달과 환경 오류로 나눠 적는다. 환경 오류는 평가 비서의 Control Plane 연결이 없었다는 사실만 말하고 품질 문제가 아니라고 단정하지 않는다.
+     * 배포가 {@code /mcp} 인증을 깬 회귀도 같은 모습이기 때문이다.
+     */
+    static String failedBody(List<FeatureResult> failed) {
+        Map<Boolean, List<FeatureResult>> split = failed.stream()
+            .collect(Collectors.partitioningBy(result -> CheckReason.ENVIRONMENT.name().equals(result.reasonCode())));
+        List<String> sentences = new ArrayList<>();
+        if (!split.get(false).isEmpty()) {
+            sentences.add(labels(split.get(false)) + " 확인이 통과하지 못했어요.");
+        }
+        if (!split.get(true).isEmpty()) {
+            sentences.add(labels(split.get(true)) + " 확인은 평가 비서의 Control Plane 연결이 없었어요. 연결 문제(배포 직후라면 Control Plane 회귀일 수 있음)부터 보세요.");
+        }
+        return String.join(" ", sentences);
+    }
+
+
+    private static String labels(List<FeatureResult> results) {
+        return results.stream().map(result -> featureLabel(result.feature())).collect(Collectors.joining(", "));
     }
 
 
@@ -163,6 +186,7 @@ public class DeployCheckRuns {
             case MEMORY_READ -> "기억 읽기";
             case TASK_FIRE -> "예약 작업 발화";
             case PHOTO_INSPECT -> "원본 사진 조회";
+            case TOOL_DISCOVERY -> "도구 찾기";
         };
     }
 }

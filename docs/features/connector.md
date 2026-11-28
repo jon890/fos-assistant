@@ -2,7 +2,7 @@
 
 사용자가 플러그인에 계정을 연결하고 그 연결을 에이전트에 붙이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
+covers: `connectors/career/plugin/`, `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
 
 ## 도구 이름과 요약
 
@@ -120,7 +120,7 @@ READ 데이터의 인터넷 전파 위험은 [플러그인 도구 정책](connec
 | 연결됐고 쓰는 에이전트가 없다. 또는 `?agent=<번호>` 의 에이전트에 아직 붙지 않았다 | 이 서비스를 쓸 에이전트 |
 | 「붙인 에이전트」 의 「쓸 에이전트 고르기」 나 「다른 에이전트에도 붙이기」 를 눌렀다 | 같다 |
 
-- 후보는 내 에이전트다. 순서는 `?agent=` 의 에이전트, 붙일 수 있는 것, 이미 붙은 것, 그룹 공개 순서다
+- 후보는 기본 비서를 뺀 내 에이전트다. 연결은 전문 에이전트에만 붙인다([비서 중심 대화](assistant-hub.md) 의 「연결은 전문 에이전트에만」). 순서는 `?agent=` 의 에이전트, 붙일 수 있는 것, 이미 붙은 것, 그룹 공개 순서다
 - 그룹 공개 에이전트는 단추 대신 나만 쓰는 에이전트로 바꾸면 붙일 수 있다고 안내한다
 - 붙일 수 있는 에이전트가 없으면 「에이전트 만들기」(`/agents?new=1`)를 둔다. 「나중에」 는 영역을 닫는다
 - 「이 에이전트에서 쓰기」 는 그 에이전트의 도구를 먼저 읽는다. 셸, 파일, 코드 실행 도구가 켜졌거나 도구를 읽지 못했으면 에이전트 화면과 같은 확인 창을 거치고, 아니면 바로 붙인다
@@ -239,6 +239,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | --- | --- |
 | 이미 붙어 있다 | 지금 상태를 돌려준다 |
 | 읽을 수 없는 에이전트다. 읽을 수 있어도 주인이 아니다 | `AGENT_NOT_FOUND`, `FORBIDDEN` |
+| 화면의 붙이기이고 그 에이전트가 요청자의 기본 비서다 | `PRIMARY_AGENT_NO_CONNECTIONS`. 전문 에이전트 만들기가 실패해 비서에서 뗀 연결을 되돌려 붙이는 길은 막지 않는다 |
 | 에이전트가 `PRIVATE` 가 아니다 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE` |
 | 내 연결이 `READY` 가 아니거나 값이 보관 파일에 없다 | `CONNECTOR_NOT_CONNECTED` |
 | 플러그인이 카탈로그에 없다 | `CONNECTOR_NOT_FOUND` |
@@ -605,3 +606,11 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 | `POST /api/v1/admin/secrets/connector-oauth/signing/regenerate` | 비밀을 새로 만들고 단추 연결마다 새 통로 주소를 다시 쓴다. 바뀐 상태(`signing`)와 다시 쓴 결과(`rewrite.total`, `rewrite.failed`)를 준다 |
 
 새로 만들면 옛 표식은 바로 401 이다. 바인딩을 다시 설치하지 않으며, 떠 있는 플러그인 프로세스는 다음 프로세스부터 새 주소를 받는다. 응답에 원문과 통로 주소는 없다.
+
+## 커리어 플러그인 이전 설계
+
+커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. 현재 이 모듈에는 GitHub 연동과 공통 오류 처리가 있다. 설치에는 기존 패키지를 쓴다.
+
+후속 단계에서 조립할 설치본에는 기존 ID `fos-career`, 버전 `0.14.1`, MCP 서버와 로컬 실행기, 에이전트 스킬이 함께 들어간다. 기존 `connector.json`은 같은 내용을 담은 `assistant.json`으로 옮긴다. Bun과 패키지 전용 잠금 파일로 두 실행 파일을 빌드한다. CI는 변경 경로에 맞춰 대역 테스트와 타입 검사를 실행한다. 설치본만으로 실행되는지는 두 실행 파일을 조립하는 단계에서 검증한다.
+
+GitHub 연동부터 테스트와 함께 옮긴다. 이어서 공고 조회와 MCP 서버, 로컬 실행기가 사용하는 명령 모듈을 각각 검증한 뒤 설치본을 조립한다. 운영 목록의 설치 경로는 두 실행 파일과 스킬 검증이 끝난 뒤 전환한다. 노트북 사용량 수집기와 월별 집계는 별도로 옮긴다. 서비스의 동작 계약과 유효한 설계 결정은 해당 코드와 함께 문서에 남긴다. 운영 주소와 계정은 운영 저장소에서 관리한다. 테스트에는 가상 지원 자료를 쓴다.

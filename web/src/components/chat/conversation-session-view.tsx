@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useReplyTarget } from "./use-reply-target";
 import { Composer } from "./composer";
 import { ConversationHeader } from "./conversation-header";
-import {
-  StartAgentTag,
-  StartScreenHeader,
-  StarterPrompts,
-} from "./start-screen";
+import { StartScreenHeader, StarterPrompts } from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
 import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
@@ -82,6 +78,7 @@ export function ConversationSessionView({
   startScreen,
   skillCommandsEnabled,
   skillNames,
+  skillDescriptions,
   starters,
 }: Props) {
   const { replyTo, replyRef, setReplyTo } = useReplyTarget();
@@ -123,14 +120,7 @@ export function ConversationSessionView({
     <section className="relative flex h-full min-h-0 min-w-0">
       {startScreen ? null : <h1 className="sr-only">대화</h1>}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {startScreen ? (
-          <StartAgentTag
-            agents={agents}
-            loading={agentsLoading}
-            agentsError={agentsError}
-            selectedCode={agentCode}
-          />
-        ) : (
+        {!startScreen && (
           <ConversationHeader
             answerAgent={answerAgent}
             agentLocked={agentLocked}
@@ -340,6 +330,7 @@ export function ConversationSessionView({
                   void stop();
                 }}
                 skillNames={skillNames}
+                skillDescriptions={skillDescriptions}
                 onBlockingChange={setComposerBlocking}
                 modelChoiceUnknown={
                   conversationId !== null && currentConversation === undefined

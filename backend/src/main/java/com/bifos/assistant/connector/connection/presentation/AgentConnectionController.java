@@ -1,8 +1,14 @@
 package com.bifos.assistant.connector.connection.presentation;
 
+import com.bifos.assistant.agent.application.PrimaryAgents;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.presentation.ConnectionDtos.AgentConnectionResponse;
+import com.bifos.assistant.connector.connection.application.dto.AgentConnectionsView;
 import com.bifos.assistant.connector.connection.presentation.ConnectionDtos.AgentConnectionsResponse;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,19 +31,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AgentConnectionController {
     private final ConnectorBindingService bindings;
+    private final PrimaryAgents primaryAgents;
     private final CurrentUserProvider currentUser;
 
 
     @GetMapping("/{code}/connections")
     public AgentConnectionsResponse list(@PathVariable String code) {
-        return AgentConnectionsResponse.from(bindings.listForAgent(currentUser.require(), code));
+        CurrentUser user = currentUser.require();
+        AgentConnectionsView view = bindings.listForAgent(user, code);
+        return AgentConnectionsResponse.from(
+            isPrimary(user, code) ? new AgentConnectionsView(view.connections(), AgentConnectionsView.PRIMARY_AGENT) : view);
     }
 
 
-    /** 이미 붙어 있으면 지금 상태를 돌려준다. 붙인 바인딩은 관리자 반영 완료 전까지 재시작 대기다. */
+    /** 이미 붙어 있으면 지금 상태를 돌려준다. 붙인 바인딩은 관리자 반영 완료 전까지 재시작 대기다. 기본 비서에는 붙이지 않는다. */
     @PutMapping("/{code}/connections/{connectorId}")
     public AgentConnectionResponse bind(@PathVariable String code, @PathVariable String connectorId) {
-        return AgentConnectionResponse.from(bindings.bind(currentUser.require(), code, connectorId));
+        CurrentUser user = currentUser.require();
+        if (isPrimary(user, code)) {
+            throw new ApiException(ErrorCode.PRIMARY_AGENT_NO_CONNECTIONS, "connections are attached to specialist agents only");
+        }
+        return AgentConnectionResponse.from(bindings.bind(user, code, connectorId));
     }
 
 
@@ -45,5 +59,14 @@ public class AgentConnectionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unbind(@PathVariable String code, @PathVariable String connectorId) {
         bindings.unbind(currentUser.require(), code, connectorId);
+    }
+
+
+    /**
+     * 기본 비서에는 화면에서 연결을 붙이지 않는다(docs/features/assistant-hub/spec.md 의 REQ9, DECISION7). {@code bind} 자체는 막지 않는다.
+     * 전문 에이전트 만들기가 실패해 비서에서 뗀 연결을 되돌려 붙일 때 쓰기 때문이다. 떼기는 막지 않는다.
+     */
+    private boolean isPrimary(CurrentUser user, String code) {
+        return primaryAgents.of(user).map(Agent::code).filter(code::equals).isPresent();
     }
 }

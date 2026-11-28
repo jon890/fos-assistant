@@ -281,7 +281,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 `ProactiveCheckRecovery` 가 `RUNNING` 줄을 `FAILED`, `INTERRUPTED` 로 적고 그 트리의 위임 결과를 전했다고 적는다. 대화에는 알림 줄을 남기지 않는다.
 이 복구는 기동 정리([`docs/features/chat.md`](chat.md) 의 「기동할 때 남은 실행 정리」)보다 먼저 돈다. 그래야 기동 정리가 끝낸 위임 자식이 점검 대화에 읽기 경계 밖의 자동 turn 을 열지 않는다.
 기동 정리가 다시 붙어 끝낸 살펴보기 turn 의 답은 검사하지 않은 글이라 남기지 않고 알림 줄 하나만 남긴다.
-기동 때는 이 서버가 돌리는 위임이 없으므로 run 번호가 있는 자식에 Hermes 중지를 보낸다. 다시 붙는 루트 turn 은 멈추지 않으며 `hermes.run-timeout` 까지 돌 수 있다.
+기동 때는 이 서버가 돌리는 위임이 없으므로 run 번호가 있는 자식에 Hermes 중지를 보낸다. 다시 붙는 루트 turn 은 멈추지 않으며 기동 정리가 사람이 없는 루트에 쓰는 상한(`hermes.background-run-timeout`)까지 돌 수 있다([`docs/features/execution.md`](execution.md) 의 「실행 한도」).
 
 ### 비용과 효과
 

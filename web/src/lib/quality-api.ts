@@ -14,7 +14,10 @@ export type QualityFeatureResult = {
   executionIds: number[];
 };
 
-/** 배포 뒤 확인 한 번이다. 도는 동안 `finishedAt` 과 `elapsedMs` 는 null 이다. */
+/**
+ * 배포 뒤 확인 한 번이다. 도는 동안 `finishedAt` 과 `elapsedMs` 는 null 이다.
+ * `environmentError` 는 통과하지 못한 기능이 모두 평가 비서의 Control Plane 연결이 없던 환경 오류라는 뜻이다. 규칙 미달과 섞이면 거짓이다.
+ */
 export type QualityCheck = {
   publicId: string;
   trigger: "PIPELINE" | "ADMIN";
@@ -25,6 +28,7 @@ export type QualityCheck = {
   itemCount: number;
   modelCallCount: number;
   results: QualityFeatureResult[];
+  environmentError: boolean;
 };
 
 export type QualityCheckPage = {
@@ -48,6 +52,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   MEMORY_READ: "기억 읽기",
   TASK_FIRE: "예약 작업 발화",
   PHOTO_INSPECT: "원본 사진 조회",
+  TOOL_DISCOVERY: "도구 찾기",
 };
 
 /** 통과하지 못한 까닭이다. 모르는 코드는 코드를 그대로 보인다. 관리자 화면이라 내부 코드를 보여도 된다. */
@@ -69,6 +74,10 @@ export const REASON_LABELS: Record<string, string> = {
   TASK_NOT_SUCCEEDED: "예약 작업 발화가 성공하지 못했어요",
   NO_INSPECT: "원본 사진 조회 도구가 끝나지 않았어요",
   MARKER_MISSING: "사진의 글자가 답에 없어요",
+  NO_TOOL:
+    "도구 이름을 적지 않은 질문에서 Control Plane 도구를 찾아 부르지 않았어요",
+  ENVIRONMENT:
+    "평가 비서의 Control Plane 연결이 없었어요. 연결 문제(배포 직후라면 Control Plane 회귀일 수 있음)부터 보세요",
 };
 
 /** 평가 사용자 준비에서 빠진 것이다. */

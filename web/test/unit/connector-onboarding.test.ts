@@ -34,6 +34,25 @@ test("남의 에이전트는 후보에서 뺀다", () => {
   );
 });
 
+test("기본 비서는 비서에 이미 붙은 연결이라도 후보에서 뺀다(스펙 assistant-hub REQ9)", () => {
+  const choices = agentChoices(
+    [agent("chief", { primary: true }), agent("shopper")],
+    [
+      {
+        agentCode: "chief",
+        agentName: "chief 비서",
+        status: "READY" as const,
+        restartRequired: false,
+      },
+    ],
+    "chief",
+  );
+  assert.deepEqual(
+    choices.map((choice) => choice.code),
+    ["shopper"],
+  );
+});
+
 test("붙일 수 있는 것, 붙은 것, 그룹 공개 순서로 두고 보던 에이전트를 맨 앞에 둔다", () => {
   const agents = [
     agent("group", { visibility: "GROUP" }),

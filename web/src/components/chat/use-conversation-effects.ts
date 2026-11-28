@@ -9,6 +9,7 @@ import { receiveDelegation } from "@/lib/delegation";
 import { applySteerEvent } from "./steer";
 import {
   applyDelegationActivity,
+  applyDelegationName,
   routeDelegationActivity,
 } from "./activity/activity-delegation";
 import { parseLiveImages } from "./artifact/live-images";
@@ -60,6 +61,8 @@ export function useConversationEffects({
   stop,
 }: Context) {
   const liveImageRequest = useRef(0);
+  /** 맡기기 도구 줄에 이름을 붙인 맡긴 실행이다. 같은 맡김의 상태 줄이 다시 와도 다른 도구 줄에 붙이지 않는다 */
+  const namedDelegations = useRef(new Set<number>());
 
   /**
    * 아직 답에 묶이지 않은 그림 목록을 저장한 순서대로 다시 읽는다. 늦게 온 앞 요청의 응답은 버린다.
@@ -146,10 +149,23 @@ export function useConversationEffects({
             // 맡긴 줄도 보류하지 않는다. 위임은 보낸 turn 이 도는 중에 시작하고, 끝난 줄은 이력이 아직 모른다.
             if (event.type === "delegation") {
               const line = event.delegation;
-              if (line)
+              if (line) {
                 setLiveDelegations((previous) =>
                   receiveDelegation(previous, line),
                 );
+                // 도는 답이 맡긴 첫 줄이면 그 답의 맡기기 도구 줄에 맡은 에이전트 이름을 붙인다.
+                if (
+                  line.parentExecutionId === currentExecutionId.current &&
+                  !namedDelegations.current.has(line.executionId)
+                ) {
+                  namedDelegations.current.add(line.executionId);
+                  setActivity(
+                    (previous) =>
+                      previous &&
+                      applyDelegationName(previous, line.agent?.name),
+                  );
+                }
+              }
               return;
             }
             return runConversationTask(() => applyConversationEvent(id, event));

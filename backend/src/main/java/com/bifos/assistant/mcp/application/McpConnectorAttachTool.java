@@ -16,7 +16,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 에이전트가 요청자의 연결을 지금 에이전트에 붙여 달라고 청하는 MCP 도구다(스펙 service-concepts REQ15). 붙이지 않고 승인 카드만 띄운다.
  *
- * <p>붙일 에이전트는 인자가 아니라 origin 실행의 에이전트다. 하지 못했으면 {@code isError} 와 까닭이고, 예외가 나도 turn 을 막지 않는다.
+ * <p>붙일 에이전트는 인자가 아니라 승인할 때 새로 만드는 전문 에이전트다(비서 중심 대화 스펙 REQ9). 하지 못했으면 {@code isError} 와 까닭이고,
+ * 예외가 나도 turn 을 막지 않는다.
  */
 @Slf4j
 @Service
@@ -44,9 +45,10 @@ public class McpConnectorAttachTool {
     public Map<String, Object> attach(McpCaller caller, String connectorId) {
         try {
             var origin = caller.originExecution();
-            Map<String, Object> body = requests.request(caller.user(), origin.id(), origin.agentId(), connectorId);
+            Map<String, Object> body = requests.request(caller.user(), origin.id(), connectorId);
             String status = String.valueOf(body.get("status"));
-            if (ConnectorAttachRequests.REQUESTED.equals(status) || ConnectorAttachRequests.ALREADY_ATTACHED.equals(status)) {
+            if (ConnectorAttachRequests.REQUESTED.equals(status) || ConnectorAttachRequests.ALREADY_ATTACHED.equals(status)
+                || ConnectorAttachRequests.SPECIALIST_ATTACHED.equals(status)) {
                 return McpToolService.success(JSON.writeValueAsString(body));
             }
             return McpToolService.jsonFailure(body, nextFor(status));
@@ -76,12 +78,13 @@ public class McpConnectorAttachTool {
         return Map.of(
             "name", NAME,
             "description",
-            "사용자가 이미 연결한 외부 서비스를 지금 이 에이전트에서 쓰게 해 달라고 하거나(「○○ 여기서 쓰게 해 줘」), 연결 화면에서 "
-                + "연결을 마쳤다고 하면 「이 에이전트에 붙이기」 승인 카드를 띄운다. connector 는 connector_list 의 id 다. "
-                + "connector_list 에서 connected 가 true 이고 thisAgent 가 none 일 때 부른다. connected 가 false 면 부르지 않고 link 로 연결을 안내한다. "
-                + "이 도구는 붙이지 않는다. 사용자가 카드에서 승인해야 붙으므로 붙였다고 말하지 않고 승인 카드에서 승인하면 붙는다고 알린다. "
+            "사용자가 이미 연결한 외부 서비스를 쓰게 해 달라고 하거나(「○○ 쓰게 해 줘」), 연결 화면에서 연결을 마쳤다고 하면 "
+                + "「그 서비스만 맡는 새 전문 에이전트를 만들어 붙이기」 승인 카드를 띄운다. connector 는 connector_list 의 id 다. "
+                + "connected 가 false 면 부르지 않고 link 로 연결을 안내한다. "
+                + "status 가 specialist_attached 면 그 서비스가 붙은 전문 에이전트가 이미 있다. 카드는 없고 agent_code 의 에이전트에게 agent_delegate 로 맡긴다. "
+                + "이 도구는 만들거나 붙이지 않는다. 사용자가 카드에서 승인해야 만들어 붙으므로 했다고 말하지 않고 승인하면 만들어 붙는다고 알린다. "
                 + "isError 면 카드를 띄우지 못한 것이다. message 의 까닭을 알리고 link 가 있으면 그대로 마크다운 링크로 붙인다. "
-                + "떼기와 다른 에이전트에 붙이기는 하지 못한다. /connections 화면을 안내한다.",
+                + "떼기와 이미 있는 다른 에이전트에 붙이기는 하지 못한다. /connections 화면을 안내한다.",
             "inputSchema", schema);
     }
 }

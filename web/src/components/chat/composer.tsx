@@ -27,6 +27,7 @@ export function Composer(props: Props) {
     disabled,
     running,
     skillNames,
+    skillDescriptions,
     value,
     canQueue,
     acceptsAttachments,
@@ -182,6 +183,7 @@ export function Composer(props: Props) {
           <SkillCommandMenu
             id={skillListId}
             names={skillNames}
+            descriptions={skillDescriptions}
             query={skillQuery}
             activeIndex={activeSkillIndex}
             onPick={pickSkill}

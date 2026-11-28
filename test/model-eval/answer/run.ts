@@ -34,15 +34,20 @@ type RunsFile = { version: 1; startedAt: string; label: string; tier: string; ru
 const DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TURN_TIMEOUT_MS = 900000;
 const LINK_TIMEOUT_MS = 15000;
-/** 평가 전용 사용자로 도는 답변 품질 묶음의 id 다(backend/src/main/resources/quality/bundles/answer-quality.json). */
-const ANSWER_BUNDLE = "answer-quality";
+/**
+ * 이 채점기가 맡는 묶음의 id 와 그 문항 파일이다(backend/src/main/resources/quality/bundles/<id>.json).
+ * `send` 와 `score` 는 첫 묶음(answer-quality)만 돌린다. 어려운 답변 묶음은 문항에 위임 대상 자리가 있어 평가 실행기로만 돈다.
+ */
+const BUNDLE_QUESTIONS: Record<string, string> = { "answer-quality": "questions.json", "answer-hard": "hard-questions.json" };
+const DEFAULT_BUNDLE = "answer-quality";
 const USAGE = `사용법:
   node test/model-eval/answer/run.ts send --out <결과 디렉터리> [--question <id>]... [--tier <칸>] [--label <이름표>]
   node test/model-eval/answer/run.ts score --out <결과 디렉터리> [--compare <사람 비교 파일>] [--keep]
-  node test/model-eval/answer/run.ts score-eval --eval <평가 publicId> --out <결과 디렉터리> [--compare <사람 비교 파일>]
+  node test/model-eval/answer/run.ts score-eval --eval <평가 publicId> --out <결과 디렉터리> [--bundle <묶음 id>] [--compare <사람 비교 파일>]
 
 환경 변수: FOS_EVAL_BASE_URL, FOS_EVAL_TOKEN, FOS_EVAL_AGENT_CODE (send 는 셋 모두, score 는 앞의 둘)
-score-eval 은 평가 전용 사용자로 돈 묶음 평가(answer-quality 묶음)의 대화를 관리자 API 로 읽어 같은 기준으로 채점한다.
+score-eval 은 평가 전용 사용자로 돈 묶음 평가의 대화를 관리자 API 로 읽어 같은 기준으로 채점한다.
+  --bundle 은 ${Object.keys(BUNDLE_QUESTIONS).join(", ")} 가운데 하나다. 없으면 ${DEFAULT_BUNDLE} 이다
   FOS_EVAL_BASE_URL 과 관리자의 FOS_EVAL_TOKEN 이 필요하다. 대화는 지우지 않는다(30일 뒤 Control Plane 이 지운다)
 선택: FOS_EVAL_TIER (--tier 가 없을 때), FOS_EVAL_TURN_TIMEOUT_MS
 score 는 통과한 대화를 지운다(사람 비교 문항과 통과하지 못한 문항은 남긴다). --keep 은 모두 남긴다.
@@ -73,8 +78,8 @@ function readJson<T>(file: string): T {
   return JSON.parse(readFileSync(file, "utf8")) as T;
 }
 
-function loadQuestions(ids: string[]): Question[] {
-  const all = readJson<{ questions: Question[] }>(join(DIR, "questions.json")).questions;
+function loadQuestions(ids: string[], bundle = DEFAULT_BUNDLE): Question[] {
+  const all = readJson<{ questions: Question[] }>(join(DIR, BUNDLE_QUESTIONS[bundle])).questions;
   const unknown = ids.filter((id) => !all.some((question) => question.id === id));
   if (unknown.length > 0) throw new UsageError(`없는 문항이다: ${unknown.join(", ")}`);
   return ids.length > 0 ? all.filter((question) => ids.includes(question.id)) : all;
@@ -213,13 +218,19 @@ async function scoreEval(values: Record<string, unknown>): Promise<number> {
   if (!values.eval) throw new UsageError("--eval 이 필요하다");
   const out = resolve(values.out as string);
   mkdirSync(out, { recursive: true });
+  const bundle = (values.bundle as string | undefined) ?? DEFAULT_BUNDLE;
+  if (!Object.hasOwn(BUNDLE_QUESTIONS, bundle)) throw new UsageError(`--bundle 은 ${Object.keys(BUNDLE_QUESTIONS).join(", ")} 가운데 하나여야 한다`);
   const comparisons = loadComparisons(values.compare as string | undefined);
-  const questions = new Map(loadQuestions([]).map((question) => [question.id, question]));
+  const questions = new Map(loadQuestions([], bundle).map((question) => [question.id, question]));
   const api = new ControlPlane(env.FOS_EVAL_BASE_URL, env.FOS_EVAL_TOKEN, turnTimeout());
   const run = await api.evalRun(values.eval as string);
   if (run.status === "RUNNING") throw new UsageError("평가가 아직 돈다. 끝난 뒤 다시 부른다");
-  const items = run.items.filter((item) => item.bundle === ANSWER_BUNDLE);
-  if (items.length === 0) throw new UsageError(`그 평가에 ${ANSWER_BUNDLE} 묶음 문항이 없다`);
+  const inBundle = run.items.filter((item) => item.bundle === bundle);
+  if (inBundle.length === 0) throw new UsageError(`그 평가에 ${bundle} 묶음 문항이 없다`);
+  // 평가 실행기가 자리(예: 위임 대상)를 채우지 못해 건너뛴 문항은 채점과 사람 비교, 세트 분모에서 뺀다(design.md 의 「묶음 파일」, 스펙 DECISION35)
+  const skipped = inBundle.filter((item) => item.status === "SKIPPED");
+  const items = inBundle.filter((item) => item.status !== "SKIPPED");
+  for (const item of skipped) console.log(`${item.question} 건너뜀(평가 실행기가 문항의 자리를 채우지 못했다)`);
   const links = new Map<string, LinkState>();
   const scores: QuestionScore[] = [];
   for (const item of items) {
@@ -244,9 +255,9 @@ async function scoreEval(values: Record<string, unknown>): Promise<number> {
     scores.push(result);
     console.log(`${question.id} ${result.error ? `오류 ${result.error}` : result.passed ? "통과" : "미달"}`);
   }
-  const label = `eval-${run.publicId}`;
+  const label = bundle === DEFAULT_BUNDLE ? `eval-${run.publicId}` : `eval-${run.publicId} ${bundle}`;
   const tier = run.tier ?? "";
-  const set = scoreSet(scores, comparisons, questions.size);
+  const set = scoreSet(scores, comparisons, questions.size - skipped.length);
   writeFileSync(join(out, "report.json"), `${JSON.stringify({ label, tier, set, scores, comparisons }, null, 2)}\n`);
   writeFileSync(join(out, "report.md"), markdown(label, tier, scores, set, comparisons));
   console.log(`세트 결과: ${set.outcome}${set.reasons.length > 0 ? ` (${set.reasons.join("; ")})` : ""}`);
@@ -265,6 +276,7 @@ async function main(): Promise<number> {
       compare: { type: "string" },
       keep: { type: "boolean" },
       eval: { type: "string" },
+      bundle: { type: "string" },
     },
   });
   if (values.help) {
@@ -274,6 +286,7 @@ async function main(): Promise<number> {
   const command = positionals[0];
   if (command !== "send" && command !== "score" && command !== "score-eval") throw new UsageError(`명령은 send, score, score-eval 이다\n\n${USAGE}`);
   if (!values.out) throw new UsageError("--out 이 필요하다");
+  if (values.bundle && command !== "score-eval") throw new UsageError("--bundle 은 score-eval 에만 쓴다");
   if (command === "score-eval") return scoreEval(values);
   return command === "send" ? send(values) : score(values);
 }

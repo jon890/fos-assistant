@@ -6,7 +6,12 @@ import {
 } from "@/components/agent/agent-badge";
 import { useEffect } from "react";
 import { ConversationSessionView } from "./conversation-session-view";
-import { commandSkillNames } from "./skill-command";
+import {
+  commandSkillDescriptions,
+  commandSkillNames,
+  delegationDescriptions,
+  delegationLabels,
+} from "./skill-command";
 import { useStarterSuggestions } from "./use-starter-suggestions";
 import { useShellTitle } from "@/components/shell/app-shell";
 import { fetchCommandSkills } from "@/lib/chat-api";
@@ -22,6 +27,7 @@ import { useConversationRetry } from "./use-conversation-retry";
 import { useConversationControls } from "./use-conversation-controls";
 import { useConversationObservation } from "./use-conversation-observation";
 import { useConversationEffects } from "./use-conversation-effects";
+import { useSkillDelegation } from "./use-skill-delegation";
 
 export function ConversationSession(props: ConversationSessionProps) {
   const state = useConversationSessionState(props);
@@ -86,9 +92,9 @@ export function ConversationSession(props: ConversationSessionProps) {
   const selectedAgent = currentConversation
     ? agentLabel(currentConversation.agentName)
     : agents.find((agent) => agent.code === agentCode)?.name;
-  useShellTitle(selectedAgent ?? null);
   const startScreen =
     freshStart && turns.length === 0 && !sending && outgoing === null;
+  useShellTitle(startScreen ? null : (selectedAgent ?? null));
   const currentAgent = agentMissing
     ? undefined
     : agents.find((agent) => agent.code === agentCode);
@@ -97,10 +103,21 @@ export function ConversationSession(props: ConversationSessionProps) {
   );
   const skillCommandsEnabled = currentAgent !== undefined;
   const commandAgentCode = skillCommandsEnabled ? currentAgent.code : null;
+  // 비서 대화면 비서 스킬 뒤에 맡길 전문 에이전트의 스킬을 붙이고, 그 스킬로 시작한 글은 맡기기로 보낸다(스펙 assistant-hub REQ10).
+  const { delegationTargets, submit } = useSkillDelegation({
+    ...state,
+    ...conversationHistory,
+    primary: currentAgent?.primary === true,
+    submit: conversationQueue.submit,
+  });
   const skillNames =
     commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
-      ? skillCommands.names
+      ? [...skillCommands.names, ...delegationLabels(delegationTargets)]
       : undefined;
+  const skillDescriptions = {
+    ...skillCommands?.descriptions,
+    ...delegationDescriptions(delegationTargets),
+  };
 
   useEffect(() => {
     if (commandAgentCode === null) return;
@@ -114,6 +131,7 @@ export function ConversationSession(props: ConversationSessionProps) {
           setSkillCommands({
             agentCode: commandAgentCode,
             names: commandSkillNames(list),
+            descriptions: commandSkillDescriptions(list),
           });
       })
       .catch(() => {
@@ -152,12 +170,14 @@ export function ConversationSession(props: ConversationSessionProps) {
         {...conversationSend}
         {...conversationRetry}
         {...conversationControls}
+        submit={submit}
         agentLocked={agentLocked}
         agentMissing={agentMissing}
         currentAgent={currentAgent}
         startScreen={startScreen}
         skillCommandsEnabled={skillCommandsEnabled}
         skillNames={skillNames}
+        skillDescriptions={skillDescriptions}
         starters={starters}
         answerAgent={answerAgent}
       />

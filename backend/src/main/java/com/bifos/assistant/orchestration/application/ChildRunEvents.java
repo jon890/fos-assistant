@@ -219,6 +219,7 @@ public class ChildRunEvents {
             }
             executionEvents.save(event);
             recording.next++;
+            eventRecorder.saved(event);
         } catch (RuntimeException ex) {
             log.warn("실행 사건을 남기지 못했다 executionId={}", recording.execution.id(), ex);
             executions.finishEventObservation(recording.execution, false);

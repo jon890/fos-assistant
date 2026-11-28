@@ -335,6 +335,7 @@ Hermes 는 막은 호출의 글도 `{"error": "<글>"}` 로 만들어 `mcp_` 도
 결정은 [ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
 승인과 거절은 그 요청이 나온 대화의 승인 카드에서 한다. 실행 결과는 그 대화의 알림 줄과 자동 turn 으로 온다.
 코드는 `ConnectorActionService`, `ConnectorActionApproval`, `ConnectorActionLifecycle` 이 갖는다.
+새로고침 뒤 승인 대기 상태와 가짜 Hermes 호출 수는 [승인·거절 탐색 QA](../../web/test/browser/README.md#승인거절-탐색-qa)에서 확인한다.
 
 ### 승인의 불변식
 

@@ -31,7 +31,7 @@ class ExecutionEventRecorderTest {
     /** 스킬 호출 이력은 따로 적는 자리가 맡는다. 여기서는 그 자리에 무엇을 넘기는지만 본다. */
     private final SkillUseRecorder skillUses = mock(SkillUseRecorder.class);
 
-    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder(skillUses, Clock.systemUTC());
+    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder(skillUses, Clock.systemUTC(), null);
 
     private static final AgentExecution EXECUTION = AgentExecution.builder()
         .userId(1L)

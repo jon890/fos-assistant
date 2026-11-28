@@ -671,6 +671,9 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     await mkdir(workspaceRoot);
     await writeFile(WORKSPACE_CONTROL_PATH, workspaceRoot);
     hermes = await startFakeHermes(PROFILE_KEYS, undefined, {}, skillRoot);
+    hermes.setConnectorPolicy(
+      `${CONTROL_PLANE_BASE_URL}/internal/hermes/connector-policy`,
+    );
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     await seedBrowserToolsets(hermes.baseUrl);
     const controlPlane = startControlPlane(
@@ -696,10 +699,20 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 
   return async () => {
     await stopProcess(app);
-    await hermes?.close();
-    await rm(HERMES_CONTROL_PATH, { force: true });
-    await rm(WORKSPACE_CONTROL_PATH, { force: true });
-    await rm(work, { recursive: true, force: true });
+    try {
+      const evidence = process.env.BROWSER_CONNECTOR_CALLS_LOG;
+      if (evidence && hermes) {
+        await writeFile(
+          evidence,
+          JSON.stringify(hermes.connectorToolCalls(), null, 2),
+        );
+      }
+    } finally {
+      await hermes?.close();
+      await rm(HERMES_CONTROL_PATH, { force: true });
+      await rm(WORKSPACE_CONTROL_PATH, { force: true });
+      await rm(work, { recursive: true, force: true });
+    }
   };
 }
 

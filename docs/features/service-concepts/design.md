@@ -220,6 +220,8 @@ PR2 부터 기대에 `instructionIncludes` 가 있다. 답이 링크한 예약 �
 
 ## PR4 연결 붙이기 승인 카드
 
+**이 절의 대상과 차례는 [비서 중심 대화 설계](../assistant-hub/design.md) 의 「PR3」 이 바꿨다.** 카드는 새 전문 에이전트를 만들어 붙이고(`SpecialistAgentCreator`), 그 연결이 붙은 전문 에이전트가 있으면 카드 없이 `specialist_attached` 다. 아래 `not_owner`, `agent_not_private`, `single_binding` 차례와 셸 경고는 없어졌고, `already_attached` 는 기본 비서에 붙은 경우에만, 쓸 수 없는 전문 에이전트에만 붙은 경우는 `specialist_unavailable` 이다. `not_connected` 링크에는 `?agent=` 가 없다. 승인 줄과 승인 뒤 세 걸음은 그대로다.
+
 ### 도구
 
 `connector_attach` 의 인자는 `connector` 하나다. `connector_list` 의 `id` 다. 붙일 에이전트는 인자로 받지 않고 origin 실행의 에이전트다. 맡긴 실행이면 맡겨진 에이전트이고 카드는 루트 실행의 대화에 뜬다(스펙 DECISION27).

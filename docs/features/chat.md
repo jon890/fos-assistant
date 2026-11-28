@@ -413,7 +413,7 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 | `GET /api/v1/usage/breakdown` | 응답 전체. `MEMBER` 역할이 부르면 `FORBIDDEN` 이다 |
 | `GET /api/v1/usage/skills` 의 한 줄 | `agentCode` |
 | `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 | `agentCode`, `provider`, `model`, `reasoningEffort`, `reasoningEffortSource`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `estimatedCostMicros`, `requestReceivedAt`, `submittedAt`, `firstDeltaAt`, `finishedAt`, `contextSources` |
-| 같은 응답의 사건 | `model`, `inputTokens`, `outputTokens`. `PROVIDER_SWITCHED` 사건은 사건째 뺀다 |
+| 같은 응답의 사건 | `model`, `inputTokens`, `outputTokens`, 실패한 도구의 `errorType`, `errorSummary`([실행 추적](run-trace/spec.md) REQ3). `PROVIDER_SWITCHED` 사건은 사건째 뺀다 |
 | `GET /api/v1/chat/conversations/{id}/messages` 의 메시지 | `switchedTo` |
 | 대화 스트림과 대화 단위 SSE 의 `subagent` 사건 | `model`, `inputTokens`, `outputTokens` |
 | 같은 흐름의 `switched` 사건 | 사건째 보내지 않는다 |

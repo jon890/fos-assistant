@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import com.bifos.assistant.context.application.dto.InstructionScope;
+import com.bifos.assistant.runtime.domain.RunWait;
 import java.util.List;
 
 /** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, {@code @} 로 맡긴 일인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
@@ -39,7 +40,8 @@ public sealed interface TurnIntent {
         + "이 결과 때문에 일을 새로 맡기거나 같은 도구를 다시 부르지 않는다. "
         + RESULT_HANDLING_RULES;
 
-    String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
+    String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 이 작업의 시각과 주기는 이미 등록되어 있으니 같은 작업을 다시 만들지 않는다. "
+        + "사용자는 지금 화면에 없을 수 있다. 사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 
 
     /**
@@ -133,6 +135,15 @@ public sealed interface TurnIntent {
             return InstructionScope.PROACTIVE;
         }
         return unattended(intent) ? InstructionScope.SCHEDULED : InstructionScope.CONVERSATION;
+    }
+
+
+    /**
+     * 이 turn 의 실행이 끝나기를 어느 한도로 기다리는가. 예약 작업이 연 turn 만 긴 한도다(사용자 결정 2026-11-24). 결과를 전하는 turn 과
+     * 먼저 살펴보기는 사람이 보낸 turn 과 같은 한도다. 살펴보기는 그보다 짧은 {@code max-duration} 이 따로 끊는다.
+     */
+    static RunWait runWait(TurnIntent intent) {
+        return intent instanceof Scheduled ? RunWait.BACKGROUND : RunWait.CONVERSATION;
     }
 
 

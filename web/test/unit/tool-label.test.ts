@@ -172,3 +172,12 @@ test("예약 작업 지우기는 지웠다고 말하지 않고 승인을 요청�
   );
   assert.doesNotMatch(toolLabel("mcp__fos_assistant__task_delete", false), /지웠어요/);
 });
+
+test("agent_delegate 는 맡은 에이전트 이름을 알면 그 이름에게 맡기는 말이고, 모르면 「다른 에이전트」 다", () => {
+  assert.equal(toolLabel("mcp__fos__agent_delegate", true, null, "커리어"), "커리어에게 맡기고 있어요");
+  assert.equal(toolLabel("agent_delegate", false, null, "커리어"), "커리어에게 맡겼어요");
+  assert.equal(toolLabel("agent_delegate", true, null, null), "다른 에이전트에게 맡기고 있어요");
+  assert.equal(toolLabel("agent_delegate", false, null, "  "), "다른 에이전트에게 맡겼어요");
+  // 다른 도구에는 이름을 쓰지 않는다.
+  assert.equal(toolLabel("web_search", true, null, "커리어"), "검색하고 있어요");
+});

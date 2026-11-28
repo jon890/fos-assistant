@@ -145,18 +145,9 @@ export async function openAccountMenu(page: Page, testInfo: TestInfo) {
   await expect(page.getByRole("menu")).toBeVisible();
 }
 
-/**
- * 새 대화 화면의 에이전트 이름표다. 넓은 화면은 대화 영역 머리 줄, 좁은 폭은 위 막대 가운데에 있어 보이는 쪽을 쓴다.
- */
-export function startAgentTag(page: Page): Locator {
-  return page.locator('[data-testid="start-agent-tag"]:visible');
-}
-
-/** 새 대화 화면이 그 에이전트로 열렸는지 본다. 새 대화는 늘 기본 비서다(docs/features/assistant-hub/spec.md 의 REQ4) */
-export async function expectStartAgent(page: Page, name: string) {
-  await expect(startAgentTag(page).getByTestId("start-agent-name")).toHaveText(
-    name,
-  );
+/** 기본 비서 목록을 읽고 새 대화에 글을 쓸 수 있을 때까지 기다린다. */
+export async function waitForStartComposer(page: Page) {
+  await expect(page.getByRole("textbox", { name: "메시지" })).toBeEnabled();
 }
 
 /** 그 사용자의 메일로 서명한 Control Plane 토큰으로 test-support 경로를 부른다. */

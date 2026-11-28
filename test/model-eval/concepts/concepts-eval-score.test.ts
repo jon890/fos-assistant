@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
@@ -149,4 +150,17 @@ test("답이 링크한 예약 작업 번호를 찾고, 지시문 요소는 항�
   assert.equal(missing.passed, false);
   assert.deepEqual(missing.failures, ["지시문에 30만, 300000 가운데 하나도 없다", "지시문에 없으면, 없을 때 가운데 하나도 없다"]);
   assert.deepEqual(none.failures, ["답이 링크한 예약 작업의 지시문이 없다"]);
+});
+
+test("브리핑 작업은 뉴스 개수를 건으로 적어도 통과하고 개수를 뺀 경우 미달이다", () => {
+  const { questions } = JSON.parse(readFileSync(new URL("./questions.json", import.meta.url), "utf8")) as { questions: Question[] };
+  const briefing = questions.find(({ id }) => id === "schedule-briefing");
+  assert.ok(briefing);
+
+  const answer = "[뉴스 브리핑](/tasks/0192f6a1-0000-7000-8000-000000000001)";
+  const tree = node([completed("mcp__fos_assistant__task_create")]);
+  const rest = "이미 알린 뉴스는 빼고 새 뉴스가 없으면 알리지 않는다.";
+  assert.equal(scoreQuestion(briefing, answer, tree, [`AI 뉴스는 최대 3건 요약한다. ${rest}`]).passed, true);
+  assert.equal(scoreQuestion(briefing, answer, tree, [`AI 뉴스를 요약한다. ${rest}`]).passed, false);
+  assert.equal(scoreQuestion(briefing, answer, tree, [`AI 뉴스는 최대 5건 요약한다. ${rest}`]).passed, false);
 });

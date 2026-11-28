@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -42,6 +43,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestPrimaryAgents;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
@@ -82,6 +84,12 @@ class AgentConnectionControllerTest {
             new ConnectorTool("list_scopes", "READ", "none", null, null),
             new ConnectorTool("write_note", "WRITE", "required", null, null)),
         List.of());
+
+    @Autowired
+    PrimaryAgents primaryAgents;
+
+    @Autowired
+    TestPrimaryAgents primaries;
 
     @Autowired
     ConnectorBindingService service;
@@ -130,7 +138,7 @@ class AgentConnectionControllerTest {
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of());
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web"));
-        mvc = MockMvcBuilders.standaloneSetup(new AgentConnectionController(service, currentUser))
+        mvc = MockMvcBuilders.standaloneSetup(new AgentConnectionController(service, primaryAgents, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }
@@ -289,6 +297,25 @@ class AgentConnectionControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.connections").isEmpty())
             .andExpect(jsonPath("$.blockedReason").value("AGENT_NOT_PRIVATE"));
+    }
+
+
+    @Test
+    @DisplayName("기본 비서에 붙이면 PRIMARY_AGENT_NO_CONNECTIONS 이고 바인딩이 생기지 않으며, 목록의 까닭은 PRIMARY_AGENT 다(스펙 assistant-hub REQ9)")
+    void refusesPrimaryAgent() throws Exception {
+        CurrentUser owner = user(UserRole.MEMBER);
+        Agent primary = primaries.make(owner, agent(owner, AgentVisibility.PRIVATE));
+        connect(owner);
+        signIn(owner);
+        String path = "/api/v1/agents/" + primary.code() + "/connections";
+
+        mvc.perform(put(path + "/" + DEMO))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PRIMARY_AGENT_NO_CONNECTIONS"));
+        mvc.perform(get(path))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blockedReason").value("PRIMARY_AGENT"))
+            .andExpect(jsonPath("$.connections[0].bound").value(false));
     }
 
 

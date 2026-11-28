@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -48,6 +50,10 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.library.application.SkillService;
+import com.bifos.assistant.skill.library.application.dto.SkillList;
+import com.bifos.assistant.skill.library.application.dto.SkillListItem;
+import com.bifos.assistant.skill.library.application.dto.SkillSource;
 import com.bifos.assistant.task.application.TaskRunStarter;
 import com.bifos.assistant.task.application.TaskService;
 import com.bifos.assistant.task.application.dto.ScheduleInput;
@@ -147,6 +153,10 @@ class TaskRunStarterTest {
 
     @Autowired
     TestPrimaryAgents primaries;
+
+    /** 맡길 스킬 목록을 테스트가 정한다. Hermes 대시보드를 부르지 않는다. */
+    @Autowired
+    SkillService skillService;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -281,6 +291,54 @@ class TaskRunStarterTest {
 
         assertThat(awaitFinished(run).status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(seen).as("도는 중의 판정과 task_run 실행 번호가 비었는지").containsExactly(true, true);
+    }
+
+
+    @Test
+    @DisplayName("지시가 「/에이전트 이름 · 스킬」 이면 대화 turn 없이 그 에이전트를 사람이 없는 실행으로 그 스킬로 돌려 발화를 닫고, 없는 에이전트면 FAILED 다")
+    void delegatedSkillInstructionRunsThatAgent() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        Agent career = agents.save(Agent.of(
+            "career-" + UUID.randomUUID().toString().substring(0, 8), "커리어", "career-profile-" + UUID.randomUUID(),
+            "http://agent-runtime.test/p/career", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
+            fixture.owner().id()));
+        doReturn(new SkillList(List.of(new SkillListItem("position-recommender", "", SkillSource.UPLOADED, true, null)), false, true, 30))
+            .when(skillService)
+            .commandList(argThat(agent -> agent != null && career.code().equals(agent.code())));
+        withInstruction(fixture, "/커리어 · position-recommender 이번 주 공고");
+        List<Boolean> unattended = new ArrayList<>();
+        stub().willAnswer(command -> {
+            executions.findAll().stream()
+                .filter(execution -> execution.status() == ExecutionStatus.RUNNING)
+                .filter(execution -> career.id().equals(execution.agentId()))
+                .findFirst()
+                .ifPresent(running -> unattended.add(owners.unattendedTree(running)));
+            return HermesRunResult.of("run-career", "session", "completed", "공고 셋", "model", "provider", TokenUsage.empty());
+        });
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        AgentExecution delegated = executions.findById(finished.executionId()).orElseThrow();
+        assertThat(delegated.agentId()).isEqualTo(career.id());
+        assertThat(delegated.parentExecutionId()).isNull();
+        assertThat(delegated.delegationKey()).isNotNull();
+        assertThat(unattended).as("도는 동안 사람이 없는 실행").containsExactly(true);
+        assertThat(stub().received()).first().satisfies(command -> {
+            assertThat(command.profileName()).isEqualTo(career.hermesProfile());
+            assertThat(command.input()).contains("skill_view(name=\"position-recommender\")", "이번 주 공고");
+        });
+        assertThat(messages.findByConversationIdOrderByIdAsc(finished.conversationId()))
+            .extracting(ChatMessage::content)
+            .startsWith("예약 작업 「" + TITLE + "」 을 시작했어요", "/커리어 · position-recommender 이번 주 공고");
+
+        withInstruction(fixture, "/없는 담당 · position-recommender");
+        Instant next = Instant.parse("2026-12-01T00:00:00Z");
+        TaskRun missing = queued(fixture, next, next);
+        starter.startQueued(next);
+        assertThat(awaitFinished(missing).status()).isEqualTo(TaskRunStatus.FAILED);
     }
 
 
@@ -1117,6 +1175,14 @@ class TaskRunStarterTest {
         task.changeMissedPolicy(MissedPolicy.RUN_ONCE);
         tasks.save(task);
         return new Fixture(owner, task);
+    }
+
+
+    /** 그 작업의 지시만 바꾼다. 지시는 저장할 때 암호화되므로 엔티티로 고친다. */
+    private void withInstruction(Fixture fixture, String instruction) {
+        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+        task.edit(task.agentId(), task.title(), instruction, task.conversationMode(), task.notifyPolicy());
+        tasks.save(task);
     }
 
 

@@ -6,6 +6,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.runtime.application.dto.SessionRuntime;
 import com.bifos.assistant.runtime.application.dto.SteerOutcome;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.SubagentSessionUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
@@ -37,6 +38,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile HermesRunResult nextResult;
     private final Deque<HermesRunResult> queuedResults = new ArrayDeque<>();
     private final Map<String, HermesRunResult> submittedResults = new ConcurrentHashMap<>();
+    /** run 번호마다 마지막으로 기다린 한도의 종류다. */
+    private final Map<String, RunWait> waits = new ConcurrentHashMap<>();
     private volatile Function<HermesRunCommand, HermesRunResult> answer;
     private volatile ApiException nextFailure;
     private volatile Runnable beforeAwait = () -> {
@@ -253,6 +256,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
             queuedResults.clear();
         }
         submittedResults.clear();
+        waits.clear();
         answer = null;
         nextFailure = null;
         beforeAwait = () -> {
@@ -301,12 +305,21 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
 
     @Override
-    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
+    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId, RunWait wait) {
+        if (runId != null) {
+            waits.put(runId, wait);
+        }
         beforeAwait.run();
         if (nextFailure != null) {
             throw nextFailure;
         }
         return submittedResults.getOrDefault(runId, nextResult);
+    }
+
+
+    /** 그 run 을 마지막으로 기다린 한도의 종류다. 기다린 적이 없으면 null 이다. */
+    public RunWait waitOf(String runId) {
+        return waits.get(runId);
     }
 
 

@@ -9,6 +9,8 @@ import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +85,24 @@ public class MemoryReplacements {
                 capture.replacing(supersede(user, MemoryAccess.owner(), memoryId, capture.replacedMemoryIds()));
                 captures.save(capture);
             });
+    }
+
+
+    /**
+     * 받아들이려는 제안이 고치기 제안이면 고칠 항목이 제안 때의 판 그대로인지 본다. 그 사이 사람이 고쳤으면 옛 글로 만든 제안이 최신 기억을 대신하지 않게
+     * 받아들이기를 막는다. 고칠 항목이 없어졌거나 다른 기억이 대신했으면 대신할 것이 없으므로 막지 않는다.
+     *
+     * @throws ApiException 고칠 항목이 바뀌었으면 MEMORY_REVISION_CONFLICT
+     */
+    @Transactional
+    public void requireUnchangedTarget(Long memoryId) {
+        captures.findFirstByMemoryIdAndKindOrderByIdDesc(memoryId, MemoryCaptureKind.PROPOSED)
+            .filter(capture -> capture.baseRevision() != null && capture.replacedMemoryIds().size() == 1)
+            .ifPresent(capture -> memories.findByIdForUpdate(capture.replacedMemoryIds().getFirst())
+                .filter(target -> target.supersededByMemoryId() == null && target.revision() != capture.baseRevision())
+                .ifPresent(target -> {
+                    throw new ApiException(ErrorCode.MEMORY_REVISION_CONFLICT, "the memory to update has changed after the proposal");
+                }));
     }
 
 

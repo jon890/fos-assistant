@@ -48,6 +48,7 @@ import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
@@ -75,6 +76,8 @@ import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.usage.execution.application.ToolTraceWriter;
+import com.bifos.assistant.usage.execution.application.dto.ToolTrace;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
@@ -131,6 +134,9 @@ class ChatServiceTest {
 
     @Autowired
     ChatService chat;
+
+    @Autowired
+    ToolTraceWriter toolTraces;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
     @Autowired
     ArtifactService artifactService;
@@ -505,6 +511,21 @@ class ChatServiceTest {
 
 
     @Test
+    @DisplayName("사람이 보낸 turn 은 대화 한도로, 예약 작업 turn 은 긴 한도로 결과를 기다린다")
+    void scheduledTurnWaitsWithBackgroundLimit() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+        assertThat(stub().waitOf("run-1")).as("사람이 보낸 turn").isEqualTo(RunWait.CONVERSATION);
+
+        chat.runScheduledTurn(dad, turn.conversationId(), null, "예약 작업", "오늘 할 일을 정리해 줘", event -> {
+        });
+        assertThat(stub().waitOf("run-1")).as("예약 작업 turn").isEqualTo(RunWait.BACKGROUND);
+    }
+
+
+    @Test
     @DisplayName("대화 turn 의 지시문에 요청자가 맡길 수 있는 다른 에이전트와 맡기는 규칙을 넣고 지금 에이전트는 넣지 않는다")
     void sendsDelegationTargetsOtherThanCurrentAgent() {
         CurrentUser dad = member("dad@example.com", "dad");
@@ -612,6 +633,29 @@ class ChatServiceTest {
                 any(),
                 any(),
                 argThat(scope -> !scope.hideAll() && scope.hiddenPrefixes().equals(Set.of("mcp__demo__"))));
+    }
+
+
+    @Test
+    @DisplayName("대화 turn 이 저장한 실패한 도구 완료 줄에 나중에 온 plugin 기록의 오류가 옮겨진다")
+    void laterToolTraceReachesCompletedRowSavedByTurn() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(
+            new HermesRunEvent("tool.started", null, "terminal", "ls", null, null, null, null, null, null, null, null, null,
+                null, null, null, null, "call_turn_1"),
+            new HermesRunEvent("tool.completed", null, "terminal", null, 1_200L, true, null, null, null, null, null, null,
+                null, null, null, null, null, "call_turn_1"),
+            new HermesRunEvent("run.completed", null, null, null, null, null));
+
+        ChatTurn turn = chat.send(dad, null, "목록 보여 줘", "dad");
+        toolTraces.receive(turn.executionId(), "call_turn_1", new ToolTrace("terminal", 900L, "tool_error", "명령 실패"));
+
+        ExecutionEvent completed = eventsOf(turn.executionId()).get(2);
+        assertThat(completed.toolCallId()).isEqualTo("call_turn_1");
+        assertThat(completed.errorType()).isEqualTo("tool_error");
+        assertThat(completed.errorSummary()).isEqualTo("명령 실패");
+        assertThat(completed.durationMs()).as("사건 값이 hook 값보다 먼저다").isEqualTo(1_200L);
     }
 
 

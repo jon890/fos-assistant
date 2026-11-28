@@ -152,7 +152,8 @@ class ChatRunEvents {
 
     RunResult awaitCompletion(PendingTurn pending, String runId) {
         try {
-            return runtimes.of(pending.command().target()).awaitCompletion(pending.command(), runId);
+            return runtimes.of(pending.command().target())
+                .awaitCompletion(pending.command(), runId, TurnIntent.runWait(pending.intent()));
         } catch (ApiException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
@@ -265,6 +266,7 @@ class ChatRunEvents {
             }
             executionEvents.save(event);
             pending.counter().advance();
+            eventRecorder.saved(event);
         } catch (RuntimeException ex) {
             log.warn(
                 "could not record an execution event executionId={}",

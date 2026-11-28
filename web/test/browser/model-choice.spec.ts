@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import { clearPrimary, expectStartAgent, usePrimary } from "./helpers.ts";
+import { clearPrimary, waitForStartComposer, usePrimary } from "./helpers.ts";
 import type {
   Locator,
   Page,
@@ -516,7 +516,7 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
   await expect(trigger(page)).toHaveText("Medium");
 });
 
-test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 사진을 올려 보낼 수 있다", async ({
+test("새 대화에서 모델 단계를 먼저 고른 뒤 사진을 올려 보낼 수 있다", async ({
   page,
 }, testInfo) => {
   // 슬롯 대기만 30초까지 허용된다. 응답 45초와 칸 선택·메시지 전송 시간을 따로 확보한다.
@@ -531,7 +531,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
     await route.fulfill({ response });
   });
   await page.goto("/new");
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
 
   await openList(page);
   await chooseAndWait(page, "Instant");
@@ -541,7 +541,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(trigger(page)).toHaveText("Instant");
   // 새 대화는 늘 기본 비서라 고르는 목록이 없다(스펙 assistant-hub REQ4).
-  await expectStartAgent(page, "브라우저 비서");
+  await waitForStartComposer(page);
   await expect(page.getByRole("menuitemradio")).toHaveCount(0);
 
   const uploaded = page.waitForResponse(

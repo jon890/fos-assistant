@@ -75,5 +75,6 @@ export type Props = Pick<
     startScreen: boolean;
     skillCommandsEnabled: boolean;
     skillNames: string[] | undefined;
+    skillDescriptions: Readonly<Record<string, string>>;
     starters: ReturnType<typeof useStarterSuggestions>;
   };

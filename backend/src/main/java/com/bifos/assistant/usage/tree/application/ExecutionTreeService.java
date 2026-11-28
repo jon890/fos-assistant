@@ -22,6 +22,7 @@ import com.bifos.assistant.usage.execution.infra.ExecutionContextSourceRepositor
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.subagent.infra.SubagentUsageJobRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,6 +58,8 @@ public class ExecutionTreeService {
      * 않는 깊이에 {@code truncated} 가 실려, 잘렸다는 것이 아무 데도 보이지 않게 된다. 함께 바꾼다.
      */
     static final int MAX_DEPTH = 8;
+
+    private static final String DELEGATE_TOOL = "agent_delegate";
 
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
@@ -261,6 +264,8 @@ public class ExecutionTreeService {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
         boolean internal = InternalValuePolicy.visibleTo(viewer);
+        List<ExecutionEvent> own = byExecution.getOrDefault(execution.id(), List.of());
+        Map<Integer, String> delegatedNames = delegatedNames(own, branch.children());
         return new ExecutionNode(
             branch.truncated(),
             execution.id(),
@@ -286,7 +291,7 @@ public class ExecutionTreeService {
             execution.startedAt(),
             internal ? execution.finishedAt() : null,
             internal ? sources.getOrDefault(execution.id(), List.of()) : null,
-            byExecution.getOrDefault(execution.id(), List.of()).stream()
+            own.stream()
                 .filter(event -> internal || event.eventType() != ExecutionEventType.PROVIDER_SWITCHED)
                 .map(event -> ExecutionEventView.from(
                     event,
@@ -296,12 +301,69 @@ public class ExecutionTreeService {
                         : usageStatuses
                             .getOrDefault(execution.id(), Map.of())
                             .get(event.hermesSessionId()),
-                    event.eventType().isTool() ? toolNames.get(event.toolName()) : null))
+                    event.eventType().isTool() ? toolNames.get(event.toolName()) : null,
+                    delegatedNames.get(event.sequence())))
                 .toList(),
             branch.children().stream()
                 .map(child -> node(child, byExecution, usageStatuses, sources, toolNames, viewer))
                 .toList(),
             execution.delegationKey() != null);
+    }
+
+
+    /**
+     * {@code agent_delegate} 도구 사건의 순번마다 맡은 에이전트 이름이다(docs/features/assistant-hub/spec.md 의 DECISION30).
+     *
+     * <p>시작과 완료를 차례로 짝지은 호출마다 시작부터 완료까지의 창을 둔다. 맡긴 자식 실행의 시작 시각이 한 창에만 들고 그 창에 그 자식만 들
+     * 때만 이름을 붙인다. 사건 시각과 실행 시작 시각은 둘 다 Control Plane 의 시계로 적는다. 거절돼 자식이 없는 호출, 동시에 돈 호출처럼
+     * 짝을 확실히 지을 수 없으면 이름을 붙이지 않고 화면은 지금 문장으로 보인다. 도구 호출과 자식을 잇는 저장된 열쇠가 없어서다.
+     */
+    private Map<Integer, String> delegatedNames(List<ExecutionEvent> own, List<Branch> children) {
+        List<AgentExecution> delegated = children.stream()
+            .map(Branch::execution)
+            .filter(child -> child.delegationKey() != null && child.startedAt() != null)
+            .toList();
+        if (delegated.isEmpty()) {
+            return Map.of();
+        }
+        List<ExecutionEvent[]> calls = new ArrayList<>();
+        for (ExecutionEvent event : own) {
+            if (!isDelegateTool(event.toolName()) || event.occurredAt() == null) {
+                continue;
+            }
+            if (event.eventType() == ExecutionEventType.TOOL_STARTED) {
+                calls.add(new ExecutionEvent[] {event, null});
+            } else if (event.eventType() == ExecutionEventType.TOOL_COMPLETED) {
+                calls.stream().filter(call -> call[1] == null).findFirst().ifPresent(call -> call[1] = event);
+            }
+        }
+        Map<Integer, String> names = new HashMap<>();
+        for (ExecutionEvent[] call : calls) {
+            List<AgentExecution> inside = delegated.stream().filter(child -> within(call, child)).toList();
+            if (inside.size() != 1 || calls.stream().filter(other -> within(other, inside.getFirst())).count() != 1) {
+                continue;
+            }
+            agents.findById(inside.getFirst().agentId()).map(Agent::name).ifPresent(name -> {
+                names.put(call[0].sequence(), name);
+                if (call[1] != null) {
+                    names.put(call[1].sequence(), name);
+                }
+            });
+        }
+        return names;
+    }
+
+
+    /** 자식 실행이 그 호출의 시작과 완료 사이에 시작했는지 본다. 완료가 없으면 시작 뒤 모두다. */
+    private static boolean within(ExecutionEvent[] call, AgentExecution child) {
+        return !child.startedAt().isBefore(call[0].occurredAt())
+            && (call[1] == null || !child.startedAt().isAfter(call[1].occurredAt()));
+    }
+
+
+    /** Control Plane 의 맡기기 도구다. MCP 도구는 {@code mcp__<서버>__agent_delegate} 로 온다. */
+    private static boolean isDelegateTool(String toolName) {
+        return toolName != null && (toolName.equals(DELEGATE_TOOL) || toolName.endsWith("__" + DELEGATE_TOOL));
     }
 
 

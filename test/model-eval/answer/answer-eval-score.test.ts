@@ -3,6 +3,7 @@ import test from "node:test";
 import type { ExecutionNode } from "../control-plane.ts";
 import {
   asksForPhoto,
+  delegated,
   drewImage,
   collectAnswers,
   exitCode,
@@ -405,4 +406,24 @@ test("사용자 turn 이 연 실행만 고르고 위임 결과를 전하는 자�
   ];
 
   assert.deepEqual(userTurnExecutionIds(messages), [11, 21]);
+});
+
+test("맡기기 문항은 위임 도구가 실패 없이 끝났으면 통과하고, 아니면 세트 사유에 든다", () => {
+  const links = new Map<string, LinkState>();
+  const done = (toolName: string, failed: boolean) => ({ eventType: "TOOL_COMPLETED", toolName, failed }) as ExecutionNode["events"][number];
+  const handed = node([done("mcp__fos_assistant__agent_delegate", false)], [node([done("web_search", false)])]);
+  const nested = node([], [node([done("mcp__fos_assistant__agent_delegate", false)])]);
+  const refused = node([done("mcp__fos_assistant__agent_delegate", true), done("web_search", false)]);
+  assert.equal(delegated(handed), true);
+  assert.equal(delegated(nested), true);
+  assert.equal(delegated(refused), false);
+  assert.equal(delegated(null), false);
+  assert.equal(scoreQuestion(question("d1", "delegate"), ["맡겨서 받은 결과예요."], NOON, links, handed).passed, true);
+  const missed = scoreQuestion(question("d1", "delegate"), ["직접 찾아봤어요."], NOON, links, refused);
+  assert.equal(missed.passed, false, "위임이 실패하고 직접 답했으면 통과가 아니다");
+  const scores = fullSet(15);
+  scores.push(missed);
+  const set = scoreSet(scores, comparisons(6));
+  assert.equal(set.outcome, "FAIL");
+  assert.ok(set.reasons.some((reason) => reason.includes("위임하지 않았다")), set.reasons.join(", "));
 });

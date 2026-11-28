@@ -1,6 +1,7 @@
 import type { ChatEvent } from "@/lib/chat-event";
 import { labelIdentity } from "../../../lib/delegation.ts";
 import { subagentLabel } from "../../../lib/format.ts";
+import { bareName } from "../../../lib/tool-label.ts";
 import type { ActivityItem, ActivityState } from "./activity-state";
 
 /**
@@ -55,6 +56,10 @@ export function applyDelegationActivity(
                 // 끝 사건의 빈 `detail` 은 시작 사건의 대상(검색어)을 지우지 않는다.
                 detail: event.detail || entry.detail,
                 connector: entry.connector ?? event.connector ?? null,
+                delegatedAgentName:
+                  entry.delegatedAgentName ??
+                  event.delegatedAgentName ??
+                  undefined,
                 durationMs: event.durationMs ?? entry.durationMs,
                 state: event.failed ? "failed" : "done",
               }
@@ -76,6 +81,7 @@ export function applyDelegationActivity(
     pairKey,
     delegated: true,
     parent,
+    delegatedAgentName: event.delegatedAgentName ?? undefined,
   });
   if (event.phase === "completed") tool.durationMs = event.durationMs ?? null;
   const helper = items.findIndex(
@@ -95,7 +101,7 @@ function item(
     ActivityItem,
     "kind" | "name" | "connector" | "detail" | "state" | "pairKey"
   > &
-    Partial<Pick<ActivityItem, "delegated" | "parent">>,
+    Partial<Pick<ActivityItem, "delegated" | "parent" | "delegatedAgentName">>,
 ): ActivityItem {
   return {
     key: `delegated-${items.length}-${fields.pairKey}`,
@@ -142,4 +148,36 @@ export function takeHeldDelegationActivity(
   );
   held.length = 0;
   return taken;
+}
+
+/**
+ * 도는 답이 맡긴 줄(`delegation` 사건)을 받으면 아직 이름이 없고 지금 도는 맡기기 도구 줄이 하나일 때 그 줄에 맡은 에이전트 이름을 붙인다.
+ *
+ * <p>맡기기 도구가 도는 동안 맡긴 실행이 생기고 Control Plane 이 그 에이전트로 맡긴 줄을 보낸다. 이름은 모델의 인자가 아니라 그 줄에서
+ * 받는다(스펙 assistant-hub DECISION30). 그런 줄이 없거나 둘 이상이면 그대로 두어 지금 문장으로 보인다.
+ */
+export function applyDelegationName(
+  state: ActivityState,
+  agentName: string | null | undefined,
+): ActivityState {
+  const name = agentName?.trim();
+  if (!name) return state;
+  // 지금 도는 줄 하나만 받는다. 앞서 거절돼 끝난 줄이나, 동시에 도는 줄이 여럿이라 어느 쪽인지 모르면 붙이지 않는다.
+  const candidates = state.items.flatMap((item, position) =>
+    item.kind === "tool" &&
+    item.parent === undefined &&
+    item.state === "running" &&
+    bareName(item.name) === "agent_delegate" &&
+    item.delegatedAgentName === undefined
+      ? [position]
+      : [],
+  );
+  if (candidates.length !== 1) return state;
+  const index = candidates[0]!;
+  return {
+    ...state,
+    items: state.items.map((item, position) =>
+      position === index ? { ...item, delegatedAgentName: name } : item,
+    ),
+  };
 }

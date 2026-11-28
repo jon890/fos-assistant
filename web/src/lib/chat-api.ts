@@ -20,6 +20,24 @@ export function fetchCommandSkills(agentCode: string): Promise<Response> {
   return fetch(`/api/agents/${agentCode}/skills`);
 }
 
+/** 비서 대화의 `/` 목록에 함께 보일 맡길 스킬을 읽는다(docs/features/assistant-hub/spec.md 의 REQ10). */
+export function fetchSkillDelegationTargets(): Promise<Response> {
+  return fetch("/api/chat/skill-delegations/targets", { cache: "no-store" });
+}
+
+/** 고른 전문 에이전트의 스킬을 맡긴다. 대화 turn 을 열지 않고, 결과는 대화에 따로 온다. */
+export function startSkillDelegation(body: {
+  conversationId: string;
+  agentCode: string;
+  text: string;
+}): Promise<Response> {
+  return fetch("/api/chat/skill-delegations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 /** 시작 화면에 띄울 그 에이전트의 추천 질문을 읽는다. */
 export function fetchAgentStarters(agentCode: string): Promise<Response> {
   return fetch(`/api/agents/${agentCode}/starters`, { cache: "no-store" });

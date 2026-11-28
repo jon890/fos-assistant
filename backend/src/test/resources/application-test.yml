@@ -177,3 +177,5 @@ hermes:
   shared-listener-base-url: https://hermes-listener.example.com
   poll-interval: 10ms
   run-timeout: 1s
+  # 맡긴 실행과 예약 turn 의 한도도 짧게 둔다. run-timeout 을 올리는 검사는 이 값이 함께 올라간다(짧으면 run-timeout 으로 올린다)
+  background-run-timeout: 1s

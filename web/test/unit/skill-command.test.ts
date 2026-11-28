@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  commandSkillDescriptions,
   commandSkillNames,
+  delegatedTargetOf,
+  delegationDescriptions,
+  delegationLabels,
+  filterSkillNames,
   findSkillQuery,
   parseSkillCommand,
+  skillDescriptionLine,
   withSkillCommand,
 } from "../../src/components/chat/skill-command.ts";
 
@@ -49,3 +55,50 @@ test("커맨드로 부를 이름은 켜진 스킬 가운데 점과 밑줄이 없
   assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: true, uploadLimit: 30 }), ["weekly-plan"]);
   assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: false, uploadLimit: 30 }), []);
 });
+
+const TARGETS = [
+  {
+    agentCode: "career",
+    agentName: "커리어",
+    skills: ["position-recommender", "resume-review"],
+    skillDescriptions: { "position-recommender": "공고를 골라요", "resume-review": "" },
+  },
+  // 설명 칸이 없는 옛 응답도 이름과 맡기기는 그대로다.
+  { agentCode: "gmail", agentName: "Gmail 담당", skills: ["mail-digest"] },
+];
+
+test("/ 목록의 설명은 비서 스킬은 이름, 맡길 스킬은 「에이전트 · 스킬」 을 키로 두고, 줄바꿈과 겹친 공백은 한 칸으로 줄인다", () => {
+  const skills = [
+    { name: "weekly-plan", description: "이번 주 계획을 세워요", source: "UPLOADED" as const, enabled: true },
+  ];
+  assert.deepEqual(commandSkillDescriptions({ skills, editable: true, skillsToolsetEnabled: true, uploadLimit: 30 }), {
+    "weekly-plan": "이번 주 계획을 세워요",
+  });
+  assert.deepEqual(delegationDescriptions(TARGETS), {
+    "커리어 · position-recommender": "공고를 골라요",
+    "커리어 · resume-review": "",
+    "Gmail 담당 · mail-digest": "",
+  });
+  assert.equal(skillDescriptionLine("메일을\n  요약해요 "), "메일을 요약해요");
+  assert.equal(skillDescriptionLine(undefined), "");
+});
+
+test("맡길 스킬은 「에이전트 이름 · 스킬」 로 붙고, 고르면 /에이전트 이름 · 스킬 이 들어가며 이름 일부로 걸러진다(스펙 assistant-hub REQ10)", () => {
+  const labels = delegationLabels(TARGETS);
+  assert.deepEqual(labels, ["커리어 · position-recommender", "커리어 · resume-review", "Gmail 담당 · mail-digest"]);
+  assert.deepEqual(filterSkillNames(["weekly-plan", ...labels], "커리"), ["커리어 · position-recommender", "커리어 · resume-review"]);
+  assert.deepEqual(withSkillCommand("/커리", "커리어 · position-recommender"), {
+    value: "/커리어 · position-recommender ",
+    caret: "/커리어 · position-recommender ".length,
+  });
+});
+
+test("목록에 있는 「에이전트 · 스킬」 로 시작하는 글만 맡기기이고, 비서의 /이름 과 목록에 없는 스킬은 아니다", () => {
+  assert.equal(delegatedTargetOf("/커리어 · position-recommender 이번 주", TARGETS)?.agentCode, "career");
+  assert.equal(delegatedTargetOf("/Gmail 담당 · mail-digest", TARGETS)?.agentCode, "gmail");
+  assert.equal(delegatedTargetOf("/weekly-plan 이번 주", TARGETS), null);
+  assert.equal(delegatedTargetOf("/커리어 · cooking", TARGETS), null);
+  assert.equal(delegatedTargetOf("/커리어·position-recommender", TARGETS), null);
+  assert.equal(delegatedTargetOf("커리어 · position-recommender", TARGETS), null);
+});
+

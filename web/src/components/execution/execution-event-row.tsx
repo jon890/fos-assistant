@@ -14,6 +14,8 @@ export type MergedEventRow =
       toolName: string | null;
       /** 플러그인 도구의 서비스 이름과 도구 제목 */
       connector: ConnectorToolName | null;
+      /** `agent_delegate` 의 맡은 에이전트 이름. Control Plane 이 맡긴 실행에서 정한다 */
+      delegatedAgentName: string | null;
       durationMs: number | null;
       detail: string | null;
       finished: boolean;
@@ -98,8 +100,8 @@ export function ExecutionEventRow({
   return (
     <li data-testid="execution-event-row" data-tool={row.toolName ?? "도구"}>
       <p className="truncate text-sm text-muted-foreground">
-        {toolLabel(row.toolName, false, row.connector)} ·{" "}
-        {row.finished ? formatDuration(row.durationMs ?? 0) : "끝나지 않음"}
+        {toolLabel(row.toolName, false, row.connector, row.delegatedAgentName)}{" "}
+        · {row.finished ? formatDuration(row.durationMs ?? 0) : "끝나지 않음"}
         {row.finished && row.detail && readable ? ` · ${row.detail}` : ""}
       </p>
       {isAdmin && row.detail && !readable ? (

@@ -40,14 +40,25 @@ async function startWith(page: Page, agentCode: string, email?: string) {
   await openConversationWith(page, agentCode, email);
 }
 
-/** 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. */
+/**
+ * 그 에이전트의 스킬 목록을 이 본문으로 바꿔 돌려준다. 비서 대화의 `/` 목록에 붙는 맡길 스킬(스펙 assistant-hub REQ10)은 비워 이
+ * 에이전트의 목록만 보이게 한다.
+ */
 async function routeSkills(
   page: Page,
   body: {
-    skills: { name: string; enabled: boolean; source?: "CONNECTOR" }[];
+    skills: {
+      name: string;
+      enabled: boolean;
+      source?: "CONNECTOR";
+      description?: string;
+    }[];
     skillsToolsetEnabled: boolean;
   },
 ) {
+  await page.route("**/api/chat/skill-delegations/targets", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
   await page.route("**/api/agents/*/skills", async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({
@@ -85,7 +96,7 @@ test("붙인 플러그인의 스킬이 슬래시 목록과 읽기 전용 설정�
 
     await startWith(page, code, isolatedMember.email);
     await composer(page).fill("/");
-    await expect(skillList(page).getByRole("option")).toHaveText(["/demo-note-review"]);
+    await expect(skillList(page).getByTestId("skill-option-name")).toHaveText(["/demo-note-review"]);
 
     await page.goto(`/agents/${code}`);
     const item = page.getByRole("region", { name: "스킬" }).getByRole("listitem")
@@ -140,7 +151,8 @@ test.describe("스킬을 올린 에이전트", () => {
     const list = skillList(page);
     await expect(list.getByRole("option", { name: `/${NAME}` })).toBeVisible();
     // 일반 API 를 쓰므로 켜진 업로드 스킬만 보이고 기본 스킬과 꺼진 스킬은 빠진다.
-    await expect(list.getByRole("option")).toHaveText([
+    // 줄에는 설명도 보이므로 이름 칸만 맞춘다.
+    await expect(list.getByTestId("skill-option-name")).toHaveText([
       `/${OTHER_NAME}`,
       `/${NAME}`,
     ]);
@@ -151,11 +163,11 @@ test.describe("스킬을 올린 에이전트", () => {
       0,
     );
     await expect(
-      list.getByRole("option", { name: `/${DISABLED_NAME}`, exact: true }),
+      list.getByTestId("skill-option-name").filter({ hasText: new RegExp(`^/${DISABLED_NAME}$`) }),
     ).toHaveCount(0);
 
     await input.fill("/week");
-    await expect(list.getByRole("option")).toHaveText([`/${NAME}`]);
+    await expect(list.getByTestId("skill-option-name")).toHaveText([`/${NAME}`]);
 
     await input.press("Escape");
     await expect(list).toHaveCount(0);
@@ -368,6 +380,41 @@ test("스트림이 HTTP 오류로 거절해도 없는 이름을 같은 문구로
   );
   await expect(input).toHaveValue("/nope");
   await expect(page.getByText("no enabled skill")).toHaveCount(0);
+});
+
+test("/ 목록 줄마다 이름 아래 스킬 설명이 한 줄로 보이고, 길면 말줄임으로 자르며 설명이 없으면 이름만 보인다", async ({
+  page,
+}) => {
+  const long = `이번 주 일정과 할 일을 모아\n계획을 세워요. ${"길게 이어지는 설명 ".repeat(20)}`;
+  await routeSkills(page, {
+    skills: [
+      { name: "weekly-plan", enabled: true, description: long },
+      { name: "bare-skill", enabled: true },
+    ],
+    skillsToolsetEnabled: true,
+  });
+  await page.goto("/new");
+  const input = composer(page);
+  await input.fill("/");
+  const list = skillList(page);
+  const described = list.getByRole("option", { name: /^\/weekly-plan/ });
+  const line = described.getByTestId("skill-option-description");
+  await expect(line).toContainText("이번 주 일정과 할 일을 모아 계획을 세워요.");
+  // 한 줄로 두고 넘치는 글은 말줄임으로 자른다.
+  expect(
+    await line.evaluate((element) => ({
+      overflow: element.scrollWidth > element.clientWidth,
+      oneLine: element.getBoundingClientRect().height < 24,
+    })),
+  ).toEqual({ overflow: true, oneLine: true });
+  await expect(
+    list.getByRole("option", { name: "/bare-skill" }).getByTestId("skill-option-description"),
+  ).toHaveCount(0);
+
+  // 키보드로 줄을 옮겨 고르는 동작은 그대로다.
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(input).toHaveValue("/bare-skill ");
 });
 
 test("스킬 목록이 빈 에이전트에서 / 를 치면 스킬이 없다고 알린다", async ({
