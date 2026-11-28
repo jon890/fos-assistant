@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -190,10 +191,11 @@ public class BrowserTabControl {
     private static boolean internalHost(String host) {
         if (host.startsWith("[") || IPV4.matcher(host).matches()) {
             try {
-                InetAddress address = InetAddress.ofLiteral(host.startsWith("[") ? host.substring(1, host.length() - 1) : host);
+                // IP 표기라 이름 풀이 없이 읽는다. 표기가 틀려 풀이로 넘어가 실패하면 내부 주소로 본다
+                InetAddress address = InetAddress.getByName(host.startsWith("[") ? host.substring(1, host.length() - 1) : host);
                 return address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress()
                     || address.isAnyLocalAddress() || address.isMulticastAddress() || uniqueLocal(address);
-            } catch (IllegalArgumentException ex) {
+            } catch (UnknownHostException | IllegalArgumentException ex) {
                 return true;
             }
         }
