@@ -688,6 +688,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 부모가 끝난 뒤에도 완료 사건이 없으면 재조회로 보완한다. `(execution_id, completed_child_session_id)` 가 유일해 같은 자식 완료를 두 번 저장하지 않는다. 이 칸이 생기기 전의 중복 완료 사건은 최신 한 줄에만 키가 있다.
 `PROVIDER_SWITCHED` 는 옛 실행에만 남은 값이고, 지금은 이 값을 적는 경로가 없다.
 **`tool_call_id`, `error_type`, `error_summary` 는 도구 사건의 호출 번호와 실패한 도구의 오류다.** 호출 번호는 Hermes 사건의 `tool_call_id` 이고 128자를 넘으면 적지 않는다. 오류 두 칸은 fos-ctx plugin 이 `post_tool_call` 에서 보낸 기록을 사건의 실패 표시가 참인 `TOOL_COMPLETED` 줄에만 옮긴 값이다. 오류 종류는 받은 값을 64자로 자르고, 오류 요약은 `ToolDetailRedactor.redactError` 로 가린 뒤 200자로 자른다. 플러그인 도구, 플러그인 호출 뒤 도구, 내용을 남기지 않는 도구는 요약을 비운다. 오류 두 칸은 `ADMIN` 에게만 응답에 넣고, 대화를 지우면 요약을 `detail` 과 함께 비운다. 흐름은 [`docs/features/run-trace/design.md`](../../docs/features/run-trace/design.md) 가 갖는다.
+맡긴 자식 실행은 성공을 먼저 기록한 뒤에도 같은 실행의 시작 줄과 호출 번호가 맞는 도구 완료를 짧게 더 받는다. 이 완료 줄의 `sequence` 는 실행 종료 줄보다 뒤에 온다. 수집 범위는 [자식 실행 설계](../../docs/features/assistant-hub/design.md#실패와-일관성)가 갖는다.
 
 ### subagent_usage_job
 

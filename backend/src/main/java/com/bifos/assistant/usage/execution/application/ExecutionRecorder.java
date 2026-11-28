@@ -13,6 +13,7 @@ import com.bifos.assistant.usage.execution.domain.ExecutionConversation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionObservationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
@@ -37,6 +38,7 @@ public class ExecutionRecorder {
     private final UserExecutionLimiter limiter;
     private final ExecutionContextSourceWriter contextSources;
     private final ExecutionCompletionRecorder completion;
+    private final ExecutionObservationRepository observations;
 
 
     /**
@@ -322,6 +324,12 @@ public class ExecutionRecorder {
         if (execution.finishEventObservation(complete)) {
             saveEventObservation(execution);
         }
+    }
+
+
+    /** 결과를 먼저 저장한 자식의 관측 상태만 갱신한다. 후속 수집 쪽이 연 트랜잭션 안에서 부른다. */
+    public int completeLateEventObservation(Long executionId) {
+        return observations.completeLateEventObservation(executionId);
     }
 
 
