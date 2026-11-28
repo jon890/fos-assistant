@@ -13,6 +13,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,9 +49,13 @@ class BrowserGatewayTest {
     private static final long BINDING_ID = 42L;
     private static final Long OWNER = 7L;
     private static final Long BROWSER_ID = 11L;
+    private static final long OTHER_BINDING_ID = 77L;
+    private static final Long OTHER_OWNER = 8L;
+    private static final Long OTHER_BROWSER_ID = 12L;
+    private static final URI OTHER_CDP = URI.create("http://192.0.2.20:9999");
 
     private final Set<Long> revoked = new HashSet<>();
-    private final Map<Long, Long> bindingOwners = Map.of(BINDING_ID, OWNER);
+    private final Map<Long, Long> bindingOwners = Map.of(BINDING_ID, OWNER, OTHER_BINDING_ID, OTHER_OWNER);
     private UserBrowserService browsers;
     private BrowserUsage usage;
     private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
@@ -65,6 +70,7 @@ class BrowserGatewayTest {
         browsers = mock(UserBrowserService.class);
         when(browsers.enabled()).thenReturn(true);
         when(browsers.ensureRunning(OWNER)).thenReturn(new BrowserEndpoint(BROWSER_ID, CDP));
+        when(browsers.ensureRunning(OTHER_OWNER)).thenReturn(new BrowserEndpoint(OTHER_BROWSER_ID, OTHER_CDP));
         usage = new BrowserUsage();
     }
 
@@ -96,6 +102,34 @@ class BrowserGatewayTest {
         assertThat(usage.inUse(BROWSER_ID)).isTrue();
         handle.close();
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("합성 사용자 둘의 표식은 각자 자기 브라우저만 켜고, 표식의 번호를 남의 것으로 바꾸면 남의 브라우저를 켜지 않는다")
+    void twoUsersReachOnlyTheirOwnBrowsers() {
+        BrowserGatewayTokens tokens = tokens(BASE, SECRET);
+        BrowserGateway gateway = gateway(tokens);
+        String ownBinding = token(tokens.bindingAddress(BINDING_ID).orElseThrow());
+        String ownCall = token(tokens.callAddress(OWNER).orElseThrow());
+
+        assertThat(gateway.open(ownBinding)).isEqualTo(new GatewayTarget(OWNER, BROWSER_ID, CDP));
+        assertThat(gateway.open(ownCall)).isEqualTo(new GatewayTarget(OWNER, BROWSER_ID, CDP));
+        assertThat(gateway.open(token(tokens.bindingAddress(OTHER_BINDING_ID).orElseThrow())))
+            .isEqualTo(new GatewayTarget(OTHER_OWNER, OTHER_BROWSER_ID, OTHER_CDP));
+        assertThat(gateway.open(token(tokens.callAddress(OTHER_OWNER).orElseThrow())))
+            .isEqualTo(new GatewayTarget(OTHER_OWNER, OTHER_BROWSER_ID, OTHER_CDP));
+
+        // 자기 서명을 그대로 두고 번호만 다른 사용자의 바인딩과 사용자로 바꾼다.
+        String forgedBinding = ownBinding.replaceFirst("^b" + BINDING_ID + "\\.", "b" + OTHER_BINDING_ID + ".");
+        String forgedCall = ownCall.replaceFirst("^u" + OWNER + "\\.", "u" + OTHER_OWNER + ".");
+        assertThat(forgedBinding).isNotEqualTo(ownBinding);
+        assertThat(forgedCall).isNotEqualTo(ownCall);
+        assertCode(() -> gateway.open(forgedBinding), ErrorCode.BROWSER_NOT_FOUND);
+        assertCode(() -> gateway.open(forgedCall), ErrorCode.BROWSER_NOT_FOUND);
+
+        verify(browsers, times(2)).ensureRunning(OWNER);
+        verify(browsers, times(2)).ensureRunning(OTHER_OWNER);
     }
 
 

@@ -89,6 +89,9 @@ Hermes 는 profile 마다 아래를 따로 가진다.
 `config.yaml` 안의 `${VAR}` 는 그 profile 의 `.env` 에서만 값을 찾는다.
 셸 환경 변수도, 다른 profile 의 `.env` 도 보지 않는다.
 
+**이 격리는 Hermes 코드 안의 논리 경계다.** 공유 gateway 와 그 자식인 플러그인 MCP 프로세스는 모든 profile 과 같은 OS 계정으로 돌아, 파일 권한이 profile 사이를 막지 않는다.
+사용자 요청에서 실행 공간, 플러그인, 「내 브라우저」 까지 구간마다 인증 주체와 강제 경계, 경계가 없는 경로는 [`docs/code-architecture.md`](../../docs/code-architecture.md#사용자별-실행-경계) 의 「사용자별 실행 경계」 가 갖는다.
+
 #### OAuth credential 은 여기서 빠진다
 
 AI credential 이 어디 있고 profile 사이에 무엇을 함께 쓰는지는 이 절과 다음 절이 갖는다. 다른 문서는 요약만 두고 여기를 가리킨다.
