@@ -297,7 +297,7 @@ PR1 은 운영 코드 상한을 넘어 셋으로 나눈다. 각 PR 이 그 단�
 | --- | --- |
 | `id` | 묶음 안에서 유일 |
 | `turns[]` | 차례. 각 차례는 `text`(보낼 글), 선택 `attachment`(리소스 사진 이름), 선택 `card`(`approve`, `reject`, `leave`) |
-| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`, `delegate`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
+| `expect` | 규칙 판정. 서비스 개념의 기대(`tools`, `noTools`, `links`, `linkPrefixes`, `noLinkPrefixes`, `includes`, `absent`, `instructionIncludes`)와 답변 품질의 `check`(`sources`, `date`, `none`, `photo-request`, `delegate`), 카드 결과 `cardStatus`(예: `SUCCEEDED`) |
 | `keepConversation` | 통과해도 대화를 30일 남긴다. 답변 품질의 사람 비교 문항(스펙 DECISION38) |
 
 옛 `questions.json` 의 문항은 `messages` 를 `turns` 로 바꿔 그대로 옮긴다. 「답변 품질」 묶음은 `timeoutMinutes` 15, `pass` `answer-quality` 이고, 「서비스 개념」 묶음은 `ratio` 0.85 다.

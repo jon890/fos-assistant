@@ -88,9 +88,11 @@
 
 | 파일 | 갖는 것 |
 | --- | --- |
-| `test/model-eval/concepts/questions.json` | 문항마다 개념, 보낼 글, 기대. 기대는 답의 링크(경로와 질의 문자열이 똑같은 `links`, 앞부분이 맞는 `linkPrefixes`, 없어야 할 앞부분 `noLinkPrefixes`), 불러야 할 도구(`tools`), 하나 이상 있어야 할 낱말(`includes`), 없어야 할 낱말(`absent`)이다 |
+| `test/model-eval/concepts/questions.json` | 문항마다 개념, 보낼 글, 기대. 기대는 답의 링크(경로와 질의 문자열이 똑같은 `links`, 앞부분이 맞는 `linkPrefixes`, 없어야 할 앞부분 `noLinkPrefixes`), 실행이 끝나야 할 도구(`tools`), 끝난 사건에 없어야 할 도구(`noTools`), 하나 이상 있어야 할 낱말(`includes`), 없어야 할 낱말(`absent`)이다 |
 | `test/model-eval/concepts/score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수 |
 | `test/model-eval/concepts/run.ts` | `send` 는 문항마다 새 대화를 만들어 보낸다. `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다. 답변 품질 평가의 `run.ts` 와 같은 명령, 환경 변수, 종료 코드 |
+
+배포 뒤 서비스 개념 묶음에서 두 날씨 문항을 확인한다. `schedule-weather` 는 서울 날씨 예약에 `task_create` 와 `/tasks/` 링크가 있는지 본다. `schedule-weather-clarify` 는 평가 사용자의 기억에 날씨 지역이 없는 상태에서 지역을 되묻고 `task_create` 가 실행되지 않았는지 본다.
 
 문항은 개념마다 둘 이상이고 개인 사정이 없는 일반 문장이다.
 

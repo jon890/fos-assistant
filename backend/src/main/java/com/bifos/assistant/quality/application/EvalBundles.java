@@ -106,7 +106,7 @@ public class EvalBundles {
         EvalExpect expect = question.expect();
         EvalExpect filled = new EvalExpect(list.apply(expect.links()), list.apply(expect.linkPrefixes()), list.apply(expect.noLinkPrefixes()),
             list.apply(expect.tools()), list.apply(expect.includes()), list.apply(expect.absent()), list.apply(expect.instructionIncludes()),
-            expect.cardStatus());
+            expect.cardStatus(), list.apply(expect.noTools()));
         if (missing[0]) {
             return Optional.empty();
         }
@@ -207,7 +207,7 @@ public class EvalBundles {
             }
             EvalExpect expect = question.expect();
             List<List<String>> lists = List.of(expect.links(), expect.linkPrefixes(), expect.noLinkPrefixes(), expect.tools(),
-                expect.includes(), expect.absent(), expect.instructionIncludes());
+                expect.includes(), expect.absent(), expect.instructionIncludes(), expect.noTools());
             if (!bundle.pass().external() && lists.stream().allMatch(List::isEmpty) && expect.cardStatus() == null) {
                 // 기대가 없으면 무엇을 답해도 통과한다. 옛 평가 세트의 형식 검사와 같이 막는다.
                 throw invalid(name, "question " + question.id() + " has no expectation");

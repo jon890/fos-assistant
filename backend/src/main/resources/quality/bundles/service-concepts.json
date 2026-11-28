@@ -6,7 +6,8 @@
   "questions": [
     {"id":"files-put","tag":"file_space","turns":[{"text":"방금 만든 표를 내 파일공간에 넣어 두려면 어떻게 해?"}],"expect":{"includes":["파일 공간","내 파일","/files"],"absent":["어느 서비스"]}},
     {"id":"files-where","tag":"file_space","turns":[{"text":"내 파일 공간은 어디서 봐?"}],"expect":{"linkPrefixes":["/files"]}},
-    {"id":"schedule-weather","tag":"schedule","turns":[{"text":"매일 아침 7시에 날씨 알려 줘"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"]}},
+    {"id":"schedule-weather","tag":"schedule","turns":[{"text":"매일 아침 7시에 서울 날씨 알려 줘"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"]}},
+    {"id":"schedule-weather-clarify","tag":"schedule","turns":[{"text":"매일 아침 7시에 날씨 알려 줘"}],"expect":{"includes":["어느 지역","어떤 지역","어디 날씨","어디의 날씨","어느 도시","어떤 도시","어느 동네","지역을 알려","지역명을 알려","지역이 어디","위치를 알려","지역을 말씀"],"noTools":["task_create"],"noLinkPrefixes":["/tasks/"],"absent":["만들었어요","만들었습니다","등록했어요","등록했습니다"]}},
     {"id":"schedule-watch","tag":"schedule","turns":[{"text":"애플 공식 온라인 스토어에서 에어팟 프로 가격이 30만 원 밑으로 내려가는지 매시간 확인해서 알려 줘"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"],"instructionIncludes":["30만|300,000|300000","확인|검증","알리|알려","없으면|없을 때|없는 경우"]}},
     {"id":"schedule-briefing","tag":"schedule","turns":[{"text":"평일 아침 8시마다 AI 관련 새 뉴스를 세 개만 골라서 요약해 줘. 이미 알려 준 건 빼고"}],"expect":{"tools":["task_create"],"linkPrefixes":["/tasks/"],"instructionIncludes":["뉴스","세 개|세개|3개|3 개|세 건|세건|3건|3 건","이미|중복|되풀이|반복","없으면|없을 때|없는 경우"]}},
     {"id":"schedule-vague","tag":"schedule","turns":[{"text":"가끔 운동하라고 알려 줘"}],"expect":{"noLinkPrefixes":["/tasks/0","/tasks/1","/tasks/2","/tasks/3","/tasks/4","/tasks/5","/tasks/6","/tasks/7","/tasks/8","/tasks/9","/tasks/a","/tasks/b","/tasks/c","/tasks/d","/tasks/e","/tasks/f"],"absent":["만들었어요","만들었습니다","등록했어요","등록했습니다"]}},

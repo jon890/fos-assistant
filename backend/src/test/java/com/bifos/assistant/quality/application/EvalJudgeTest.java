@@ -19,7 +19,7 @@ class EvalJudgeTest {
 
     private static EvalExpect expect(
         List<String> links, List<String> prefixes, List<String> noPrefixes, List<String> tools, List<String> includes, List<String> absent) {
-        return new EvalExpect(links, prefixes, noPrefixes, tools, includes, absent, null, null);
+        return new EvalExpect(links, prefixes, noPrefixes, tools, includes, absent, null, null, null);
     }
 
 
@@ -101,7 +101,7 @@ class EvalJudgeTest {
         String text = "만들었어요. [아침 날씨](/tasks/" + id + ") 에서 바꿀 수 있어요. 목록은 /tasks 예요.";
         assertThat(EvalJudge.linkedTaskIds(text)).containsExactly(id);
 
-        EvalExpect expect = new EvalExpect(null, null, null, null, null, null, List.of("30만|300000", "없으면|없을 때"), null);
+        EvalExpect expect = new EvalExpect(null, null, null, null, null, null, List.of("30만|300000", "없으면|없을 때"), null, null);
         assertThat(EvalJudge.judge(expect, new EvalObservation(text, Set.of(), List.of("가격이 30만 원 밑이면 알린다. 새 소식이 없으면 알리지 않는다."), null))
             .passed()).isTrue();
         assertThat(EvalJudge.judge(expect, new EvalObservation(text, Set.of(), List.of("가격을 확인해 알린다."), null)).failures())
@@ -114,7 +114,7 @@ class EvalJudgeTest {
     @Test
     @DisplayName("승인 카드 결과는 마지막으로 누른 줄의 상태가 기대와 같아야 통과다")
     void cardStatus() {
-        EvalExpect expect = new EvalExpect(null, null, null, null, null, null, null, "SUCCEEDED");
+        EvalExpect expect = new EvalExpect(null, null, null, null, null, null, null, "SUCCEEDED", null);
 
         assertThat(EvalJudge.judge(expect, new EvalObservation("지웠어요", Set.of(), List.of(), "SUCCEEDED")).passed()).isTrue();
         assertThat(EvalJudge.judge(expect, new EvalObservation("지웠어요", Set.of(), List.of(), "REJECTED")).failures())
