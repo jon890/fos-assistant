@@ -27,6 +27,7 @@ public class McpToolCatalog {
     private final McpFollowUpTools followUpTools;
     private final McpMemoryForgetTool memoryForget;
     private final McpConnectorAttachTool connectorAttach;
+    private final McpBrowserTabTools browserTabs;
 
 
     public List<Map<String, Object>> tools() {
@@ -199,7 +200,7 @@ public class McpToolCatalog {
                         "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
                     List.of("query")))),
-            taskTools.definitions(), followUpTools.definitions(), List.of(memoryForget.definition(), connectorAttach.definition()))
+            taskTools.definitions(), followUpTools.definitions(), List.of(memoryForget.definition(), connectorAttach.definition()), browserTabs.definitions())
             .flatMap(List::stream)
             .map(McpToolCatalog::allowRuntimeContext).toList();
     }

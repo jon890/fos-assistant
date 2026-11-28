@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes.infra;
 
 import com.bifos.assistant.runtime.domain.ToolDetailScope;
+import com.bifos.assistant.runtime.domain.WithheldToolContent;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
@@ -63,6 +64,28 @@ class HermesRunEventStreamTest {
                 }
             }
         }
+    }
+
+
+    @Test
+    @DisplayName("「내 브라우저」 탭 도구와 그 MCP 별칭은 시작과 끝 사건 모두 탭 제목과 주소를 남기지 않는다")
+    void suppressesBrowserTabToolContent() {
+        var mapper = JsonMapper.builder().build();
+        String marker = "https://bank.example.com/account?id=SYNTH";
+        for (String tool : List.of("browser_tabs", "browser_tab_close", "browser_tab_open",
+            "mcp__fos_assistant__browser_tabs", "mcp__fos_assistant__browser_tab_close", "mcp__fos_assistant__browser_tab_open")) {
+            for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                for (String field : List.of("preview", "detail", "result", "text")) {
+                    var root = mapper.createObjectNode().put("event", event).put("tool", tool).put(field, marker);
+                    HermesRunEvent parsed = HermesRunEventStream.toRunEvent(root, ToolDetailScope.NONE);
+                    assertThat(parsed.detail()).as(tool + " " + event + " " + field).isNull();
+                    assertThat(parsed.text()).isNull();
+                    assertThat(mapper.writeValueAsString(parsed)).doesNotContain(marker);
+                }
+            }
+        }
+        assertThat(WithheldToolContent.withholdsErrorText("mcp__fos_assistant__browser_tabs")).isTrue();
+        assertThat(WithheldToolContent.withholdsErrorText("browser_tab_closer")).isFalse();
     }
 
 

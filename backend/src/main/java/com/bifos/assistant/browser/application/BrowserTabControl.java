@@ -172,7 +172,7 @@ public class BrowserTabControl {
      * loopback·사설·link-local IP)가 아니어야 한다. 이름 풀이는 하지 않는다. 막는 사이트 목록은 다음 단계에서 더한다(design 의 「뒤 PR 의
      * 경계」).
      */
-    static void requireWebAddress(String url) {
+    public static void requireWebAddress(String url) {
         URI uri;
         try {
             uri = url == null ? null : URI.create(url.strip());

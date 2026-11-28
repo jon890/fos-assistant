@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.port.ApprovalResumes;
 import com.bifos.assistant.mcp.application.port.FinancialLimitRequests;
+import com.bifos.assistant.mcp.application.port.BrowserTabRequests;
 import com.bifos.assistant.mcp.application.port.ConnectorAttachRequests;
 import com.bifos.assistant.mcp.application.port.ConnectorListing;
 import com.bifos.assistant.mcp.application.port.MemoryForgetRequests;
@@ -48,7 +49,8 @@ class McpToolCatalogTest {
             new McpTaskTools(mock(TaskRequests.class)),
             new McpFollowUpTools(null, null, null, null, null, null, null),
             new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
-            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
+            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)),
+            new McpBrowserTabTools(null, null, mock(BrowserTabRequests.class)));
 
         var first = catalog.tools();
         assertThat(first).extracting(tool -> tool.get("name"))
@@ -58,7 +60,8 @@ class McpToolCatalogTest {
                 McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftTools.IMAGE, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
                 McpFinancialLimitTools.READ, McpFinancialLimitTools.CHANGE, McpApprovalResumeTool.NAME, McpFileSpaceTools.PUT, McpConnectorListTool.NAME, "memory_remember",
                 "memory_search", McpTaskTools.LIST, McpTaskTools.CREATE, McpTaskTools.UPDATE, McpTaskTools.SET_STATE,
-                McpTaskTools.DELETE, McpFollowUpTools.LIST, McpFollowUpTools.DONE, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME);
+                McpTaskTools.DELETE, McpFollowUpTools.LIST, McpFollowUpTools.DONE, McpMemoryForgetTool.NAME, McpConnectorAttachTool.NAME,
+                McpBrowserTabTools.TABS, McpBrowserTabTools.CLOSE, McpBrowserTabTools.OPEN);
         assertThat(first).contains(list, record, memory);
         assertThat(description(first, "agent_delegate"))
             .contains("승인 전에 확인할 수 없는 값은 준비를 시작하는 조건으로 붙이지 않는다",
@@ -117,7 +120,8 @@ class McpToolCatalogTest {
             new McpTaskTools(mock(TaskRequests.class)),
             new McpFollowUpTools(null, null, null, null, null, null, null),
             new McpMemoryForgetTool(mock(MemoryForgetRequests.class)),
-            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)));
+            new McpConnectorAttachTool(mock(ConnectorAttachRequests.class)),
+            new McpBrowserTabTools(null, null, mock(BrowserTabRequests.class)));
     }
 
 

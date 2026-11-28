@@ -91,6 +91,17 @@ public record ConnectorActionView(
      */
     public static ConnectorActionView from(ConnectorAction action, Optional<ToolPolicy> declared,
         boolean grantable, boolean hiddenArgs, Map<String, String> argLabels, boolean conversationGrantable) {
+        return from(action, action.argsJson(), declared, grantable, hiddenArgs, argLabels, conversationGrantable);
+    }
+
+
+    /**
+     * 위와 같고 카드에 보일 인자를 따로 받는다. Control Plane 동작이 서버가 만든 실행 칸을 뺀 인자를 넘긴다.
+     *
+     * @param argsJson 가리기 전의 보일 인자
+     */
+    public static ConnectorActionView from(ConnectorAction action, String argsJson, Optional<ToolPolicy> declared,
+        boolean grantable, boolean hiddenArgs, Map<String, String> argLabels, boolean conversationGrantable) {
         return new ConnectorActionView(
             action.publicId(),
             action.connectorId(),
@@ -98,7 +109,7 @@ public record ConnectorActionView(
             titleOf(declared),
             action.risk(),
             action.status(),
-            ToolDetailRedactor.redactArguments(action.argsJson(), identifiersOf(declared)),
+            ToolDetailRedactor.redactArguments(argsJson, identifiersOf(declared)),
             action.resultText(),
             action.errorCode(),
             action.createdAt(),

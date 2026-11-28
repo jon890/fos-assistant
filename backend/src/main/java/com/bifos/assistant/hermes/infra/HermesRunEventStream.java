@@ -225,6 +225,11 @@ public class HermesRunEventStream {
             detail = null;
             text = null;
         }
+        if (toolName != null && WithheldToolContent.browser(toolName)) {
+            // 「내 브라우저」 탭 도구는 인자와 결과에 탭 제목과 주소가 실린다. 사건 종류와 상관없이 두 경로 모두 버린다(agent-browser REQ8).
+            detail = null;
+            text = null;
+        }
         if (!"USER".equalsIgnoreCase(type) && !"message.delta".equalsIgnoreCase(type) && !"message.interim".equalsIgnoreCase(type)
             && (contentDraftTool(root) || contentDraftTool(payload))) {
             // 원고 도구는 별칭 전체를 확인하고 사건 이름과 역할에 관계없이 두 출력 경로를 버린다.

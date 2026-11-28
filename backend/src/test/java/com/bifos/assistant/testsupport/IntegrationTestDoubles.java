@@ -173,6 +173,14 @@ public class IntegrationTestDoubles {
     }
 
 
+    /** 메모리의 탭 창구다. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다. */
+    @Bean
+    @Primary
+    FakeCdpTargets fakeCdpTargets() {
+        return new FakeCdpTargets();
+    }
+
+
     /** 늘 답하는 CDP 다. 상태가 없다. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다. */
     @Bean
     @Primary

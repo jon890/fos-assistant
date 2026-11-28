@@ -4,11 +4,15 @@ import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 플러그인 도구가 아니라 Control Plane 이 하는 동작의 승인 줄이다(서비스 개념 설계의 「지우기 승인 카드」, 「PR3 할 일과 기억 도구」, 「PR4 연결 붙이기 승인 카드」).
@@ -26,6 +30,12 @@ public final class ControlPlaneActions {
     public static final String MEMORY_FORGET = "memory_forget";
     /** 연결을 새 전문 에이전트를 만들어 붙이기다. MCP 도구 이름과 같다(비서 중심 대화 스펙 REQ9). */
     public static final String CONNECTOR_ATTACH = "connector_attach";
+    /** 「내 브라우저」 탭 닫기다. MCP 도구 이름과 같다(docs/features/agent-browser/design.md). */
+    public static final String BROWSER_TAB_CLOSE = "browser_tab_close";
+    /** 「내 브라우저」 탭 열기다. MCP 도구 이름과 같다. */
+    public static final String BROWSER_TAB_OPEN = "browser_tab_open";
+    /** 닫기 카드의 실행 칸이다. {@code <탭 번호>:<주소 지문>} 을 쉼표로 이은 글이고 카드에는 보이지 않는다. */
+    public static final String BROWSER_TARGETS = "targets";
     /** 등록 이름의 앞붙임이다. Hermes 는 이 이름을 쓰지 않는다. */
     private static final String HERMES_PREFIX = "fos_";
 
@@ -33,15 +43,25 @@ public final class ControlPlaneActions {
     public static final ToolPolicyDecision DECISION = new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.ALWAYS);
 
     private static final Map<String, ToolPolicy> POLICIES = Map.of(
+        BROWSER_TAB_CLOSE, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "브라우저 탭 닫기", false, Set.of()),
+        BROWSER_TAB_OPEN, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "브라우저 탭 열기", false, Set.of()),
         TASK_DELETE, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "예약 작업 지우기", false, Set.of("task_id", "task", "next_run")),
         MEMORY_FORGET, new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "기억 지우기", false, Set.of("memory_id", "revision")),
         CONNECTOR_ATTACH,
         new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "새 전문 에이전트를 만들어 붙이기", false, Set.of("connector_id", "agent_name")));
 
     private static final Map<String, String> SCREENS = Map.of(
+        BROWSER_TAB_CLOSE, "내 브라우저 화면", BROWSER_TAB_OPEN, "내 브라우저 화면",
         TASK_DELETE, "예약 작업 화면", MEMORY_FORGET, "기억 화면", CONNECTOR_ATTACH, "외부 서비스 연결 화면");
 
+    /** 카드에 보이지 않는 실행 칸이다. 서버가 만든 값이라 사람에게 뜻이 없다(docs/features/agent-browser/design.md 의 「PR1 도구」). */
+    private static final Map<String, Set<String>> CARD_HIDDEN = Map.of(BROWSER_TAB_CLOSE, Set.of(BROWSER_TARGETS));
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     private static final Map<String, Map<String, String>> LABELS = Map.of(
+        BROWSER_TAB_CLOSE, Map.of("tabs", "닫을 탭"),
+        BROWSER_TAB_OPEN, Map.of("url", "열 주소"),
         TASK_DELETE, Map.of("task", "작업", "next_run", "다음 실행", "task_id", "작업 번호"),
         MEMORY_FORGET, Map.of("memory", "기억", "content", "내용", "scope", "범위", "memory_id", "기억 번호", "revision", "버전"),
         CONNECTOR_ATTACH,
@@ -79,5 +99,26 @@ public final class ControlPlaneActions {
     /** 카드가 인자 이름 대신 보일 글이다. */
     public static Map<String, String> labels(String toolName) {
         return toolName == null ? Map.of() : LABELS.getOrDefault(toolName, Map.of());
+    }
+
+
+    /**
+     * 카드에 보일 인자다. 그 동작의 실행 칸을 뺀다. 읽지 못하는 인자는 그대로 돌려줘 카드 가림이 통째로 가리게 둔다.
+     *
+     * @param argsJson 승인 줄의 인자. 문자열 칸의 JSON 객체다
+     */
+    public static String cardArgs(String toolName, String argsJson) {
+        Set<String> hidden = toolName == null ? Set.of() : CARD_HIDDEN.getOrDefault(toolName, Set.of());
+        if (hidden.isEmpty() || argsJson == null) {
+            return argsJson;
+        }
+        try {
+            Map<String, Object> args = JSON.readValue(argsJson, new TypeReference<LinkedHashMap<String, Object>>() {
+            });
+            args.keySet().removeAll(hidden);
+            return JSON.writeValueAsString(args);
+        } catch (JacksonException ex) {
+            return argsJson;
+        }
     }
 }

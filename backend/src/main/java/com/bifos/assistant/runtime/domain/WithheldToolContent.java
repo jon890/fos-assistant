@@ -33,6 +33,15 @@ public final class WithheldToolContent {
     /** 사진과 OCR 본문을 다루는 도구다. 정확한 이름과 {@code __} 뒤 이름만 가린다. */
     public static final List<String> MEDIA_OBSERVATION_TOOLS = List.of("list_media_observations", "record_media_observation");
 
+    /** 「내 브라우저」 의 탭 도구다. 결과와 인자에 탭 제목과 주소가 실린다(docs/features/agent-browser/spec.md 의 REQ8). */
+    public static final List<String> BROWSER_TOOLS = List.of("browser_tabs", "browser_tab_close", "browser_tab_open");
+
+
+    /** 「내 브라우저」 탭 도구인가. */
+    public static boolean browser(String toolName) {
+        return named(toolName, BROWSER_TOOLS);
+    }
+
 
     /** 사진·OCR 관찰 도구인가. */
     public static boolean mediaObservation(String toolName) {
@@ -53,6 +62,7 @@ public final class WithheldToolContent {
         }
         return mediaObservation(toolName)
             || contentDraft(toolName)
+            || browser(toolName)
             || toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
             || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
             || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX)
