@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -132,6 +134,30 @@ class ChildRunEventsTest {
     @AfterEach
     void tearDown() throws InterruptedException {
         releaseStream();
+    }
+
+
+    @Test
+    @DisplayName("실행 종료 줄 저장이 실패하면 늦은 도구 완료를 받아도 관측 상태는 불완전으로 남는다")
+    void keepsIncompleteWhenRunEndEventCannotBeSaved() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        onEvent.accept(toolCall(RunEventKind.TOOL_STARTED, "call-1"));
+        ExecutionEvent runEnd = mock(ExecutionEvent.class);
+        doReturn(runEnd).when(recorder).record(execution, ExecutionEventType.RUN_COMPLETED, null, 2);
+        doThrow(new IllegalStateException("종료 줄 저장 실패")).when(repository).save(runEnd);
+
+        assertThat(events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null)).isSameAs(execution);
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(completed);
+        onEvent.accept(toolCall(RunEventKind.RUN_COMPLETED, null));
+        releaseStream();
+
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "TOOL_COMPLETED#2");
+        verify(publisher).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+        verify(executions).finishEventObservation(execution, false);
+        verify(executions, never()).completeLateEventObservation(11L);
     }
 
 

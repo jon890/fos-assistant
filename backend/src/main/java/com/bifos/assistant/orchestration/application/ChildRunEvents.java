@@ -102,7 +102,8 @@ public class ChildRunEvents {
             reader = recording.streamEnded ? null : recording.streamThread;
             boolean drain = !recording.closed && reader != null && type == ExecutionEventType.RUN_COMPLETED;
             if (drain) {
-                recording.drainIncomplete = recording.execution.eventObservation() != EventObservation.OBSERVING;
+                recording.drainIncomplete = recording.drainIncomplete
+                    || recording.execution.eventObservation() != EventObservation.OBSERVING;
             } else if (!recording.closed && reader != null) {
                 executions.finishEventObservation(recording.execution, hasAllEvents(recording));
             }
@@ -343,9 +344,8 @@ public class ChildRunEvents {
             eventRecorder.saved(event);
         } catch (RuntimeException ex) {
             log.warn("실행 사건을 남기지 못했다 executionId={}", recording.execution.id(), ex);
-            if (recording.closed) {
-                recording.drainIncomplete = true;
-            } else {
+            recording.drainIncomplete = true;
+            if (!recording.closed) {
                 executions.finishEventObservation(recording.execution, false);
             }
         }
