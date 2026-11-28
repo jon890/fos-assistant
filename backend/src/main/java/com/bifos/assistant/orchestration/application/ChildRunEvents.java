@@ -153,11 +153,9 @@ public class ChildRunEvents {
             recording.drainDeadline = null;
             stream = recording.stream;
         }
-        if (stream == null) {
-            reader.interrupt();
-        } else {
-            closeQuietly(stream);
-        }
+        // 응답이 멈춘 HTTP 연결은 close 만 부르면 읽기가 풀릴 때까지 기다릴 수 있다.
+        reader.interrupt();
+        closeQuietly(stream);
     }
 
 

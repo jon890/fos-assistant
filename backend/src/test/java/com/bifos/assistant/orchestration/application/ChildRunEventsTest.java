@@ -78,6 +78,7 @@ class ChildRunEventsTest {
     private final Closeable opened = mock(Closeable.class);
     private final CountDownLatch streamOpened = new CountDownLatch(1);
     private final CountDownLatch streamReleased = new CountDownLatch(1);
+    private final CountDownLatch streamReadInterrupted = new CountDownLatch(1);
     private final CountDownLatch streamClosed = new CountDownLatch(1);
     private final List<Thread> workers = new ArrayList<>();
 
@@ -117,7 +118,12 @@ class ChildRunEventsTest {
             onEvent = call.getArgument(2);
             ((Consumer<Closeable>)call.getArgument(3)).accept(opened);
             streamOpened.countDown();
-            assertThat(streamReleased.await(5, TimeUnit.SECONDS)).isTrue();
+            try {
+                assertThat(streamReleased.await(5, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException ex) {
+                streamReadInterrupted.countDown();
+                Thread.currentThread().interrupt();
+            }
             return null;
         }).when(stream).openEvents(any(), anyString(), any(), any(), any(ToolDetailScope.class));
     }
@@ -181,6 +187,12 @@ class ChildRunEventsTest {
     @Test
     @DisplayName("시간 상한 뒤 스트림을 닫고 늦은 호출은 기록하거나 알리지 않는다")
     void closesStreamWhenCollectionTimesOut() throws Exception {
+        doAnswer(call -> {
+            // HTTP 본문을 읽는 쪽이 먼저 풀려야 닫히는 연결을 흉내 낸다.
+            assertThat(streamReadInterrupted.await(2, TimeUnit.SECONDS)).isTrue();
+            streamClosed.countDown();
+            return null;
+        }).when(opened).close();
         ChildRunRecording recording = events.start(execution);
         events.relay(recording, agent, "run-1", conversation);
         awaitStreamOpened();
