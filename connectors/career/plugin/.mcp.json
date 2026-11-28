@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "career": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/career-mcp.js"],
+      "env": {
+        "CAREER_GITHUB_TOKEN": "${CAREER_GITHUB_TOKEN:-}",
+        "CAREER_GITHUB_TOKEN_URL": "${CAREER_GITHUB_TOKEN_URL}",
+        "CAREER_GITHUB_PROFILE_REPO": "${CAREER_GITHUB_PROFILE_REPO}",
+        "CAREER_BROWSER_URL": "${CAREER_BROWSER_URL}"
+      }
+    }
+  }
+}

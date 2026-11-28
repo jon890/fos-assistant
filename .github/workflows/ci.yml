@@ -515,7 +515,7 @@ jobs:
         run: |
           test -x /usr/bin/google-chrome || { echo '합성 DOM 회귀에 실제 Chrome 설치가 필요합니다.' >&2; exit 1; }
           /usr/bin/google-chrome --version
-      - name: 커리어 GitHub 연동 타입 검사와 대역 테스트
+      - name: 커리어 플러그인 타입 검사와 대역 테스트
         working-directory: connectors/career/plugin
         run: |
           bun install --frozen-lockfile

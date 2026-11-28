@@ -17,6 +17,8 @@ export type Expect = {
   noLinkPrefixes?: string[];
   /** `mcp__fos_assistant__<도구>` 로 끝나는 도구가 끝난 사건이 있어야 한다. */
   tools?: string[];
+  /** 끝난 사건에 없어야 할 Control Plane 도구 이름이다. */
+  noTools?: string[];
   /** 낱말 가운데 하나 이상이 답에 있어야 한다. */
   includes?: string[];
   /** 낱말이 답에 하나도 없어야 한다. */
@@ -120,6 +122,7 @@ export function scoreQuestion(question: Question, answer: string, root: Executio
   for (const prefix of expect.noLinkPrefixes ?? [])
     if (links.some((link) => link.startsWith(prefix))) failures.push(`${prefix} 로 시작하는 링크가 있다`);
   for (const tool of expect.tools ?? []) if (!tools.has(tool)) failures.push(`도구 ${tool} 를 부르지 않았다`);
+  for (const tool of expect.noTools ?? []) if (tools.has(tool)) failures.push(`없어야 할 도구 ${tool} 를 불렀다`);
   if (expect.includes && !expect.includes.some((word) => answer.includes(word)))
     failures.push(`${expect.includes.join(", ")} 가운데 하나도 없다`);
   for (const word of expect.absent ?? []) if (answer.includes(word)) failures.push(`없어야 할 「${word}」 가 있다`);

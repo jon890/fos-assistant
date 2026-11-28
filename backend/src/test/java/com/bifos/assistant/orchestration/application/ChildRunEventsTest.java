@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -15,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegatedRunActivity;
 import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.runtime.application.dto.RunEvent;
@@ -28,18 +31,28 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
+import com.bifos.assistant.usage.execution.domain.type.EventObservation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.io.Closeable;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ChildRunEventsTest {
     private final AgentConnectorBindings bindings = mock(AgentConnectorBindings.class);
@@ -52,8 +65,10 @@ class ChildRunEventsTest {
     private final ExecutionEventRepository repository = mock(ExecutionEventRepository.class);
     private final BackgroundTasks tasks = mock(BackgroundTasks.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
+    private final ConversationRepository conversations = mock(ConversationRepository.class);
+    private final TransactionTemplate transactions = mock(TransactionTemplate.class);
     private final ChildRunEvents events = new ChildRunEvents(
-        bindings, connectorCalls, runtimes, executions, recorder, repository, tasks, publisher);
+        bindings, connectorCalls, runtimes, executions, recorder, repository, tasks, publisher, conversations, transactions);
     private final AgentExecution execution = mock(AgentExecution.class);
     private final Agent agent = mock(Agent.class);
     private final Conversation conversation = mock(Conversation.class);
@@ -63,38 +78,199 @@ class ChildRunEventsTest {
     /** 테스트가 스트림 사건을 흘려 넣는 자리다. */
     private Consumer<RunEvent> onEvent;
     private final Closeable opened = mock(Closeable.class);
+    private final CountDownLatch streamOpened = new CountDownLatch(1);
+    private final CountDownLatch streamReleased = new CountDownLatch(1);
+    private final CountDownLatch streamReadInterrupted = new CountDownLatch(1);
+    private final CountDownLatch streamClosed = new CountDownLatch(1);
+    private final List<Thread> workers = new ArrayList<>();
 
 
     @BeforeEach
     @SuppressWarnings("unchecked")
-    void setUp() {
+    void setUp() throws IOException {
         when(execution.id()).thenReturn(11L);
         when(execution.treeRootId()).thenReturn(10L);
+        when(execution.conversationId()).thenReturn(7L);
+        when(execution.eventObservation()).thenReturn(EventObservation.OBSERVING);
         when(agent.id()).thenReturn(5L);
         when(agent.runtimeTarget()).thenReturn(target);
         when(runtimes.of(target)).thenReturn(stream);
         when(conversation.id()).thenReturn(7L);
+        when(conversations.findByIdForShare(7L)).thenReturn(Optional.of(conversation));
+        when(transactions.execute(any())).thenAnswer(call -> ((TransactionCallback<?>)call.getArgument(0)).doInTransaction(null));
         when(bindings.connectorToolPrefixes(5L)).thenReturn(Set.of("mcp_naver_shopping_"));
         when(recorder.record(any(AgentExecution.class), any(ExecutionEventType.class), any(), anyInt()))
             .thenAnswer(call -> recorded(call.getArgument(1).toString(), call.getArgument(3)));
         when(recorder.record(any(AgentExecution.class), any(RunEvent.class), anyInt()))
             .thenAnswer(call -> recorded(((RunEvent)call.getArgument(1)).kind().name(), call.getArgument(2)));
-        // 스트림 스레드는 이 테스트에서 따로 띄우지 않는다. 시작한 작업을 붙잡아 두고 사건은 onEvent 로 흘린다.
+        // 스트림을 연 뒤 테스트가 사건과 종료 순서를 정한다.
         when(tasks.start(anyString(), any())).thenAnswer(call -> {
             Runnable task = call.getArgument(1);
             Thread thread = new Thread(task);
+            workers.add(thread);
             thread.start();
             return thread;
         });
         doAnswer(call -> {
+            streamClosed.countDown();
+            streamReleased.countDown();
+            return null;
+        }).when(opened).close();
+        doAnswer(call -> {
             onEvent = call.getArgument(2);
             ((Consumer<Closeable>)call.getArgument(3)).accept(opened);
-            synchronized (this) {
-                notifyAll();
-                wait(5_000);
+            streamOpened.countDown();
+            try {
+                assertThat(streamReleased.await(5, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException ex) {
+                streamReadInterrupted.countDown();
+                Thread.currentThread().interrupt();
             }
             return null;
         }).when(stream).openEvents(any(), anyString(), any(), any(), any(ToolDetailScope.class));
+    }
+
+
+    @AfterEach
+    void tearDown() throws InterruptedException {
+        releaseStream();
+    }
+
+
+    @Test
+    @DisplayName("실행 종료 줄 저장이 실패하면 늦은 도구 완료를 받아도 관측 상태는 불완전으로 남는다")
+    void keepsIncompleteWhenRunEndEventCannotBeSaved() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        onEvent.accept(toolCall(RunEventKind.TOOL_STARTED, "call-1"));
+        ExecutionEvent runEnd = mock(ExecutionEvent.class);
+        doReturn(runEnd).when(recorder).record(execution, ExecutionEventType.RUN_COMPLETED, null, 2);
+        doThrow(new IllegalStateException("종료 줄 저장 실패")).when(repository).save(runEnd);
+
+        assertThat(events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null)).isSameAs(execution);
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(completed);
+        onEvent.accept(toolCall(RunEventKind.RUN_COMPLETED, null));
+        releaseStream();
+
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "TOOL_COMPLETED#2");
+        verify(publisher).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+        verify(executions).finishEventObservation(execution, false);
+        verify(executions, never()).completeLateEventObservation(11L);
+    }
+
+
+    @Test
+    @DisplayName("런타임이 호출 번호를 재사용해도 새로 시작한 도구의 완료를 기록한다")
+    void recordsAnotherToolCallWithReusedId() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        RunEvent started = toolCall(RunEventKind.TOOL_STARTED, "call-1");
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(started);
+        onEvent.accept(completed);
+        onEvent.accept(completed);
+        onEvent.accept(started);
+        onEvent.accept(completed);
+        events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
+        releaseStream();
+
+        assertThat(recorded)
+            .containsExactly("TOOL_STARTED#1", "TOOL_COMPLETED#2", "TOOL_STARTED#3", "TOOL_COMPLETED#4", "RUN_COMPLETED#5");
+        verify(publisher, times(2)).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+    }
+
+
+    @Test
+    @DisplayName("자식의 결과를 먼저 확정해도 같은 호출의 늦은 도구 완료를 한 번만 기록하고 알린다")
+    void recordsLateToolCompletionOnce() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        RunEvent started = toolCall(RunEventKind.TOOL_STARTED, "call-1");
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(started);
+
+        try {
+            assertThat(events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null))
+                .isSameAs(execution);
+            verify(opened, never()).close();
+            onEvent.accept(completed);
+            onEvent.accept(completed);
+            onEvent.accept(toolCall(RunEventKind.RUN_COMPLETED, null));
+        } finally {
+            releaseStream();
+        }
+
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "RUN_COMPLETED#2", "TOOL_COMPLETED#3");
+        verify(publisher).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+        verify(executions).completeLateEventObservation(11L);
+    }
+
+
+    @Test
+    @DisplayName("시간 상한 뒤 스트림을 닫고 늦은 호출은 기록하거나 알리지 않는다")
+    void closesStreamWhenCollectionTimesOut() throws Exception {
+        doAnswer(call -> {
+            // HTTP 본문을 읽는 쪽이 먼저 풀려야 닫히는 연결을 흉내 낸다.
+            assertThat(streamReadInterrupted.await(2, TimeUnit.SECONDS)).isTrue();
+            streamClosed.countDown();
+            return null;
+        }).when(opened).close();
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        onEvent.accept(toolCall(RunEventKind.TOOL_STARTED, "call-1"));
+
+        assertThat(events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null)).isSameAs(execution);
+        assertThat(streamClosed.await(5, TimeUnit.SECONDS)).isTrue();
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(completed);
+
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "RUN_COMPLETED#2");
+        verify(publisher, never()).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+        verify(executions, never()).completeLateEventObservation(11L);
+    }
+
+
+    @Test
+    @DisplayName("이미 끝난 스트림을 결과 확정 뒤 다시 열거나 늦은 수집을 시작하지 않는다")
+    void doesNotDrainAnEndedStream() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        onEvent.accept(toolCall(RunEventKind.TOOL_STARTED, "call-1"));
+        releaseStream();
+
+        events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
+        onEvent.accept(toolCall(RunEventKind.TOOL_COMPLETED, "call-1"));
+
+        assertThat(recorded).containsExactly("TOOL_STARTED#1", "RUN_COMPLETED#2");
+        verify(executions).finishEventObservation(execution, false);
+        verify(tasks, times(1)).start(anyString(), any());
+    }
+
+
+    @Test
+    @DisplayName("대화가 삭제됐으면 늦은 도구 완료 내용을 저장하거나 알리지 않는다")
+    void discardsLateToolCompletionForDeletedConversation() throws Exception {
+        ChildRunRecording recording = events.start(execution);
+        events.relay(recording, agent, "run-1", conversation);
+        awaitStreamOpened();
+        onEvent.accept(toolCall(RunEventKind.TOOL_STARTED, "call-1"));
+
+        events.end(recording, () -> execution, ExecutionEventType.RUN_COMPLETED, null);
+        when(conversation.deletedAt()).thenReturn(Instant.now());
+        RunEvent completed = toolCall(RunEventKind.TOOL_COMPLETED, "call-1");
+        onEvent.accept(completed);
+        onEvent.accept(toolCall(RunEventKind.RUN_COMPLETED, null));
+        releaseStream();
+
+        verify(repository, times(2)).save(any());
+        verify(publisher, never()).publishEvent(new DelegatedRunActivity(7L, 10L, 11L, completed));
+        verify(executions, never()).completeLateEventObservation(11L);
     }
 
 
@@ -118,7 +294,6 @@ class ChildRunEventsTest {
         verify(publisher, times(2)).publishEvent(published.capture());
         assertThat(published.getAllValues())
             .allSatisfy(value -> assertThat(((DelegatedRunActivity)value).executionId()).isEqualTo(11L));
-        verify(opened).close();
     }
 
 
@@ -196,20 +371,21 @@ class ChildRunEventsTest {
     }
 
 
-    private void awaitStreamOpened() throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5_000;
-        synchronized (this) {
-            while (onEvent == null && System.currentTimeMillis() < deadline) {
-                wait(50);
-            }
-        }
-        assertThat(onEvent).as("스트림이 열렸다").isNotNull();
+    private static RunEvent toolCall(RunEventKind kind, String toolCallId) {
+        return new RunEvent(kind, null, "example_tool", null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, toolCallId);
     }
 
 
-    private void releaseStream() {
-        synchronized (this) {
-            notifyAll();
+    private void awaitStreamOpened() throws InterruptedException {
+        assertThat(streamOpened.await(5, TimeUnit.SECONDS)).as("스트림이 열렸다").isTrue();
+    }
+
+
+    private void releaseStream() throws InterruptedException {
+        streamReleased.countDown();
+        for (Thread worker : workers) {
+            assertThat(worker.join(Duration.ofSeconds(5))).isTrue();
         }
     }
 }

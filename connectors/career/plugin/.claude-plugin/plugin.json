@@ -1,0 +1,9 @@
+{
+  "name": "fos-career",
+  "version": "0.14.1",
+  "description": "GitHub 프로필 README 와 원티드 이력서를 승인받아 갱신한다. 면접 연습, 공고 추천, 공부 자료 수집·추천, 지원 준비(지원 패키지, 이력서 준비와 검토, 공고별 면접 질문 연습), 후보자 맥락 문서와 프로필 원고 관리는 fos-assistant 에이전트의 셸 실행 공간에서 작업 폴더와 기억으로 한다.",
+  "author": {
+    "name": "fos-agents"
+  },
+  "skills": []
+}

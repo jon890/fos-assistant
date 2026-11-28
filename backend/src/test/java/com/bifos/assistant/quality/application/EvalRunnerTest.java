@@ -352,14 +352,14 @@ class EvalRunnerTest {
 
     private static EvalQuestion question(String id) {
         return new EvalQuestion(id, "schedule", List.of(new EvalTurn("예약 작업 하나 만들어 줘", null, null)),
-            new EvalExpect(null, null, null, List.of("task_create"), null, null, null, null), false);
+            new EvalExpect(null, null, null, List.of("task_create"), null, null, null, null, null), false);
     }
 
 
     private EvalBundle bundle(CardAction secondTurnCard, String cardStatus) {
         EvalQuestion question = new EvalQuestion("task-delete-card", "schedule",
             List.of(new EvalTurn("매일 아침 7시에 날씨 알려 줘", null, null), new EvalTurn("그 예약 지워 줘", null, secondTurnCard)),
-            new EvalExpect(null, null, null, List.of("task_delete"), null, null, null, cardStatus), false);
+            new EvalExpect(null, null, null, List.of("task_delete"), null, null, null, cardStatus, null), false);
         return new EvalBundle("b", "묶음", 10, new PassRule(PassRule.RATIO, 0.85), List.of(question));
     }
 
