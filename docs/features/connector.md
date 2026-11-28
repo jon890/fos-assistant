@@ -609,7 +609,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 ## 커리어 플러그인 이전 설계
 
-커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. 현재 이 모듈에는 MCP 서버와 도구(GitHub 프로필, 원티드 이력서, 「내 브라우저」 중계), 도구 선언 `assistant.json`, 공통 오류 처리, MCP 실행 파일 빌드, 에이전트 스킬 `agent-skills/` 와 그 검사(`scripts/agent-skills.ts`), 설치본 선언 `.mcp.json` 과 `.claude-plugin/plugin.json`, 아이콘이 있다. 빌드한 실행 파일과 설치본 선언은 옮기기 전 설치본과 바이트 단위로 같고, 스킬은 금지어에 걸린 한 낱말만 고쳤다. 설치에는 아직 기존 패키지를 쓴다.
+커리어는 운영자가 연결 정보를 제공하고 노트북에서도 실행기를 쓰므로 서비스 전용 모듈 `connectors/career/`에 둔다. `plugin/`은 설치 단위이고 `scripts/`는 로컬 실행기와 사용량 수집기의 소스를 갖는다. 현재 이 모듈에는 MCP 서버와 도구(GitHub 프로필, 원티드 이력서, 「내 브라우저」 중계), 도구 선언 `assistant.json`, 공통 오류 처리, MCP 실행 파일 빌드, 에이전트 스킬 `agent-skills/` 와 그 검사(`connectors/career/plugin/scripts/agent-skills.ts`), 설치본 선언 `.mcp.json` 과 `.claude-plugin/plugin.json`, 아이콘이 있다. 빌드한 실행 파일과 설치본 선언은 옮기기 전 설치본과 바이트 단위로 같고, 스킬은 금지어에 걸린 한 낱말만 고쳤다. 설치에는 아직 기존 패키지를 쓴다.
 
 설치본은 `plugin/` 의 추적 파일과 빌드한 `dist/` 다. 기존 ID `fos-career`, 버전 `0.14.1`, MCP 서버와 에이전트 스킬이 들어 있고, 로컬 실행기 번들 `dist/career-local.js` 는 다음 단계에서 더한다. 기존 `connector.json`은 같은 내용의 `assistant.json`으로 옮겼고, MCP 서버가 도구 설명을 이 파일에서 읽는다. Bun과 패키지 전용 잠금 파일로 실행 파일을 빌드한다. CI는 변경 경로에 맞춰 대역 테스트와 타입 검사를 실행한다. MCP 실행 파일만으로 서버가 뜨는지는 테스트가 확인한다. 스킬이 적은 실행기 명령이 번들 사용법에 있는지는 로컬 실행기 번들을 옮길 때 함께 검사한다.
 
