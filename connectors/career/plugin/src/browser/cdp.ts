@@ -266,7 +266,7 @@ export function relayBrowser(endpoint: string): BrowserLink {
       try {
         await httpJson(endpoint, `/json/close/${encodeURIComponent(tabId)}`);
       } catch {
-        // ignore
+        // 무시한다
       }
     },
   };

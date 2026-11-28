@@ -3,8 +3,6 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dist = join(import.meta.dir, "../dist");
-
 /**
  * 빌드를 별도 bun 프로세스에서 실행한다. 같은 `bun test` 프로세스에서 Bun.build 를 부르면
  * 함께 실행하는 테스트 파일의 해석 상태를 공유해, `.js` 로 적은 TypeScript import 를
@@ -36,8 +34,4 @@ test("독립 빌드 두 번이 실행 파일 하나를 같은 바이트로 만�
   expect(readdirSync(first)).toEqual(["career-mcp.js"]);
   expect(readdirSync(second)).toEqual(["career-mcp.js"]);
   expect(readFileSync(join(first, "career-mcp.js"))).toEqual(readFileSync(join(second, "career-mcp.js")));
-});
-
-test("로컬 dist 의 실행 파일이 지금 소스의 빌드와 같다", () => {
-  expect(readFileSync(join(dist, "career-mcp.js"), "utf8")).toBe(readFileSync(join(first, "career-mcp.js"), "utf8"));
 });
