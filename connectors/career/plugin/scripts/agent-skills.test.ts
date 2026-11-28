@@ -114,7 +114,7 @@ test("근거 원본 검사를 부르는 스킬은 프로젝트 근거 위치를 
 });
 
 test("비서용 스킬과 그 sandbox_env 는 커리어 Backend 의 주소와 token 을 요구하지 않는다", () => {
-  // 공고·공부 추천과 면접 연습은 작업 폴더의 SQLite 를 쓴다Backend 값을 요구하면 그 값을 내린 뒤 스킬이 빠진다.
+  // 공고·공부 추천과 면접 연습은 작업 폴더의 SQLite 를 쓴다. Backend 값을 요구하면 그 값을 내린 뒤 스킬이 빠진다.
   for (const names of Object.values(agentSkills.sandbox_env ?? {})) {
     expect(names.filter((name) => name.startsWith("CAREER_BACKEND"))).toEqual([]);
   }

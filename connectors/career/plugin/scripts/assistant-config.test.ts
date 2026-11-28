@@ -163,7 +163,6 @@ test("원티드 도구 설명이 나눠 부르기, 범위 밖 칸, 다시 부르
   expect(manifest.owner_browser_login_url).toBe("https://www.wanted.co.kr/cv/list");
 });
 
-// fos-assistant 는 단추를 아는 provider 에만 「GitHub 으로 연결」 을 보이고 그 칸을 비워 둔다. 그래서 칸마다 선택 비밀 칸이어야 한다.
 // 대시보드 plugin 의 connector_manifest 는 선택 칸에만 빈 기본값(`${NAME:-}`)을 받는다.
 // owner_*_env 를 포함한 나머지 서버 env 는 정확히 `${NAME}` 이어야 하고, 어기면 플러그인이 카탈로그에서 빠진다.
 test(".mcp.json 의 빈 기본값 참조는 선택 칸에만 쓴다", () => {
@@ -174,6 +173,7 @@ test(".mcp.json 의 빈 기본값 참조는 선택 칸에만 쓴다", () => {
     expect({ name, value }).toEqual({ name, value: optional.has(name) ? `\${${name}:-}` : `\${${name}}` });
 });
 
+// fos-assistant 는 단추를 아는 provider 에만 「GitHub 으로 연결」 을 보이고 그 칸을 비워 둔다. 그래서 칸마다 선택 비밀 칸이어야 한다.
 test("oauth 선언은 GitHub 단추로 선택 비밀 칸 github_token 을 채우고 통로 주소 env 는 다른 env 와 겹치지 않는다", () => {
   expect(manifest.oauth).toEqual({
     provider: "github",
