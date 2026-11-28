@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
+import { AdminAgentControl } from "@/components/browser/admin-agent-control";
 import { DeleteBrowserDialog } from "@/components/browser/delete-browser-dialog";
 import { formatWhen } from "@/lib/format";
 import {
@@ -75,6 +76,7 @@ export function AdminBrowserList() {
   return (
     <div className="mx-auto w-full max-w-3xl">
       <h1 className="mb-4 text-xl font-semibold">브라우저</h1>
+      <AdminAgentControl />
       {loadError && browsers === null ? (
         <Notice variant="error" role="alert">
           브라우저 목록을 읽지 못했어요. 화면을 다시 열어 주세요.
