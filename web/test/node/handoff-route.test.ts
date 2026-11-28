@@ -96,3 +96,91 @@ test("넘기기 라우트는 목록이 아닌 응답을 빈 목록으로 돌려�
 
   assert.deepEqual(await response.json(), []);
 });
+
+/** 실제 닫기 라우트를 실행한다. Control Plane 호출과 오류 응답 도우미만 바꾼다. 받은 경로와 본문을 `calls` 에 남긴다. */
+async function closeHandoff(
+  body: unknown,
+  answer: unknown,
+  calls: unknown[] = [],
+): Promise<Response> {
+  const webRequire = createRequire(
+    new URL("../../package.json", import.meta.url),
+  );
+  const dependencies: Record<string, unknown> = {
+    "@/lib/control-plane": {
+      callControlPlane: async (path: string, init: unknown) => {
+        calls.push({ path, init });
+        return { ok: true, status: 200, data: answer };
+      },
+    },
+    "@/lib/connector-action-route": {
+      connectorActionResponse: () => new Response(null, { status: 502 }),
+      invalidConnectorActionRequest: () => new Response(null, { status: 400 }),
+      isActionId: (value: string) => conversationId.isConversationId(value),
+    },
+    "@/lib/conversation-id": conversationId,
+    "@/lib/json-body": {
+      readJsonBody: async (request: Request) => ({
+        ok: true,
+        body: (await request.json()) as Record<string, unknown>,
+      }),
+    },
+    "@/lib/handoff": handoff,
+  };
+  const source = await readFile(
+    new URL(
+      "../../src/app/api/chat/conversations/[conversationId]/handoffs/[handoffId]/close/route.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, {
+    module,
+    exports: module.exports,
+    require: (name: string) => dependencies[name] ?? webRequire(name),
+  });
+  const route = module.exports as {
+    POST: (
+      request: Request,
+      context: {
+        params: Promise<{ conversationId: string; handoffId: string }>;
+      },
+    ) => Promise<Response>;
+  };
+  return route.POST(
+    new Request("http://localhost/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+    {
+      params: Promise.resolve({
+        conversationId: CONVERSATION,
+        handoffId: ROW.handoffId,
+      }),
+    },
+  );
+}
+
+test("닫기 라우트는 정한 단추 값만 넘기고 계약 안의 답만 돌려준다", async () => {
+  const calls: unknown[] = [];
+  const done = await closeHandoff({ outcome: "DONE" }, { result: "CONTINUE" }, calls);
+
+  assert.equal(done.status, 200);
+  assert.deepEqual(await done.json(), { result: "CONTINUE" });
+  // 라우트가 다른 vm 영역에서 만든 객체라 JSON 으로 옮겨 비교한다.
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      path: `/api/v1/chat/conversations/${CONVERSATION}/handoffs/${ROW.handoffId}/close`,
+      init: { method: "POST", body: { outcome: "DONE" } },
+    },
+  ]);
+  assert.equal((await closeHandoff({ outcome: "LATER" }, { result: "CONTINUE" })).status, 400);
+  assert.equal((await closeHandoff({ outcome: "STOP" }, { result: "MAYBE" })).status, 502);
+});

@@ -82,6 +82,19 @@ async function routeEvents(page: Page, conversationId: string) {
   };
 }
 
+/** 카드 닫기를 대역한다. 받은 본문을 모으고 `result` 가 주는 답을 돌려준다. */
+async function routeClose(page: Page, result: () => string) {
+  const bodies: unknown[] = [];
+  await page.route(
+    "**/api/chat/conversations/*/handoffs/*/close",
+    (route: Route) => {
+      bodies.push(route.request().postDataJSON());
+      return route.fulfill({ json: { result: result() } });
+    },
+  );
+  return bodies;
+}
+
 function ofType(inputs: Input[], type: string): Input[] {
   return inputs.filter((input) => input.type === type);
 }
@@ -104,6 +117,7 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
   const conversationId = await createConversation(page);
   let open: unknown[] = [HANDOFF];
   await routeHandoffs(page, conversationId, () => open);
+  const closes = await routeClose(page, () => "CONTINUE");
   await page.goto(`/chat/${conversationId}`);
 
   // 처음 연 대화에 이미 있던 카드는 패널을 저절로 열지 않고 입력창 위 한 줄만 보인다.
@@ -171,6 +185,62 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
     LOGIN_DONE,
   );
   await expect(summary).toHaveCount(0);
+  expect(closes).toEqual([{ outcome: "DONE" }]);
+});
+
+test("다른 질문을 보내고 새로 고쳐도 카드가 남고, 「그만할래요」 는 그만두는 글을, 이어 갈 수 없거나 이미 닫힌 카드는 글을 보내지 않는다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(page);
+  let open: unknown[] = [HANDOFF];
+  await routeHandoffs(page, conversationId, () => open);
+  let answer = "UNAVAILABLE";
+  const closes = await routeClose(page, () => answer);
+  await page.goto(`/chat/${conversationId}`);
+  const summary = page.getByTestId("todo-summary");
+  await expect(summary).toHaveText("할 일 1건");
+
+  const composer = page.getByRole("textbox", { name: "메시지" });
+  await composer.fill("내일 일정 알려 줘");
+  await composer.press("Enter");
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
+    "내일 일정 알려 줘",
+  );
+  await page.reload();
+  await expect(summary).toHaveText("할 일 1건");
+  await openTodo(page);
+  const card = page.getByTestId("handoff-card");
+  await expect(card.getByRole("button", { name: "내 브라우저 열기" })).toBeVisible();
+  const messages = page.getByTestId("user-message");
+  const sent = await messages.count();
+
+  // 이어 갈 수 없으면 서버가 알림 줄을 남기고 화면은 보내지 않는다.
+  open = [];
+  await card.getByRole("button", { name: "다 했어요", exact: true }).click();
+  await expect.poll(() => closes.length).toBe(1);
+  await expect(card).toHaveCount(0);
+
+  // 다른 창이 먼저 닫았으면 보내지 않는다.
+  open = [HANDOFF];
+  answer = "ALREADY_CLOSED";
+  await page.reload();
+  await openTodo(page);
+  await card.getByRole("button", { name: "다 했어요", exact: true }).click();
+  await expect.poll(() => closes.length).toBe(2);
+  await expect(messages).toHaveCount(sent);
+
+  answer = "STOPPED";
+  await page.reload();
+  await openTodo(page);
+  await card.getByRole("button", { name: "그만할래요" }).click();
+  await expect(messages.last().locator("p")).toHaveText(
+    "이 일은 그만할게요. 멈춘 단계부터 이어 가지 않아도 돼요.",
+  );
+  expect(closes).toEqual([
+    { outcome: "DONE" },
+    { outcome: "DONE" },
+    { outcome: "STOP" },
+  ]);
 });
 
 test("넘긴 탭의 주소가 바뀌면 끝났는지 묻고, 「아직이에요」 뒤에는 다시 바뀔 때만 묻는다", async ({
@@ -341,7 +411,7 @@ test("넘기기가 없는 대화에는 카드를 그리지 않는다", async ({ 
   await expect(page.getByTestId("handoff-card")).toHaveCount(0);
 });
 
-test("사람이 브라우저를 쓰는 중 카드는 탭 없이 패널을 열고, 패널에서 넘겨받으면 대화 번호를 싣고, 「돌려주기」 가 정해 둔 글을 보낸다", async ({
+test("사람이 브라우저를 쓰는 중 카드는 탭 없이 패널을 열고, 패널에서 넘겨받으면 대화 번호를 싣고, 「돌려주기」 가 카드를 남긴 채 정해 둔 글을 보낸다", async ({
   page,
 }) => {
   const fake = await fakeScreen(page);
@@ -372,9 +442,10 @@ test("사람이 브라우저를 쓰는 중 카드는 탭 없이 패널을 열고
   await expect(panel.getByTestId("human-band")).toBeVisible();
   expect(bodies).toEqual([JSON.stringify({ conversationId })]);
 
-  open = [];
   await panel.getByRole("button", { name: "돌려주기" }).click();
   await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
     "「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.",
   );
+  // 돌려주기는 카드를 닫지 않는다. 플러그인의 다음 호출이 서버에서 닫는다.
+  await expect(page.getByTestId("todo-summary")).toHaveText("할 일 1건");
 });

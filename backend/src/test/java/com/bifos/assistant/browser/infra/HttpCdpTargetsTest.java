@@ -39,6 +39,7 @@ class HttpCdpTargetsTest {
         server.createContext("/json/new", exchange -> answer(exchange, 200, """
                 {"id":"NEW1","type":"page","title":"","url":"https://example.com/login?a=1&b=2"}"""));
         server.createContext("/json/activate", exchange -> answer(exchange, 200, "Target activated"));
+        server.createContext("/json/close", exchange -> answer(exchange, 200, "Target is closing"));
         server.start();
         cdp = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     }
@@ -83,6 +84,16 @@ class HttpCdpTargetsTest {
             assertThatThrownBy(() -> targets.activate(cdp, id)).isInstanceOf(IllegalArgumentException.class);
         }
         assertThat(requests).containsExactly("GET /json/activate/PAGE1");
+    }
+
+
+    @Test
+    @DisplayName("탭을 닫고 이상한 번호는 부르지 않고 거절한다")
+    void closesTabAndRejectsMalformedIds() {
+        targets.closeTab(cdp, "PAGE2");
+
+        assertThatThrownBy(() -> targets.closeTab(cdp, "../browser")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(requests).containsExactly("GET /json/close/PAGE2");
     }
 
 

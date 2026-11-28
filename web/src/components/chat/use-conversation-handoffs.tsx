@@ -11,12 +11,13 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   giveBackSends,
-  HANDOFF_TEXT,
+  handoffCloseSends,
   HUMAN_BROWSER_DONE,
   newHandoffs,
   type Handoff,
+  type HandoffAction,
 } from "@/lib/handoff";
-import { readHandoffs } from "@/lib/handoff-api";
+import { closeHandoff, readHandoffs } from "@/lib/handoff-api";
 import { HANDOFF_ENTRY_OPEN, HANDOFF_ENTRY_PARAM } from "@/lib/notification";
 import type { SidePanelTarget } from "./conversation-session-types";
 import { HandoffList } from "./handoff-list";
@@ -57,7 +58,7 @@ export function useConversationHandoffs({
   submit: (text: string) => void;
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  /** 「다 했어요」 를 누른 넘기기다. 서버가 닫기 전에 다시 누르지 않게 감춘다. */
+  /** 단추를 누른 넘기기다. 서버가 닫기 전에 다시 누르지 않게 감춘다. 닫기 요청이 실패하면 다시 보인다. */
   const [hidden, setHidden] = useState<Ids | null>(null);
   /** 처음 성공한 읽기부터 본 번호다. 여기에 없는 번호가 새 카드다. */
   const seen = useRef<Ids | null>(null);
@@ -143,27 +144,39 @@ export function useConversationHandoffs({
     router.replace(query ? `${pathname}?${query}` : pathname);
   }, [entry, ready, latest, open, router, pathname, searchParams]);
 
+  // 카드의 단추다. 서버가 그 카드 하나만 닫고, 처음 닫은 요청일 때만 단추의 글을 보낸다(mobile-default-chat spec REQ3, REQ4).
+  // 이어 갈 수 없으면 서버가 대화에 알림 줄을 남기므로 여기서는 보내지 않는다.
   const done = useCallback(
-    (handoff: Handoff, text: string = HANDOFF_TEXT[handoff.need].done) => {
+    (handoff: Handoff, action: HandoffAction) => {
       if (conversationId === null) return;
+      const id = handoff.handoffId;
       setHidden((previous) => ({
         conversationId,
-        ids: new Set([...idsFor(previous, conversationId), handoff.handoffId]),
+        ids: new Set([...idsFor(previous, conversationId), id]),
       }));
-      // 사람이 보낸 turn 이 열린 넘기기를 모두 닫으므로 패널을 닫고 에이전트의 다음 답을 보인다.
       setPanelTarget((previous) =>
         previous?.kind === "todo" ? null : previous,
       );
-      submit(text);
+      void closeHandoff(conversationId, id, action.outcome).then((result) => {
+        if (!result.ok) {
+          setHidden((previous) => {
+            const ids = idsFor(previous, conversationId);
+            ids.delete(id);
+            return { conversationId, ids };
+          });
+          return;
+        }
+        if (handoffCloseSends(result.data.result)) submit(action.text);
+      });
     },
     [conversationId, setPanelTarget, submit],
   );
 
-  // 패널의 「돌려주기」 다. 결제 밖의 열린 넘기기가 있을 때만 정해 둔 글을 보낸다(spec DECISION12, DECISION24).
+  // 패널의 「돌려주기」 다. 결제 밖의 열린 넘기기가 있을 때만 정해 둔 글을 보낸다(user-browser spec DECISION12, DECISION24).
+  // 카드는 닫지 않는다. 플러그인의 다음 호출이 넘기기 없이 끝나면 서버가 닫는다(mobile-default-chat spec DECISION23).
   const givenBack = useCallback(() => {
-    const target = shown.find((handoff) => handoff.need !== "PAYMENT");
-    if (target && giveBackSends(shown)) done(target, HUMAN_BROWSER_DONE);
-  }, [shown, done]);
+    if (giveBackSends(shown)) submit(HUMAN_BROWSER_DONE);
+  }, [shown, submit]);
 
   const panelHandoff =
     panelTarget?.kind === "todo" ? panelTarget.handoff : null;
@@ -175,7 +188,7 @@ export function useConversationHandoffs({
         key={panelHandoff.handoffId}
         handoff={panelHandoff}
         onClose={closePanel}
-        onDone={(text) => done(panelHandoff, text)}
+        onDone={(action) => done(panelHandoff, action)}
         conversationId={conversationId}
         onGivenBack={givenBack}
       />

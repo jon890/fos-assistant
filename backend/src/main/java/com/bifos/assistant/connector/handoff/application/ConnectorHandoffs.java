@@ -1,11 +1,13 @@
 package com.bifos.assistant.connector.handoff.application;
 
 import com.bifos.assistant.browser.application.BrowserHumanHold;
+import com.bifos.assistant.browser.application.BrowserLeftTabs;
 import com.bifos.assistant.chat.turn.application.ConversationNotices;
-import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
+import com.bifos.assistant.connector.action.application.ConnectorBrowserKeptTabs;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.ConnectorActionKey;
+import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.approval.application.dto.PaymentHandoffResult;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
@@ -17,6 +19,7 @@ import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
+import com.bifos.assistant.orchestration.application.dto.PluginCallEnded;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.util.List;
@@ -34,9 +37,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 플러그인이 사람에게 화면을 넘긴 호출을 판정 줄에 적고, 알림과 대화의 카드를 내고, 사람이 다음 turn 을 시작하면 닫는다.
+ * 플러그인이 사람에게 화면을 넘긴 호출을 판정 줄에 적고, 알림과 대화의 카드를 내고, 같은 플러그인의 다음 호출이 끝나면 닫는다.
  *
- * <p>흐름은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 서비스 이름을 모른다.
+ * <p>흐름은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이, 닫히는 때는
+ * {@code docs/features/mobile-default-chat/design.md} 의 「넘기기의 상태」 가 갖는다. 사람이 보낸 turn 은 닫지 않는다. 카드의 단추는
+ * {@link HandoffButtons} 가 닫는다. 서비스 이름을 모른다.
  */
 @Slf4j
 @Service
@@ -48,12 +53,15 @@ public class ConnectorHandoffs {
     private final ConversationNotices conversations;
     private final ConnectorCatalogCache catalog;
     private final BrowserHumanHold holds;
+    private final BrowserLeftTabs leftTabs;
+    private final ConnectorBrowserKeptTabs keptTabs;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
 
     /**
-     * 같은 호출의 판정 줄에 넘기기를 적는다. 처음 적은 때만 알림 한 건을 남긴다.
+     * 같은 호출의 판정 줄에 넘기기를 적는다. 처음 적은 때만 알림 한 건을 남기고, 같은 대화에서 같은 플러그인이 앞서 낸 열린 넘기기를 닫는다
+     * (spec DECISION23).
      *
      * <p>판정 줄이 없거나, hook 에 통과로 답한 줄이 아니거나, 등록 이름이 다르면 거절한다. 판정을 지난 호출의 결과만
      * 넘기기가 될 수 있다.
@@ -76,6 +84,9 @@ public class ConnectorHandoffs {
             // 대화 밖에서 돈 실행이다. 넘기기는 적되 눌러 갈 곳이 없어 알리지 않는다.
             return;
         }
+        handoffs.findOpenOfConnector(action.userId(), action.conversationId(), action.connectorId()).stream()
+            .filter(earlier -> !earlier.id().equals(action.id()) && plugin(earlier))
+            .forEach(earlier -> close(earlier, true));
         conversations.publicIdOf(action.conversationId())
             .filter(conversation -> !watchingHold(action.userId(), request.need(), conversation))
             .ifPresent(conversation -> notifications.notify(
@@ -124,22 +135,65 @@ public class ConnectorHandoffs {
 
 
     /**
-     * 그 대화에서 사람이 보낸 turn 이 시작되면 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 결과 전달 같은 자동 turn 은
-     * 사용자가 보기 전이라 닫지 않는다. 트랜잭션 안에서 났으면 커밋한 뒤, 밖에서 났으면 바로 새 트랜잭션에서 돈다. 예외는 사건을 낸 쪽이 받아 로그만 남기므로 닫지 못해도 turn 은 잇는다. 카드가 남을 뿐이다.
+     * 도구 기록이 알린 호출이 플러그인 호출이고 넘기기 없이 끝났으면, 같은 사용자, 대화, 플러그인의 앞선 열린 넘기기를 닫는다(spec
+     * DECISION13, DECISION23). 실패한 호출, 넘기기를 낸 호출, 판정 줄이 없는 호출(플러그인이 아닌 도구)은 닫지 않는다.
+     *
+     * <p>Hermes 는 도구 기록 hook 을 넘기기 알림보다 먼저 부르므로 같은 호출의 기록이 먼저 올 수 있다. 그때는 넘기기가 아직 없어 앞선 것을 닫고, 뒤이어
+     * 온 넘기기가 새 카드를 연다. 어느 순서든 결과가 같다. 트랜잭션 안에서 났으면 커밋한 뒤, 밖에서 났으면 바로 새 트랜잭션에서 돈다.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void onTurnStarted(ConversationTurnStarted event) {
-        if (!event.byUser()) {
+    public void onPluginCallEnded(PluginCallEnded event) {
+        if (event.failed()) {
             return;
         }
-        List<ConnectorAction> open = handoffs.findOpenInConversation(event.conversationId());
-        if (open.isEmpty()) {
+        String key;
+        try {
+            key = ConnectorActionKey.of(event.profileName(), event.rootSessionId(), event.sessionId(), event.toolCallId()).value();
+        } catch (IllegalArgumentException ex) {
             return;
         }
-        handoffs.close(open.stream().map(ConnectorAction::id).toList(), clock.instant());
-        open.forEach(action -> notifications.resolve(action.userId(), NotificationKind.HANDOFF_REQUESTED, action.publicId()));
-        open.forEach(this::afterCommit);
+        handoffs.findByDedupeKey(key)
+            .filter(action -> action.passed() && action.conversationId() != null && action.handoff() == null)
+            .ifPresent(succeeded -> handoffs.findOpenOfConnector(
+                succeeded.userId(), succeeded.conversationId(), succeeded.connectorId()).stream()
+                .filter(earlier -> plugin(earlier) && earlier.handoff().at().isBefore(succeeded.createdAt()))
+                .forEach(earlier -> close(earlier, true)));
+    }
+
+
+    /**
+     * 플러그인 호출의 성공이 닫을 수 있는 넘기기인가. 승인한 주문서 채우기가 사람 화면에서 기다리는 줄({@code WAITING})은 「다 했어요」 로만 닫는다. 그
+     * 넘기기가 닫혀야 같은 승인으로 이어 가므로, 같은 플러그인의 다른 호출이 닫으면 탭과 연결 확인 없이 이어 간다.
+     */
+    private static boolean plugin(ConnectorAction action) {
+        return action.status() != ActionStatus.WAITING;
+    }
+
+
+    /**
+     * 열린 넘기기 하나를 닫고 그 알림을 읽음으로 바꾼 뒤 대화에 알린다. 부르는 쪽의 트랜잭션 안에서 돈다.
+     *
+     * @param releaseTab 커밋한 뒤 남긴 탭도 닫는가. 플러그인의 다음 호출이 닫을 때 참이다. 그 호출이 시작할 때 탭을 닫으려 했지만 카드가 열려 있어
+     * 중계가 거절했다. 단추가 닫을 때는 거짓이다. 이어 가는 다음 호출이 탭을 닫는다
+     * @return 이 호출이 닫았으면 참. 이미 닫혀 있었으면 거짓이고 아무것도 하지 않는다
+     */
+    @Transactional
+    public boolean close(ConnectorAction action, boolean releaseTab) {
+        if (handoffs.close(List.of(action.id()), clock.instant()) == 0) {
+            return false;
+        }
+        notifications.resolve(action.userId(), NotificationKind.HANDOFF_REQUESTED, action.publicId());
+        afterCommit(action);
+        if (releaseTab && action.handoff().tab() != null) {
+            String tab = action.handoff().tab();
+            runAfterCommit(() -> {
+                if (!keptTabs.kept(action.userId(), tab, action.handoff().at())) {
+                    leftTabs.close(action.userId(), tab, action.handoff().at());
+                }
+            });
+        }
+        return true;
     }
 
 
@@ -149,21 +203,27 @@ public class ConnectorHandoffs {
             return;
         }
         ConnectorActionChanged changed = new ConnectorActionChanged(action.conversationId(), action.publicId());
-        Runnable publish = () -> {
+        runAfterCommit(() -> events.publishEvent(changed));
+    }
+
+
+    /** 트랜잭션이 있으면 커밋한 뒤, 없으면 바로 돈다. 예외는 로그만 남긴다. */
+    private static void runAfterCommit(Runnable work) {
+        Runnable guarded = () -> {
             try {
-                events.publishEvent(changed);
+                work.run();
             } catch (RuntimeException ex) {
-                log.warn("화면 넘기기가 바뀐 것을 알리지 못했다 actionId={}", action.publicId(), ex);
+                log.warn("화면 넘기기를 닫은 뒤의 일을 하지 못했다 kind={}", ex.getClass().getSimpleName());
             }
         };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            publish.run();
+            guarded.run();
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                publish.run();
+                guarded.run();
             }
         });
     }

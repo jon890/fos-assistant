@@ -48,7 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 사람 화면에서 멈춘 승인한 주문서 채우기를 같은 승인으로 이어 간다(docs/features/browser-cowork/spec.md 의 REQ8, REQ9, 설계의
  * 「PR4 이어 가기」). 에이전트의 MCP 도구가 부른다.
  *
- * <p>그 대화의 {@code WAITING} 줄 하나만 고른다. 사람이 그 뒤 이 대화에 메시지를 보내 넘기기 카드가 닫혀 있어야 하고, 수명과 같은 브라우저인지 다시 본다.
+ * <p>그 대화의 {@code WAITING} 줄 하나만 고른다. 사람이 카드의 「다 했어요」 로 넘기기를 닫았어야 하고(이 도구는 플러그인 호출이 아니라 플러그인 성공이 닫지 않는다), 수명과 같은 브라우저인지 다시 본다.
  * 이어 가는 전이({@code WAITING} 에서 {@code EXECUTING})를 행 잠금 아래에서 한 번만 하므로 멈출 때마다 한
  * 번이다. 실행은 처음 승인과 같은 {@link ConnectorFinancialApproval#run} 이고 ticket 을 새로 낸다.
  */
@@ -59,8 +59,8 @@ class ConnectorApprovalResume implements ApprovalResumes {
     // 이어 가지 못한 글은 승인이나 사람 손이 필요해 바로 알림으로 끝난다(docs/features/tool-fallback/spec.md 의 REQ2, REQ3). RUNNING 은 실패가 아니다.
     static final String NONE = ToolFailureText.askUser("이 대화에 이어 갈 승인이 없다. 승인이 이미 끝났거나 이어 갈 수 있는 시간이 지났다."
         + " 사용자가 여전히 원하면 처음처럼 준비해 새 승인을 받는다.").text();
-    static final String NOT_YET = ToolFailureText.askUser("사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.").text();
-    static final String HELD = ToolFailureText.askUser("사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.").text();
+    static final String NOT_YET = ToolFailureText.askUser("사용자가 아직 넘기기 카드의 「다 했어요」를 누르지 않았다. 입력창의 답으로는 이어 가지 않는다. 사용자에게 「내 브라우저」에서 마친 뒤 카드의 「다 했어요」를 눌러 달라고 하고, 누른 뒤 다시 부른다.").text();
+    static final String HELD = ToolFailureText.askUser("사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누르고 넘기기 카드의 「다 했어요」를 누른 뒤 다시 부른다.").text();
     /** 끝낸 줄의 결과를 뒤에 붙일 때 쓰는 앞글이다. 뒤에 붙는 복구 안내(ADR-092)는 끝 줄 규칙의 대상이 아니다(docs/features/tool-fallback/design.md 의 DECISION2). */
     static final String ENDED_LEAD = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
     static final String ENDED = ToolFailureText.askUser(ENDED_LEAD).text();

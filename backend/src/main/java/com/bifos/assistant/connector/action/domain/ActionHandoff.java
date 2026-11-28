@@ -36,7 +36,7 @@ public class ActionHandoff {
     @Column(name = "handoff_at")
     private Instant at;
 
-    /** 그 대화의 다음 turn 이 시작돼 카드를 닫은 시각이다. 열려 있으면 null 이다. */
+    /** 카드를 닫은 시각이다. 카드의 단추나 같은 플러그인의 다음 호출이 닫는다. 열려 있으면 null 이다. */
     @Column(name = "handoff_closed_at")
     private Instant closedAt;
 

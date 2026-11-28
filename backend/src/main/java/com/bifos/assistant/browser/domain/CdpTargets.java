@@ -4,7 +4,7 @@ import java.net.URI;
 import java.util.List;
 
 /**
- * 브라우저의 탭을 CDP HTTP 창구로 보고 만들고 앞으로 가져온다.
+ * 브라우저의 탭을 CDP HTTP 창구로 보고 만들고 앞으로 가져오고 닫는다.
  *
  * <p>{@code cdp} 는 {@link BrowserRuntime#cdpAddress(String)} 가 준 주소다. 대상 번호가 영문자와 숫자가 아니면
  * {@link IllegalArgumentException} 이고, 닿지 못하거나 200 이 아니면 런타임 예외다.
@@ -21,4 +21,8 @@ public interface CdpTargets {
 
     /** 그 탭을 앞으로 가져온다. */
     void activate(URI cdp, String id);
+
+
+    /** 그 탭을 닫는다. 이미 없는 탭이면 Chrome 이 200 이 아닌 답을 줘 런타임 예외다. */
+    void closeTab(URI cdp, String id);
 }

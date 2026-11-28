@@ -6,14 +6,15 @@ import {
   handoffActions,
   handoffDoneHint,
   type Handoff,
+  type HandoffAction,
 } from "@/lib/handoff";
 
 /**
  * 옆 패널의 「할 일」 탭에 그 대화의 화면 넘기기 카드를 보인다. 플러그인이 사람이 해야 하는 화면에서 멈추면 생긴다.
  *
- * <p>「내 브라우저 열기」 는 남긴 탭을 같은 패널의 「내 브라우저」 탭에 띄운다. 「다 했어요」 는 정해 둔 글을 다음 메시지로 보낸다.
- * 결제 카드는 「결제했어요」 와 「사지 않을래요」 둘이다(`handoffActions`).
- * 새 turn 이 시작되면 서버가 카드를 닫는다. 입력창에 직접 답해도 같다. 읽기와 상태는 `useConversationHandoffs` 가 갖는다.
+ * <p>「내 브라우저 열기」 는 남긴 탭을 같은 패널의 「내 브라우저」 탭에 띄운다. 「다 했어요」 와 「그만할래요」 는 그 카드만 닫고 정해 둔 글을 다음
+ * 메시지로 보낸다. 결제 카드는 「결제했어요」 와 「사지 않을래요」 둘이다(`handoffActions`).
+ * 다른 질문을 보내도 카드는 남는다. 같은 플러그인의 다음 호출이 넘기기 없이 끝나면 서버가 닫는다. 읽기와 상태는 `useConversationHandoffs` 가 갖는다.
  */
 export function HandoffList({
   handoffs,
@@ -22,7 +23,7 @@ export function HandoffList({
 }: {
   handoffs: Handoff[];
   onOpen: (handoff: Handoff) => void;
-  onDone: (handoff: Handoff, text: string) => void;
+  onDone: (handoff: Handoff, action: HandoffAction) => void;
 }) {
   if (handoffs.length === 0) return null;
   return (
@@ -32,7 +33,7 @@ export function HandoffList({
           key={handoff.handoffId}
           handoff={handoff}
           onOpen={() => onOpen(handoff)}
-          onDone={(text) => onDone(handoff, text)}
+          onDone={(action) => onDone(handoff, action)}
         />
       ))}
     </div>
@@ -46,7 +47,7 @@ function HandoffCard({
 }: {
   handoff: Handoff;
   onOpen: () => void;
-  onDone: (text: string) => void;
+  onDone: (action: HandoffAction) => void;
 }) {
   const text = HANDOFF_TEXT[handoff.need];
   return (
@@ -85,8 +86,8 @@ function HandoffCard({
           <Button
             key={action.label}
             size="sm"
-            variant={action.text === text.done ? "default" : "outline"}
-            onClick={() => onDone(action.text)}
+            variant={action.outcome === "DONE" ? "default" : "outline"}
+            onClick={() => onDone(action)}
           >
             {action.label}
           </Button>

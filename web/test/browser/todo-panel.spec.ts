@@ -54,6 +54,17 @@ async function routeTodo(
   await page.route(`${base}/connector-actions`, (route: Route) =>
     route.fulfill({ json: state.actions }),
   );
+  // 카드 단추의 닫기다. 처음 닫은 요청이라 단추의 글을 보내게 답한다.
+  await page.route(`${base}/handoffs/*/close`, (route: Route) =>
+    route.fulfill({
+      json: {
+        result:
+          route.request().postDataJSON()?.outcome === "STOP"
+            ? "STOPPED"
+            : "CONTINUE",
+      },
+    }),
+  );
 }
 
 /** 대화 단위 SSE 를 붙잡아 두고, `bump` 를 부르면 승인 사건 하나를 보내 목록을 다시 읽게 한다. */
@@ -261,7 +272,7 @@ test("「할 일」 탭의 넘기기 카드 「다 했어요」 는 패널을 �
   state.handoffs = [];
   await page
     .getByTestId("handoff-card")
-    .getByRole("button", { name: "다 했어요" })
+    .getByRole("button", { name: "다 했어요", exact: true })
     .click();
 
   await expect(page.getByTestId("todo-panel")).toHaveCount(0);

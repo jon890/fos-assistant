@@ -11,7 +11,6 @@ import static org.mockito.Mockito.doThrow;
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
-import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.connector.action.application.ConnectorBrowserKeptTabs;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
@@ -267,7 +266,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
-    @DisplayName("사람이 그 대화에 메시지를 보낸 뒤의 이어 가기는 새 ticket 과 남긴 탭으로 한 번 더 실행해 주문서까지 가고 claim 은 한 번이다")
+    @DisplayName("사람이 넘기기 카드의 「다 했어요」 로 닫은 뒤의 이어 가기는 새 ticket 과 남긴 탭으로 한 번 더 실행해 주문서까지 가고 claim 은 한 번이다")
     void resumeAfterHumanTurnFillsOnce() {
         browserRunning();
         var answer = prepare(UUID.randomUUID().toString());
@@ -275,10 +274,10 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         publicApproval.approve(user, answer.actionId(), null, false);
         String firstTicket = sent.ticket();
         Long conversation = action(answer).conversationId();
-        assertThat(resumes.resume(user, conversation)).as("사람이 아직 메시지를 보내지 않았다").isEqualTo(ConnectorApprovalResume.NOT_YET);
+        assertThat(resumes.resume(user, conversation)).as("사람이 아직 카드를 닫지 않았다").isEqualTo(ConnectorApprovalResume.NOT_YET);
         assertThat(fills.get()).isEqualTo(1);
 
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        handoffs.close(action(answer), false);
         assertThat(resumes.resume(user, conversation + 1_000_000)).as("다른 대화는 고르지 않는다").isEqualTo(ConnectorApprovalResume.NONE);
         fill = claimThen(sheet(expected));
         String text = resumes.resume(user, conversation);
@@ -307,7 +306,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         Instant first = action(answer).waiting().since();
         Instant end = action(answer).expiresAt();
         Long conversation = action(answer).conversationId();
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        handoffs.close(action(answer), false);
         clock.set(clock.instant().plusSeconds(600));
         fill = execution -> CallResult.success(resumable("captcha"));
 
@@ -330,7 +329,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         fill = execution -> CallResult.success(resumable("login"));
         publicApproval.approve(user, expired.actionId(), null, false);
         Long conversation = action(expired).conversationId();
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        handoffs.close(action(expired), false);
         clock.set(clock.instant().plus(ConnectorCheckoutOutcome.WAITING_LIFE));
 
         assertThat(resumes.resume(user, conversation)).startsWith(ConnectorApprovalResume.ENDED_LEAD);
@@ -357,7 +356,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         fill = execution -> CallResult.success(resumable("login"));
         publicApproval.approve(user, answer.actionId(), null, false);
         Long conversation = action(answer).conversationId();
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        handoffs.close(action(answer), false);
         jdbc.update("update user_browser set human_held_at = ? where user_id = ?", Timestamp.from(clock.instant()), user.id());
 
         assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.HELD);
@@ -379,7 +378,7 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         fill = execution -> CallResult.success(resumable("login"));
         publicApproval.approve(user, answer.actionId(), null, false);
         Long conversation = action(answer).conversationId();
-        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        handoffs.close(action(answer), false);
         doThrow(new IllegalStateException("대시보드에 닿지 않는다")).when(hermes).readConnector(anyString(), anyString());
 
         assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.RETRY);

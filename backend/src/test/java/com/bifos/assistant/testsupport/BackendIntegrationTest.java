@@ -1,5 +1,6 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.browser.application.BrowserLeftTabs;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentService;
@@ -106,6 +107,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         AgentService.class,
         AppUserRepository.class,
         AttachmentService.class,
+        BrowserLeftTabs.class,
         ChatMessageRepository.class,
         ChatService.class,
         CheckNotificationPolicy.class,

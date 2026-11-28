@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
+import com.bifos.assistant.orchestration.application.dto.PluginCallEnded;
 import com.bifos.assistant.orchestration.application.dto.ToolTraceRecord;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 class RunTraceIntakeTest {
     private static final String PROFILE = "dad";
@@ -39,7 +41,8 @@ class RunTraceIntakeTest {
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
     private final ExecutionConnectorCalls connectorCalls = mock(ExecutionConnectorCalls.class);
     private final ToolTraceWriter writer = mock(ToolTraceWriter.class);
-    private final RunTraceIntake intake = new RunTraceIntake(bindings, executions, connectorBindings, connectorCalls, writer);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final RunTraceIntake intake = new RunTraceIntake(bindings, executions, connectorBindings, connectorCalls, writer, events);
     private final AgentExecution execution = mock(AgentExecution.class);
 
 
@@ -115,6 +118,22 @@ class RunTraceIntakeTest {
         assertThat(intake.receive(PROFILE, List.of(noTime))).isZero();
 
         verify(writer, never()).receive(anyLong(), anyString(), any());
+    }
+
+
+    @Test
+    @DisplayName("호출 번호가 있는 기록은 하위 에이전트 session 이어도 호출의 끝을 사건으로 내고, 번호 없는 기록은 내지 않는다")
+    void announcesPluginCallEnd() {
+        when(bindings.findByProfileNameAndSessionId(PROFILE, "child-1")).thenReturn(Optional.of(mock(HermesSessionBinding.class)));
+        ToolTraceRecord child = new ToolTraceRecord("root-1", "child-1", "call_2", "mcp__shop__search", 5L, false, null, null, STARTED);
+
+        intake.receive(PROFILE, List.of(child, record("terminal", "", false, null, null), failed("terminal", "실패", "tool_error")));
+
+        ArgumentCaptor<PluginCallEnded> ended = ArgumentCaptor.forClass(PluginCallEnded.class);
+        verify(events, times(2)).publishEvent(ended.capture());
+        assertThat(ended.getAllValues()).containsExactly(
+            new PluginCallEnded(PROFILE, "root-1", "child-1", "call_2", false),
+            new PluginCallEnded(PROFILE, "root-1", "root-1", "call_1", true));
     }
 
 
