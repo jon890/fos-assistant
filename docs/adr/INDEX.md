@@ -143,6 +143,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261121 / acp-runtime](ADR-20261121-acp-runtime.md) | 실행 port 를 런타임에 묶이지 않게 두고 두 번째 런타임은 ACP 구현 하나로 붙인다 | backend, frontend | Accepted. ADR-001 옆에 다른 런타임을 붙이는 경계를 정한다. ADR-086 과 [ADR-20261120 / no-local-shell](ADR-20261120-no-local-shell.md) 은 Hermes profile 에 그대로 적용하고, 다른 런타임의 명령 실행은 승인 카드로 묻는다 |
 | [ADR-20261121 / found-link-image-source](ADR-20261121-found-link-image-source.md) | 비서가 찾은 주소의 사진은 fos-ctx 가 결과에서 뽑아 알린 주소일 때만 받는다 | backend, hermes | Accepted. [ADR-20261120 / link-image-source](ADR-20261120-link-image-source.md) 의 「비서가 찾은 주소는 받지 않는다」 를 대체한다 |
 | [ADR-20261121 / purchase-approval](ADR-20261121-purchase-approval.md) | 구매는 매번 승인받고 결제 직전에 승인 금액을 확인한다 | backend, frontend, hermes | Accepted. [ADR-20261113 / purchase-checkout](ADR-20261113-purchase-checkout.md) 의 상한 관련 결정을 대체한다 |
+| [ADR-20261128 / agent-browser](ADR-20261128-agent-browser.md) | 에이전트는 Control Plane 내장 도구로 요청자의 「내 브라우저」 를 쓰고, 바꾸는 동작은 먼저 살펴보기에서도 승인 카드로만 한다 | backend, frontend | Accepted. ADR-080 의 읽기 경계와 ADR-082 의 쓰기 설정에 브라우저 예외를 둔다. [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) 가 미룬 범용 브라우저 길을 정한다 |
 
 ## 보관
 

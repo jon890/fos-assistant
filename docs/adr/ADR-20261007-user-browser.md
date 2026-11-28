@@ -4,6 +4,7 @@
 - Date: 2026-10-07
 - [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) 의 「사용자가 CDP 주소를 연결 칸에 넣는다」 를 바꾼다.
   [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간과 같은 방식(본문을 검사하는 Docker socket proxy)으로 컨테이너를 만들되, 정책과 proxy 는 따로 둔다.
+- 아래 「대안 기각」 에서 「나중에 따로 정한다」 로 미룬 「모델이 로그인된 세션으로 사이트를 다니는 길」 은 [ADR-20261128 / agent-browser](ADR-20261128-agent-browser.md) 가 정한다. Hermes 내장 browser 도구는 그대로 붙이지 않고, Control Plane 내장 도구가 요청자의 브라우저를 쓴다
 
 ### 결정
 
