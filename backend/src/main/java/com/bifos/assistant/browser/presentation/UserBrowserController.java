@@ -1,20 +1,27 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.browser.application.BrowserAgentControl;
 import com.bifos.assistant.browser.application.BrowserHumanHold;
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
+import com.bifos.assistant.browser.presentation.UserBrowserDtos.AgentControlRequest;
+import com.bifos.assistant.browser.presentation.UserBrowserDtos.AgentControlView;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.BrowserView;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.ScreenInputRequest;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.TakeoverRequest;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,6 +40,7 @@ public class UserBrowserController {
     private final UserBrowserService browsers;
     private final CurrentUserProvider currentUser;
     private final BrowserHumanHold holds;
+    private final BrowserAgentControl agentControl;
 
 
     /** 기능이 꺼져 있어도 200 이다. 화면이 「준비 중」 을 그릴 수 있게 한다. */
@@ -43,26 +51,39 @@ public class UserBrowserController {
             return BrowserView.disabled();
         }
         return browsers.get(userId)
-            .map(browser -> BrowserView.of(browser, browsers.idleTimeout()))
+            .map(this::view)
             .orElseGet(() -> BrowserView.missing(browsers.idleTimeout()));
+    }
+
+
+    /**
+     * 에이전트가 내 브라우저를 쓰게 하는 스위치를 바꾼다. 끄기는 늘 된다. 브라우저가 없으면 {@code BROWSER_NOT_FOUND}, 관리자가 꺼 두었는데 켜면
+     * {@code BROWSER_AGENT_CONTROL_OFF} 다.
+     */
+    @PutMapping("/agent-control")
+    public BrowserView agentControl(@RequestBody(required = false) AgentControlRequest body) {
+        CurrentUser user = currentUser.require();
+        requireEnabled();
+        agentControl.setUser(user, Optional.ofNullable(body).orElse(new AgentControlRequest(null)).required());
+        return browsers.get(user.id()).map(this::view).orElseGet(() -> BrowserView.missing(browsers.idleTimeout()));
     }
 
 
     @PostMapping
     public BrowserView create() {
-        return BrowserView.of(browsers.create(currentUser.require().id()), browsers.idleTimeout());
+        return view(browsers.create(currentUser.require().id()));
     }
 
 
     @PostMapping("/start")
     public BrowserView start() {
-        return BrowserView.of(browsers.start(currentUser.require().id()), browsers.idleTimeout());
+        return view(browsers.start(currentUser.require().id()));
     }
 
 
     @PostMapping("/stop")
     public BrowserView stop() {
-        return BrowserView.of(browsers.stop(currentUser.require().id()), browsers.idleTimeout());
+        return view(browsers.stop(currentUser.require().id()));
     }
 
 
@@ -115,6 +136,13 @@ public class UserBrowserController {
         requireEnabled();
         holds.giveBack(userId);
         return ResponseEntity.noContent().build();
+    }
+
+
+    private BrowserView view(UserBrowserSnapshot browser) {
+        CurrentUser user = currentUser.require();
+        var control = new AgentControlView(agentControl.userEnabled(user.id()), agentControl.adminAllowed(user.groupId()));
+        return BrowserView.of(browser, browsers.idleTimeout(), control);
     }
 
 

@@ -81,6 +81,13 @@ public class UserBrowser extends CreatedAtEntity {
     @Column(name = "human_held_at", insertable = false, updatable = false)
     private Instant humanHeldAt;
 
+    /**
+     * 에이전트가 이 브라우저를 쓰도록 사용자가 켠 시각이다. 비어 있으면 꺼짐이다. {@code humanHeldAt} 과 같이 엔티티는 읽기만 하고
+     * {@code UserBrowserRepository} 의 전용 갱신만 쓴다. 브라우저를 지우면 줄과 함께 사라져 꺼진다(docs/features/agent-browser/design.md).
+     */
+    @Column(name = "agent_control_at", insertable = false, updatable = false)
+    private Instant agentControlAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

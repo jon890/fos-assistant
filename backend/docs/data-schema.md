@@ -386,6 +386,8 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 `MEMORY_CONTEXT` 는 그룹의 기억 조립 예산이다. `{"version":1,"summaryMaxChars":4000,"maxChars":10000}` 이고 읽고 쓰는 일은 `MemoryContextSettings` 가 한다. 줄이 없으면 이 기본값이고, 모르는 버전이나 깨진 JSON 은 오류로 올리지 않고 기본값으로 돈다. 그 까닭과 허용 범위는 [기억](../../docs/features/memory.md) 의 「기억 예산 설정」 이 갖는다
 
+`BROWSER_AGENT_CONTROL` 은 관리자가 그룹 전체의 에이전트 브라우저 조작을 켰는지다. `{"version":1,"enabled":false}` 이고 읽고 쓰는 일은 `BrowserAgentControl` 이 한다. 줄이 없으면 허용이고, 모르는 버전이나 깨진 JSON 은 끈 것으로 본다. 끄려던 값을 잃고 허용하는 쪽으로 틀리지 않게 하려는 것이다
+
 `TOOLSET` 은 그룹이 일반 에이전트 도구 화면에서 숨긴 toolset 이다. `{"version":1,"hidden":["<toolset 이름>", ...]}` 이고 이름은 이름 순에 중복이 없다. 읽고 쓰는 일은 `ToolsetVisibilityService` 가 한다.
 
 - 줄이 없는 그룹은 숨김이 없어 모두 보인다
@@ -989,6 +991,7 @@ action을 지우면 실행 내용도 지운다.
 `user_id` 에 외래 키를 둔다. 사용자 줄이 지워지면 이 줄도 지워진다.
 쿠키, 저장소, 열린 주소, 화면 프레임은 이 표에 없다. 로그인 세션은 프로필 디렉터리에만 남는다.
 `human_held_at` 은 사람이 「직접 할게요」 로 브라우저를 쥔 시각이고 `RUNNING` 일 때만 뜻이 있다. 엔티티는 읽기만 하고 회수와 돌려주기는 조건부 갱신으로만 쓴다. 끄기와 상태 맞추기가 비운다. 결정은 [ADR-20261116 / browser-lock](../../docs/adr/ADR-20261116-browser-lock.md) 이 갖는다.
+`agent_control_at` 은 에이전트가 이 브라우저를 쓰도록 사용자가 켠 시각이고 비어 있으면 꺼짐이다. 엔티티는 읽기만 하고 켜기와 끄기는 전용 갱신으로만 쓴다. 브라우저를 지우면 함께 사라진다. 판정은 [에이전트의 내 브라우저 조작 설계](../../docs/features/agent-browser/design.md) 의 「PR1 스위치」 가 갖는다.
 
 ## 할 일과 먼저 알리기 표
 

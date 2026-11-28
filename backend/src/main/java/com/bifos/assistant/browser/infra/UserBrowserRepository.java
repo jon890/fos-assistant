@@ -60,4 +60,16 @@ public interface UserBrowserRepository extends JpaRepository<UserBrowser, Long> 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update UserBrowser b set b.humanHeldAt = null where b.id = :id and b.humanHeldAt is not null")
     int releaseHumanHold(@Param("id") Long id);
+
+
+    /** 에이전트 조작을 켠다. 이미 켰으면 처음 켠 시각을 둔다. 버전은 올리지 않는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update UserBrowser b set b.agentControlAt = :now where b.userId = :userId and b.agentControlAt is null")
+    int enableAgentControl(@Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /** 에이전트 조작을 끈다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update UserBrowser b set b.agentControlAt = null where b.userId = :userId and b.agentControlAt is not null")
+    int disableAgentControl(@Param("userId") Long userId);
 }

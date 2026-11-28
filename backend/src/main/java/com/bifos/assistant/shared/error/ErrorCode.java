@@ -355,6 +355,8 @@ public enum ErrorCode {
     BROWSER_HUMAN_HELD(HttpStatus.LOCKED),
     /** 브라우저를 쓰는 승인한 실행이 도는 중이라 사람이 넘겨받지 못한다. 실행이 끝나면 다시 할 수 있다. */
     BROWSER_APPROVAL_RUNNING(HttpStatus.CONFLICT),
+    /** 관리자가 그룹 전체의 에이전트 브라우저 조작을 꺼 두어 사용자가 켜지 못한다(docs/features/agent-browser/design.md). */
+    BROWSER_AGENT_CONTROL_OFF(HttpStatus.CONFLICT),
     /** 실행 공간 루트가 설정되지 않았거나 디렉터리가 아니다. 상태 조회 말고 모든 파일 공간 경로가 이 코드다. */
     WORKSPACE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /** 없는 경로, 링크를 지나는 경로, 본문을 줄 수 없는 종류를 같은 응답으로 숨긴다. 남의 공간은 경로로 닿을 수 없다. */

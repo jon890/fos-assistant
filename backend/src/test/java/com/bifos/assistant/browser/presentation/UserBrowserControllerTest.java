@@ -11,9 +11,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.browser.application.BrowserAgentControl;
 import com.bifos.assistant.browser.application.BrowserAgentTabs;
 import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
@@ -32,6 +34,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.user.application.GroupSettingStore;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.net.URI;
 import java.time.Clock;
@@ -46,6 +49,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -69,12 +73,19 @@ class UserBrowserControllerTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    PlatformTransactionManager transactions;
+
+    @Autowired
+    GroupSettingStore groupSettings;
+
     private final List<String> containers = new ArrayList<>();
 
 
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM user_browser");
+        jdbc.update("DELETE FROM group_setting WHERE setting_key = 'BROWSER_AGENT_CONTROL'");
         containers.clear();
         signIn(MEMBER);
     }
@@ -83,6 +94,7 @@ class UserBrowserControllerTest {
     @AfterEach
     void tearDown() {
         jdbc.update("DELETE FROM user_browser");
+        jdbc.update("DELETE FROM group_setting WHERE setting_key = 'BROWSER_AGENT_CONTROL'");
         SecurityContextHolder.clearContext();
     }
 
@@ -166,6 +178,42 @@ class UserBrowserControllerTest {
 
 
     @Test
+    @DisplayName("에이전트 조작 스위치는 처음에 꺼져 있고 사용자가 켜고 끈다. 관리자가 끄면 켜기는 409 이고 끄기는 되며, 사용자가 켜 둔 값은 남는다")
+    void togglesAgentControl() throws Exception {
+        MockMvc mvc = mvc(true);
+        mvc.perform(put("/api/v1/browser/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_NOT_FOUND.name()));
+        mvc.perform(post("/api/v1/browser")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.agentControl.enabled").value(false))
+            .andExpect(jsonPath("$.agentControl.adminAllowed").value(true));
+
+        mvc.perform(put("/api/v1/browser/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agentControl.enabled").value(true));
+        mvc.perform(put("/api/v1/browser/agent-control").contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isBadRequest());
+
+        signIn(ADMIN);
+        mvc.perform(get("/api/v1/admin/browsers/agent-control")).andExpect(jsonPath("$.enabled").value(true));
+        mvc.perform(put("/api/v1/admin/browsers/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        signIn(MEMBER);
+        mvc.perform(get("/api/v1/browser"))
+            .andExpect(jsonPath("$.agentControl.enabled").value(true))
+            .andExpect(jsonPath("$.agentControl.adminAllowed").value(false));
+        mvc.perform(put("/api/v1/browser/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agentControl.enabled").value(false));
+        mvc.perform(put("/api/v1/browser/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_AGENT_CONTROL_OFF.name()));
+    }
+
+
+    @Test
     @DisplayName("일반 사용자는 관리자 경로에서 403 이다")
     void forbidsAdminPathsToMember() throws Exception {
         MockMvc mvc = mvc(true);
@@ -175,6 +223,9 @@ class UserBrowserControllerTest {
             .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()));
         mvc.perform(post("/api/v1/admin/browsers/1/stop")).andExpect(status().isForbidden());
         mvc.perform(delete("/api/v1/admin/browsers/1")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/browsers/agent-control")).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/admin/browsers/agent-control").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+            .andExpect(status().isForbidden());
     }
 
 
@@ -225,9 +276,10 @@ class UserBrowserControllerTest {
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);
         when(names.find(MEMBER.id())).thenReturn("아이");
+        BrowserAgentControl control = new BrowserAgentControl(service, repository, groupSettings, Clock.systemUTC(), transactions);
         return MockMvcBuilders.standaloneSetup(
-            new UserBrowserController(service, currentUser, holds),
-            new UserBrowserAdminController(service, names, currentUser))
+            new UserBrowserController(service, currentUser, holds, control),
+            new UserBrowserAdminController(service, names, currentUser, control))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }

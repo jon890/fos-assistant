@@ -1,6 +1,8 @@
 package com.bifos.assistant.admin.browser.presentation;
 
 import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -28,6 +30,22 @@ public final class UserBrowserAdminDtos {
                 browser.lastError(),
                 browser.startedAt(),
                 browser.lastActiveAt());
+        }
+    }
+
+    /** 그룹 전체의 에이전트 브라우저 조작 스위치다. 거짓이면 켜 둔 사용자도 쓰지 않는다. */
+    public record AdminAgentControlView(boolean enabled) {
+    }
+
+    /** 그룹 전체 스위치를 바꾸는 본문이다. */
+    public record AdminAgentControlRequest(Boolean enabled) {
+
+        /** 칸이 없으면 {@code VALIDATION_FAILED} 다. */
+        static boolean required(AdminAgentControlRequest body) {
+            if (body == null || body.enabled() == null) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "enabled is required");
+            }
+            return body.enabled();
         }
     }
 }

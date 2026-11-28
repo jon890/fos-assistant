@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import com.bifos.assistant.browser.application.BrowserAgentControl;
 import com.bifos.assistant.browser.application.BrowserAgentTabs;
 import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
@@ -309,7 +310,7 @@ class UserBrowserScreenControllerTest {
             LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
             Clock.systemUTC(),
             screens);
-        return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider(), holds))
+        return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider(), holds, mock(BrowserAgentControl.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }
