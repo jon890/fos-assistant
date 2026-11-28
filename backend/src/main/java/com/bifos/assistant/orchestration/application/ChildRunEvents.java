@@ -3,6 +3,7 @@ package com.bifos.assistant.orchestration.application;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegatedRunActivity;
 import com.bifos.assistant.runtime.application.AgentRuntimes;
 import com.bifos.assistant.runtime.application.dto.RunEvent;
@@ -14,23 +15,26 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
+import com.bifos.assistant.usage.execution.domain.type.EventObservation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * {@link AgentRunner} 가 돌리는 실행의 사건을 남긴다. 시작과 끝은 직접 적고, 그 사이 도구 사건은 Hermes 사건 스트림에서 옮겨 적는다
  * (스펙 assistant-hub REQ3, 대화 turn 의 한 번에 받는 경로와 같다. ADR-090).
  *
  * <p>순서 번호는 실행마다 {@link ChildRunRecording} 하나가 1 부터 센다. 시작, 스트림 사건, 끝의 기록과 번호 증가는 모두 그
- * {@code ChildRunRecording} 을 잠근 채 한다. 끝을 적은 뒤에 온 스트림 사건은 적지도 알리지도 않는다.
+ * {@code ChildRunRecording} 을 잠근 채 한다. 성공을 먼저 기록했으면 짧은 시간 동안 앞서 적은 도구 시작의 완료만 받는다.
  *
  * <p>연결 도구의 내용은 스트림을 열 때 넘기는 {@link ToolDetailScope} 가 가린다(ADR-047, ADR-083). 도구 사건은 대화 화면의 도는 답에
  * 그리도록 {@link DelegatedRunActivity} 로도 알린다. 받는 쪽이 직접 위임인지 가른다.
@@ -42,6 +46,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ChildRunEvents {
 
+    private static final Duration LATE_TOOL_WINDOW = Duration.ofSeconds(1);
+
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
     private final AgentRuntimes runtimes;
@@ -50,6 +56,8 @@ public class ChildRunEvents {
     private final ExecutionEventRepository executionEvents;
     private final BackgroundTasks backgroundTasks;
     private final ApplicationEventPublisher events;
+    private final ConversationRepository conversations;
+    private final TransactionTemplate transactions;
 
 
     /** 실행 하나의 사건 기록을 시작한다. 관측 시작을 실행 줄에 적는다. 제출 전에 부른다. */
@@ -76,7 +84,7 @@ public class ChildRunEvents {
 
 
     /**
-     * 실행 줄에 끝난 상태를 적고, 끝 사건을 남기고, 기록을 닫는다. 열린 스트림은 닫고 그 뒤에 온 스트림 사건은 버린다.
+     * 실행 줄과 끝 사건을 먼저 적는다. 성공 결과를 돌려주는 동안 남은 도구 완료는 스트림 스레드가 받는다.
      *
      * <p>끝 상태 쓰기({@code finish})도 잠금 안에서 한다. 스트림 스레드가 같은 실행 줄 객체에 관측 상태를 적어 저장하는 것과 겹치지
      * 않게 하기 위해서다.
@@ -86,21 +94,70 @@ public class ChildRunEvents {
      */
     AgentExecution end(
         ChildRunRecording recording, Supplier<AgentExecution> finish, ExecutionEventType type, String detail) {
-        Closeable stream;
+        Thread reader;
+        Closeable streamToClose;
+        Long deadline;
         AgentExecution ended;
         synchronized (recording) {
-            if (recording.stream != null && !recording.streamEnded) {
-                executions.finishEventObservation(recording.execution, recording.terminalSeen);
+            reader = recording.streamEnded ? null : recording.streamThread;
+            boolean drain = !recording.closed && reader != null && type == ExecutionEventType.RUN_COMPLETED;
+            if (drain) {
+                recording.drainIncomplete = recording.execution.eventObservation() != EventObservation.OBSERVING;
+            } else if (!recording.closed && reader != null) {
+                executions.finishEventObservation(recording.execution, hasAllEvents(recording));
             }
             ended = finish.get();
             if (!recording.closed) {
                 store(recording, sequence -> eventRecorder.record(ended, type, detail, sequence));
             }
             recording.closed = true;
+            deadline = drain ? System.nanoTime() + LATE_TOOL_WINDOW.toNanos() : null;
+            recording.drainDeadline = deadline;
+            streamToClose = !drain && reader != null ? recording.stream : null;
+        }
+        if (deadline != null) {
+            limitDrain(recording, reader, deadline);
+        } else {
+            closeQuietly(streamToClose);
+        }
+        return ended;
+    }
+
+
+    private void limitDrain(ChildRunRecording recording, Thread reader, long deadline) {
+        try {
+            backgroundTasks.start("child-event-drain-" + recording.execution.id(), () -> {
+                try {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining > 0 && reader.join(Duration.ofNanos(remaining))) {
+                        return;
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+                expireDrain(recording, reader);
+            });
+        } catch (RuntimeException ex) {
+            log.warn("맡긴 실행의 사건 수집 상한을 시작하지 못했다 executionId={}", recording.execution.id(), ex);
+            expireDrain(recording, reader);
+        }
+    }
+
+
+    private static void expireDrain(ChildRunRecording recording, Thread reader) {
+        Closeable stream;
+        synchronized (recording) {
+            if (recording.streamEnded || recording.drainDeadline == null) {
+                return;
+            }
+            recording.drainDeadline = null;
             stream = recording.stream;
         }
-        closeQuietly(stream);
-        return ended;
+        if (stream == null) {
+            reader.interrupt();
+        } else {
+            closeQuietly(stream);
+        }
     }
 
 
@@ -130,34 +187,55 @@ public class ChildRunEvents {
 
     private void startStream(
         ChildRunRecording recording, Agent agent, String runId, Long conversationId, ToolDetailScope scope) {
-        AgentExecution execution = recording.execution;
-        backgroundTasks.start("child-event-stream-" + runId, () -> {
-            boolean[] terminalSeen = {false};
-            boolean complete = false;
-            try {
-                runtimes.of(agent.runtimeTarget()).openEvents(
-                    agent.runtimeTarget(),
-                    runId,
-                    event -> receive(recording, event, conversationId, terminalSeen),
-                    stream -> attach(recording, stream),
-                    scope);
-                complete = terminalSeen[0];
-            } catch (RuntimeException ex) {
-                if (isClosed(recording)) {
-                    // 실행이 끝나 이쪽이 스트림을 닫았다
-                    log.debug("맡긴 실행이 끝나 사건 스트림을 닫았다 executionId={}", execution.id());
-                } else {
-                    log.warn("맡긴 실행의 Hermes 사건 스트림이 끝 상태 전에 끝났다 executionId={} runId={}", execution.id(), runId, ex);
-                }
-            } finally {
-                synchronized (recording) {
-                    recording.streamEnded = true;
-                    if (!recording.closed) {
-                        executions.finishEventObservation(execution, complete);
-                    }
-                }
+        synchronized (recording) {
+            recording.streamThread = backgroundTasks.start("child-event-stream-" + runId,
+                () -> readStream(recording, agent, runId, conversationId, scope));
+        }
+    }
+
+
+    private void readStream(
+        ChildRunRecording recording, Agent agent, String runId, Long conversationId, ToolDetailScope scope) {
+        boolean returned = false;
+        try {
+            runtimes.of(agent.runtimeTarget()).openEvents(
+                agent.runtimeTarget(), runId, event -> receive(recording, event, conversationId),
+                stream -> attach(recording, stream), scope);
+            returned = true;
+        } catch (RuntimeException ex) {
+            if (acceptsEvents(recording)) {
+                log.warn("맡긴 실행의 Hermes 사건 스트림이 끊겼다 executionId={} runId={}",
+                    recording.execution.id(), runId, ex);
             }
-        });
+        } finally {
+            endStream(recording, returned);
+        }
+    }
+
+
+    private void endStream(ChildRunRecording recording, boolean returned) {
+        boolean completeLate;
+        synchronized (recording) {
+            boolean complete = returned && hasAllEvents(recording);
+            completeLate = complete && !recording.drainIncomplete && isDraining(recording);
+            recording.streamEnded = true;
+            recording.drainDeadline = null;
+            if (!recording.closed) {
+                executions.finishEventObservation(recording.execution, complete);
+            }
+        }
+        if (completeLate) {
+            try {
+                executions.completeLateEventObservation(recording.execution.id());
+            } catch (RuntimeException ex) {
+                log.warn("맡긴 실행의 후속 사건 관측 상태를 저장하지 못했다 executionId={}", recording.execution.id(), ex);
+            }
+        }
+    }
+
+
+    private static boolean hasAllEvents(ChildRunRecording recording) {
+        return recording.terminalSeen && recording.pendingTools.values().stream().allMatch(remaining -> remaining == 0);
     }
 
 
@@ -168,17 +246,35 @@ public class ChildRunEvents {
     }
 
 
-    private void receive(ChildRunRecording recording, RunEvent event, Long conversationId, boolean[] terminalSeen) {
+    private void receive(ChildRunRecording recording, RunEvent event, Long conversationId) {
         RunEventKind kind = event.kind();
+        String callId = event.toolCallId();
         synchronized (recording) {
-            if (recording.closed) {
+            if (!acceptsEvents(recording)) {
                 return;
             }
             if (kind != null && kind.terminal()) {
-                terminalSeen[0] = true;
                 recording.terminalSeen = true;
+                return;
             }
-            store(recording, sequence -> eventRecorder.record(recording.execution, event, sequence));
+            Integer pending = recording.pendingTools.get(callId);
+            if (kind == RunEventKind.TOOL_COMPLETED && pending != null && pending == 0) {
+                return;
+            }
+            if (recording.closed && !acceptsLateTool(recording, kind, pending)) {
+                return;
+            }
+            boolean stored = store(recording, sequence -> eventRecorder.record(recording.execution, event, sequence));
+            if (stored && callId != null && !callId.isBlank() && callId.length() <= ExecutionEvent.TOOL_CALL_ID_LIMIT) {
+                if (kind == RunEventKind.TOOL_STARTED) {
+                    recording.pendingTools.merge(callId, 1, Integer::sum);
+                } else if (kind == RunEventKind.TOOL_COMPLETED) {
+                    recording.pendingTools.put(callId, pending == null ? 0 : pending - 1);
+                }
+            }
+            if (recording.closed && !stored) {
+                return;
+            }
         }
         if (conversationId != null && (kind == RunEventKind.TOOL_STARTED || kind == RunEventKind.TOOL_COMPLETED)) {
             AgentExecution execution = recording.execution;
@@ -191,10 +287,28 @@ public class ChildRunEvents {
     }
 
 
-    private static boolean isClosed(ChildRunRecording recording) {
-        synchronized (recording) {
-            return recording.closed;
+    private static boolean acceptsLateTool(ChildRunRecording recording, RunEventKind kind, Integer pending) {
+        // 호출 번호를 재사용하는 런타임에서 앞서 기록한 시작을 하나로 특정할 수 있어야 한다.
+        if (kind == RunEventKind.TOOL_COMPLETED && pending != null && pending == 1) {
+            return true;
         }
+        if (kind == RunEventKind.TOOL_STARTED || kind == RunEventKind.TOOL_COMPLETED
+            || kind == RunEventKind.SUBAGENT_STARTED || kind == RunEventKind.SUBAGENT_COMPLETED) {
+            recording.drainIncomplete = true;
+        }
+        return false;
+    }
+
+
+    private static boolean acceptsEvents(ChildRunRecording recording) {
+        synchronized (recording) {
+            return !recording.streamEnded && (!recording.closed || isDraining(recording));
+        }
+    }
+
+
+    private static boolean isDraining(ChildRunRecording recording) {
+        return recording.drainDeadline != null && recording.drainDeadline - System.nanoTime() > 0;
     }
 
 
@@ -202,7 +316,7 @@ public class ChildRunEvents {
         boolean close;
         synchronized (recording) {
             recording.stream = stream;
-            close = recording.closed;
+            close = !acceptsEvents(recording);
         }
         if (close) {
             closeQuietly(stream);
@@ -211,19 +325,46 @@ public class ChildRunEvents {
 
 
     /** 사건 하나를 저장하고 번호를 올린다. 잠금 안에서 부른다. 저장하지 못하면 번호를 쓰지 않고 관측을 불완전으로 둔다. */
-    private void store(ChildRunRecording recording, IntFunction<ExecutionEvent> build) {
+    private boolean store(ChildRunRecording recording, IntFunction<ExecutionEvent> build) {
+        boolean stored = false;
         try {
             ExecutionEvent event = build.apply(recording.next);
             if (event == null) {
-                return;
+                return false;
             }
-            executionEvents.save(event);
+            Long conversationId = recording.execution.conversationId();
+            if (recording.closed && conversationId != null) {
+                if (!saveBeforePurge(recording, conversationId, event)) {
+                    return false;
+                }
+            } else {
+                executionEvents.save(event);
+            }
             recording.next++;
+            stored = true;
             eventRecorder.saved(event);
         } catch (RuntimeException ex) {
             log.warn("실행 사건을 남기지 못했다 executionId={}", recording.execution.id(), ex);
-            executions.finishEventObservation(recording.execution, false);
+            if (recording.closed) {
+                recording.drainIncomplete = true;
+            } else {
+                executions.finishEventObservation(recording.execution, false);
+            }
         }
+        return stored;
+    }
+
+
+    /** 대화 삭제 및 본문 정리와 같은 줄을 잠근다. 삭제가 먼저면 도구 결과를 다시 남기지 않는다. */
+    private boolean saveBeforePurge(ChildRunRecording recording, Long conversationId, ExecutionEvent event) {
+        return Boolean.TRUE.equals(transactions.execute(status -> {
+            if (conversations.findByIdForShare(conversationId).filter(row -> row.deletedAt() == null).isEmpty()
+                || !isDraining(recording)) {
+                return false;
+            }
+            executionEvents.save(event);
+            return true;
+        }));
     }
 
 

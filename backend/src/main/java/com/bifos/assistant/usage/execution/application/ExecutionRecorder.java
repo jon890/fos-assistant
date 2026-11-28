@@ -13,6 +13,7 @@ import com.bifos.assistant.usage.execution.domain.ExecutionConversation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionObservationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
@@ -20,6 +21,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
@@ -37,6 +39,7 @@ public class ExecutionRecorder {
     private final UserExecutionLimiter limiter;
     private final ExecutionContextSourceWriter contextSources;
     private final ExecutionCompletionRecorder completion;
+    private final ExecutionObservationRepository observations;
 
 
     /**
@@ -322,6 +325,13 @@ public class ExecutionRecorder {
         if (execution.finishEventObservation(complete)) {
             saveEventObservation(execution);
         }
+    }
+
+
+    /** 결과를 먼저 저장한 자식이 사건을 마저 받았다. 다른 스레드가 쓴 결과 전달 표시를 보존한다. */
+    @Transactional
+    public void completeLateEventObservation(Long executionId) {
+        observations.completeLateEventObservation(executionId);
     }
 
 

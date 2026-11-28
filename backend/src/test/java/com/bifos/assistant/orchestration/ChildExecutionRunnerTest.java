@@ -2,8 +2,11 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -20,8 +23,10 @@ import com.bifos.assistant.user.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.HermesRunEvent;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.runtime.domain.RunWait;
 import com.bifos.assistant.runtime.domain.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -37,17 +42,26 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.ConversationTierChoice;
+import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
+import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
+import com.bifos.assistant.usage.execution.domain.type.EventObservation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.io.Closeable;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -94,6 +108,15 @@ class ChildExecutionRunnerTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    HermesRunEventStream eventStream;
+
+    @Autowired
+    TrackingBackgroundTasks backgroundTasks;
+
+    @Autowired
+    ExecutionDeliveryWriter delivery;
 
     @Autowired
     ModelSettingStore settings;
@@ -189,6 +212,74 @@ class ChildExecutionRunnerTest {
             "example-model-large",
             "anthropic",
             new TokenUsage(30L, 10L, 5L, 35L));
+    }
+
+
+    @Test
+    @DisplayName("자식 결과를 부모에게 먼저 전해도 늦은 도구 완료와 전달 시각이 모두 남는다")
+    void preservesDeliveryAndLateToolCompletion() throws Exception {
+        CurrentUser dad = member("child-dad@example.com", "child-dad");
+        Conversation conversation = conversationOf(dad, "child-dad");
+        AgentExecution parent = parentOf(dad, conversation, "child-dad");
+        stub().willReturn(completed("run-late-tool", "조사 결과"));
+        CountDownLatch toolStarted = new CountDownLatch(1);
+        CountDownLatch resultDelivered = new CountDownLatch(1);
+        streamLateTool(toolStarted, resultDelivered);
+        stub().beforeAwait(() -> await(toolStarted));
+
+        ChildResult result = child(dad, conversation, parent, "child-dad", "조사해라");
+        Long executionId = result.executionId();
+        Instant deliveredAt = Instant.parse("2026-11-28T00:00:00Z");
+        try {
+            assertThat(result.output()).isEqualTo("조사 결과");
+            assertThat(executions.findById(executionId).orElseThrow().eventObservation())
+                .isEqualTo(EventObservation.INCOMPLETE);
+            assertThat(delivery.markResultDelivered(executionId, deliveredAt)).isEqualTo(1);
+        } finally {
+            resultDelivered.countDown();
+        }
+        backgroundTasks.awaitIdle(Duration.ofSeconds(5));
+
+        assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)))
+            .extracting(ExecutionEvent::eventType)
+            .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.TOOL_STARTED, ExecutionEventType.RUN_COMPLETED,
+                ExecutionEventType.TOOL_COMPLETED);
+        AgentExecution saved = executions.findById(executionId).orElseThrow();
+        assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(saved.eventObservation()).isEqualTo(EventObservation.OBSERVED);
+        assertThat(saved.resultDeliveredAt()).isEqualTo(deliveredAt);
+    }
+
+
+    private void streamLateTool(CountDownLatch toolStarted, CountDownLatch resultDelivered) {
+        doAnswer(call -> {
+            Consumer<HermesRunEvent> onEvent = call.getArgument(3);
+            Consumer<Closeable> onOpened = call.getArgument(4);
+            onOpened.accept(resultDelivered::countDown);
+            onEvent.accept(toolEvent("tool.started"));
+            toolStarted.countDown();
+            await(resultDelivered);
+            onEvent.accept(toolEvent("tool.completed"));
+            onEvent.accept(toolEvent("tool.completed"));
+            onEvent.accept(new HermesRunEvent("run.completed", null, null, null, null, null));
+            return null;
+        }).when(eventStream).open(any(), any(), eq("run-late-tool"), any(), any(), any());
+    }
+
+
+    private static HermesRunEvent toolEvent(String type) {
+        return new HermesRunEvent(type, null, "example_tool", null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, "call-late-tool");
+    }
+
+
+    private static void await(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ex);
+        }
     }
 
 

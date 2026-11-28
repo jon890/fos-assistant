@@ -46,7 +46,7 @@
 - `AgentRunner.run` 은 지금 `submit` 뒤 `awaitCompletion` 만 한다. 대화 turn 의 한 번에 받는 경로(`ChatRunEvents`)처럼 제출 뒤 사건 스트림을 열어 그 자식 실행 줄에 적는다. 스트림을 열지 못해도 실행은 이어 가고 사건만 없다(ADR-090 과 같다).
 - 순서 번호: 지금 `AgentRunner` 는 시작 1, 끝 2 를 직접 넣는다. 스트림 사건과 겹치면 `(execution_id, sequence)` 유일 제약에 걸려 사건이 조용히 사라진다. 실행마다 counter 하나를 두고 시작, 스트림 사건, 끝을 모두 그 counter 로 적는다(`ChatRunEvents` 의 `pending.counter()` 와 같은 꼴).
 - 가리기: 기록기가 아니라 스트림을 열 때 넘기는 `ToolDetailScope` 가 연결 도구 내용을 가린다. 자식 스트림에도 그 에이전트의 연결 도구 접두사와 트리 이력을 넘긴다(대화 turn 과 같은 값, ADR-047, ADR-083).
-- 관측 상태: 제출 전에 관측 시작을, 스트림이 끝날 때 관측 끝을 적는다(`beginEventObservation`, `finishEventObservation`). 스트림 대기 상한은 `hermes.run-timeout` 이고, 실행이 끝나면 스트림을 닫는다.
+- 관측 상태: 제출 전에 관측을 시작한다(`beginEventObservation`). 결과가 스트림보다 먼저 끝났을 때의 수집 범위는 아래 「실패와 일관성」에서 정한다.
 - 사건마다 `DelegatedRunActivity(conversationId, rootExecutionId, executionId, event)` Spring 사건을 낸다. `chat` 의 리스너는 대화 단위 SSE(`ConversationEventHub`)로 `delegation_activity` 사건을 publish 만 한다. 보는 사람마다의 가리기는 구독 쪽 `ChatEvent.forViewer` 가 하므로, 그 메서드에 `delegation_activity` 의 도구 칸 가리기(`ToolDetailPolicy`)와 내부 값 빼기를 더한다. 칸은 자식 실행 번호, 맡은 에이전트 이름표, 도구 사건 하나(대화 스트림의 `tool` 사건과 같은 칸)다.
 - 웹: 도는 답의 작업 과정 상태에 자식 실행 번호를 열쇠로 「도우미」 줄을 만들고 그 아래에 도구 줄을 넣는다. 끝난 뒤나 새로 고친 뒤는 지금처럼 트리(`fromTree`)가 같은 줄을 만든다. `fromTree` 는 이미 자식 노드의 사건을 도우미 줄과 도구 줄로 그린다.
 - 맡겨 둔 도우미: 답이 끝날 때 아직 도는 맡긴 실행의 도우미 줄은 지금 규칙대로면 「결과를 받지 못함」 이 되고 접힌 줄이 「끝까지 하지 못했어요」 로 바뀐다. 맡긴 실행(자식 실행 번호를 열쇠로 둔 줄)은 새 상태 「맡겨 둠」 으로 남기고 답의 실패 판정에서 뺀다. 트리(`fromTree`)도 위임 키가 있는 도는 자식을 같은 상태로 그린다. 문장은 「끝나면 이어서 알려 드려요」 이고 `docs/features/execution.md` 의 하위 에이전트 상태 표에 더한다.
@@ -86,7 +86,7 @@
 - 자식이 끝난 순간 `DelegationFinished` 로 깨우기가 돌아도, 부모 turn 이 대화 잠금을 쥐고 있어 열지 않고 turn 이 닫힐 때 다시 본다. 그 전에 도구가 `markResultDelivered` 를 적으므로 같은 결과로 자동 답이 생기지 않는다. 도구가 적기 전에 서버가 내려가면 기동 훑기가 지금처럼 자동 답을 연다. 결과를 잃지 않는다.
 - 기다리는 동안 MCP 요청 스레드 하나를 쥔다. Hermes 의 MCP 도구 호출 제한은 기본 300초이고 우리 profile 틀은 바꾸지 않는다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 「제한 시간은 우리가 정하지만 상한은 있다」). 2분은 그 안이다. 동시 기다림의 수는 루트당 동시 위임 한도와 전체 한도가 묶는다.
 - **같은 profile 의 호출이 멈춘다.** Hermes 는 profile 마다 Control Plane MCP 연결 하나를 잠금(`_rpc_lock`)으로 묶어 호출을 하나씩 보낸다. 기다리는 동안 같은 사용자의 비서로 도는 다른 실행의 Control Plane 도구 호출이 멈추고, 기다림이 줄을 서면 뒤 호출이 300초 제한에 걸릴 수 있다. 사용자가 이 위험을 받아들였다(스펙 DECISION28). 맡은 실행이 같은 profile 이면 그 실행이 끝날 수 없으므로 `DelegationWaiter` 가 기다리지 않는다.
-- 사건 스트림이 끊기거나 늦게 와도 자식의 끝은 `awaitCompletion` 이 정한다. 끝난 뒤 온 사건은 버린다(ADR-090 과 같다).
+- 자식 결과는 `awaitCompletion` 이 정하며 부모는 사건 스트림과 별개로 결과를 받는다. 성공을 먼저 적으면 기존 스트림을 최대 1초 더 읽는다. 같은 실행에서 호출 번호로 시작 줄 하나가 짝지어지는 도구 완료를 한 번만 저장하고 대화에 알린다. 끝 사건까지 받고 시작과 완료가 짝을 이루면 관측 완료로 적는다. 스트림이 끊겼거나 마저 받지 못하면 실행 기록에 관측 불완전으로 남긴다.
 - 배포 순서: PR1 은 Control Plane 과 웹만 바꾼다. 웹이 먼저 떠도 `delegation_activity` 를 받지 않을 뿐이고, Control Plane 이 먼저 떠도 웹이 모르는 사건을 버린다.
 - 배포 순서(PR2 앞 PR): 웹과 Control Plane 을 함께 배포한다. Control Plane 만 먼저 뜨거나 옛 화면 탭이 열린 채로 남으면, 옛 웹은 새로 고치기 전까지 새 대화를 목록의 첫 에이전트로 보낸다. 그 에이전트가 기본 비서가 아니면 `VALIDATION_FAILED` 로 거절되고, 옛 `@` 맡김 보내기도 거절된다. 저장되는 것은 없고 입력한 글은 입력창에 돌아온다.
 - 배포 순서(PR2 뒤 PR): 웹과 Control Plane 을 함께 배포한다. 옛 화면 탭에서 비서가 아닌 대화에 보내면 `VALIDATION_FAILED` 로 거절되고 글은 입력창에 돌아온다. 옛 작업 화면이 보내는 `agentCode` 는 버리고 기본 비서로 저장한다.
