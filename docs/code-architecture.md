@@ -34,6 +34,47 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 둘은 만드는 방법이 달라 설정도 다르다.
 `fos-home-infra` 가 그 차이를 소유한다.
 
+## 사용자별 실행 경계
+
+사용자 요청이 Hermes 를 거쳐 실행 공간, 플러그인, 「내 브라우저」 에 닿을 때 구간마다 누가 인증하고 무엇이 막는지를 적는다.
+**profile 을 나눈 것은 Hermes 안의 논리 경계다. OS 권한 경계가 아니다.** 공유 gateway 는 모든 profile 을 한 프로세스, 한 OS 계정으로 돌리고, 플러그인 MCP 서버는 그 프로세스의 자식이다([`hermes-contract.md`](../hermes/docs/hermes-contract.md) 의 「공유 listener 가 바꾸는 경계」 와 「무엇이 실행 공간 안에서 도는가」, [ADR-20261008 / browser-gateway-token](../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「맥락」).
+그래서 아래 표는 OS 권한과 서버의 권한 판정을 따로 적는다.
+
+확인 수준은 셋이다.
+
+- **소스·구성 확인**: 소스나 측정 기록으로 판정했다. 근거 절을 함께 적는다.
+- **합성 검사**: 합성 사용자 둘 이상으로 자기 자원은 쓰고 남의 자원은 거절되는 것을 테스트가 매번 확인한다.
+- **운영 확인 필요**: 운영 저장소의 설정(Docker proxy 정책, 망, 방화벽)에 기댄다. 별도 승인을 받아 운영에서 확인한다.
+
+| 구간 | 인증 주체 | 프로세스와 OS 권한 | 닿는 파일 범위 | 쓰는 토큰의 주인 | 강제 경계 | 확인 수준과 검사 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 웹 → Control Plane | 사용자. 웹 서버 라우트가 세션에서 요청마다 짧은 수명 JWT 를 만든다 | 공용 서비스 | 데이터베이스와 사용자별 저장소. 사용자 본문은 사용자 key 로 암호화한다 | 사용자 | Control Plane 이 JWT 의 사용자로 대화, 첨부, 작업 공간, 브라우저를 고른다. 남의 것은 없는 것과 같은 404 다 | 합성 검사: `ConversationPublicIdTest`, `AttachmentServiceTest`, `WorkspaceControllerTest`, `WorkspaceServiceTest`, `UserBrowserScreenControllerTest`, `ChatAttachmentTurnTest` |
+| Control Plane → Hermes 실행 | profile. 그 profile 의 `API_SERVER_KEY` | Hermes gateway 한 프로세스. 모든 profile 이 같은 OS 계정이다 | Hermes 홈 전체. profile 경계는 Hermes 의 secret scope 와 설정 scope 가 정한다 | profile key | 요청자가 쓸 수 있는 에이전트에서만 profile 을 꺼낸다. Hermes 는 남의 접두, 남의 key, 남의 실행 번호를 404 나 401 로 거절한다 | 합성 검사: `AgentToolServiceAccessTest`, `AgentConnectionControllerTest`. Hermes 쪽은 소스·구성 확인([「profile 접두」](../hermes/docs/hermes-contract.md#profile-접두)) |
+| Hermes → AI 모델 | **의도적으로 공유한다.** `SHARED_HOUSEHOLD` 에이전트는 그룹이 함께 쓰는 AI 계정이다. `DEDICATED` 만 그 profile 의 계정이다 | Hermes gateway | 해당 없음 | 그룹의 AI 계정이나 그 profile 의 계정 | 경계를 두지 않기로 했다([ADR-002](../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)). 사용량은 Control Plane 실행 기록이 사용자별로 센다. 개인 연동 권한과 다른 줄이다 | 소스·구성 확인([「OAuth credential 은 여기서 빠진다」](../hermes/docs/hermes-contract.md#oauth-credential-은-여기서-빠진다)) |
+| Hermes → Control Plane MCP | profile 의 `agent_token` 과 루트 session 서명. 사용자는 실행 기록에서 정한다 | Hermes gateway | 해당 없음 | profile 토큰 | `McpCallerResolver` 가 origin 실행의 사용자로만 기억, 결과물, 파일 공간, 위임을 연다([MCP 요청자](features/mcp.md#mcp-요청자)) | 합성 검사: `McpPrincipalTest`, `McpAgentToolsTest`, `McpArtifactWriteToolTest`, `McpFileSpacePutToolTest`, `RunTraceEndpointTest` |
+| 셸과 파일 도구(실행 공간) | 실행 공간 정책이 받는 profile 과 그 주인. 목록에 적은 profile 과, `isolate_unlisted` 를 켜면 목록 밖 named profile 도 공통 설정으로 받는다 | 사용자나 profile 마다 docker 컨테이너. 컨테이너 안은 root 이고 capability 를 줄였다 | 그 주인의 `/workspace`, 그 주인의 첨부(읽기 전용), 그 profile 의 스킬과 media cache, 플러그인 출력(읽기 전용), 운영 정책이 정한 읽기 전용 마운트 | 없음. 컨테이너에 비밀 env 를 넣지 않는다. 예외는 운영 정책이 그 profile 에 붙인 token 파일이고, 그 셸은 그 token 의 권한을 모두 쓴다([「profile 별 적용」](../hermes/docs/hermes-contract.md#profile-별-적용)) | 대시보드 plugin 의 정책이 마운트를 정하고, 컨테이너 생성 본문을 검사하는 Docker proxy 가 bind 와 권한을 막는다. local 셸은 켜지 않고 `default` profile 은 거절한다([ADR-20261121 / sandbox-default-policy](../hermes/docs/adr/ADR-20261121-sandbox-default-policy.md)) | 합성 검사: `test_dashboard_profile_api_sandbox_attachments.py`, `test_dashboard_profile_api_sandbox_terminal.py`, `test_dashboard_profile_api_sandbox_policy.py`. 측정: [「측정 결과」](../hermes/docs/hermes-contract.md#측정-결과). 운영 확인 필요: Docker proxy 정책, 전용 망, 같은 LAN 으로 나가는 길의 방화벽 |
+| 로컬 플러그인 MCP 프로세스 | 연결의 주인. 실행기가 그 연결의 보관 파일을 풀어 그 프로세스 env 에만 넣는다 | **Hermes 의 자식 프로세스. Hermes 와 모든 사용자의 플러그인이 같은 OS 계정이다.** 실행 공간 밖이다 | **Hermes 컨테이너의 파일 전체** | 연결 주인의 자격증명 | 호출마다 fos-ctx 가 Control Plane 에 묻고, 연결 주인과 실행의 사용자가 다르면 막는다. **OS 권한 경계는 없다**(아래 「경계 없음」 1) | 합성 검사: `ConnectorPolicyEndpointTest`, `ConnectorGuardSupportTest`, `ConnectorActionExecutionTest`, `test_connector_launcher.py`, `test_fos_ctx.py` |
+| 원격 플러그인 | 연결의 주인. 붙인 에이전트 profile 의 `.env` 에 값을 복사한다 | Hermes gateway 가 직접 연결한다 | 해당 없음 | 연결 주인의 자격증명 | 위와 같은 호출 판정. **사본이 profile `.env` 에 있어 같은 OS 계정의 프로세스가 읽는다**(아래 「경계 없음」 1) | 소스·구성 확인([「플러그인 비밀값을 두는 곳」](#플러그인-비밀값을-두는-곳)) |
+| 「내 브라우저」 중계 | 접근 표식. 바인딩 표식은 그 연결의 주인, 호출 표식은 그 사용자다. HMAC 서명이고 호출 표식은 5분 뒤 만료된다 | 사용자마다 브라우저 컨테이너 하나. 프로필 디렉터리도 사용자마다 따로다 | 그 사용자의 브라우저 프로필 | 표식의 주인 | Control Plane 중계가 서명, 바인딩, 만료, 허용 목록, 사람 잠금을 본 뒤 그 주인의 브라우저에만 넘긴다. 브라우저 망에서 브라우저에 닿는 것은 Control Plane 하나다 | 합성 검사: `BrowserGatewayTest`(합성 사용자 둘), `BrowserGatewayTokensTest`, `UserBrowserScreenControllerTest`. 운영 확인 필요: 브라우저 망에 Hermes 와 실행 공간이 닿지 않는 것 |
+| Hermes 내장 브라우저(`browser_*`) | 해당 없음 | Hermes 컨테이너 | Hermes 컨테이너 | 해당 없음 | **기능을 보류했다.** profile 틀이 toolset 을 끈다 | 소스·구성 확인([「같은 프로세스에 남는 구멍」](../hermes/docs/hermes-contract.md#같은-프로세스에-남는-구멍)) |
+
+### 경계 없음
+
+강제 경계가 없는 실행 경로다. 고칠지, 그 기능을 보류할지는 따로 정한다.
+
+1. **로컬 플러그인 MCP 프로세스는 다른 사용자의 비밀과 같은 OS 계정에서 돈다.**
+   위치는 Hermes 가 띄우는 stdio MCP 서버와 대시보드 plugin 의 보관 파일이다.
+   같은 계정이라 파일 권한이 막지 않는 것은 보관 key, 다른 사용자의 보관 파일과 OAuth 파일, 다른 profile 의 `.env`(원격 플러그인 사본 포함), 다른 바인딩의 서버 정의다. 서버 정의에는 만료 없는 바인딩 표식이 든 중계 주소가 있다.
+   profile `.env` 에는 그 profile 의 `API_SERVER_KEY`, AI provider key, Control Plane MCP 토큰도 있다.
+   영향은 플러그인 하나의 코드나 의존이 뚫리면 모든 사용자의 플러그인 자격증명과 「내 브라우저」 로그인에 닿고, 다른 profile 로 실행을 띄우거나 그 profile 의 이름으로 Control Plane MCP 를 부를 수 있다는 것이다.
+   지금 막는 것은 이 저장소가 검토한 플러그인 코드뿐이다([ADR-20261008 / browser-gateway-token](../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「맥락」). 보관 key 와 보관 파일을 같은 계정이 읽는다는 것은 [ADR-20261103 / connector-vault-key](../hermes/docs/adr/ADR-20261103-connector-vault-key.md) 의 「결과」 가 적는다.
+   호출 판정(연결 주인과 실행 사용자 비교)은 모델이 부르는 도구만 막고 프로세스 자체를 막지 않는다.
+2. **Hermes gateway 의 profile 경계는 한 프로세스 안의 scope 다.**
+   모든 profile 의 설정과 `.env` 를 한 OS 계정이 읽는다. Hermes core 의 scope 처리에 결함이 있으면 다른 profile 의 값이 섞일 수 있고 OS 가 막지 않는다.
+   Control Plane 을 모든 사용자가 함께 쓰는 것과 같은 이미지를 profile 마다 다시 쓰는 것은 이 문제가 아니다. 이 항목은 실행하는 프로세스의 OS 권한이 사용자마다 나뉘지 않는다는 것만 말한다.
+3. **실행 공간 밖에서 Hermes 프로세스 권한으로 도는 도구 경로가 남아 있다.**
+   파일 도구의 존재 확인과 `text_to_speech` 의 출력 경로 쓰기다. 상한은 Hermes 의 경로 검사뿐이고 OS 계정 경계는 없다. 목록과 지금 상태는 [「같은 프로세스에 남는 구멍」](../hermes/docs/hermes-contract.md#같은-프로세스에-남는-구멍) 이 갖는다.
+
 ## 모델 판단을 구조로 정하는 범위
 
 판단의 수준, 축, 종류 같은 분류를 테이블 컬럼이나 enum으로 고정하지 않는다.
