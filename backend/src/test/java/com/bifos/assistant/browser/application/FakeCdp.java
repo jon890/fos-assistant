@@ -29,6 +29,7 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
     public final List<String> attached = new CopyOnWriteArrayList<>();
     /** 앞으로 가져온 탭 번호다. */
     public final List<String> activated = new CopyOnWriteArrayList<>();
+    public final List<String> closedTabs = new CopyOnWriteArrayList<>();
 
     /** 연 탭 표다. {@link #openers(URI)} 가 돌려준다. */
     public final Map<String, String> openers = new ConcurrentHashMap<>();
@@ -73,6 +74,12 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
     @Override
     public void activate(URI cdp, String id) {
         activated.add(id);
+    }
+
+
+    @Override
+    public void closeTab(URI cdp, String id) {
+        closedTabs.add(id);
     }
 
 
