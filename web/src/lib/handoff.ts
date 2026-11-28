@@ -87,30 +87,78 @@ export const HANDOFF_TEXT: Record<
   },
 };
 
-/** 카드의 단추 하나다. 누르면 `text` 를 다음 메시지로 보낸다. */
-export type HandoffAction = { label: string; text: string };
+/**
+ * 카드의 단추가 서버에 알리는 것이다. `DONE` 은 마쳤으니 이어 가라는 것이고 `STOP` 은 그만둔다는 것이다. 동작은
+ * `docs/features/mobile-default-chat/design.md` 의 「단추 닫기 API」 가 갖는다.
+ */
+export type HandoffOutcome = "DONE" | "STOP";
+
+/** 닫기 API 의 답이다. `CONTINUE` 와 `STOPPED` 에서만 단추의 글을 보낸다. */
+export type HandoffCloseResult =
+  "CONTINUE" | "STOPPED" | "UNAVAILABLE" | "ALREADY_CLOSED";
+
+const CLOSE_RESULTS: readonly HandoffCloseResult[] = [
+  "CONTINUE",
+  "STOPPED",
+  "UNAVAILABLE",
+  "ALREADY_CLOSED",
+];
+
+/** 「그만할래요」 가 보내는 글이다. 비서가 그 일을 멈추고 다시 부르지 않게 한다. */
+export const HANDOFF_STOP =
+  "이 일은 그만할게요. 멈춘 단계부터 이어 가지 않아도 돼요.";
+
+/** 카드의 단추 하나다. 누르면 서버가 그 카드를 닫고, 처음 닫은 때만 `text` 를 다음 메시지로 보낸다. */
+export type HandoffAction = {
+  label: string;
+  text: string;
+  outcome: HandoffOutcome;
+};
 
 /**
- * 카드와 옆 패널이 보일 단추다. 결제 카드만 「결제했어요」 와 「사지 않을래요」 둘이고(사용자 결정 2026-11-16), 다른 카드는 「다 했어요」 하나다.
- * 결제하지 않고 탭만 닫아도 「결제를 마쳤어요」 를 보내던 것을 막는다. 동작은 `docs/features/user-browser.md` 의 「대화 위 화면」 이 갖는다.
+ * 카드와 옆 패널이 보일 단추다. 결제 카드는 「결제했어요」 와 「사지 않을래요」 이고(사용자 결정 2026-11-16), 다른 카드는 「다 했어요」 와
+ * 「그만할래요」 다(mobile-default-chat spec DECISION3, DECISION14). 결제하지 않고 탭만 닫아도 「결제를 마쳤어요」 를 보내던 것을 막는다.
+ * 동작은 `docs/features/user-browser.md` 의 「대화 위 화면」 이 갖는다.
  */
 export function handoffActions(need: HandoffNeed): HandoffAction[] {
   if (need === "PAYMENT")
     return [
-      { label: "결제했어요", text: HANDOFF_TEXT.PAYMENT.done },
+      {
+        label: "결제했어요",
+        text: HANDOFF_TEXT.PAYMENT.done,
+        outcome: "DONE",
+      },
       {
         label: "사지 않을래요",
         text: "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요.",
+        outcome: "STOP",
       },
     ];
-  return [{ label: "다 했어요", text: HANDOFF_TEXT[need].done }];
+  return [
+    { label: "다 했어요", text: HANDOFF_TEXT[need].done, outcome: "DONE" },
+    { label: "그만할래요", text: HANDOFF_STOP, outcome: "STOP" },
+  ];
+}
+
+/** 닫기 API 의 응답을 읽는다. 모양이 틀리면 null 이다. */
+export function safeHandoffClose(value: unknown): HandoffCloseResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = (value as Record<string, unknown>).result;
+  return CLOSE_RESULTS.includes(result as HandoffCloseResult)
+    ? (result as HandoffCloseResult)
+    : null;
+}
+
+/** 닫기 답을 받고 단추의 글을 보낼지다. 다른 창이 먼저 닫았거나 이어 갈 수 없으면 보내지 않는다. */
+export function handoffCloseSends(result: HandoffCloseResult): boolean {
+  return result === "CONTINUE" || result === "STOPPED";
 }
 
 /** 카드 본문 끝의 안내다. 단추 이름을 그대로 쓴다. */
 export function handoffDoneHint(need: HandoffNeed): string {
   return need === "PAYMENT"
     ? "결제했으면 「결제했어요」를, 사지 않을 거면 「사지 않을래요」를 눌러 주세요."
-    : "마친 뒤 「다 했어요」를 눌러 주세요.";
+    : "마친 뒤 「다 했어요」를, 그만둘 거면 「그만할래요」를 눌러 주세요.";
 }
 
 /** 화면 입력 `tab` 의 `id` 와 같은 모양이다. */

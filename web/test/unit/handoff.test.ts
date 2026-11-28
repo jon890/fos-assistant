@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   HANDOFF_NEEDS,
+  HANDOFF_STOP,
   HANDOFF_TEXT,
+  handoffCloseSends,
   handoffActions,
   handoffBrowserHref,
   handoffDoneHint,
@@ -11,6 +13,7 @@ import {
   newHandoffs,
   rebaseHandoffWatch,
   safeHandoff,
+  safeHandoffClose,
   watchHandoffTab,
   type Handoff,
 } from "../../src/lib/handoff.ts";
@@ -134,17 +137,33 @@ test("처음 읽은 번호에 없는 넘기기만 새 넘기기로 보고 받은
   assert.deepEqual(newHandoffs(new Set(["a"]), [first]), []);
 });
 
-test("결제 카드만 「결제했어요」 와 「사지 않을래요」 두 단추이고 다른 카드는 「다 했어요」 하나다", () => {
+test("결제 카드는 「결제했어요」 와 「사지 않을래요」, 다른 카드는 「다 했어요」 와 「그만할래요」 이고 단추마다 닫는 뜻이 있다", () => {
   assert.deepEqual(handoffActions("PAYMENT"), [
-    { label: "결제했어요", text: "「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요." },
-    { label: "사지 않을래요", text: "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요." },
+    { label: "결제했어요", text: "「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요.", outcome: "DONE" },
+    { label: "사지 않을래요", text: "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요.", outcome: "STOP" },
   ]);
   for (const need of HANDOFF_NEEDS.filter((value) => value !== "PAYMENT")) {
-    assert.deepEqual(handoffActions(need), [{ label: "다 했어요", text: HANDOFF_TEXT[need].done }]);
-    assert.equal(handoffDoneHint(need), "마친 뒤 「다 했어요」를 눌러 주세요.");
+    assert.deepEqual(handoffActions(need), [
+      { label: "다 했어요", text: HANDOFF_TEXT[need].done, outcome: "DONE" },
+      { label: "그만할래요", text: HANDOFF_STOP, outcome: "STOP" },
+    ]);
+    assert.equal(handoffDoneHint(need), "마친 뒤 「다 했어요」를, 그만둘 거면 「그만할래요」를 눌러 주세요.");
   }
   assert.ok(handoffDoneHint("PAYMENT").includes("「사지 않을래요」"));
 });
+
+
+test("닫기 답은 계약 안의 값만 읽고, 처음 닫은 이어 가기와 그만두기만 글을 보낸다", () => {
+  assert.equal(safeHandoffClose({ result: "CONTINUE" }), "CONTINUE");
+  assert.equal(safeHandoffClose({ result: "DONE" }), null);
+  assert.equal(safeHandoffClose(null), null);
+  assert.equal(safeHandoffClose([]), null);
+  assert.deepEqual(
+    (["CONTINUE", "STOPPED", "UNAVAILABLE", "ALREADY_CLOSED"] as const).map(handoffCloseSends),
+    [true, true, false, false],
+  );
+});
+
 
 test("사람이 브라우저를 쓰는 중 넘기기는 탭 없이도 카드로 읽고, 다른 사람 화면은 탭 없이 오면 버린다", () => {
   const held = safeHandoff({ ...row, need: "HUMAN_BROWSER", tab: null });

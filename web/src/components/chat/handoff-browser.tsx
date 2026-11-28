@@ -12,6 +12,7 @@ import {
   rebaseHandoffWatch,
   watchHandoffTab,
   type Handoff,
+  type HandoffAction,
   type HandoffWatch,
 } from "@/lib/handoff";
 
@@ -34,7 +35,7 @@ export function HandoffBrowser({
 }: {
   handoff: Handoff;
   onClose(): void;
-  onDone(text: string): void;
+  onDone(action: HandoffAction): void;
   conversationId: string | null;
   /** 화면의 「돌려주기」 가 성공한 뒤 부른다. 열린 넘기기가 있으면 글을 보낸다. */
   onGivenBack(): void;
@@ -103,13 +104,13 @@ export function HandoffBrowser({
                   <Button
                     key={action.label}
                     size="sm"
-                    onClick={() => onDone(action.text)}
+                    onClick={() => onDone(action)}
                   >
                     {action.label}
                   </Button>
                 ))
               ) : (
-                <Button size="sm" onClick={() => onDone(text.done)}>
+                <Button size="sm" onClick={() => onDone(actions[0])}>
                   다 했어요, 이어서 해 주세요
                 </Button>
               )}
@@ -130,7 +131,7 @@ export function HandoffBrowser({
               <Button
                 key={action.label}
                 size="sm"
-                onClick={() => onDone(action.text)}
+                onClick={() => onDone(action)}
               >
                 {action.label}
               </Button>
