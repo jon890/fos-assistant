@@ -43,8 +43,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class BrowserTabControl {
 
-    /** 점으로 나눈 IPv4 표기다. 이름 풀이 없이 IP 로 읽을 것만 고른다. */
-    private static final Pattern IPV4 = Pattern.compile("^[0-9.]+$");
+    /** 0 으로 시작하지 않는 네 마디 십진 IPv4 표기다. */
+    private static final Pattern IPV4 = Pattern.compile("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$");
+    /** 마디가 모두 숫자나 0x 16진수인 호스트다. 브라우저가 IP 로 읽는다. */
+    private static final Pattern NUMERIC = Pattern.compile("^(0x[0-9a-f]*|[0-9]+)(\\.(0x[0-9a-f]*|[0-9]+))*$");
 
     private final UserBrowserRepository repository;
     private final UserBrowserService browsers;
@@ -188,7 +190,12 @@ public class BrowserTabControl {
     }
 
 
-    private static boolean internalHost(String host) {
+    /** 끝의 점을 떼고 본다. 숫자 꼴의 호스트는 0 으로 시작하지 않는 네 마디 십진 표기만 받는다. Chrome 이 8진수와 16진수로 읽기 때문이다. */
+    private static boolean internalHost(String raw) {
+        String host = raw.replaceAll("\\.+$", "");
+        if (NUMERIC.matcher(host).matches() && !IPV4.matcher(host).matches()) {
+            return true;
+        }
         if (host.startsWith("[") || IPV4.matcher(host).matches()) {
             try {
                 // IP 표기라 이름 풀이 없이 읽는다. 표기가 틀려 풀이로 넘어가 실패하면 내부 주소로 본다

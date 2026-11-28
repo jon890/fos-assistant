@@ -26,6 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 class BrowserTabRequester implements BrowserTabRequests {
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** 카드 한 줄에 보일 제목의 글자 수 상한이다. */
+    static final int MAX_TITLE = 80;
     private final ControlPlaneApprovals approvals;
 
 
@@ -66,7 +68,9 @@ class BrowserTabRequester implements BrowserTabRequests {
 
     /** 카드의 한 줄이다. 사이트는 서버가 주소에서 꺼낸 호스트다. 제목은 페이지가 정한 글이라 사이트와 함께 보인다. */
     static String line(CdpTarget tab) {
-        String title = tab.title() == null || tab.title().isBlank() ? "(제목 없음)" : tab.title().strip();
+        // 제목은 페이지가 정한다. 줄바꿈으로 카드에 가짜 줄을 만들지 못하게 제어 문자와 공백을 한 칸으로 줄이고 자른다
+        String title = tab.title() == null ? "" : tab.title().replaceAll("[\\p{Cntrl}\\p{Z}\\s]+", " ").strip();
+        title = title.isEmpty() ? "(제목 없음)" : title.length() > MAX_TITLE ? title.substring(0, MAX_TITLE) + "…" : title;
         return title + " · " + host(tab.url());
     }
 

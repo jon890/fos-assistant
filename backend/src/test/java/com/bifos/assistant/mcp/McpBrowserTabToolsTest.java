@@ -265,6 +265,43 @@ class McpBrowserTabToolsTest {
     }
 
 
+    @Test
+    @DisplayName("카드에서 가려지는 주소, 대화 없는 실행은 카드를 띄우지 않고, 모양이 틀린 인자는 인자 오류다")
+    void refusesUndisplayableAndMalformed() throws Exception {
+        turnOn(dad);
+
+        JsonNode hidden = call("browser_tab_open", url("https://www.example.com/reset?token=" + "a1b2c3d4".repeat(6)));
+        assertThat(text(hidden)).contains("url_not_displayable");
+        assertThat(call("browser_tab_close", tabIds()).has("error")).isTrue();
+        assertThat(call("browser_tab_close", tabIds(new String[21])).has("error")).isTrue();
+        assertThat(call("browser_tab_open", url("https://www.example.com/" + "a".repeat(2001))).has("error")).isTrue();
+        assertThat(call("browser_tabs", url("https://www.example.com/")).has("error")).isTrue();
+
+        jdbc.update("UPDATE agent_execution SET conversation_id = NULL WHERE id = ?", run.id());
+        assertThat(text(call("browser_tab_close", tabIds("TAB1")))).contains("no_conversation");
+        assertThat(actions.findAll()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("카드를 띄운 뒤 관리자가 그룹 전체를 끄면 승인해도 닫지 않고, 다음 호출도 거절한다")
+    void adminOffBeforeApprovalRefuses() throws Exception {
+        turnOn(dad);
+        call("browser_tab_close", tabIds("TAB1"));
+        ConnectorAction card = actions.findAll().getFirst();
+        control.setAdmin(dad.groupId(), false);
+        try {
+            var finished = actionService.approve(current(dad), card.publicId(), null, false);
+
+            assertThat(finished.status()).isEqualTo(ActionStatus.FAILED);
+            assertThat(cdp.closed).isEmpty();
+            assertThat(text(call("browser_tabs", json.createObjectNode()))).contains("admin_off").doesNotContain("TAB1");
+        } finally {
+            jdbc.update("DELETE FROM group_setting WHERE setting_key = 'BROWSER_AGENT_CONTROL'");
+        }
+    }
+
+
     private void turnOn(AppUser user) {
         browsers.create(user.id());
         browsers.start(user.id());
@@ -276,7 +313,7 @@ class McpBrowserTabToolsTest {
         ObjectNode arguments = json.createObjectNode();
         var array = arguments.putArray("tab_ids");
         for (String id : ids) {
-            array.add(id);
+            array.add(id == null ? "T" + array.size() : id);
         }
         return arguments;
     }

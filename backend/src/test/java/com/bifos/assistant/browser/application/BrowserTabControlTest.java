@@ -144,10 +144,13 @@ class BrowserTabControlTest {
     void rejectsNonPublicAddresses() {
         for (String url : List.of("file:///etc/passwd", "javascript:alert(1)", "http://localhost:8080/", "http://intranet/",
             "http://127.0.0.1/", "http://10.0.0.5/", "http://192.168.1.1/", "http://169.254.169.254/latest", "http://[::1]/",
-            "http://[fd00::1]/", "http://printer.local/", "")) {
+            "http://[fd00::1]/", "http://printer.local/", "http://localhost./", "http://metadata.google.internal./",
+            "http://0x7f.0.0.1/", "http://0177.0.0.1/", "http://2130706433/", "http://127.1/", "")) {
             assertThatThrownBy(() -> control.open(OWNER, url)).as(url).isInstanceOf(IllegalArgumentException.class);
         }
         verify(browsers, never()).ensureRunning(anyLong());
+        BrowserTabControl.requireWebAddress("http://8.8.8.8/");
+        BrowserTabControl.requireWebAddress("https://www.example.com./path");
     }
 
 
